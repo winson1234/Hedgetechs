@@ -280,3 +280,108 @@ func HandleKlines(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error writing response to client: %v", err)
 	}
 }
+
+// In-memory cache for ticker data
+var tickerCache = gocache.New(10*time.Second, 30*time.Second)
+
+// HandleTicker fetches 24h ticker statistics from Binance API
+// Example: GET /api/v1/ticker?symbols=BTCUSDT,ETHUSDT,SOLUSDT
+func HandleTicker(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+
+	// Extract symbols parameter (comma-separated)
+	symbolsParam := q.Get("symbols")
+	if symbolsParam == "" {
+		http.Error(w, "Query parameter 'symbols' is required", http.StatusBadRequest)
+		return
+	}
+
+	// Build cache key
+	cacheKey := fmt.Sprintf("ticker-%s", symbolsParam)
+
+	// Check cache first
+	if cached, found := tickerCache.Get(cacheKey); found {
+		if tickersCached, ok := cached.([]models.TickerResponse); ok {
+			out, err := json.Marshal(tickersCached)
+			if err == nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set("X-Cache", "HIT")
+				w.WriteHeader(http.StatusOK)
+				if _, err := w.Write(out); err != nil {
+					log.Printf("Error writing cached ticker response: %v", err)
+				}
+				return
+			}
+			log.Printf("Failed to marshal cached tickers: %v", err)
+		}
+	}
+
+	// Build Binance API URL
+	binanceURL := fmt.Sprintf("%s?symbols=[\"%s\"]", config.BinanceTicker24hURL,
+		strings.ReplaceAll(symbolsParam, ",", "\",\""))
+
+	log.Printf("Fetching tickers from Binance: %s", binanceURL)
+
+	// Make the request to Binance
+	resp, err := http.Get(binanceURL)
+	if err != nil {
+		log.Printf("Error fetching tickers from Binance API: %v", err)
+		http.Error(w, "Failed to fetch data from upstream provider", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Check Binance response status
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		log.Printf("Binance API returned non-OK status %d: %s", resp.StatusCode, string(bodyBytes))
+		http.Error(w, fmt.Sprintf("Upstream provider returned status %d", resp.StatusCode), http.StatusBadGateway)
+		return
+	}
+
+	// Read and parse response
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Error reading Binance ticker response body: %v", err)
+		http.Error(w, "Failed to read upstream response", http.StatusBadGateway)
+		return
+	}
+
+	var binanceTickers []models.Binance24hTicker
+	if err := json.Unmarshal(bodyBytes, &binanceTickers); err != nil {
+		log.Printf("Error unmarshalling Binance ticker response: %v", err)
+		http.Error(w, "Failed to parse upstream response", http.StatusBadGateway)
+		return
+	}
+
+	// Convert to simplified response format
+	var tickers []models.TickerResponse
+	for _, bt := range binanceTickers {
+		tickers = append(tickers, models.TickerResponse{
+			Symbol:             bt.Symbol,
+			LastPrice:          bt.LastPrice,
+			PriceChangePercent: bt.PriceChangePercent,
+			HighPrice:          bt.HighPrice,
+			LowPrice:           bt.LowPrice,
+			Volume:             bt.Volume,
+		})
+	}
+
+	// Cache the result
+	tickerCache.Set(cacheKey, tickers, gocache.DefaultExpiration)
+
+	// Marshal and return
+	out, err := json.Marshal(tickers)
+	if err != nil {
+		log.Printf("Error marshalling ticker response: %v", err)
+		http.Error(w, "Failed to generate response", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Cache", "MISS")
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(out); err != nil {
+		log.Printf("Error writing ticker response to client: %v", err)
+	}
+}

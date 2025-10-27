@@ -12,13 +12,41 @@ type Kline = {
   volume: string
 }
 
-export default function ChartComponent() {
+type ChartComponentProps = {
+  timeframe: string
+  symbol: string
+}
+
+export default function ChartComponent({ timeframe, symbol }: ChartComponentProps) {
   const ref = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const lastBarRef = useRef<{ time: UTCTimestamp; open: number; high: number; low: number; close: number } | null>(null)
   const priceLineRef = useRef<IPriceLine | null>(null)
-  const timeframeSeconds = 3600 // 1h candles
+  
+  // Map timeframe to seconds for candle grouping
+  const getTimeframeSeconds = (tf: string): number => {
+    const timeframeSecondsMap: Record<string, number> = {
+      '1m': 60,
+      '3m': 180,
+      '5m': 300,
+      '15m': 900,
+      '30m': 1800,
+      '1h': 3600,
+      '2h': 7200,
+      '4h': 14400,
+      '6h': 21600,
+      '8h': 28800,
+      '12h': 43200,
+      '1d': 86400,
+      '3d': 259200,
+      '1w': 604800,
+      '1M': 2592000
+    }
+    return timeframeSecondsMap[tf] || 3600 // default to 1h if not found
+  }
+  const timeframeSeconds = getTimeframeSeconds(timeframe)
+  
   const ws = useContext(WebSocketContext)
   const lastMessage = ws?.lastMessage ?? null
 
@@ -43,9 +71,15 @@ export default function ChartComponent() {
       },
       timeScale: {
         borderColor: isDark ? '#334155' : '#cbd5e1',
+        timeVisible: true,
+        secondsVisible: false,
       },
       rightPriceScale: {
         borderColor: isDark ? '#334155' : '#cbd5e1',
+      },
+      localization: {
+        locale: 'en-US',
+        dateFormat: 'dd MMM',
       },
     })
     
@@ -65,8 +99,8 @@ export default function ChartComponent() {
     }
     window.addEventListener('resize', onResize)
 
-    // Fetch klines
-    fetch('/api/v1/klines?symbol=BTCUSDT&interval=1h&limit=200')
+    // Fetch klines with dynamic timeframe and symbol
+    fetch(`/api/v1/klines?symbol=${symbol}&interval=${timeframe}&limit=200`)
       .then((r) => r.json())
       .then((data: Kline[]) => {
         const formatted: CandlestickData<UTCTimestamp>[] = data.map((k) => ({
@@ -90,12 +124,19 @@ export default function ChartComponent() {
       chartRef.current?.remove()
       chartRef.current = null
     }
-  }, [])
+  }, [timeframe, symbol])
 
-  // live update handler: append/update 1h candles based on ws ticks
+  // live update handler: append/update candles based on ws ticks
+  // Filter messages to only process data for the currently selected symbol
   useEffect(() => {
     if (!lastMessage || !seriesRef.current) return
     const msg: PriceMessage = lastMessage
+    
+    // CRITICAL: Only process WebSocket messages that match the current symbol
+    if (msg.symbol !== symbol) {
+      return // Ignore messages from other symbols
+    }
+    
     const price = typeof msg.price === 'string' ? parseFloat(msg.price) : msg.price
     if (Number.isNaN(price)) return
 
@@ -140,11 +181,16 @@ export default function ChartComponent() {
       seriesRef.current.update(newBar)
       lastBarRef.current = newBar
     }
-  }, [lastMessage])
+  }, [lastMessage, timeframeSeconds, symbol])
+
+  // Format symbol for display (e.g., BTCUSDT -> BTC/USDT)
+  const displaySymbol = symbol.replace(/USDT?$/, match => `/${match}`)
 
   return (
     <div className="w-full h-full">
-      <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">BTC/USDT - 1h (last 200)</div>
+      <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+        {displaySymbol} - {timeframe} (last 200)
+      </div>
       <div ref={ref} className="w-full" />
     </div>
   )

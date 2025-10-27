@@ -63,13 +63,16 @@ func StreamTrades(h *hub.Hub) {
 				break
 			}
 
-			// Parse the incoming Binance trade message
-			var tradeMsg models.BinanceTradeMessage
-			err = json.Unmarshal(message, &tradeMsg)
+			// Parse the combined stream wrapper message
+			var combinedMsg CombinedStreamMessage
+			err = json.Unmarshal(message, &combinedMsg)
 			if err != nil {
-				log.Println("Binance JSON Unmarshal error:", err, string(message))
+				log.Println("Binance combined stream JSON Unmarshal error:", err, string(message))
 				continue // Skip malformed messages
 			}
+
+			// Extract the trade data from the wrapper
+			tradeMsg := combinedMsg.Data
 
 			// Ensure it's a trade event (though the stream should only send trades)
 			if tradeMsg.EventType == "trade" {

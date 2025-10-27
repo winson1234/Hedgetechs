@@ -26,6 +26,8 @@ func main() {
 	})
 	// REST handler for klines
 	http.HandleFunc(config.KlinesAPIPath, api.HandleKlines)
+	// REST handler for 24h ticker data
+	http.HandleFunc(config.TickerAPIPath, api.HandleTicker)
 
 	// Start the local HTTP server
 	log.Fatal(http.ListenAndServe(config.LocalServerAddress, nil))

@@ -9,6 +9,17 @@ import Header from './components/Header'
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [activeTimeframe, setActiveTimeframe] = useState('1h')
+  const [showCustomInterval, setShowCustomInterval] = useState(false)
+  const [customInterval, setCustomInterval] = useState('')
+  const [activeInstrument, setActiveInstrument] = useState('BTCUSDT')
+
+  const handleCustomIntervalSubmit = () => {
+    if (customInterval.trim()) {
+      setActiveTimeframe(customInterval.trim())
+      setShowCustomInterval(false)
+      setCustomInterval('')
+    }
+  }
 
   // read persisted preference on mount
   React.useEffect(() => {
@@ -78,6 +89,43 @@ export default function App() {
                     >
                       1d
                     </button>
+                    
+                    {/* Custom interval button/input */}
+                    {!showCustomInterval ? (
+                      <button 
+                        onClick={() => setShowCustomInterval(true)}
+                        className="px-3 py-1.5 text-sm font-medium rounded text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition border border-slate-300 dark:border-slate-700"
+                      >
+                        Custom
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={customInterval}
+                          onChange={(e) => setCustomInterval(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleCustomIntervalSubmit()}
+                          placeholder="e.g., 15m, 1w"
+                          className="px-2 py-1 text-sm border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-24"
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleCustomIntervalSubmit}
+                          className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 transition"
+                        >
+                          OK
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowCustomInterval(false)
+                            setCustomInterval('')
+                          }}
+                          className="px-2 py-1 text-xs font-medium rounded text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 text-sm font-medium text-slate-500 dark:text-slate-400">
                     <button className="hover:text-slate-700 dark:hover:text-slate-200 transition">Indicators</button>
@@ -87,12 +135,12 @@ export default function App() {
 
                 {/* Live price display */}
                 <div className="mb-5">
-                  <LivePriceDisplay />
+                  <LivePriceDisplay symbol={activeInstrument} />
                 </div>
 
                 {/* Chart */}
                 <div className="h-[500px]">
-                  <ChartComponent />
+                  <ChartComponent timeframe={activeTimeframe} symbol={activeInstrument} />
                 </div>
               </div>
             </div>
@@ -106,7 +154,10 @@ export default function App() {
 
               {/* Instruments panel */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
-                <InstrumentsPanel />
+                <InstrumentsPanel 
+                  activeInstrument={activeInstrument}
+                  onInstrumentChange={setActiveInstrument}
+                />
               </div>
 
               {/* News panel */}

@@ -1,31 +1,45 @@
-import React from 'react'
+import React, { useState } from 'react'
 import LivePriceDisplay from './components/LivePriceDisplay'
 import ChartComponent from './components/ChartComponent'
 import TradePanel from './components/TradePanel'
 import InstrumentsPanel from './components/InstrumentsPanel'
 import NewsPanel from './components/NewsPanel'
+import Header from './components/Header'
 
 export default function App() {
+  const [isDarkMode, setIsDarkMode] = useState(true)
+
+  // read persisted preference on mount
+  React.useEffect(() => {
+    try {
+      const v = localStorage.getItem('isDarkMode')
+      if (v !== null) setIsDarkMode(v === 'true')
+      else {
+        const prefers = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        setIsDarkMode(Boolean(prefers))
+      }
+    } catch (e) {
+      // ignore errors reading theme preference
+    }
+  }, [])
+
+  // persist on change
+  React.useEffect(() => {
+    try { localStorage.setItem('isDarkMode', String(isDarkMode)) } catch (e) {
+      // ignore write errors (e.g., blocked storage)
+    }
+  }, [isDarkMode])
+
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className={isDarkMode ? 'dark' : ''}>
+      <div className="min-h-screen bg-slate-900 text-slate-200 p-4">
       {/* Top bar */}
-      <div className="max-w-[1200px] mx-auto mb-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Brokerage Market Data (Dev)</h1>
-            <div className="text-sm text-gray-600">Prototype dashboard</div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-sm text-gray-700">Balance: <span className="font-medium">0.00 USD</span></div>
-            <button className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm">Deposit</button>
-          </div>
-        </div>
-      </div>
+      <Header isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
 
       {/* Main content area */}
       <div className="max-w-[1200px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left: Chart and toolbar */}
-        <div className="lg:col-span-8 bg-white rounded-md shadow p-4">
+          <div className="lg:col-span-8 bg-white dark:bg-slate-800 rounded-lg ring-1 ring-inset ring-slate-700 dark:ring-slate-700 shadow-sm p-4 text-slate-900 dark:text-slate-200">
           {/* Chart toolbar placeholder */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -51,17 +65,18 @@ export default function App() {
 
         {/* Right: side panels */}
         <div className="lg:col-span-4 flex flex-col gap-4">
-          <div className="bg-white rounded-md shadow p-3">
+          <div className="bg-white dark:bg-slate-800 rounded-lg ring-1 ring-inset ring-slate-700 shadow-sm p-4 text-slate-900 dark:text-slate-200">
             <TradePanel />
           </div>
-          <div className="bg-white rounded-md shadow p-3">
+          <div className="bg-white dark:bg-slate-800 rounded-lg ring-1 ring-inset ring-slate-700 shadow-sm p-4 text-slate-900 dark:text-slate-200">
             <InstrumentsPanel />
           </div>
-          <div className="bg-white rounded-md shadow p-3">
+          <div className="bg-white dark:bg-slate-800 rounded-lg ring-1 ring-inset ring-slate-700 shadow-sm p-4 text-slate-900 dark:text-slate-200">
             <NewsPanel />
           </div>
         </div>
       </div>
+    </div>
     </div>
   )
 }

@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -388,7 +389,7 @@ func HandleTicker(w http.ResponseWriter, r *http.Request) {
 }
 
 // --- News Cache ---
-var newsCache = gocache.New(5*time.Minute, 10*time.Minute)
+var newsCache = gocache.New(2*time.Minute, 5*time.Minute)
 
 // RSS Feed Structures for Yahoo Finance
 type rssChannel struct {
@@ -542,6 +543,11 @@ func HandleNews(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("Combined news from %d sources: total %d articles", successCount, len(allArticles))
+
+	// Sort articles by publication date (newest first)
+	sort.Slice(allArticles, func(i, j int) bool {
+		return allArticles[i].PubDate.After(allArticles[j].PubDate)
+	})
 
 	// Cache the result
 	newsCache.Set(cacheKey, allArticles, gocache.DefaultExpiration)

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 
 type NewsArticle = {
   title: string
@@ -26,6 +26,7 @@ export default function NewsPanel() {
   const [readArticles, setReadArticles] = useState<Set<string>>(new Set())
   const [lastFetchTime, setLastFetchTime] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState(0)
+  const previousArticlesRef = useRef<NewsArticle[]>([])
 
   useEffect(() => {
     const fetchNews = async () => {
@@ -38,12 +39,16 @@ export default function NewsPanel() {
         
         // Mark new articles as unread (if this is not the first fetch)
         if (lastFetchTime > 0) {
-          // Articles published after last fetch are considered new
-          data.articles.forEach(article => {
-            const articleTime = new Date(article.pubDate).getTime()
-            if (articleTime > lastFetchTime) {
-              // These are new articles, don't add to readArticles
-            }
+          // Keep existing read articles as read
+          // New articles (not in previous articles list) will automatically be unread
+          const previousArticles = previousArticlesRef.current
+          setReadArticles(prev => {
+            const newReadArticles = new Set(prev)
+            // Mark all previously loaded articles as read
+            previousArticles.forEach(article => {
+              newReadArticles.add(article.guid || article.link)
+            })
+            return newReadArticles
           })
         } else {
           // First load - mark all as read after 2 seconds
@@ -53,6 +58,8 @@ export default function NewsPanel() {
           }, 2000)
         }
         
+        // Update ref with new articles for next fetch
+        previousArticlesRef.current = data.articles
         setArticles(data.articles)
         setLastFetchTime(Date.now())
         setLoading(false)
@@ -64,8 +71,8 @@ export default function NewsPanel() {
     }
 
     fetchNews()
-    // Refresh news every 5 minutes
-    const interval = setInterval(fetchNews, 5 * 60 * 1000)
+    // Refresh news every 2 minutes
+    const interval = setInterval(fetchNews, 2 * 60 * 1000)
     return () => clearInterval(interval)
   }, [lastFetchTime])
 

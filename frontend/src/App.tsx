@@ -153,15 +153,15 @@ export default function App() {
               </div>
 
               {/* Instruments panel - Fixed height */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[290px] overflow-y-auto">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[250px] overflow-y-auto">
                 <InstrumentsPanel 
                   activeInstrument={activeInstrument}
                   onInstrumentChange={setActiveInstrument}
                 />
               </div>
 
-              {/* News panel - Same height as chart (720px) */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[470px]">
+              {/* News panel - Fixed height */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[510px]">
                 <NewsPanel />
               </div>
             </div>

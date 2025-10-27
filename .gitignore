@@ -1,0 +1,28 @@
+# Environment
+.env
+
+# Go
+/bin/
+/vendor/
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.turbo/
+frontend/.cache/
+
+# Editors
+.vscode/
+.idea/
+.github/copilot-instructions.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Build artifacts
+*.exe

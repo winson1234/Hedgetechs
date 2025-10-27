@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useContext } from 'react'
-import { createChart, IChartApi, ISeriesApi, UTCTimestamp, CandlestickData } from 'lightweight-charts'
+import { createChart, IChartApi, ISeriesApi, UTCTimestamp, CandlestickData, IPriceLine } from 'lightweight-charts'
 import { WebSocketContext } from '../context/WebSocketContext'
 import type { PriceMessage } from '../hooks/useWebSocket'
 
@@ -17,14 +17,46 @@ export default function ChartComponent() {
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const lastBarRef = useRef<{ time: UTCTimestamp; open: number; high: number; low: number; close: number } | null>(null)
+  const priceLineRef = useRef<IPriceLine | null>(null)
   const timeframeSeconds = 3600 // 1h candles
   const ws = useContext(WebSocketContext)
   const lastMessage = ws?.lastMessage ?? null
 
   useEffect(() => {
     if (!ref.current) return
-    chartRef.current = createChart(ref.current, { width: ref.current.clientWidth, height: 400 })
-    seriesRef.current = chartRef.current.addCandlestickSeries()
+    
+    const isDark = document.documentElement.classList.contains('dark')
+    
+    chartRef.current = createChart(ref.current, { 
+      width: ref.current.clientWidth, 
+      height: 480,
+      layout: {
+        background: { color: 'transparent' },
+        textColor: isDark ? '#94a3b8' : '#64748b',
+      },
+      grid: {
+        vertLines: { color: isDark ? '#1e293b' : '#e2e8f0' },
+        horzLines: { color: isDark ? '#1e293b' : '#e2e8f0' },
+      },
+      crosshair: {
+        mode: 1,
+      },
+      timeScale: {
+        borderColor: isDark ? '#334155' : '#cbd5e1',
+      },
+      rightPriceScale: {
+        borderColor: isDark ? '#334155' : '#cbd5e1',
+      },
+    })
+    
+    seriesRef.current = chartRef.current.addCandlestickSeries({
+      upColor: '#10b981',
+      downColor: '#ef4444',
+      borderUpColor: '#10b981',
+      borderDownColor: '#ef4444',
+      wickUpColor: '#10b981',
+      wickDownColor: '#ef4444',
+    })
 
     const onResize = () => {
       if (chartRef.current && ref.current) {
@@ -67,6 +99,24 @@ export default function ChartComponent() {
     const price = typeof msg.price === 'string' ? parseFloat(msg.price) : msg.price
     if (Number.isNaN(price)) return
 
+    // Update price line
+    if (priceLineRef.current) {
+      seriesRef.current.removePriceLine(priceLineRef.current)
+    }
+    
+    // Determine color based on last bar
+    const isUp = lastBarRef.current ? price >= lastBarRef.current.close : true
+    const lineColor = isUp ? '#10b981' : '#ef4444'
+    
+    priceLineRef.current = seriesRef.current.createPriceLine({
+      price: price,
+      color: lineColor,
+      lineWidth: 2,
+      lineStyle: 2, // dashed
+      axisLabelVisible: true,
+      title: '',
+    })
+
     // compute candle time (UTCTimestamp in seconds)
     const tickSec = Math.floor(msg.time / 1000)
     const candleTime = (Math.floor(tickSec / timeframeSeconds) * timeframeSeconds) as UTCTimestamp
@@ -86,16 +136,16 @@ export default function ChartComponent() {
       lastBarRef.current = updated
     } else {
       // new candle: create candle with open=close=price
-  const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
-  seriesRef.current.update(newBar)
-  lastBarRef.current = newBar
+      const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
+      seriesRef.current.update(newBar)
+      lastBarRef.current = newBar
     }
   }, [lastMessage])
 
   return (
-    <div className="p-4 bg-white rounded shadow">
-      <div className="text-sm text-gray-500 mb-2">BTC/USDT - 1h (last 200)</div>
-      <div ref={ref} />
+    <div className="w-full h-full">
+      <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">BTC/USDT - 1h (last 200)</div>
+      <div ref={ref} className="w-full" />
     </div>
   )
 }

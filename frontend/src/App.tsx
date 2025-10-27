@@ -8,6 +8,7 @@ import Header from './components/Header'
 
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(true)
+  const [activeTimeframe, setActiveTimeframe] = useState('1h')
 
   // read persisted preference on mount
   React.useEffect(() => {
@@ -32,51 +33,90 @@ export default function App() {
 
   return (
     <div className={isDarkMode ? 'dark' : ''}>
-      <div className="min-h-screen bg-slate-900 text-slate-200 p-4">
-      {/* Top bar */}
-      <Header isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+        {/* Top bar */}
+        <Header isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
 
-      {/* Main content area */}
-      <div className="max-w-[1200px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left: Chart and toolbar */}
-          <div className="lg:col-span-8 bg-white dark:bg-slate-800 rounded-lg ring-1 ring-inset ring-slate-700 dark:ring-slate-700 shadow-sm p-4 text-slate-900 dark:text-slate-200">
-          {/* Chart toolbar placeholder */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="text-sm font-medium">Timeframe:</div>
-              <div className="bg-gray-100 px-2 py-1 rounded text-sm">1h</div>
-              <div className="bg-gray-100 px-2 py-1 rounded text-sm">4h</div>
-              <div className="bg-gray-100 px-2 py-1 rounded text-sm">1d</div>
+        {/* Main content area - full width with internal padding */}
+        <div className="px-4 py-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Left + Center: Chart area (2 columns) */}
+            <div className="lg:col-span-2">
+              {/* Chart panel */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
+                {/* Timeframe selector */}
+                <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Timeframe:</span>
+                    <button 
+                      onClick={() => setActiveTimeframe('1h')}
+                      className={`px-3 py-1.5 text-sm font-medium rounded transition ${
+                        activeTimeframe === '1h' 
+                          ? 'bg-indigo-600 text-white shadow-sm' 
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      1h
+                    </button>
+                    <button 
+                      onClick={() => setActiveTimeframe('4h')}
+                      className={`px-3 py-1.5 text-sm font-medium rounded transition ${
+                        activeTimeframe === '4h' 
+                          ? 'bg-indigo-600 text-white shadow-sm' 
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      4h
+                    </button>
+                    <button 
+                      onClick={() => setActiveTimeframe('1d')}
+                      className={`px-3 py-1.5 text-sm font-medium rounded transition ${
+                        activeTimeframe === '1d' 
+                          ? 'bg-indigo-600 text-white shadow-sm' 
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      1d
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm font-medium text-slate-500 dark:text-slate-400">
+                    <button className="hover:text-slate-700 dark:hover:text-slate-200 transition">Indicators</button>
+                    <button className="hover:text-slate-700 dark:hover:text-slate-200 transition">Compare</button>
+                  </div>
+                </div>
+
+                {/* Live price display */}
+                <div className="mb-5">
+                  <LivePriceDisplay />
+                </div>
+
+                {/* Chart */}
+                <div className="h-[500px]">
+                  <ChartComponent />
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <div>Indicators</div>
-              <div>Compare</div>
+
+            {/* Right: side panels (1 column) */}
+            <div className="space-y-4">
+              {/* Trade panel */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
+                <TradePanel />
+              </div>
+
+              {/* Instruments panel */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
+                <InstrumentsPanel />
+              </div>
+
+              {/* News panel */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
+                <NewsPanel />
+              </div>
             </div>
-          </div>
-
-          {/* Live price + chart */}
-          <div className="mb-4">
-            <LivePriceDisplay />
-          </div>
-          <div className="h-[480px]">
-            <ChartComponent />
-          </div>
-        </div>
-
-        {/* Right: side panels */}
-        <div className="lg:col-span-4 flex flex-col gap-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg ring-1 ring-inset ring-slate-700 shadow-sm p-4 text-slate-900 dark:text-slate-200">
-            <TradePanel />
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-lg ring-1 ring-inset ring-slate-700 shadow-sm p-4 text-slate-900 dark:text-slate-200">
-            <InstrumentsPanel />
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-lg ring-1 ring-inset ring-slate-700 shadow-sm p-4 text-slate-900 dark:text-slate-200">
-            <NewsPanel />
           </div>
         </div>
       </div>
-    </div>
     </div>
   )
 }

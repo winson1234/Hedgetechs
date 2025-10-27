@@ -5,6 +5,7 @@ import (
 	"brokerageProject/internal/hub" // Import local hub package
 	"brokerageProject/internal/models"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"log"
@@ -384,4 +385,212 @@ func HandleTicker(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write(out); err != nil {
 		log.Printf("Error writing ticker response to client: %v", err)
 	}
+}
+
+// --- News Cache ---
+var newsCache = gocache.New(5*time.Minute, 10*time.Minute)
+
+// RSS Feed Structures for Yahoo Finance
+type rssChannel struct {
+	Title string    `xml:"title"`
+	Items []rssItem `xml:"item"`
+}
+
+type rssItem struct {
+	Title       string `xml:"title"`
+	Link        string `xml:"link"`
+	PubDate     string `xml:"pubDate"`
+	Description string `xml:"description"`
+	GUID        string `xml:"guid"`
+}
+
+type rssFeed struct {
+	Channel rssChannel `xml:"channel"`
+}
+
+// HandleNews fetches and caches news from Yahoo Finance RSS feed
+func HandleNews(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Add CORS headers for frontend
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET")
+
+	// Check cache first
+	cacheKey := "yahoo-finance-news"
+	if cached, found := newsCache.Get(cacheKey); found {
+		if articles, ok := cached.([]models.NewsArticle); ok {
+			// Return cached data
+			response := models.NewsResponse{
+				Articles: articles,
+				Count:    len(articles),
+			}
+			out, err := json.Marshal(response)
+			if err != nil {
+				log.Printf("Error marshalling cached news response: %v", err)
+				http.Error(w, "Failed to generate response", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Cache", "HIT")
+			w.WriteHeader(http.StatusOK)
+			w.Write(out)
+			return
+		}
+	}
+
+	// Try multiple RSS feed sources and combine results from all successful sources
+	feedURLs := []struct {
+		url    string
+		source string
+	}{
+		{config.CoinDeskRSSURL, "CoinDesk"},
+		{config.CryptoNewsRSSURL, "CryptoNews"},
+		{config.CoinTelegraphRSSURL, "CoinTelegraph"},
+		{config.FXStreetRSSURL, "FXStreet"},
+		{config.InvestingComForexRSSURL, "Investing.com"},
+		{config.YahooFinanceForexRSSURL, "Yahoo Finance"},
+	}
+
+	var allArticles []models.NewsArticle
+	successCount := 0
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	// Try each feed URL and collect all successful results
+	for _, feedInfo := range feedURLs {
+		req, err := http.NewRequest("GET", feedInfo.url, nil)
+		if err != nil {
+			log.Printf("Error creating request for %s RSS: %v", feedInfo.source, err)
+			continue
+		}
+
+		// Add headers to mimic a browser request
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+		req.Header.Set("Accept", "application/rss+xml, application/xml, text/xml, */*")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("Error fetching %s RSS: %v", feedInfo.source, err)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("%s RSS returned status %d", feedInfo.source, resp.StatusCode)
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			maxLen := 500
+			if len(bodyBytes) < maxLen {
+				maxLen = len(bodyBytes)
+			}
+			log.Printf("Response body: %s", string(bodyBytes[:maxLen]))
+			continue
+		}
+
+		// Read response body
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			log.Printf("Error reading %s RSS response: %v", feedInfo.source, err)
+			continue
+		}
+
+		// Try to parse RSS XML
+		var feed rssFeed
+		if err := parseXML(body, &feed); err != nil {
+			log.Printf("Error parsing %s RSS XML: %v", feedInfo.source, err)
+			continue
+		}
+
+		// Success! Convert and add articles from this source
+		log.Printf("Successfully fetched news from %s (%d articles)", feedInfo.source, len(feed.Channel.Items))
+		successCount++
+
+		for _, item := range feed.Channel.Items {
+			// Parse pubDate (RFC1123 format: "Mon, 02 Jan 2006 15:04:05 MST")
+			pubDate, err := time.Parse(time.RFC1123, item.PubDate)
+			if err != nil {
+				// Try RFC1123Z if RFC1123 fails
+				pubDate, err = time.Parse(time.RFC1123Z, item.PubDate)
+				if err != nil {
+					log.Printf("Error parsing pubDate '%s': %v", item.PubDate, err)
+					pubDate = time.Now() // fallback to current time
+				}
+			}
+
+			allArticles = append(allArticles, models.NewsArticle{
+				Title:       item.Title,
+				Link:        item.Link,
+				Description: stripHTMLTags(item.Description),
+				PubDate:     pubDate,
+				Source:      feedInfo.source,
+				GUID:        item.GUID,
+			})
+		}
+	}
+
+	// If all sources failed, return error
+	if successCount == 0 {
+		log.Printf("All news feed sources failed")
+		http.Error(w, "Failed to fetch news from all sources", http.StatusBadGateway)
+		return
+	}
+
+	log.Printf("Combined news from %d sources: total %d articles", successCount, len(allArticles))
+
+	// Cache the result
+	newsCache.Set(cacheKey, allArticles, gocache.DefaultExpiration)
+
+	// Return response
+	response := models.NewsResponse{
+		Articles: allArticles,
+		Count:    len(allArticles),
+	}
+	out, err := json.Marshal(response)
+	if err != nil {
+		log.Printf("Error marshalling news response: %v", err)
+		http.Error(w, "Failed to generate response", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Cache", "MISS")
+	w.WriteHeader(http.StatusOK)
+	w.Write(out)
+}
+
+// parseXML parses XML data using encoding/xml from stdlib
+func parseXML(data []byte, v interface{}) error {
+	return xml.Unmarshal(data, v)
+}
+
+// stripHTMLTags removes HTML tags from description
+func stripHTMLTags(s string) string {
+	// Simple HTML tag removal - replace common tags
+	s = strings.ReplaceAll(s, "<p>", "")
+	s = strings.ReplaceAll(s, "</p>", " ")
+	s = strings.ReplaceAll(s, "<br>", " ")
+	s = strings.ReplaceAll(s, "<br/>", " ")
+	s = strings.ReplaceAll(s, "<br />", " ")
+	s = strings.ReplaceAll(s, "&nbsp;", " ")
+	s = strings.ReplaceAll(s, "&amp;", "&")
+	s = strings.ReplaceAll(s, "&lt;", "<")
+	s = strings.ReplaceAll(s, "&gt;", ">")
+	s = strings.ReplaceAll(s, "&quot;", "\"")
+	// Remove any remaining tags
+	for strings.Contains(s, "<") && strings.Contains(s, ">") {
+		start := strings.Index(s, "<")
+		end := strings.Index(s, ">")
+		if start < end {
+			s = s[:start] + s[end+1:]
+		} else {
+			break
+		}
+	}
+	return strings.TrimSpace(s)
 }

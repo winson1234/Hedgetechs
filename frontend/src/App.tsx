@@ -138,8 +138,8 @@ export default function App() {
                   <LivePriceDisplay symbol={activeInstrument} />
                 </div>
 
-                {/* Chart */}
-                <div className="h-[500px]">
+                {/* Chart - Height calculated to match sidebar total */}
+                <div className="h-[720px]">
                   <ChartComponent timeframe={activeTimeframe} symbol={activeInstrument} />
                 </div>
               </div>
@@ -147,21 +147,21 @@ export default function App() {
 
             {/* Right: side panels (1 column) */}
             <div className="space-y-4">
-              {/* Trade panel */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
+              {/* Trade panel - Fixed height */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[190px] overflow-y-auto">
                 <TradePanel />
               </div>
 
-              {/* Instruments panel */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
+              {/* Instruments panel - Fixed height */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[290px] overflow-y-auto">
                 <InstrumentsPanel 
                   activeInstrument={activeInstrument}
                   onInstrumentChange={setActiveInstrument}
                 />
               </div>
 
-              {/* News panel */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
+              {/* News panel - Same height as chart (720px) */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[470px]">
                 <NewsPanel />
               </div>
             </div>

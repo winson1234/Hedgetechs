@@ -6,6 +6,8 @@ import InstrumentsPanel from './components/InstrumentsPanel'
 import NewsPanel from './components/NewsPanel'
 import Header from './components/Header'
 import OrderBookPanel from './components/OrderBookPanel'
+import LeftToolbar from './components/LeftToolbar'
+import AnalyticsPanel from './components/AnalyticsPanel'
 
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(true)
@@ -13,6 +15,22 @@ export default function App() {
   const [showCustomInterval, setShowCustomInterval] = useState(false)
   const [customInterval, setCustomInterval] = useState('')
   const [activeInstrument, setActiveInstrument] = useState('BTCUSDT')
+  const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false)
+  const [activeTool, setActiveTool] = useState<string | null>(null)
+
+  const handleToolSelect = (toolId: string | null) => {
+    setActiveTool(toolId)
+    if (toolId === 'alpha-vantage') {
+      setShowAnalyticsPanel(true)
+    } else {
+      setShowAnalyticsPanel(false)
+    }
+  }
+
+  const handleAnalyticsPanelClose = () => {
+    setShowAnalyticsPanel(false)
+    setActiveTool(null) // Clear the toolbar highlight when panel closes
+  }
 
   const handleCustomIntervalSubmit = () => {
     if (customInterval.trim()) {
@@ -49,8 +67,18 @@ export default function App() {
         {/* Top bar */}
         <Header isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
 
-        {/* Main content area - full width with internal padding */}
-        <div className="px-4 py-4">
+        {/* Left Toolbar */}
+        <LeftToolbar onToolSelect={handleToolSelect} activeTool={activeTool} />
+
+        {/* Analytics Panel */}
+        <AnalyticsPanel
+          isOpen={showAnalyticsPanel}
+          onClose={handleAnalyticsPanelClose}
+          symbol={activeInstrument}
+        />
+
+        {/* Main content area - with left margin for toolbar + gap */}
+        <div className="ml-14 px-4 py-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Left + Center: Chart area (2 columns) */}
             <div className="lg:col-span-2">

@@ -7,7 +7,7 @@ type Props = {
 
 export default function Header({ isDarkMode, setIsDarkMode }: Props) {
   return (
-    <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3">
+    <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">Brokerage Market Data</div>

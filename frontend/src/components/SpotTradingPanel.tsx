@@ -37,22 +37,25 @@ export default function SpotTradingPanel({ activeInstrument }: SpotTradingPanelP
         const price = typeof msg.price === 'string' ? parseFloat(msg.price) : msg.price
         if (!isNaN(price)) {
           setCurrentPrice(price)
-          // Auto-fill limit price with current price if empty
-          if (orderType === 'limit' && !limitPrice) {
-            setLimitPrice(price.toFixed(2))
-          }
         }
       }
     }
-  }, [lastMessage, activeInstrument, orderType, limitPrice])
+  }, [lastMessage, activeInstrument])
   
-  // Reset form when instrument changes
+  // Initialize limit price when instrument changes or when first price is received
   useEffect(() => {
-    setLimitPrice(currentPrice > 0 ? currentPrice.toFixed(2) : '')
+    if (currentPrice > 0 && !limitPrice) {
+      setLimitPrice(currentPrice.toFixed(2))
+    }
+  }, [currentPrice, limitPrice])
+  
+  // Reset form ONLY when instrument changes
+  useEffect(() => {
+    setLimitPrice('')
     setStopPrice('')
     setAmount('')
     setPercentage(0)
-  }, [activeInstrument, currentPrice])
+  }, [activeInstrument])
   
   // Calculate total
   const getTotal = (): string => {

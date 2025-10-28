@@ -128,9 +128,6 @@ export default function SpotTradingPanel({ activeInstrument }: SpotTradingPanelP
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Spot Trading</h3>
-        <div className="text-xs text-slate-500 dark:text-slate-400">
-          Avbl: <span className="font-medium text-slate-700 dark:text-slate-300">{balance.toLocaleString()} {quoteCurrency}</span>
-        </div>
       </div>
       
       {/* Order Type Tabs */}
@@ -256,6 +253,9 @@ export default function SpotTradingPanel({ activeInstrument }: SpotTradingPanelP
             </span>
           </div>
         </div>
+        
+        {/* Spacer for Limit and Market orders to balance with Stop-Limit */}
+        {orderType !== 'stop-limit' && <div className="flex-2"></div>}
         
         {/* Buy/Sell Buttons */}
         <div className="grid grid-cols-2 gap-2 pt-2">

@@ -11,7 +11,6 @@ export default function Header({ isDarkMode, setIsDarkMode }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">Brokerage Market Data</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">REAL #1812761287</div>
         </div>
 
         <div className="flex items-center gap-4">

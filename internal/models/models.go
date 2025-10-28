@@ -22,9 +22,11 @@ type BinanceTradeMessage struct {
 
 // PriceUpdateMessage represents the simplified message sent to frontend clients.
 type PriceUpdateMessage struct {
-	Symbol string `json:"symbol"`
-	Price  string `json:"price"`
-	Time   int64  `json:"time"` // Use Binance's trade time
+	Symbol       string `json:"symbol"`
+	Price        string `json:"price"`
+	Time         int64  `json:"time"`                   // Use Binance's trade time
+	Quantity     string `json:"quantity,omitempty"`     // Trade quantity
+	IsBuyerMaker bool   `json:"isBuyerMaker,omitempty"` // Is buyer the market maker (for trade direction)
 }
 
 // Kline represents a single candlestick data point (OHLCV) from Binance REST API.
@@ -45,4 +47,21 @@ type Kline struct {
 	TakerBuyBaseVol  string `json:"takerBuyBaseAssetVolume"`
 	TakerBuyQuoteVol string `json:"takerBuyQuoteAssetVolume"`
 	Ignore           string `json:"ignore"`
+}
+
+// --- Order Book Structures ---
+
+// BinanceDepthMessage represents the structure of depth (order book) updates from Binance WebSocket
+// Ref: https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md#partial-book-depth-streams
+type BinanceDepthMessage struct {
+	LastUpdateID int64      `json:"lastUpdateId"`
+	Bids         [][]string `json:"bids"` // [price, quantity]
+	Asks         [][]string `json:"asks"` // [price, quantity]
+}
+
+// OrderBookUpdate represents the message sent to frontend clients
+type OrderBookUpdate struct {
+	Symbol string     `json:"symbol"`
+	Bids   [][]string `json:"bids"` // [price, quantity]
+	Asks   [][]string `json:"asks"` // [price, quantity]
 }

@@ -6,6 +6,9 @@ package config
 // Binance combined streams WebSocket URL for multiple symbols
 // Format: wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@trade/solusdt@trade/eurusdt@trade
 const BinanceWebSocketURL = "wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@trade/solusdt@trade/eurusdt@trade"
+
+// Binance order book depth stream URL (use with symbol, e.g., btcusdt@depth20@100ms)
+const BinanceDepthStreamURL = "wss://stream.binance.com:9443/stream?streams=btcusdt@depth20@100ms/ethusdt@depth20@100ms/solusdt@depth20@100ms/eurusdt@depth20@100ms"
 const BinanceRestURL = "https://api.binance.com/api/v3/klines"
 const BinanceTicker24hURL = "https://api.binance.com/api/v3/ticker/24hr"
 

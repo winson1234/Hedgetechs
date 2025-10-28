@@ -15,14 +15,22 @@ export default function LivePriceDisplay({ symbol }: LivePriceDisplayProps) {
 
   useEffect(() => {
     if (!lastMessage) return
-    const msg: PriceMessage = lastMessage
     
-    // CRITICAL: Only process WebSocket messages that match the current symbol
+    // CRITICAL: Check if this is a trade message (has 'price' field, not order book)
+    if (!('price' in lastMessage)) {
+      return // Ignore order book messages
+    }
+    
+    const msg: PriceMessage = lastMessage as PriceMessage
+    
+    // Only process WebSocket messages that match the current symbol
     if (msg.symbol !== symbol) {
       return // Ignore messages from other symbols
     }
     
     const p = parseFloat(String(msg.price))
+    if (isNaN(p)) return // Skip invalid prices
+    
     // store previous value from ref, then update
     setPrev(priceRef.current)
     setPrice(p)

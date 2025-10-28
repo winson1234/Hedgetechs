@@ -18,6 +18,8 @@ func main() {
 
 	// Start listening to the Binance stream and pass messages to the hub
 	go binance.StreamTrades(h)
+	// Start listening to the Binance depth stream for order book data
+	go binance.StreamDepth(h)
 
 	// Configure the HTTP server
 	// WebSocket handler uses the hub instance

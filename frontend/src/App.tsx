@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import LivePriceDisplay from './components/LivePriceDisplay'
 import ChartComponent from './components/ChartComponent'
-import TradePanel from './components/TradePanel'
+import SpotTradingPanel from './components/SpotTradingPanel'
 import InstrumentsPanel from './components/InstrumentsPanel'
 import NewsPanel from './components/NewsPanel'
 import Header from './components/Header'
+import OrderBookPanel from './components/OrderBookPanel'
 
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(true)
@@ -138,21 +139,26 @@ export default function App() {
                   <LivePriceDisplay symbol={activeInstrument} />
                 </div>
 
-                {/* Chart - Height calculated to match sidebar total */}
-                <div className="h-[720px]">
+                {/* Chart - Market standard 60% of left column */}
+                <div className="h-[550px]">
                   <ChartComponent timeframe={activeTimeframe} symbol={activeInstrument} />
                 </div>
               </div>
+
+              {/* Order Book Panel - Market standard 40% of left column */}
+              <div className="mt-4 h-[440px]">
+                <OrderBookPanel activeInstrument={activeInstrument} />
+              </div>
             </div>
 
-            {/* Right: side panels (1 column) */}
+            {/* Right: side panels (1 column) - Optimized for full space utilization */}
             <div className="space-y-4">
-              {/* Trade panel - Fixed height */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[190px] overflow-y-auto">
-                <TradePanel />
+              {/* Spot Trading panel - Binance-style with tabs */}
+              <div className="h-[480px]">
+                <SpotTradingPanel activeInstrument={activeInstrument} />
               </div>
 
-              {/* Instruments panel - Fixed height */}
+              {/* Instruments panel - Compact */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[250px] overflow-y-auto">
                 <InstrumentsPanel 
                   activeInstrument={activeInstrument}
@@ -160,7 +166,7 @@ export default function App() {
                 />
               </div>
 
-              {/* News panel - Fixed height */}
+              {/* News panel - Expanded to fill remaining space */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[510px]">
                 <NewsPanel />
               </div>

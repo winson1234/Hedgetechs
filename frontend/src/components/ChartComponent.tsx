@@ -121,8 +121,18 @@ export default function ChartComponent({ timeframe, symbol }: ChartComponentProp
 
     return () => {
       window.removeEventListener('resize', onResize)
+      if (priceLineRef.current && seriesRef.current) {
+        try {
+          seriesRef.current.removePriceLine(priceLineRef.current)
+        } catch (e) {
+          // ignore if already disposed
+        }
+      }
       chartRef.current?.remove()
       chartRef.current = null
+      seriesRef.current = null
+      priceLineRef.current = null
+      lastBarRef.current = null
     }
   }, [timeframe, symbol])
 
@@ -138,25 +148,27 @@ export default function ChartComponent({ timeframe, symbol }: ChartComponentProp
     }
     
     const price = typeof msg.price === 'string' ? parseFloat(msg.price) : msg.price
-    if (Number.isNaN(price)) return
+    if (Number.isNaN(price) || !price) return
 
-    // Update price line
-    if (priceLineRef.current) {
-      seriesRef.current.removePriceLine(priceLineRef.current)
+    // Update price line only if we have historical data loaded
+    if (lastBarRef.current) {
+      if (priceLineRef.current) {
+        seriesRef.current.removePriceLine(priceLineRef.current)
+      }
+      
+      // Determine color based on last bar
+      const isUp = price >= lastBarRef.current.close
+      const lineColor = isUp ? '#10b981' : '#ef4444'
+      
+      priceLineRef.current = seriesRef.current.createPriceLine({
+        price: price,
+        color: lineColor,
+        lineWidth: 2,
+        lineStyle: 2, // dashed
+        axisLabelVisible: true,
+        title: '',
+      })
     }
-    
-    // Determine color based on last bar
-    const isUp = lastBarRef.current ? price >= lastBarRef.current.close : true
-    const lineColor = isUp ? '#10b981' : '#ef4444'
-    
-    priceLineRef.current = seriesRef.current.createPriceLine({
-      price: price,
-      color: lineColor,
-      lineWidth: 2,
-      lineStyle: 2, // dashed
-      axisLabelVisible: true,
-      title: '',
-    })
 
     // compute candle time (UTCTimestamp in seconds)
     const tickSec = Math.floor(msg.time / 1000)

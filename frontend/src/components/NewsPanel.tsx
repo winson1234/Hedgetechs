@@ -302,9 +302,11 @@ export default function NewsPanel() {
           <div className="space-y-2 flex-1">
             {displayedArticles.map((article, index) => {
               const unread = isUnread(article)
+              // Use combination of guid, link, and index to ensure unique keys
+              const uniqueKey = article.guid || article.link || `article-${index}-${article.title.slice(0, 20)}`
               return (
                 <div
-                  key={article.guid || index}
+                  key={uniqueKey}
                   onClick={() => handleArticleClick(article)}
                   className="group relative border border-slate-200 dark:border-slate-700 rounded-lg p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
                 >

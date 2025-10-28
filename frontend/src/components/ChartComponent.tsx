@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useContext } from 'react'
+import React, { useEffect, useRef, useContext, useState } from 'react'
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp, CandlestickData, IPriceLine } from 'lightweight-charts'
 import { WebSocketContext } from '../context/WebSocketContext'
 import type { PriceMessage } from '../hooks/useWebSocket'
@@ -17,12 +17,22 @@ type ChartComponentProps = {
   symbol: string
 }
 
+type OHLCVData = {
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
 export default function ChartComponent({ timeframe, symbol }: ChartComponentProps) {
   const ref = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const lastBarRef = useRef<{ time: UTCTimestamp; open: number; high: number; low: number; close: number } | null>(null)
   const priceLineRef = useRef<IPriceLine | null>(null)
+  const [ohlcv, setOhlcv] = useState<OHLCVData | null>(null)
+  const volumeDataRef = useRef<Map<number, number>>(new Map())
   
   // Map timeframe to seconds for candle grouping
   const getTimeframeSeconds = (tf: string): number => {
@@ -103,6 +113,13 @@ export default function ChartComponent({ timeframe, symbol }: ChartComponentProp
     fetch(`/api/v1/klines?symbol=${symbol}&interval=${timeframe}&limit=200`)
       .then((r) => r.json())
       .then((data: Kline[]) => {
+        // Store volume data
+        volumeDataRef.current.clear()
+        data.forEach((k) => {
+          const time = Math.floor(k.openTime / 1000)
+          volumeDataRef.current.set(time, parseFloat(k.volume))
+        })
+        
         const formatted: CandlestickData<UTCTimestamp>[] = data.map((k) => ({
           time: Math.floor(k.openTime / 1000) as UTCTimestamp,
           open: parseFloat(k.open),
@@ -111,10 +128,19 @@ export default function ChartComponent({ timeframe, symbol }: ChartComponentProp
           close: parseFloat(k.close)
         }))
         seriesRef.current?.setData(formatted)
-        // remember last bar
+        // remember last bar and set initial OHLCV
         if (formatted.length > 0) {
           const lb = formatted[formatted.length - 1]
           lastBarRef.current = { time: lb.time as UTCTimestamp, open: lb.open, high: lb.high, low: lb.low, close: lb.close }
+          // Set initial OHLCV display to last candle
+          const volume = volumeDataRef.current.get(lb.time as number) || 0
+          setOhlcv({
+            open: lb.open,
+            high: lb.high,
+            low: lb.low,
+            close: lb.close,
+            volume: volume
+          })
         }
       })
       .catch((err) => console.error('Failed to fetch klines:', err))
@@ -187,16 +213,44 @@ export default function ChartComponent({ timeframe, symbol }: ChartComponentProp
       // update chart and lastBarRef
       seriesRef.current.update(updated)
       lastBarRef.current = updated
+      
+      // Update OHLCV display
+      const volume = volumeDataRef.current.get(candleTime) || 0
+      setOhlcv({
+        open: updated.open,
+        high: updated.high,
+        low: updated.low,
+        close: updated.close,
+        volume: volume
+      })
     } else {
       // new candle: create candle with open=close=price
       const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
       seriesRef.current.update(newBar)
       lastBarRef.current = newBar
+      
+      // Initialize volume for new candle
+      volumeDataRef.current.set(candleTime, 0)
+      setOhlcv({
+        open: newBar.open,
+        high: newBar.high,
+        low: newBar.low,
+        close: newBar.close,
+        volume: 0
+      })
     }
   }, [lastMessage, timeframeSeconds, symbol])
 
   // Format symbol for display (e.g., BTCUSDT -> BTC/USDT)
   const displaySymbol = symbol.replace(/USDT?$/, match => `/${match}`)
+
+  // Format number with commas
+  const formatNumber = (num: number, decimals: number = 2): string => {
+    return num.toLocaleString('en-US', { 
+      minimumFractionDigits: decimals, 
+      maximumFractionDigits: decimals 
+    })
+  }
 
   return (
     <div className="w-full h-full">
@@ -204,6 +258,41 @@ export default function ChartComponent({ timeframe, symbol }: ChartComponentProp
         {displaySymbol} - {timeframe} (last 200)
       </div>
       <div ref={ref} className="w-full" />
+      
+      {ohlcv && (
+        <div className="mt-3 grid grid-cols-5 gap-3 text-sm">
+          <div className="flex flex-col">
+            <span className="text-slate-500 dark:text-slate-400 text-xs mb-1">Open</span>
+            <span className="font-medium text-slate-900 dark:text-white">
+              ${formatNumber(ohlcv.open)}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-slate-500 dark:text-slate-400 text-xs mb-1">High</span>
+            <span className="font-medium text-green-600 dark:text-green-400">
+              ${formatNumber(ohlcv.high)}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-slate-500 dark:text-slate-400 text-xs mb-1">Low</span>
+            <span className="font-medium text-red-600 dark:text-red-400">
+              ${formatNumber(ohlcv.low)}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-slate-500 dark:text-slate-400 text-xs mb-1">Close</span>
+            <span className="font-medium text-slate-900 dark:text-white">
+              ${formatNumber(ohlcv.close)}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-slate-500 dark:text-slate-400 text-xs mb-1">Volume</span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">
+              {formatNumber(ohlcv.volume, 0)}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

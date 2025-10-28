@@ -1,300 +1,132 @@
 # Brokerage Platform
 
-A real-time cryptocurrency and forex trading platform with live price updates, interactive charts, multi-source news aggregation, and market data visualization.
+Real-time cryptocurrency and forex trading platform with live charts, order books, news, and analytics.
 
 ---
 
-## Essential Commands
+## Commands
 
-### Backend (Go)
+**Backend (Go)**
 ```bash
-# Navigate to server directory
 cd cmd/server
-
-# Run the server
-go run main.go
-
-# Build the server
-go build
-
-# Run tests
-go test ./...
+go run main.go        # Run server
+go test ./...         # Run tests
 ```
 
-### Frontend (React + Vite)
+**Frontend (React)**
 ```bash
-# Navigate to frontend directory
 cd frontend
-
-# Install dependencies
-pnpm install
-
-# Start development server
-pnpm run dev
-
-# Build for production
-pnpm run build
-
-# Run linter
-pnpm run lint
-
-# Type checking
-pnpm run typecheck
+pnpm install          # Install dependencies
+pnpm run dev          # Start dev server
+pnpm run typecheck    # Type checking
 ```
 
 ---
 
-## Project Architecture
-
-The application uses a **client-server architecture** with:
-- **Backend**: Go server handling WebSocket connections, REST APIs, and external data integration
-- **Frontend**: React SPA with real-time updates via WebSocket and REST API calls
-- **Communication**: WebSocket for live price streaming, REST for historical data and news
+## Architecture
 
 ```
-┌─────────────┐         WebSocket/REST          ┌──────────────┐
-│   Frontend  │ <─────────────────────────────> │   Backend    │
-│   (React)   │                                 │   (Go)       │
-└─────────────┘                                 └──────┬───────┘
-                                                       │
-                                    ┌──────────────────┼──────────────────┐
-                                    ▼                  ▼                  ▼
-                              Binance WS          Binance API         RSS Feeds
-                              (Live Prices)       (Klines/Ticker)     (News)
+Frontend (React) <--WebSocket/REST--> Backend (Go) <--> Binance WS + API
+                                                    <--> Alpha Vantage API
+                                                    <--> RSS Feeds
 ```
 
 ---
 
-## Project Structure
+## Structure
 
 ```
-brokerageProject/
-├── cmd/
-│   └── server/
-│       └── main.go                     # Application entry point
-├── internal/
-│   ├── api/
-│   │   ├── handlers.go                 # HTTP/WebSocket handlers
-│   │   ├── handlers_test.go            # API handler tests
-│   │   └── middleware.go               # HTTP middleware
-│   ├── binance/
-│   │   ├── client.go                   # Binance WebSocket client
-│   │   └── types.go                    # Binance data types
-│   ├── config/
-│   │   └── config.go                   # Configuration constants
-│   ├── hub/
-│   │   └── hub.go                      # WebSocket hub for broadcasting
-│   ├── models/
-│   │   └── models.go                   # Data models
-│   ├── services/
-│   │   └── market_data_service.go      # Market data business logic
-│   └── utils/
-│       ├── errors.go                   # Error handling utilities
-│       └── json.go                     # JSON utilities
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── ChartComponent.tsx      # Candlestick chart
-│   │   │   ├── Header.tsx              # Top header with theme toggle
-│   │   │   ├── InstrumentsPanel.tsx    # Instruments list
-│   │   │   ├── LivePriceDisplay.tsx    # Price display
-│   │   │   ├── NewsPanel.tsx           # News feed
-│   │   │   └── TradePanel.tsx          # Trading interface
-│   │   ├── context/
-│   │   │   └── WebSocketContext.tsx    # WebSocket context provider
-│   │   ├── hooks/
-│   │   │   └── useWebSocket.tsx        # WebSocket custom hook
-│   │   ├── App.tsx                     # Main application component
-│   │   ├── main.tsx                    # React entry point
-│   │   └── index.css                   # Global styles
-│   ├── index.html
-│   ├── package.json
-│   ├── tailwind.config.cjs
-│   ├── tsconfig.json
-│   └── vite.config.ts
-├── docs/
-│   ├── BACKEND.md
-│   ├── FRONTEND.md
-├── go.mod
-└── README.md
+cmd/server/main.go                  # Server entry point
+internal/
+  ├── api/handlers.go               # HTTP/WebSocket handlers + tests
+  ├── binance/client.go             # Binance WebSocket (trades + depth)
+  ├── config/config.go              # Configuration
+  ├── hub/hub.go                    # WebSocket broadcasting
+  ├── services/                     # Alpha Vantage service
+  ├── models/models.go              # Data models
+  └── utils/                        # Utilities
+frontend/src/
+  ├── components/
+  │   ├── ChartComponent.tsx        # Candlestick chart with OHLC/Volume
+  │   ├── OrderBookPanel.tsx        # Order book + recent trades
+  │   ├── SpotTradingPanel.tsx      # Trading interface
+  │   ├── InstrumentsPanel.tsx      # Instruments list
+  │   ├── NewsPanel.tsx             # Multi-source news feed
+  │   ├── AnalyticsPanel.tsx        # Alpha Vantage analytics
+  │   ├── LeftToolbar.tsx           # Tool selector
+  │   ├── LivePriceDisplay.tsx      # Live price ticker
+  │   └── Header.tsx                # Theme toggle
+  ├── context/WebSocketContext.tsx  # WebSocket provider
+  └── App.tsx                       # Main component
 ```
 
 ---
 
 ## Tech Stack
 
-### Backend
-- **Language**: Go 1.25.3
-- **WebSocket**: gorilla/websocket v1.5.3
-- **Caching**: go-cache v2.1.0
-- **HTTP Server**: net/http (standard library)
-- **XML Parsing**: encoding/xml (standard library)
-
-### Frontend
-- **Framework**: React 18.2.0
-- **Language**: TypeScript 5.9.3
-- **Build Tool**: Vite 5.0.0
-- **Styling**: Tailwind CSS 3.0.0
-- **Charting**: lightweight-charts 4.0.0
-- **Linting**: ESLint 8.48.0 with TypeScript plugins
+**Backend:** Go 1.25.3, gorilla/websocket, go-cache  
+**Frontend:** React 18, TypeScript 5, Vite 5, Tailwind CSS, lightweight-charts  
+**APIs:** Binance (WebSocket + REST), Alpha Vantage, RSS Feeds (6 sources)
 
 ### External APIs
 - **Binance WebSocket**: Live trade data streaming
 - **Binance REST API**: Historical klines and 24h ticker data
+- **Alpha Vantage API**: Market analytics and forex data (EUR/USD real-time quotes)
 - **RSS Feeds**: 
   - Crypto: CoinDesk, CryptoNews, CoinTelegraph
   - Forex: FXStreet, Investing.com, Yahoo Finance
 
 ---
 
-## Features Implemented
+## Features
 
-### Real-Time Data Streaming
-- Live price updates via WebSocket connection to Binance
+### Real-Time Trading
+- Live price updates via WebSocket
+- Candlestick charts with OHLC/Volume display
+- Order book with 10 levels (bids/asks)
+- Recent trades history (last 50 trades)
 - Multi-instrument support (BTCUSDT, ETHUSDT, SOLUSDT, EURUSDT)
-- Automatic price updates with color-coded change indicators
-- Hub-based broadcasting to multiple frontend clients
+- Auto-reconnect with exponential backoff
 
-### Interactive Charting
-- Candlestick chart with lightweight-charts library
-- Multiple timeframe support (1h, 4h, 1d, custom intervals)
-- Historical data loading from Binance klines API
-- Real-time candle updates via WebSocket
-- Instrument switching with dynamic chart updates
+### Market Data
+- Historical klines (multiple timeframes: 1h, 4h, 1d, custom)
+- 24h ticker statistics (Binance + Alpha Vantage for forex)
+- Real-time order book depth updates
+- Color-coded price changes
 
-### Market Data Display
-- Instruments panel with live ticker data
-- 24-hour price change percentages
-- Auto-refresh every 10 seconds
-- Click-to-select instrument functionality
-- Color-coded positive/negative changes
+### Analytics & News
+- Alpha Vantage integration: Global Quote, RSI, SMA, EMA, MACD, Stochastic
+- Multi-source news feed (6 RSS sources: crypto + forex)
+- Search and filter (All, Crypto, Forex, Market, Alerts)
+- Unread indicators and expandable articles
 
-### Multi-Source News Aggregation
-- 6 RSS news sources (3 crypto + 3 forex)
-- Automatic sorting by publish time (newest first)
-- Search functionality across all articles
-- Category filters (All, Crypto, Forex, Market, Alerts)
-- Pagination (3 articles per page)
-- Unread indicators for new articles
-- Expandable modal for full article view
-- Auto-refresh every 2 minutes
-- Time-ago timestamps
-- Source badges with color coding
+### UI/UX
+- Dark/light theme with persistence
+- Left toolbar for tool selection
+- Responsive panels
+- Real-time updates without page refresh
 
-### User Interface
-- Dark/light mode toggle with localStorage persistence
-- Responsive layout with fixed-height components
-- Balanced component sizing (Trade: 190px, Instruments: 290px, News: 470px)
-- Scrollable content areas
-- Loading and error states
-- Clean, professional design
-
-### Backend Optimizations
-- In-memory caching for klines (5 minutes)
-- Ticker data caching (10 seconds)
-- News feed caching (2 minutes)
-- Concurrent RSS feed fetching
-- Combined WebSocket streams for efficiency
+### Backend
+- In-memory caching (klines: 5min, ticker: 10-60sec, news: 2min)
+- Concurrent RSS fetching
+- Hub-based WebSocket broadcasting
+- Test coverage for handlers
 
 ---
 
-## Project Flow
+## API Endpoints
 
-```mermaid
-graph TD
-    A[User Opens Browser] --> B[Frontend Loads]
-    B --> C[Establish WebSocket Connection]
-    B --> D[Fetch Historical Klines]
-    B --> E[Fetch 24h Ticker Data]
-    B --> F[Fetch News Feed]
-    
-    C --> G[Backend WebSocket Handler]
-    G --> H[Hub Registers Client]
-    H --> I[Binance Stream Relay]
-    I --> J[Live Price Updates to Frontend]
-    J --> K[Update Chart & Price Display]
-    
-    D --> L[Backend Klines Handler]
-    L --> M{Cache Hit?}
-    M -->|Yes| N[Return Cached Data]
-    M -->|No| O[Fetch from Binance API]
-    O --> P[Cache for 5 min]
-    P --> N
-    N --> Q[Display Historical Chart]
-    
-    E --> R[Backend Ticker Handler]
-    R --> S{Cache Hit?}
-    S -->|Yes| T[Return Cached Data]
-    S -->|No| U[Fetch from Binance API]
-    U --> V[Cache for 10 sec]
-    V --> T
-    T --> W[Display Instruments Panel]
-    W --> X[Auto-refresh every 10s]
-    X --> E
-    
-    F --> Y[Backend News Handler]
-    Y --> Z{Cache Hit?}
-    Z -->|Yes| AA[Return Cached Data]
-    Z -->|No| AB[Fetch 6 RSS Feeds Concurrently]
-    AB --> AC[Parse XML]
-    AC --> AD[Combine & Sort by Time]
-    AD --> AE[Cache for 2 min]
-    AE --> AA
-    AA --> AF[Display News Panel]
-    AF --> AG[Auto-refresh every 2 min]
-    AG --> F
-    
-    K --> AH[User Selects Timeframe]
-    AH --> D
-    
-    W --> AI[User Clicks Instrument]
-    AI --> D
-    AI --> K
-    
-    AF --> AJ[User Searches/Filters News]
-    AJ --> AF
-    
-    subgraph Backend Server
-        G
-        H
-        I
-        L
-        M
-        O
-        P
-        R
-        S
-        U
-        V
-        Y
-        Z
-        AB
-        AC
-        AD
-        AE
-    end
-    
-    subgraph Frontend Client
-        B
-        C
-        D
-        E
-        F
-        K
-        Q
-        W
-        X
-        AF
-        AG
-        AH
-        AI
-        AJ
-    end
-    
-    subgraph External APIs
-        I
-        O
-        U
-        AB
-    end
+**WebSocket:** `/ws` - Real-time price and order book updates  
+**REST:** `/api/v1/klines` - Historical candlestick data  
+**REST:** `/api/v1/ticker` - 24h ticker statistics  
+**REST:** `/api/v1/news` - Aggregated news from 6 RSS sources  
+**REST:** `/api/v1/alphavantage` - Alpha Vantage analytics proxy
+
+---
+
+## Environment Variables
+
+Create `.env` file at project root (see `env.example`):
+```
+ALPHA_VANTAGE_API_KEY=your_api_key_here
 ```

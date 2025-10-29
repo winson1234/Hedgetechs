@@ -34,7 +34,7 @@ export default function ChartComponent({ timeframe, symbol }: ChartComponentProp
   const [ohlcv, setOhlcv] = useState<OHLCVData | null>(null)
   const volumeDataRef = useRef<Map<number, number>>(new Map())
   const [isLoading, setIsLoading] = useState(false)
-  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const loadingTimeoutRef = useRef<number | null>(null)
   
   // Map timeframe to seconds for candle grouping
   const getTimeframeSeconds = (tf: string): number => {
@@ -74,7 +74,7 @@ export default function ChartComponent({ timeframe, symbol }: ChartComponentProp
     }
     
     // Auto-hide after 500ms maximum
-    loadingTimeoutRef.current = setTimeout(() => {
+    loadingTimeoutRef.current = window.setTimeout(() => {
       setIsLoading(false)
     }, 500)
     

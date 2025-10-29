@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FP Markets - Sign In</title>
+  <link rel="stylesheet" href="styles/login.css">
+</head>
+<body>
+  <div class="container">
+    <div class="background"></div>
+    <div class="chart-overlay"></div>
+    <div class="candlestick-pattern" id="candlesticks"></div>
+
+    <div class="login-card">
+      <div class="logo">
+        <h1><span class="fp">FP</span><span class="markets">Markets</span></h1>
+      </div>
+      <p class="subtitle">Sign in to Secure Client Area</p>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label">Your email address</label>
+          <input type="email" class="form-input"  required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-input" required>
+          <div class="forgot-password">
+            <a href="#" id="forgotPasswordLink">Forgot Password?</a>
+          </div>
+        </div>
+
+        <button type="submit" class="login-button">Login</button>
+      </form>
+
+      <div class="signup-section">
+        <p class="signup-text">Don't have an account?</p>
+        <div class="signup-links">
+          <a href="#" id="registerDemoLink">Open a Demo Account</a>
+          <span>|</span>
+          <a href="#">Open a Real Account</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

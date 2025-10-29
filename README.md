@@ -50,7 +50,7 @@ frontend/src/
   ├── components/
   │   ├── ChartComponent.tsx        # Candlestick chart with OHLC/Volume
   │   ├── OrderBookPanel.tsx        # Order book + recent trades
-  │   ├── SpotTradingPanel.tsx      # Trading interface
+  │   ├── TradingPanel.tsx          # Trading interface
   │   ├── InstrumentsPanel.tsx      # Instruments list
   │   ├── NewsPanel.tsx             # Multi-source news feed
   │   ├── AnalyticsPanel.tsx        # Alpha Vantage analytics

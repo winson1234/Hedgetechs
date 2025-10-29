@@ -62,18 +62,21 @@ React-based SPA providing real-time trading interface with live price updates, i
 
 ---
 
-### Spot TradingPanel.tsx
-**Purpose:** Trading interface with live price and timeframe controls
+### TradingPanel.tsx
+**Purpose:** Trading interface with live price, quick order entry and advanced order controls
 
-**Props:** `activeTimeframe`, `setActiveTimeframe`, `activeInstrument`, etc.
+**Props:** `activeInstrument`, `usdBalance`, `cryptoHoldings`, `onBuyOrder`, `onSellOrder`
 
-**State:** `price`, `change24h`
+**State / Behavior:** Holds price and order inputs; supports limit/market/stop-limit, TP/SL, recurring orders, fee display and pending orders.
 
 **Features:**
-- Real-time price updates via WebSocket
-- 24h change percentage with color coding
-- Timeframe selection buttons (1h, 4h, 1d, Custom)
-- Custom interval input modal
+- Live price updates via WebSocket
+- Order types: Limit, Market, Stop-Limit
+- TP/SL (Take Profit / Stop Loss) advanced options with trigger & limit offsets
+- Fee displayed and applied to totals
+- Pending orders list for limit and stop-limit orders
+- Quick percentage buttons to calculate buy amounts from USD balance
+- Trading mode tabs (spot, cross, isolated, grid)
 
 ---
 
@@ -176,7 +179,7 @@ Binance → Backend Hub → /ws → WebSocketContext → Components
 
 **Components using WebSocket:**
 - ChartComponent (live candle updates)
-- SpotTradingPanel (live price)
+- TradingPanel (live price)
 - OrderBookPanel (depth updates + trades)
 - LivePriceDisplay (price ticker)
 

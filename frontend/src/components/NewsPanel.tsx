@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState } from 'react'
 
 type NewsArticle = {
   title: string
@@ -14,7 +14,7 @@ type NewsResponse = {
   count: number
 }
 
-type FilterType = 'all' | 'crypto' | 'forex' | 'market' | 'system'
+type FilterType = 'all' | 'crypto' | 'forex' | 'market' | 'system' | 'unread'
 
 export default function NewsPanel() {
   const [articles, setArticles] = useState<NewsArticle[]>([])
@@ -24,9 +24,7 @@ export default function NewsPanel() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null)
   const [readArticles, setReadArticles] = useState<Set<string>>(new Set())
-  const [lastFetchTime, setLastFetchTime] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState(0)
-  const previousArticlesRef = useRef<NewsArticle[]>([])
 
   useEffect(() => {
     const fetchNews = async () => {
@@ -37,31 +35,9 @@ export default function NewsPanel() {
         }
         const data: NewsResponse = await response.json()
         
-        // Mark new articles as unread (if this is not the first fetch)
-        if (lastFetchTime > 0) {
-          // Keep existing read articles as read
-          // New articles (not in previous articles list) will automatically be unread
-          const previousArticles = previousArticlesRef.current
-          setReadArticles(prev => {
-            const newReadArticles = new Set(prev)
-            // Mark all previously loaded articles as read
-            previousArticles.forEach(article => {
-              newReadArticles.add(article.guid || article.link)
-            })
-            return newReadArticles
-          })
-        } else {
-          // First load - mark all as read after 2 seconds
-          setTimeout(() => {
-            const allGuids = new Set(data.articles.map(a => a.guid || a.link))
-            setReadArticles(allGuids)
-          }, 2000)
-        }
-        
-        // Update ref with new articles for next fetch
-        previousArticlesRef.current = data.articles
+        // All fetched articles are unread by default
+        // Articles only become read when user clicks on them
         setArticles(data.articles)
-        setLastFetchTime(Date.now())
         setLoading(false)
       } catch (err) {
         console.error('Failed to fetch news:', err)
@@ -74,7 +50,7 @@ export default function NewsPanel() {
     // Refresh news every 2 minutes
     const interval = setInterval(fetchNews, 2 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [lastFetchTime])
+  }, [])
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
@@ -110,6 +86,11 @@ export default function NewsPanel() {
     return !readArticles.has(article.guid || article.link)
   }
 
+  const markAllAsRead = () => {
+    const allGuids = new Set(articles.map(a => a.guid || a.link))
+    setReadArticles(allGuids)
+  }
+
   // Define crypto and forex sources
   const cryptoSources = ['CoinDesk', 'CryptoNews', 'CoinTelegraph']
   const forexSources = ['FXStreet', 'Investing.com', 'Yahoo Finance']
@@ -127,6 +108,11 @@ export default function NewsPanel() {
 
     // Then apply category filter
     if (filter === 'all') return true
+    
+    // Filter for unread articles only
+    if (filter === 'unread') {
+      return isUnread(article)
+    }
     
     if (filter === 'crypto') {
       return cryptoSources.includes(article.source)
@@ -177,14 +163,47 @@ export default function NewsPanel() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header with title and unread count */}
-      <div className="flex items-center gap-2 mb-3">
-        <div className="text-xl font-bold text-slate-900 dark:text-slate-100">News</div>
-        {unreadCount > 0 && (
-          <span className="px-2 py-0.5 text-xs font-semibold bg-indigo-500 text-white rounded-full">
-            {unreadCount}
-          </span>
-        )}
+      {/* Header with title, unread count, and action buttons */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="text-xl font-bold text-slate-900 dark:text-slate-100">News</div>
+          {unreadCount > 0 && (
+            <span className="px-2 py-0.5 text-xs font-semibold bg-indigo-500 text-white rounded-full">
+              {unreadCount}
+            </span>
+          )}
+        </div>
+        
+        {/* Action buttons on the right */}
+        <div className="flex items-center gap-2">
+          {/* Unread filter toggle button */}
+          <button
+            onClick={() => setFilter(filter === 'unread' ? 'all' : 'unread')}
+            className={`p-1.5 rounded transition-colors ${
+              filter === 'unread'
+                ? 'bg-indigo-600 text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+            title={filter === 'unread' ? 'Show all news' : 'Show unread only'}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" />
+            </svg>
+          </button>
+          
+          {/* Mark all as read button - only show when there are unread articles */}
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllAsRead}
+              className="p-1.5 rounded text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="Mark all as read"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search Bar */}

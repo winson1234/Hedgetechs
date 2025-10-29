@@ -33,6 +33,8 @@ export default function ChartComponent({ timeframe, symbol }: ChartComponentProp
   const priceLineRef = useRef<IPriceLine | null>(null)
   const [ohlcv, setOhlcv] = useState<OHLCVData | null>(null)
   const volumeDataRef = useRef<Map<number, number>>(new Map())
+  const [isLoading, setIsLoading] = useState(false)
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Map timeframe to seconds for candle grouping
   const getTimeframeSeconds = (tf: string): number => {
@@ -62,6 +64,19 @@ export default function ChartComponent({ timeframe, symbol }: ChartComponentProp
 
   useEffect(() => {
     if (!ref.current) return
+    
+    // Trigger loading effect when symbol or timeframe changes
+    setIsLoading(true)
+    
+    // Clear any existing timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current)
+    }
+    
+    // Auto-hide after 500ms maximum
+    loadingTimeoutRef.current = setTimeout(() => {
+      setIsLoading(false)
+    }, 500)
     
     const isDark = document.documentElement.classList.contains('dark')
     
@@ -147,6 +162,9 @@ export default function ChartComponent({ timeframe, symbol }: ChartComponentProp
 
     return () => {
       window.removeEventListener('resize', onResize)
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+      }
       if (priceLineRef.current && seriesRef.current) {
         try {
           seriesRef.current.removePriceLine(priceLineRef.current)
@@ -257,7 +275,18 @@ export default function ChartComponent({ timeframe, symbol }: ChartComponentProp
       <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
         {displaySymbol} - {timeframe} (last 200)
       </div>
-      <div ref={ref} className="w-full" />
+      <div className="relative overflow-hidden" style={{ height: '480px' }}>
+        <div ref={ref} className="w-full h-full" />
+        
+        {isLoading && (
+          <div className="absolute inset-0 bg-slate-300/70 dark:bg-slate-700/70 flex items-center justify-center pointer-events-none z-10">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-slate-400/40 to-transparent animate-shimmer" />
+            <div className="text-sm font-medium text-slate-700 dark:text-slate-300 z-20">
+              Updating data...
+            </div>
+          </div>
+        )}
+      </div>
       
       {ohlcv && (
         <div className="mt-3 grid grid-cols-5 gap-3 text-sm">

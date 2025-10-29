@@ -4,10 +4,25 @@ import ProfileDropdown from './ProfileDropdown'
 type Props = {
   isDarkMode: boolean
   setIsDarkMode: (v: boolean) => void
+  usdBalance: number
+  onDeposit: (amount: number) => void
 }
 
-export default function Header({ isDarkMode, setIsDarkMode }: Props) {
+export default function Header({ isDarkMode, setIsDarkMode, usdBalance, onDeposit }: Props) {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [showDepositModal, setShowDepositModal] = useState(false)
+  const [depositAmount, setDepositAmount] = useState('')
+
+  const handleDeposit = () => {
+    const amount = parseFloat(depositAmount)
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount')
+      return
+    }
+    onDeposit(amount)
+    setDepositAmount('')
+    setShowDepositModal(false)
+  }
   return (
     <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3">
       <div className="flex items-center justify-between">
@@ -17,9 +32,12 @@ export default function Header({ isDarkMode, setIsDarkMode }: Props) {
 
         <div className="flex items-center gap-4">
           <div className="text-sm text-slate-700 dark:text-slate-300">
-            Balance: <span className="font-semibold">10,000.00 USD</span>
+            Balance: <span className="font-semibold">{usdBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
           </div>
-          <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded text-sm font-medium transition">
+          <button 
+            onClick={() => setShowDepositModal(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded text-sm font-medium transition"
+          >
             Deposit
           </button>
 
@@ -88,6 +106,75 @@ export default function Header({ isDarkMode, setIsDarkMode }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Deposit Modal */}
+      {showDepositModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowDepositModal(false)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-lg shadow-2xl max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Deposit Funds</h2>
+              <button
+                onClick={() => setShowDepositModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                  Amount (USD)
+                </label>
+                <input
+                  type="number"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleDeposit()}
+                  placeholder="0.00"
+                  className="w-full px-4 py-2 text-lg border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-2">
+                {[100, 500, 1000, 5000].map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => setDepositAmount(String(amount))}
+                    className="flex-1 px-3 py-2 text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                  >
+                    ${amount}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowDepositModal(false)}
+                  className="flex-1 px-4 py-2 text-sm font-medium border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeposit}
+                  className="flex-1 px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition"
+                >
+                  Confirm Deposit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   )
 }

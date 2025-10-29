@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import LivePriceDisplay from './components/LivePriceDisplay'
 import ChartComponent from './components/ChartComponent'
-import SpotTradingPanel from './components/SpotTradingPanel'
+import TradingPanel from './components/TradingPanel'
 import InstrumentsPanel from './components/InstrumentsPanel'
 import NewsPanel from './components/NewsPanel'
 import Header from './components/Header'
@@ -17,6 +17,82 @@ export default function App() {
   const [activeInstrument, setActiveInstrument] = useState('BTCUSDT')
   const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false)
   const [activeTool, setActiveTool] = useState<string | null>(null)
+  
+  // Balance and Holdings Management
+  const [usdBalance, setUsdBalance] = useState(10000)
+  const [cryptoHoldings, setCryptoHoldings] = useState<Record<string, number>>({
+    BTC: 10,
+    ETH: 10,
+    SOL: 10,
+    EUR: 10
+  })
+
+  // Persist balance and holdings to localStorage
+  React.useEffect(() => {
+    try {
+      const savedBalance = localStorage.getItem('usdBalance')
+      const savedHoldings = localStorage.getItem('cryptoHoldings')
+      if (savedBalance) setUsdBalance(parseFloat(savedBalance))
+      if (savedHoldings) setCryptoHoldings(JSON.parse(savedHoldings))
+    } catch (e) {
+      // ignore errors reading saved data
+    }
+  }, [])
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('usdBalance', String(usdBalance))
+      localStorage.setItem('cryptoHoldings', JSON.stringify(cryptoHoldings))
+    } catch (e) {
+      // ignore write errors
+    }
+  }, [usdBalance, cryptoHoldings])
+
+  // Handle deposit
+  const handleDeposit = (amount: number) => {
+    setUsdBalance(prev => prev + amount)
+  }
+
+  // Handle buy order
+  const handleBuyOrder = (symbol: string, amount: number, price: number) => {
+    const total = amount * price
+    if (total > usdBalance) {
+      return { success: false, message: 'Insufficient balance' }
+    }
+    
+    // Extract base currency from symbol
+    const baseCurrency = symbol.replace(/USDT?$/, '')
+    
+    // Deduct USD and add crypto
+    setUsdBalance(prev => prev - total)
+    setCryptoHoldings(prev => ({
+      ...prev,
+      [baseCurrency]: (prev[baseCurrency] || 0) + amount
+    }))
+    
+    return { success: true, message: 'Buy order executed' }
+  }
+
+  // Handle sell order
+  const handleSellOrder = (symbol: string, amount: number, price: number) => {
+    const baseCurrency = symbol.replace(/USDT?$/, '')
+    const currentHolding = cryptoHoldings[baseCurrency] || 0
+    
+    if (amount > currentHolding) {
+      return { success: false, message: `Insufficient ${baseCurrency} balance` }
+    }
+    
+    const total = amount * price
+    
+    // Add USD and deduct crypto
+    setUsdBalance(prev => prev + total)
+    setCryptoHoldings(prev => ({
+      ...prev,
+      [baseCurrency]: prev[baseCurrency] - amount
+    }))
+    
+    return { success: true, message: 'Sell order executed' }
+  }
 
   const handleToolSelect = (toolId: string | null) => {
     setActiveTool(toolId)
@@ -65,7 +141,12 @@ export default function App() {
     <div className={isDarkMode ? 'dark' : ''}>
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         {/* Top bar */}
-        <Header isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
+        <Header 
+          isDarkMode={isDarkMode} 
+          setIsDarkMode={setIsDarkMode}
+          usdBalance={usdBalance}
+          onDeposit={handleDeposit}
+        />
 
         {/* Left Toolbar */}
         <LeftToolbar onToolSelect={handleToolSelect} activeTool={activeTool} />
@@ -79,8 +160,8 @@ export default function App() {
 
         {/* Main content area - with left margin for toolbar + gap */}
         <div className="ml-14 px-4 py-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Left + Center: Chart area (2 columns) */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            {/* Left Panel: Chart + Order Book (50% - 2 columns) */}
             <div className="lg:col-span-2">
               {/* Chart panel */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
@@ -167,35 +248,43 @@ export default function App() {
                   <LivePriceDisplay symbol={activeInstrument} />
                 </div>
 
-                {/* Chart - Market standard 60% of left column */}
-                <div className="h-[550px]">
+                {/* Chart */}
+                <div className="h-[566px]">
                   <ChartComponent timeframe={activeTimeframe} symbol={activeInstrument} />
                 </div>
               </div>
 
-              {/* Order Book Panel - Market standard 40% of left column */}
+              {/* Order Book Panel */}
               <div className="mt-4 h-[440px]">
                 <OrderBookPanel activeInstrument={activeInstrument} />
               </div>
             </div>
 
-            {/* Right: side panels (1 column) - Optimized for full space utilization */}
-            <div className="space-y-4">
-              {/* Spot Trading panel - Binance-style with tabs */}
-              <div className="h-[480px]">
-                <SpotTradingPanel activeInstrument={activeInstrument} />
+            {/* Middle Panel: Spot Trading (25% - 1 column) */}
+            <div className="lg:col-span-1">
+              <div className="h-[1300px]">
+                <TradingPanel 
+                  activeInstrument={activeInstrument}
+                  usdBalance={usdBalance}
+                  cryptoHoldings={cryptoHoldings}
+                  onBuyOrder={handleBuyOrder}
+                  onSellOrder={handleSellOrder}
+                />
               </div>
+            </div>
 
-              {/* Instruments panel - Compact */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[250px] overflow-y-auto">
+            {/* Right Panel: Instruments + News (25% - 1 column) */}
+            <div className="lg:col-span-1 space-y-4">
+              {/* Instruments panel */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[735px] overflow-y-auto">
                 <InstrumentsPanel 
                   activeInstrument={activeInstrument}
                   onInstrumentChange={setActiveInstrument}
                 />
               </div>
 
-              {/* News panel - Expanded to fill remaining space */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[510px]">
+              {/* News panel */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[549px]">
                 <NewsPanel />
               </div>
             </div>

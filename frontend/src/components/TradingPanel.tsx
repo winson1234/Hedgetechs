@@ -1,266 +1,475 @@
-import React, { useEffect, useState, useContext } from 'react'
-import { WebSocketContext } from '../context/WebSocketContext'
+import React, { useEffect, useState, useContext, useCallback } from 'react';
+// Correct the import path again - ensure it points correctly from components dir to context dir
+import { WebSocketContext } from '../context/WebSocketContext';
+
+// Define the expected structure for a price update message from WebSocket
+// (Can be refined based on actual message structure if needed)
+type PriceUpdate = {
+  symbol: string;
+  price: string | number;
+  time: number;
+  quantity?: string | number;
+  isBuyerMaker?: boolean;
+};
 
 type TradingPanelProps = {
-  activeInstrument: string
-  usdBalance: number
-  cryptoHoldings: Record<string, number>
-  onBuyOrder: (symbol: string, amount: number, price: number) => { success: boolean; message: string }
-  onSellOrder: (symbol: string, amount: number, price: number) => { success: boolean; message: string }
-}
+  activeInstrument: string;
+  usdBalance: number;
+  cryptoHoldings: Record<string, number>;
+  onBuyOrder: (symbol: string, amount: number, price: number) => { success: boolean; message: string };
+  onSellOrder: (symbol: string, amount: number, price: number) => { success: boolean; message: string };
+};
 
-type TradingMode = 'spot' | 'cross' | 'isolated' | 'grid'
-type OrderType = 'limit' | 'market' | 'stop-limit'
+type TradingMode = 'spot' | 'cross' | 'isolated' | 'grid';
+type OrderType = 'limit' | 'market' | 'stop-limit';
 
-export default function TradingPanel({ 
-  activeInstrument, 
-  usdBalance, 
-  cryptoHoldings, 
-  onBuyOrder, 
-  onSellOrder 
+type PendingOrder = {
+  id: string;
+  type: 'limit' | 'stop-limit';
+  side: 'buy' | 'sell';
+  symbol: string;
+  price: number; // The limit price for execution
+  amount: number;
+  stopPrice?: number; // The trigger price for stop-limit orders
+  timestamp: number;
+};
+
+export default function TradingPanel({
+  activeInstrument,
+  usdBalance,
+  cryptoHoldings,
+  onBuyOrder,
+  onSellOrder,
 }: TradingPanelProps) {
-  const ws = useContext(WebSocketContext)
-  const lastMessage = ws?.lastMessage ?? null
-  
+  const ws = useContext(WebSocketContext);
+  // Ensure lastMessage is treated as potentially having different shapes
+  const lastMessage = ws?.lastMessage ?? null;
+
   // Trading mode and settings
-  const [tradingMode, setTradingMode] = useState<TradingMode>('spot')
-  const [orderType, setOrderType] = useState<OrderType>('limit')
-  const [isRecurring, setIsRecurring] = useState<boolean>(false)
-  const [buyWithEUR, setBuyWithEUR] = useState<boolean>(false)
-  const [enableTPSL, setEnableTPSL] = useState<boolean>(false)
-  const feeLevel = 0.1 // 0.1% default fee
-  
+  const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
+  const [orderType, setOrderType] = useState<OrderType>('limit');
+  const [isRecurring, setIsRecurring] = useState<boolean>(false);
+  const [buyWithEUR, setBuyWithEUR] = useState<boolean>(false);
+  const [enableTPSL, setEnableTPSL] = useState<boolean>(false);
+  const feeLevel = 0.1; // 0.1% default fee
+
   // Price and order inputs
-  const [currentPrice, setCurrentPrice] = useState<number>(0)
-  const [limitPrice, setLimitPrice] = useState<string>('')
-  const [stopPrice, setStopPrice] = useState<string>('')
-  const [amount, setAmount] = useState<string>('')
-  const [percentage, setPercentage] = useState<number>(0)
-  
+  const [currentPrice, setCurrentPrice] = useState<number>(0);
+  const [limitPrice, setLimitPrice] = useState<string>('');
+  const [stopPrice, setStopPrice] = useState<string>('');
+  const [amount, setAmount] = useState<string>('');
+  const [percentage, setPercentage] = useState<number>(0);
+
   // TP/SL inputs
-  const [tpTrigger, setTpTrigger] = useState<string>('')
-  const [tpLimit, setTpLimit] = useState<string>('')
-  const [tpOffset, setTpOffset] = useState<string>('')
-  const [slTrigger, setSlTrigger] = useState<string>('')
-  const [slLimit, setSlLimit] = useState<string>('')
-  const [slOffset, setSlOffset] = useState<string>('')
-  
+  const [tpTrigger, setTpTrigger] = useState<string>('');
+  const [tpLimit, setTpLimit] = useState<string>('');
+  const [tpOffset, setTpOffset] = useState<string>('');
+  const [slTrigger, setSlTrigger] = useState<string>('');
+  const [slLimit, setSlLimit] = useState<string>('');
+  const [slOffset, setSlOffset] = useState<string>('');
+
   // Trading info
-  const [lots, setLots] = useState<number>(0)
-  const [margin, setMargin] = useState<number>(0)
-  const [pipValue, setPipValue] = useState<number>(0)
-  
-  // Pending orders
-  type PendingOrder = {
-    id: string
-    type: 'limit' | 'stop-limit'
-    side: 'buy' | 'sell'
-    symbol: string
-    price: number
-    amount: number
-    stopPrice?: number
-    timestamp: number
-  }
-  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([])
-  
+  const [lots, setLots] = useState<number>(0);
+  const [margin, setMargin] = useState<number>(0);
+  const [pipValue, setPipValue] = useState<number>(0);
+
+  // Pending orders state
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
+
   // Extract base and quote currencies from symbol (e.g., BTCUSDT -> BTC, USDT)
-  const baseCurrency = activeInstrument.replace(/USDT?$/, '')
-  const quoteCurrency = activeInstrument.match(/USDT?$/)?.[0] || 'USDT'
-  
+  const baseCurrency = activeInstrument.replace(/USDT?$/, '');
+  const quoteCurrency = activeInstrument.match(/USDT?$/)?.[0] || 'USDT';
+
   // Get current holdings for the active instrument
-  const currentHolding = cryptoHoldings[baseCurrency] || 0
-  
-  // Listen to live price updates
+  const currentHolding = cryptoHoldings[baseCurrency] || 0;
+
+  // --- Start of Pending Order Execution Logic ---
+
+  // Effect to process pending orders based on live price updates
+  const processPendingOrders = useCallback(
+    (latestPrice: number) => {
+      // Avoid processing if price is invalid or no pending orders
+      if (isNaN(latestPrice) || latestPrice <= 0 || pendingOrders.length === 0) {
+        return;
+      }
+
+      let ordersWereExecuted = false; // Flag to check if state needs updating
+      const ordersToExecute: PendingOrder[] = [];
+      const remainingOrders: PendingOrder[] = [];
+
+
+      pendingOrders.forEach((order) => {
+        let shouldExecute = false;
+
+        // Only process orders for the currently active instrument
+        if (order.symbol !== activeInstrument) {
+          remainingOrders.push(order);
+          return;
+        }
+
+        switch (order.type) {
+          case 'limit':
+            if (order.side === 'buy' && latestPrice <= order.price) {
+              shouldExecute = true;
+            } else if (order.side === 'sell' && latestPrice >= order.price) {
+              shouldExecute = true;
+            }
+            break;
+          case 'stop-limit':
+            // Check stop condition first
+            if (order.stopPrice && order.side === 'buy' && latestPrice >= order.stopPrice) {
+                // Stop triggered, now check limit condition (buy at or below limit price)
+                // For simplicity, we execute immediately at the limit price when stop is hit
+                shouldExecute = true;
+            } else if (order.stopPrice && order.side === 'sell' && latestPrice <= order.stopPrice) {
+                // Stop triggered, now check limit condition (sell at or above limit price)
+                // For simplicity, we execute immediately at the limit price when stop is hit
+                shouldExecute = true;
+            }
+            break;
+        }
+
+        if (shouldExecute) {
+          ordersToExecute.push(order);
+          ordersWereExecuted = true; // Mark that at least one order will be processed
+        } else {
+          remainingOrders.push(order);
+        }
+      });
+
+      // Execute triggered orders only if needed
+      if (ordersToExecute.length > 0) {
+        ordersToExecute.forEach((order) => {
+          console.log(`Executing pending order ID: ${order.id}, Type: ${order.type}, Side: ${order.side}, Price: ${order.price}, Current Market Price: ${latestPrice}`);
+          const result =
+            order.side === 'buy'
+              ? onBuyOrder(order.symbol, order.amount, order.price) // Execute at the order's limit price
+              : onSellOrder(order.symbol, order.amount, order.price); // Execute at the order's limit price
+
+          if (result.success) {
+            // NOTE: Avoid using alert(). Replace with a proper notification system.
+            console.log( // Log instead of alert
+              `Pending ${order.type.toUpperCase()} ${order.side.toUpperCase()} order filled!\nSymbol: ${order.symbol}\nAmount: ${order.amount.toFixed(6)}\nPrice: ${order.price.toFixed(2)} ${quoteCurrency}`
+            );
+          } else {
+             // NOTE: Avoid using alert(). Replace with a proper notification system.
+            console.error( // Log error instead of alert
+              `Failed to fill pending ${order.type.toUpperCase()} ${order.side.toUpperCase()} order ID ${order.id}:\n${result.message}`
+            );
+            // If execution failed, put the order back into remaining orders
+            remainingOrders.push(order);
+            // Ensure flag is still true if some succeeded and some failed
+            // ordersWereExecuted = true; // (already true if we are in this block)
+          }
+        });
+      }
+
+       // Update the pending orders state only if orders were actually processed/removed/re-added
+       if(ordersWereExecuted) {
+           setPendingOrders(remainingOrders);
+       }
+    },
+    [pendingOrders, onBuyOrder, onSellOrder, activeInstrument, quoteCurrency] // Dependencies
+  );
+
+
+  // Listen to live price updates AND trigger pending order checks
   useEffect(() => {
-    if (!lastMessage) return
-    
-    // Only process trade messages (has price field, no bids/asks)
-    if ('symbol' in lastMessage && 'price' in lastMessage && !('bids' in lastMessage)) {
-      const msg = lastMessage as { symbol: string; price: string | number }
-      
+    if (!lastMessage) return;
+
+    // Check if it's a trade message (has price field, not order book)
+    // Needs symbol and price properties to be a relevant price update
+    if (
+        typeof lastMessage === 'object' &&
+        lastMessage !== null &&
+        'symbol' in lastMessage &&
+        'price' in lastMessage &&
+        !('bids' in lastMessage) // Ensure it's not an order book update
+        ) {
+      const msg = lastMessage as PriceUpdate; // Use the defined type
+
+      // Process only if the message is for the active instrument
       if (msg.symbol === activeInstrument) {
-        const price = typeof msg.price === 'string' ? parseFloat(msg.price) : msg.price
-        if (!isNaN(price)) {
-          setCurrentPrice(price)
+        const price = typeof msg.price === 'string' ? parseFloat(msg.price) : msg.price;
+        if (!isNaN(price) && price > 0) {
+          // Check if the price has actually changed to avoid unnecessary processing
+          if (price !== currentPrice) {
+              setCurrentPrice(price);
+              // ---> Call the pending order processing function <---
+              processPendingOrders(price);
+          }
+        } else {
+          console.warn("Received invalid price in WebSocket message:", msg.price);
         }
       }
     }
-  }, [lastMessage, activeInstrument])
-  
+  }, [lastMessage, activeInstrument, processPendingOrders, currentPrice]); // Added currentPrice dependency
+
+  // --- End of Pending Order Execution Logic ---
+
+
   // Initialize limit price when instrument changes or when first price is received
   useEffect(() => {
-    if (currentPrice > 0 && !limitPrice) {
-      setLimitPrice(currentPrice.toFixed(2))
+    // Set limit price only if it's currently empty AND we have a valid current price
+    if (currentPrice > 0 && limitPrice === '') {
+      setLimitPrice(currentPrice.toFixed(2));
     }
-  }, [currentPrice, limitPrice])
-  
+     // If current price becomes 0 (e.g., instrument change reset), clear limit price
+     else if (currentPrice <= 0 && limitPrice !== '') {
+        setLimitPrice('');
+     }
+    // Don't reset limitPrice automatically if currentPrice changes later, let user control it
+  }, [currentPrice, limitPrice]);
+
+
+
   // Reset form ONLY when instrument changes
   useEffect(() => {
     // Reset ALL state including currentPrice
-    setCurrentPrice(0)
-    setLimitPrice('')
-    setStopPrice('')
-    setAmount('')
-    setPercentage(0)
-    setTpTrigger('')
-    setTpLimit('')
-    setTpOffset('')
-    setSlTrigger('')
-    setSlLimit('')
-    setSlOffset('')
-  }, [activeInstrument])
-  
+    setCurrentPrice(0);
+    setLimitPrice(''); 
+    setStopPrice('');
+    setAmount('');
+    setPercentage(0);
+    setTpTrigger('');
+    setTpLimit('');
+    setTpOffset('');
+    setSlTrigger('');
+    setSlLimit('');
+    setSlOffset('');
+    // Reset toggles as well
+    setIsRecurring(false);
+    setBuyWithEUR(false);
+    setEnableTPSL(false);
+    // Clear pending orders when instrument changes to avoid executing old orders
+    setPendingOrders([]);
+  }, [activeInstrument]);
+
+
   // Calculate trading info (lots, margin, pip value)
   useEffect(() => {
-    const qty = parseFloat(amount)
-    
-    // Always use currentPrice as the base, fallback to limitPrice if needed
-    let price = currentPrice
-    
-    // For limit orders, use limitPrice if available and valid
-    if (orderType === 'limit' && limitPrice && parseFloat(limitPrice) > 0) {
-      price = parseFloat(limitPrice)
+    const qty = parseFloat(amount);
+
+    // Determine the price to use for calculation
+    let priceForCalc = currentPrice; // Default to current market price
+    if (orderType === 'limit' || orderType === 'stop-limit') {
+      const parsedLimitPrice = parseFloat(limitPrice);
+      if (!isNaN(parsedLimitPrice) && parsedLimitPrice > 0) {
+        priceForCalc = parsedLimitPrice; // Use limit price if valid
+      } else {
+          // If limit price is invalid for limit/stop-limit, use current price as fallback for calculation
+          priceForCalc = currentPrice > 0 ? currentPrice : 0;
+      }
     }
-    
-    if (!isNaN(qty) && qty > 0 && !isNaN(price) && price > 0) {
+
+
+    if (!isNaN(qty) && qty > 0 && !isNaN(priceForCalc) && priceForCalc > 0) {
       // Lots calculation (1 lot = 100,000 units in forex, for crypto we use direct amount)
-      const calculatedLots = tradingMode === 'spot' ? qty : qty / 100000
-      setLots(calculatedLots)
-      
+      const calculatedLots = tradingMode === 'spot' ? qty : qty / 100000;
+      setLots(calculatedLots);
+
       // Margin calculation (for leveraged trading)
-      const leverage = tradingMode === 'spot' ? 1 : (tradingMode === 'cross' ? 10 : 5)
-      const totalValue = qty * price
-      const calculatedMargin = totalValue / leverage
-      setMargin(calculatedMargin)
-      
+      const leverage = tradingMode === 'spot' ? 1 : tradingMode === 'cross' ? 10 : 5; // Example leverage
+      const totalValue = qty * priceForCalc;
+      const calculatedMargin = totalValue / leverage;
+      setMargin(calculatedMargin);
+
       // Pip value calculation (1 pip = 0.0001 for most pairs)
-      const pipSize = 0.0001
-      const calculatedPipValue = qty * pipSize
-      setPipValue(calculatedPipValue)
+      // This might need adjustment based on the specific instrument's pip definition
+      const pipSize = quoteCurrency === 'JPY' ? 0.01 : 0.0001; // Example adjustment for JPY pairs
+      const calculatedPipValue = qty * pipSize;
+      setPipValue(calculatedPipValue);
     } else {
-      setLots(0)
-      setMargin(0)
-      setPipValue(0)
+      setLots(0);
+      setMargin(0);
+      setPipValue(0);
     }
-  }, [amount, limitPrice, currentPrice, orderType, tradingMode])
-  
-  // Calculate total
+  }, [amount, limitPrice, currentPrice, orderType, tradingMode, quoteCurrency]); // Added quoteCurrency
+
   // Calculate fee amount
-  const getFeeAmount = (): number => {
-    let price = currentPrice
-    if (orderType === 'limit' && limitPrice && parseFloat(limitPrice) > 0) {
-      price = parseFloat(limitPrice)
+  const getFeeAmount = useCallback((): number => {
+    let priceForFee = currentPrice;
+    if ((orderType === 'limit' || orderType === 'stop-limit') ) {
+        const parsedLimitPrice = parseFloat(limitPrice);
+        if(!isNaN(parsedLimitPrice) && parsedLimitPrice > 0) {
+            priceForFee = parsedLimitPrice;
+        } else {
+            // Use current price if limit price is invalid for limit/stop-limit
+             priceForFee = currentPrice > 0 ? currentPrice : 0;
+        }
     }
-    const qty = parseFloat(amount)
-    if (isNaN(price) || isNaN(qty) || price <= 0 || qty <= 0) {
-      return 0
+    const qty = parseFloat(amount);
+    if (isNaN(priceForFee) || isNaN(qty) || priceForFee <= 0 || qty <= 0) {
+      return 0;
     }
-    return price * qty * (feeLevel / 100)
-  }
+    return priceForFee * qty * (feeLevel / 100);
+  }, [currentPrice, limitPrice, amount, orderType, feeLevel]);
+
 
   // Calculate total including fee
-  const getTotal = (): string => {
-    let price = currentPrice
-    if (orderType === 'limit' && limitPrice && parseFloat(limitPrice) > 0) {
-      price = parseFloat(limitPrice)
+  const getTotal = useCallback((): string => {
+    let priceForTotal = currentPrice;
+     if ((orderType === 'limit' || orderType === 'stop-limit') ) {
+        const parsedLimitPrice = parseFloat(limitPrice);
+        if(!isNaN(parsedLimitPrice) && parsedLimitPrice > 0) {
+            priceForTotal = parsedLimitPrice;
+        } else {
+             // Use current price if limit price is invalid for limit/stop-limit
+             priceForTotal = currentPrice > 0 ? currentPrice : 0;
+        }
     }
-    const qty = parseFloat(amount)
-    if (isNaN(price) || isNaN(qty) || price <= 0 || qty <= 0) {
-      return '0.00'
+    const qty = parseFloat(amount);
+    if (isNaN(priceForTotal) || isNaN(qty) || priceForTotal <= 0 || qty <= 0) {
+      return '0.00';
     }
-    const total = price * qty + getFeeAmount()
-    return total.toFixed(2)
-  }
-  
-  // Calculate max amount based on percentage
+    const total = priceForTotal * qty + getFeeAmount();
+    return total.toFixed(2);
+  }, [currentPrice, limitPrice, amount, orderType, getFeeAmount]);
+
+
+  // Calculate max amount based on percentage (always for BUY using USD)
   const calculateAmountFromPercentage = (pct: number) => {
-    // Always use currentPrice as the base, fallback to limitPrice if needed
-    let price = currentPrice
-    
-    // For limit orders, use limitPrice if available and valid
-    if (orderType === 'limit' && limitPrice && parseFloat(limitPrice) > 0) {
-      price = parseFloat(limitPrice)
+    // Determine the price to use for calculation
+    let price = currentPrice;
+    if ((orderType === 'limit' || orderType === 'stop-limit')) {
+        const parsedLimitPrice = parseFloat(limitPrice);
+        if (!isNaN(parsedLimitPrice) && parsedLimitPrice > 0) {
+            price = parsedLimitPrice;
+        } else if (currentPrice <= 0) {
+            // If limit price is invalid AND current price is invalid, cannot calculate
+            console.warn('Cannot calculate percentage amount: Invalid price.');
+            setAmount('0');
+            setPercentage(pct);
+            return;
+        }
+        // Fallback to current price if limit price is invalid but current price is valid
+        else {
+             price = currentPrice;
+        }
     }
-    
-    // If price is still invalid, return early
+     // If price is still invalid (e.g., market order with no current price yet)
     if (isNaN(price) || price <= 0) {
-      console.warn('Invalid price for percentage calculation:', price)
-      return
+      console.warn('Invalid price for percentage calculation:', price);
+      setAmount('0'); // Set amount to 0 if price is invalid
+      setPercentage(pct);
+      return;
     }
-    
-    const usdAmount = usdBalance * (pct / 100)
-    const cryptoAmount = usdAmount / price
-    setAmount(cryptoAmount.toFixed(6))
-    setPercentage(pct)
-  }
-  
+
+    // Always calculate BUY amount based on USD balance percentage
+    const usdToSpend = usdBalance * (pct / 100);
+    // Estimate fee and subtract it before calculating amount
+    const effectivePrice = price * (1 + feeLevel / 100);
+     // Avoid division by zero if effectivePrice is somehow zero
+    const calculatedAmount = effectivePrice > 0 ? usdToSpend / effectivePrice : 0;
+
+    // Ensure amount is not negative and format
+    setAmount(Math.max(0, calculatedAmount).toFixed(6));
+    setPercentage(pct);
+  };
+
+
   // Handle amount input change
   const handleAmountChange = (value: string) => {
-    setAmount(value)
+    setAmount(value);
     // Reset percentage slider when manually typing
-    setPercentage(0)
-  }
-  
+    setPercentage(0);
+  };
+
   // Handle order submission
   const handleOrder = (side: 'buy' | 'sell') => {
-    const price = orderType === 'market' ? currentPrice : parseFloat(limitPrice)
-    const qty = parseFloat(amount)
-    
+    // Use currentPrice for market orders, limitPrice for limit/stop-limit
+    const price = orderType === 'market' ? currentPrice : parseFloat(limitPrice);
+    const qty = parseFloat(amount);
+
+    // Basic Validations
     if (isNaN(qty) || qty <= 0) {
-      alert('Please enter a valid amount')
-      return
+      console.error('Invalid amount entered.'); // Log error instead of alert
+      return;
     }
-    
+    // Price validation only needed for non-market orders
     if (orderType !== 'market' && (isNaN(price) || price <= 0)) {
-      alert('Please enter a valid price')
-      return
+      console.error(`Invalid ${orderType === 'stop-limit' ? 'limit ' : ''}price entered.`); // Log error instead of alert
+      return;
     }
-    
-    if (orderType === 'stop-limit' && (isNaN(parseFloat(stopPrice)) || parseFloat(stopPrice) <= 0)) {
-      alert('Please enter a valid stop price')
-      return
+    // Stop price validation for stop-limit orders
+    const stopPriceNum = parseFloat(stopPrice);
+    if (orderType === 'stop-limit' && (isNaN(stopPriceNum) || stopPriceNum <= 0)) {
+        console.error('Invalid stop price entered.'); // Log error instead of alert
+        return;
     }
-    
+    // Additional validation for stop-limit: stop price vs current price
+    if (orderType === 'stop-limit') {
+        // Ensure currentPrice is valid before comparing
+         if (isNaN(currentPrice) || currentPrice <= 0) {
+            console.error("Cannot validate stop price: Current market price is unknown.");
+            return;
+         }
+        // Allow stop price to be equal for triggering immediately if needed
+        if (side === 'buy' && stopPriceNum < currentPrice) {
+            console.error('Buy Stop price must be at or above the current market price.'); // Log error
+            return;
+        }
+        if (side === 'sell' && stopPriceNum > currentPrice) {
+            console.error('Sell Stop price must be at or below the current market price.'); // Log error
+            return;
+        }
+    }
+
+
     // For limit and stop-limit orders, add to pending orders
     if (orderType === 'limit' || orderType === 'stop-limit') {
       const newOrder: PendingOrder = {
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`, // More robust ID
         type: orderType,
         side,
         symbol: activeInstrument,
-        price,
+        price, // Limit price
         amount: qty,
-        stopPrice: orderType === 'stop-limit' ? parseFloat(stopPrice) : undefined,
-        timestamp: Date.now()
-      }
-      
-      setPendingOrders(prev => [...prev, newOrder])
-      
-      alert(`${orderType.toUpperCase()} ${side.toUpperCase()} order placed successfully!\nPrice: ${price.toFixed(2)} ${quoteCurrency}\nAmount: ${qty.toFixed(6)} ${baseCurrency}`)
+        stopPrice: orderType === 'stop-limit' ? stopPriceNum : undefined,
+        timestamp: Date.now(),
+      };
+
+      setPendingOrders((prev) => [...prev, newOrder]);
+
+      console.log( // Log instead of alert
+        `${orderType.toUpperCase()} ${side.toUpperCase()} order placed successfully!\nSymbol: ${activeInstrument}\nAmount: ${qty.toFixed(6)} ${baseCurrency}\n${orderType === 'stop-limit' ? `Stop: ${stopPriceNum.toFixed(2)} ` : ''}Price: ${price.toFixed(2)} ${quoteCurrency}`
+      );
     } else {
       // Market orders execute immediately
-      const result = side === 'buy' 
-        ? onBuyOrder(activeInstrument, qty, price)
-        : onSellOrder(activeInstrument, qty, price)
-      
+      // Note: Market orders use the 'currentPrice' state variable for execution price confirmation/logging
+      // Ensure currentPrice is valid before executing market order
+       if (isNaN(currentPrice) || currentPrice <= 0) {
+           console.error("Cannot execute market order: Invalid current price.");
+           return;
+       }
+      const result =
+        side === 'buy'
+          ? onBuyOrder(activeInstrument, qty, currentPrice) // Pass currentPrice for market buy
+          : onSellOrder(activeInstrument, qty, currentPrice); // Pass currentPrice for market sell
+
       if (!result.success) {
-        alert(result.message)
-        return
+        console.error("Market order execution failed:", result.message); // Log error instead of alert
+        return;
       }
-      
-      alert(`MARKET ${side.toUpperCase()} order executed successfully!\nPrice: ${price.toFixed(2)} ${quoteCurrency}\nAmount: ${qty.toFixed(6)} ${baseCurrency}`)
+
+      console.log( // Log instead of alert
+        `MARKET ${side.toUpperCase()} order executed successfully!\nSymbol: ${activeInstrument}\nAmount: ${qty.toFixed(6)} ${baseCurrency}\nApprox. Price: ${currentPrice.toFixed(2)} ${quoteCurrency}`
+      );
     }
-    
-    // Reset form
-    setAmount('')
-    setPercentage(0)
-  }
-  
+
+    // Reset form after placing order
+    setAmount('');
+    setPercentage(0);
+    // Reset limit price to current price for convenience, keep stop price as is
+    setLimitPrice(currentPrice > 0 ? currentPrice.toFixed(2) : '');
+    // setStopPrice(''); // User might want to reuse stop price
+  };
+
   // Cancel pending order
   const cancelPendingOrder = (orderId: string) => {
-    setPendingOrders(prev => prev.filter(order => order.id !== orderId))
-    alert('Order cancelled successfully')
-  }
+    setPendingOrders((prev) => prev.filter((order) => order.id !== orderId));
+    console.log(`Pending order ${orderId} cancelled successfully.`); // Log instead of alert
+  };
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-full flex flex-col">
@@ -274,7 +483,7 @@ export default function TradingPanel({
           </span>
         </div>
       </div>
-      
+
       {/* Trading Mode Tabs */}
       <div className="flex gap-1.5 mb-4 bg-slate-100 dark:bg-slate-800 rounded-lg p-1.5">
         {(['spot', 'cross', 'isolated', 'grid'] as TradingMode[]).map((mode) => (
@@ -284,17 +493,24 @@ export default function TradingPanel({
             className={`flex-1 px-3 py-2 text-sm font-semibold rounded-md transition capitalize ${
               tradingMode === mode
                 ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                // Apply subtle styling for non-spot modes instead of disabling
+                : mode !== 'spot'
+                ? 'text-slate-400 dark:text-slate-600 cursor-not-allowed' // Less prominent text, not-allowed cursor
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200' // Normal hover for spot
             }`}
+            // Add disabled attribute only if interaction should truly be blocked
+             disabled={mode !== 'spot'}
+            title={mode !== 'spot' ? 'Coming soon' : ''}
           >
             {mode}
           </button>
         ))}
       </div>
-      
+
       {/* Order Type Tabs */}
       <div className="flex gap-1.5 mb-4 bg-slate-100 dark:bg-slate-800 rounded-lg p-1.5">
-        <button
+        {/* ... Limit, Market, Stop-Limit buttons ... */}
+         <button
           onClick={() => setOrderType('limit')}
           className={`flex-1 px-3 py-2 text-sm font-semibold rounded-md transition ${
             orderType === 'limit'
@@ -325,15 +541,16 @@ export default function TradingPanel({
           Stop-Limit
         </button>
       </div>
-      
+
       {/* Recurring and Buy with EUR Toggles */}
+      {/* Keep these clickable but indicate they are placeholders */}
       <div className="flex items-center justify-between mb-5 text-sm">
-        <label className="flex items-center gap-2.5 cursor-pointer">
+        <label className="flex items-center gap-2.5 cursor-pointer" title="Recurring Order (Coming soon)">
           <div className="relative">
             <input
               type="checkbox"
               checked={isRecurring}
-              onChange={(e) => setIsRecurring(e.target.checked)}
+              onChange={(e) => { setIsRecurring(e.target.checked);}}
               className="sr-only peer"
             />
             <div className="w-10 h-5 bg-slate-300 dark:bg-slate-700 rounded-full peer-checked:bg-blue-500 transition"></div>
@@ -341,12 +558,12 @@ export default function TradingPanel({
           </div>
           <span className="text-slate-700 dark:text-slate-300 font-medium">Recurring</span>
         </label>
-        <label className="flex items-center gap-2.5 cursor-pointer">
+        <label className="flex items-center gap-2.5 cursor-pointer" title="Buy with EUR (Coming soon)">
           <div className="relative">
             <input
               type="checkbox"
               checked={buyWithEUR}
-              onChange={(e) => setBuyWithEUR(e.target.checked)}
+              onChange={(e) => { setBuyWithEUR(e.target.checked);}}
               className="sr-only peer"
             />
             <div className="w-10 h-5 bg-slate-300 dark:bg-slate-700 rounded-full peer-checked:bg-blue-500 transition"></div>
@@ -355,9 +572,9 @@ export default function TradingPanel({
           <span className="text-slate-700 dark:text-slate-300 font-medium">Buy with EUR</span>
         </label>
       </div>
-      
+
       {/* Available Balance Breakdown */}
-      <div className="mb-5 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+       <div className="mb-5 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
         <div className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">Available Balance</div>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
@@ -373,18 +590,23 @@ export default function TradingPanel({
             </span>
           </div>
           <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
-            <span className="text-slate-600 dark:text-slate-400">Total Value:</span>
+            <span className="text-slate-600 dark:text-slate-400">Approx Value:</span>
             <span className="font-bold text-blue-600 dark:text-blue-400">
-              {(usdBalance + (currentHolding * currentPrice)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+              {(usdBalance + currentHolding * (currentPrice > 0 ? currentPrice : 0)).toLocaleString('en-US', { // Use 0 if currentPrice is not yet set
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{' '}
+              USD
             </span>
           </div>
         </div>
       </div>
-      
+
+
       {/* Order Form */}
-      <div className="flex-1 flex flex-col gap-4 overflow-y-auto">
+      <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1"> {/* Added pr-1 for scrollbar */}
         {/* Stop Price (only for stop-limit) */}
-        {orderType === 'stop-limit' && (
+         {orderType === 'stop-limit' && (
           <div>
             <label className="block text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">
               Stop Price
@@ -395,18 +617,20 @@ export default function TradingPanel({
                 value={stopPrice}
                 onChange={(e) => setStopPrice(e.target.value)}
                 placeholder={currentPrice > 0 ? currentPrice.toFixed(2) : '0.00'}
+                min="0" step="any"
                 className="w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-100"
               />
               <span className="absolute right-4 top-2.5 text-sm text-slate-400 font-medium">{quoteCurrency}</span>
             </div>
           </div>
         )}
-        
+
+
         {/* Price (not shown for market orders) */}
         {orderType !== 'market' && (
           <div>
             <label className="block text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">
-              Price
+              {orderType === 'stop-limit' ? 'Limit Price' : 'Price'}
             </label>
             <div className="relative">
               <input
@@ -414,13 +638,14 @@ export default function TradingPanel({
                 value={limitPrice}
                 onChange={(e) => setLimitPrice(e.target.value)}
                 placeholder={currentPrice > 0 ? currentPrice.toFixed(2) : '0.00'}
+                 min="0" step="any"
                 className="w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-100"
               />
               <span className="absolute right-4 top-2.5 text-sm text-slate-400 font-medium">{quoteCurrency}</span>
             </div>
           </div>
         )}
-        
+
         {/* Amount */}
         <div>
           <label className="block text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">
@@ -432,44 +657,45 @@ export default function TradingPanel({
               value={amount}
               onChange={(e) => handleAmountChange(e.target.value)}
               placeholder="0.000000"
+              min="0" // Ensure non-negative input
+              step="any" // Allow decimals
               className="w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-100"
             />
             <span className="absolute right-4 top-2.5 text-sm text-slate-400 font-medium">{baseCurrency}</span>
           </div>
         </div>
-        
-        {/* Percentage Slider */}
+
         <div>
-          <div className="flex justify-between items-center mb-2.5">
-            <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Quick Amount</span>
-            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{percentage}%</span>
-          </div>
-          <div className="flex gap-2.5">
-            {[25, 50, 75, 100].map((pct) => (
-              <button
-                key={pct}
-                onClick={() => calculateAmountFromPercentage(pct)}
-                className={`flex-1 px-3 py-2 text-sm font-semibold rounded-lg transition ${
-                  percentage === pct
-                    ? 'bg-blue-500 text-white shadow-md'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                {pct}%
-              </button>
-            ))}
-          </div>
+             <div className="flex gap-1.5">
+                {[25, 50, 75, 100].map((pct) => (
+                <button
+                    key={`buy-pct-${pct}`} // Renamed key
+                    onClick={() => calculateAmountFromPercentage(pct)} // Simplified onClick
+                    className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition ${
+                     // Simpler styling check based only on percentage
+                     percentage === pct
+                        ? 'bg-blue-500 text-white shadow-sm' // Use a neutral color like blue
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                    disabled={usdBalance <= 0} // Disable if no USD balance
+                >
+                    {pct}%
+                </button>
+                ))}
+            </div>
         </div>
-        
+
+
         {/* TP/SL Toggle */}
+        {/* Make this clickable but indicate placeholder */}
         <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
-          <label className="flex items-center justify-between cursor-pointer">
+          <label className="flex items-center justify-between cursor-pointer" title="TP/SL (Coming soon)">
             <span className="text-sm font-bold text-slate-700 dark:text-slate-300">TP/SL</span>
             <div className="relative">
               <input
                 type="checkbox"
                 checked={enableTPSL}
-                onChange={(e) => setEnableTPSL(e.target.checked)}
+                onChange={(e) => { setEnableTPSL(e.target.checked); }}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 rounded-full peer-checked:bg-blue-500 transition"></div>
@@ -477,9 +703,10 @@ export default function TradingPanel({
             </div>
           </label>
         </div>
-        
-        {/* TP/SL Advanced Options */}
-        {enableTPSL && (
+
+
+        {/* TP/SL Advanced Options (Conditional Rendering) */}
+         {enableTPSL && (
           <div className="space-y-3 p-2.5 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
             {/* Take Profit */}
             <div>
@@ -489,41 +716,31 @@ export default function TradingPanel({
                   <div className="flex-1">
                     <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">TP Trigger</label>
                     <input
-                      type="number"
-                      value={tpTrigger}
-                      onChange={(e) => setTpTrigger(e.target.value)}
-                      placeholder="0.00"
+                      type="number" value={tpTrigger} onChange={(e) => setTpTrigger(e.target.value)} placeholder="0.00" min="0" step="any"
                       className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                     />
                   </div>
                   <div className="flex-1">
                     <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">TP Limit</label>
                     <input
-                      type="number"
-                      value={tpLimit}
-                      onChange={(e) => setTpLimit(e.target.value)}
-                      placeholder="0.00"
+                      type="number" value={tpLimit} onChange={(e) => setTpLimit(e.target.value)} placeholder="0.00" min="0" step="any"
                       className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                    />
+                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-slate-600 dark:text-slate-400">Offset:</label>
-                  <input
-                    type="number"
-                    value={tpOffset}
-                    onChange={(e) => setTpOffset(e.target.value)}
-                    placeholder="0"
-                    className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                  />
-                  <button className="px-2 py-1.5 text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-300 dark:hover:bg-slate-600 transition">
-                    %
-                  </button>
-                </div>
+                 <div className="flex items-center gap-2">
+                   <label className="text-xs text-slate-600 dark:text-slate-400">Offset:</label>
+                   <input
+                     type="number" value={tpOffset} onChange={(e) => setTpOffset(e.target.value)} placeholder="0" min="0" step="any"
+                     className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                   />
+                   <button className="px-2 py-1.5 text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-300 dark:hover:bg-slate-600 transition">
+                     %
+                   </button>
+                 </div>
               </div>
             </div>
-            
-            {/* Stop Loss */}
+             {/* Stop Loss */}
             <div>
               <div className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2">Stop Loss</div>
               <div className="space-y-2">
@@ -531,45 +748,37 @@ export default function TradingPanel({
                   <div className="flex-1">
                     <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">SL Trigger</label>
                     <input
-                      type="number"
-                      value={slTrigger}
-                      onChange={(e) => setSlTrigger(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
-                    />
+                       type="number" value={slTrigger} onChange={(e) => setSlTrigger(e.target.value)} placeholder="0.00" min="0" step="any"
+                       className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+                     />
                   </div>
                   <div className="flex-1">
                     <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">SL Limit</label>
                     <input
-                      type="number"
-                      value={slLimit}
-                      onChange={(e) => setSlLimit(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
-                    />
+                       type="number" value={slLimit} onChange={(e) => setSlLimit(e.target.value)} placeholder="0.00" min="0" step="any"
+                       className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-slate-600 dark:text-slate-400">Offset:</label>
-                  <input
-                    type="number"
-                    value={slOffset}
-                    onChange={(e) => setSlOffset(e.target.value)}
-                    placeholder="0"
-                    className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
-                  />
-                  <button className="px-2 py-1.5 text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-300 dark:hover:bg-slate-600 transition">
-                    %
-                  </button>
-                </div>
+                 <div className="flex items-center gap-2">
+                   <label className="text-xs text-slate-600 dark:text-slate-400">Offset:</label>
+                   <input
+                     type="number" value={slOffset} onChange={(e) => setSlOffset(e.target.value)} placeholder="0" min="0" step="any"
+                     className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+                   />
+                   <button className="px-2 py-1.5 text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-300 dark:hover:bg-slate-600 transition">
+                     %
+                   </button>
+                 </div>
               </div>
             </div>
           </div>
         )}
-        
+
+
         {/* Total & Fee */}
         <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
-          <div className="flex justify-between items-center mb-1">
+           <div className="flex justify-between items-center mb-1">
             <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Fee ({feeLevel}%)</span>
             <span className="text-base font-semibold text-slate-900 dark:text-slate-100">
               {getFeeAmount().toFixed(2)} <span className="text-xs text-slate-500 dark:text-slate-400">{quoteCurrency}</span>
@@ -582,134 +791,154 @@ export default function TradingPanel({
             </span>
           </div>
         </div>
-        
+
         {/* Trading Info Block - Lots, Margin, Pip Value */}
         <div className="p-3.5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 rounded-lg border border-blue-200 dark:border-slate-700">
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="text-center">
               <div className="text-slate-600 dark:text-slate-400 mb-1.5 font-medium">Lots</div>
               <div className="font-bold text-slate-900 dark:text-slate-100 text-base">
-                {lots.toFixed(2)}
+                {lots.toFixed(tradingMode === 'spot' ? 6 : 2)} {/* More precision for spot */}
               </div>
             </div>
             <div className="text-center border-x border-blue-200 dark:border-slate-700">
               <div className="text-slate-600 dark:text-slate-400 mb-1.5 font-medium">Margin</div>
               <div className="font-bold text-slate-900 dark:text-slate-100 text-base">
-                ${margin.toFixed(2)}
+                 {tradingMode === 'spot' ? 'N/A' : `$${margin.toFixed(2)}`}
               </div>
             </div>
             <div className="text-center">
               <div className="text-slate-600 dark:text-slate-400 mb-1.5 font-medium">Pip Value</div>
               <div className="font-bold text-slate-900 dark:text-slate-100 text-base">
-                ${pipValue.toFixed(4)}
+                 {tradingMode === 'spot' ? 'N/A' : `$${pipValue.toFixed(4)}`}
               </div>
             </div>
           </div>
         </div>
-        
+
+
         {/* Buy/Sell Buttons */}
         <div className="grid grid-cols-2 gap-3 pt-2">
-          <button
+           <button
             onClick={() => handleOrder('buy')}
-            className="px-4 py-3 text-base font-bold bg-green-500 hover:bg-green-600 text-white rounded-lg transition shadow-sm"
+            className="px-4 py-3 text-base font-bold bg-green-500 hover:bg-green-600 text-white rounded-lg transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            // Disable buy if not enough USD balance OR amount is zero/invalid
+            disabled={
+                parseFloat(amount || '0') <= 0 || // Amount must be positive
+                (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) || // Need valid price for market
+                (orderType !== 'market' && (parseFloat(getTotal() || 'Infinity') > usdBalance)) // Check total against balance for limit/stop
+            }
           >
             Buy {baseCurrency}
           </button>
           <button
             onClick={() => handleOrder('sell')}
-            className="px-4 py-3 text-base font-bold bg-red-500 hover:bg-red-600 text-white rounded-lg transition shadow-sm"
+            className="px-4 py-3 text-base font-bold bg-red-500 hover:bg-red-600 text-white rounded-lg transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+             // Disable sell if amount entered is greater than current holding or amount is zero/invalid
+             // Also disable if price is needed but invalid (for limit/stop-limit)
+            disabled={
+                parseFloat(amount || '0') <= 0 || // Amount must be positive
+                parseFloat(amount || '0') > currentHolding || // Cannot sell more than held
+                (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) || // Need valid price for market
+                ((orderType === 'limit' || orderType === 'stop-limit') && (isNaN(parseFloat(limitPrice)) || parseFloat(limitPrice) <= 0)) // Need valid limit price
+            }
           >
             Sell {baseCurrency}
           </button>
         </div>
       </div>
-      
-      {/* Pending Orders Section */}
-      {pendingOrders.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-              Pending Orders ({pendingOrders.length})
-            </h4>
-            <button
-              onClick={() => setPendingOrders([])}
-              className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
-            >
-              Cancel All
-            </button>
-          </div>
-          <div className="space-y-2 max-h-[200px] overflow-y-auto">
-            {pendingOrders.map((order) => {
-              const fee = order.price * order.amount * (feeLevel / 100);
-              const totalWithFee = order.price * order.amount + fee;
-              return (
-                <div
-                  key={order.id}
-                  className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                        order.side === 'buy' 
-                          ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                          : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                      }`}>
-                        {order.side.toUpperCase()}
-                      </span>
-                      <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                        {order.symbol}
-                      </span>
-                      <span className="text-xs text-slate-500 dark:text-slate-400 uppercase">
-                        {order.type}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => cancelPendingOrder(order.id)}
-                      className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    {order.stopPrice && (
-                      <div>
-                        <span className="text-slate-500 dark:text-slate-400">Stop:</span>
-                        <span className="ml-1 font-semibold text-slate-700 dark:text-slate-300">
-                          ${order.stopPrice.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-slate-500 dark:text-slate-400">Price:</span>
-                      <span className="ml-1 font-semibold text-slate-700 dark:text-slate-300">
-                        ${order.price.toFixed(2)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 dark:text-slate-400">Amount:</span>
-                      <span className="ml-1 font-semibold text-slate-700 dark:text-slate-300">
-                        {order.amount.toFixed(6)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 dark:text-slate-400">Fee ({feeLevel}%):</span>
-                      <span className="ml-1 font-semibold text-slate-700 dark:text-slate-300">
-                        ${fee.toFixed(2)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 dark:text-slate-400">Total (incl. fee):</span>
-                      <span className="ml-1 font-semibold text-blue-700 dark:text-blue-300">
-                        ${totalWithFee.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+
+       {/* Pending Orders Section */}
+       {/* Filter pending orders by active instrument BEFORE checking length */}
+       {pendingOrders.filter(o => o.symbol === activeInstrument).length > 0 && (
+         <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+           <div className="flex items-center justify-between mb-3">
+             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+               Pending Orders ({pendingOrders.filter(o => o.symbol === activeInstrument).length}) {/* Show count for active instrument */}
+             </h4>
+             <button
+               onClick={() => setPendingOrders(prev => prev.filter(o => o.symbol !== activeInstrument))} // Cancel only for active instrument
+               className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
+             >
+               Cancel All ({activeInstrument})
+             </button>
+           </div>
+           {/* Scrollable container for orders */}
+           <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1"> {/* Adjusted max height */}
+             {pendingOrders
+               .filter(order => order.symbol === activeInstrument) // Filter to show only orders for the active instrument
+               .map((order) => {
+                 const fee = order.price * order.amount * (feeLevel / 100);
+                 const totalWithFee = order.price * order.amount + fee;
+                 return (
+                   <div
+                     key={order.id}
+                     className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-xs" // Made text smaller
+                   >
+                     <div className="flex items-start justify-between mb-1.5"> {/* Reduced margin */}
+                       <div className="flex items-center gap-1.5 flex-wrap"> {/* Reduced gap, added wrap */}
+                         <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${ /* Smaller badge */
+                           order.side === 'buy'
+                             ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                             : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+                         }`}>
+                           {order.side.toUpperCase()}
+                         </span>
+                         <span className="font-medium text-slate-700 dark:text-slate-300">
+                           {order.symbol}
+                         </span>
+                         <span className="text-slate-500 dark:text-slate-400 uppercase text-[10px]"> {/* Smaller text */}
+                           {order.type}
+                         </span>
+                       </div>
+                       <button
+                         onClick={() => cancelPendingOrder(order.id)}
+                         className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium text-[10px] flex-shrink-0 ml-2" /* Smaller text, prevent shrinking */
+                       >
+                         Cancel
+                       </button>
+                     </div>
+                     {/* Simplified grid layout */}
+                     <div className="grid grid-cols-2 gap-x-2 gap-y-0.5"> {/* Reduced gap */}
+                       {order.stopPrice && (
+                         <div className="col-span-1 truncate"> {/* Added truncate */}
+                           <span className="text-slate-500 dark:text-slate-400">Stop:</span>
+                           <span className="ml-1 font-semibold text-slate-700 dark:text-slate-300">
+                             ${order.stopPrice.toFixed(2)}
+                           </span>
+                         </div>
+                       )}
+                       <div className="col-span-1 truncate"> {/* Added truncate */}
+                         <span className="text-slate-500 dark:text-slate-400">Price:</span>
+                         <span className="ml-1 font-semibold text-slate-700 dark:text-slate-300">
+                           ${order.price.toFixed(2)}
+                         </span>
+                       </div>
+                       <div className="col-span-1 truncate"> {/* Added truncate */}
+                         <span className="text-slate-500 dark:text-slate-400">Amount:</span>
+                         <span className="ml-1 font-semibold text-slate-700 dark:text-slate-300">
+                           {order.amount.toFixed(6)}
+                         </span>
+                       </div>
+                         <div className="col-span-1 truncate"> {/* Added truncate */}
+                           <span className="text-slate-500 dark:text-slate-400">Fee:</span>
+                           <span className="ml-1 font-semibold text-slate-700 dark:text-slate-300">
+                             ${fee.toFixed(2)}
+                           </span>
+                         </div>
+                       <div className="col-span-2 truncate"> {/* Total spans both columns, added truncate */}
+                         <span className="text-slate-500 dark:text-slate-400">Total:</span>
+                         <span className="ml-1 font-semibold text-blue-700 dark:text-blue-300">
+                           ${totalWithFee.toFixed(2)}
+                         </span>
+                       </div>
+                     </div>
+                   </div>
+                 );
+               })}
+           </div>
+         </div>
+       )}
     </div>
-  )
+  );
 }

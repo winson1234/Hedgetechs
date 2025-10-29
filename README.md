@@ -8,6 +8,7 @@ Real-time cryptocurrency and forex trading platform with live charts, order book
 
 **Backend (Go)**
 ```bash
+go mod tidy           # Install dependencies
 cd cmd/server
 go build ./cmd/server # Build binary
 go run main.go        # Run server

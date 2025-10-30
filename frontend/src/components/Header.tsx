@@ -11,6 +11,9 @@ type Props = {
   accountCurrency: string; // Currency of the active account
   onDeposit: (amount: number) => void;
   navigateTo: (page: Page) => void; // Function to switch pages
+  // Add the new props here
+  activeAccountId: string | null;
+  activeAccountType: 'live' | 'demo' | undefined;
 };
 
 export default function Header({
@@ -19,7 +22,9 @@ export default function Header({
   usdBalance,
   accountCurrency,
   onDeposit,
-  navigateTo, // Receive navigateTo function
+  navigateTo,
+  activeAccountId,
+  activeAccountType,
 }: Props) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
@@ -131,13 +136,12 @@ export default function Header({
             </button>
 
             {/* User Profile Button with CLICK Dropdown */}
-            {/* Added ref={profileRef} to the container div */}
             <div
               className="relative"
-              ref={profileRef} // Assign ref here
+              ref={profileRef}
             >
               <button
-                onClick={() => setIsProfileOpen(prev => !prev)} // Toggle on click
+                onClick={() => setIsProfileOpen(prev => !prev)}
                 className={`p-2 border rounded transition ${
                   isProfileOpen
                     ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
@@ -150,12 +154,13 @@ export default function Header({
                 </svg>
               </button>
 
-              {/* Profile Dropdown - Now controlled by click */}
-              {/* Pass setIsProfileOpen to allow closing from within */}
+              {/* Profile Dropdown - Pass new props down */}
               <ProfileDropdown
                 isOpen={isProfileOpen}
                 navigateTo={navigateTo}
-                closeDropdown={() => setIsProfileOpen(false)} // Pass close function
+                closeDropdown={() => setIsProfileOpen(false)}
+                activeAccountId={activeAccountId}
+                activeAccountType={activeAccountType}
                />
             </div>
           </div>

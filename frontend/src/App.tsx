@@ -274,16 +274,17 @@ export default function App() {
   const handleAnalyticsPanelClose = () => { setShowAnalyticsPanel(false); setActiveTool(null); };
   const handleCustomIntervalSubmit = () => { if (customInterval.trim()) { setActiveTimeframe(customInterval.trim()); setShowCustomInterval(false); setCustomInterval(''); } };
 
-   // --- Derived State ---
-   const activeUsdBalance = activeAccount?.balances[activeAccount.currency] ?? 0;
-   const activeAccountCurrency = activeAccount?.currency ?? 'USD';
-   const activeCryptoHoldings = useMemo(() => {
-       if (!activeAccount) return {};
-       return Object.entries(activeAccount.balances)
-         .filter(([key]) => key !== activeAccount.currency)
-         .reduce((obj, [key, value]) => { obj[key] = value; return obj; }, {} as Record<string, number>);
-   }, [activeAccount]);
-
+  // --- Derived State ---
+  // This is the single, correct definition
+  const activeUsdBalance = activeAccount?.balances[activeAccount.currency] ?? 0;
+  const activeAccountCurrency = activeAccount?.currency ?? 'USD';
+  const activeCryptoHoldings = useMemo(() => {
+      if (!activeAccount) return {};
+      return Object.entries(activeAccount.balances)
+        .filter(([key]) => key !== activeAccount.currency)
+        .reduce((obj, [key, value]) => { obj[key] = value; return obj; }, {} as Record<string, number>);
+  }, [activeAccount]);
+  
   // --- Render ---
   return (
     <div className={isDarkMode ? 'dark' : ''}>
@@ -292,6 +293,9 @@ export default function App() {
           isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode}
           usdBalance={activeUsdBalance} accountCurrency={activeAccountCurrency}
           onDeposit={handleDeposit} navigateTo={navigateTo}
+          // Pass the active account info down
+          activeAccountId={activeAccountId}
+          activeAccountType={activeAccount?.type}
         />
         {currentPage === 'trading' && <LeftToolbar onToolSelect={handleToolSelect} activeTool={activeTool} />}
         {currentPage === 'trading' && <AnalyticsPanel isOpen={showAnalyticsPanel} onClose={handleAnalyticsPanelClose} symbol={activeInstrument} />}

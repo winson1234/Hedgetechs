@@ -1,3 +1,5 @@
+// frontend/src/App.tsx
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import LivePriceDisplay from './components/LivePriceDisplay';
 import ChartComponent from './components/ChartComponent';
@@ -10,7 +12,8 @@ import LeftToolbar from './components/LeftToolbar';
 import AnalyticsPanel from './components/AnalyticsPanel';
 import AccountPage from './components/AccountPage';
 import ToastNotification from './components/ToastNotification';
-import MainSidebar from './components/MainSidebar'; 
+// Import the new Wallet page
+import WalletPage from './pages/WalletPage';
 
 // --- Type Definitions ---
 export type Account = {
@@ -21,7 +24,10 @@ export type Account = {
   createdAt: number;
 };
 
-type Page = 'trading' | 'account' | 'deposit' | 'withdrawal' | 'history';
+// CORRECTED Page type
+export type Page = 'trading' | 'account' | 'wallet' | 'history';
+// Type for the wallet tabs
+export type WalletTab = 'overview' | 'deposit' | 'withdraw' | 'transfer';
 
 type ToastState = {
   id: number;
@@ -81,9 +87,12 @@ export default function App() {
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>('trading');
   const [toast, setToast] = useState<ToastState>(null);
+  
+  // Add state for the active wallet tab
+  const [activeWalletTab, setActiveWalletTab] = useState<WalletTab>('overview');
 
-  // --- Effects --- (Load/Save Logic remains the same)
-   useEffect(() => {
+  // Effects
+  useEffect(() => {
     try {
       const savedAccounts = localStorage.getItem('tradingAccounts');
       const savedActiveId = localStorage.getItem('activeAccountId');
@@ -144,8 +153,12 @@ export default function App() {
     setToast({ id: Date.now(), message, type });
   }, []);
 
-  const navigateTo = useCallback((page: Page) => {
+  // Updated navigateTo function to handle pre-selecting a wallet tab
+  const navigateTo = useCallback((page: Page, tab?: WalletTab) => {
     setCurrentPage(page);
+    if (page === 'wallet' && tab) {
+      setActiveWalletTab(tab);
+    }
   }, []);
 
   const setActiveAccount = useCallback((id: string) => {
@@ -204,25 +217,132 @@ export default function App() {
     }
   }, [showToast]);
 
-  // --- Trading Functions ---
+  // --- Trading & Wallet Functions ---
 
   const activeAccount = useMemo(() => {
     return accounts.find(acc => acc.id === activeAccountId);
   }, [accounts, activeAccountId]);
 
-  const handleDeposit = useCallback((amount: number) => {
-    if (!activeAccount || amount <= 0) return;
+  const handleDeposit = useCallback((accountId: string, amount: number, currency: string): { success: boolean; message: string } => {
+    if (amount <= 0) {
+      showToast('Deposit amount must be positive.', 'error');
+      return { success: false, message: 'Invalid amount.' };
+    }
+    
+    let accountFound = false;
     setAccounts(prevAccounts =>
       prevAccounts.map(acc => {
-        if (acc.id === activeAccountId) {
-          const currentBalance = acc.balances[acc.currency] ?? 0;
-          return { ...acc, balances: { ...acc.balances, [acc.currency]: currentBalance + amount } };
+        if (acc.id === accountId) {
+          accountFound = true;
+          const currentBalance = acc.balances[currency] ?? 0;
+          return {
+            ...acc,
+            balances: { ...acc.balances, [currency]: currentBalance + amount }
+          };
         }
         return acc;
       })
     );
-     showToast(`${formatBalance(amount, activeAccount.currency)} deposited to ${activeAccount.id}.`, 'success');
-  }, [activeAccount, activeAccountId, showToast]); // <-- CORRECTED: formatBalance removed
+
+    if (accountFound) {
+      showToast(`${formatBalance(amount, currency)} deposited to ${accountId}.`, 'success');
+      return { success: true, message: 'Deposit successful!' };
+    } else {
+      showToast(`Account ${accountId} not found.`, 'error');
+      return { success: false, message: 'Account not found.' };
+    }
+  }, [showToast]); // Removed accounts
+
+  const handleWithdrawal = useCallback((accountId: string, amount: number, currency: string): { success: boolean; message: string } => {
+    if (amount <= 0) {
+      showToast('Withdrawal amount must be positive.', 'error');
+      return { success: false, message: 'Invalid amount.' };
+    }
+
+    let success = false;
+    let message = 'Withdrawal failed.';
+
+    setAccounts(prevAccounts =>
+      prevAccounts.map(acc => {
+        if (acc.id === accountId) {
+          const currentBalance = acc.balances[currency] ?? 0;
+          if (currentBalance < amount) {
+            message = `Insufficient funds. You only have ${formatBalance(currentBalance, currency)}.`;
+            showToast(message, 'error');
+            return acc; // Return unmodified account
+          }
+          
+          success = true;
+          message = `Withdrew ${formatBalance(amount, currency)} from ${accountId}.`;
+          showToast(message, 'success');
+          
+          return {
+            ...acc,
+            balances: { ...acc.balances, [currency]: currentBalance - amount }
+          };
+        }
+        return acc;
+      })
+    );
+    
+    return { success, message };
+  }, [showToast]); // Removed accounts
+
+  const handleTransfer = useCallback((fromAccountId: string, toAccountId: string, amount: number, currency: string): { success: boolean; message: string } => {
+    if (amount <= 0) {
+      showToast('Transfer amount must be positive.', 'error');
+      return { success: false, message: 'Invalid amount.' };
+    }
+    if (fromAccountId === toAccountId) {
+      showToast('Cannot transfer to the same account.', 'error');
+      return { success: false, message: 'Cannot transfer to the same account.' };
+    }
+
+    let success = false;
+    let message = 'Transfer failed.';
+
+    setAccounts(prevAccounts => {
+      const fromAcc = prevAccounts.find(a => a.id === fromAccountId);
+      const toAcc = prevAccounts.find(a => a.id === toAccountId);
+
+      if (!fromAcc || !toAcc) {
+        message = 'One or both accounts not found.';
+        showToast(message, 'error');
+        return prevAccounts;
+      }
+      
+      if (fromAcc.currency !== toAcc.currency) {
+        message = 'Cross-currency transfers are not supported.';
+        showToast(message, 'error');
+        return prevAccounts;
+      }
+
+      const fromBalance = fromAcc.balances[currency] ?? 0;
+      if (fromBalance < amount) {
+        message = `Insufficient funds in account ${fromAccountId}.`;
+        showToast(message, 'error');
+        return prevAccounts;
+      }
+
+      success = true;
+      message = `Transferred ${formatBalance(amount, currency)} from ${fromAccountId} to ${toAccountId}.`;
+      showToast(message, 'success');
+
+      return prevAccounts.map(acc => {
+        if (acc.id === fromAccountId) {
+          return { ...acc, balances: { ...acc.balances, [currency]: fromBalance - amount } };
+        }
+        if (acc.id === toAccountId) {
+          const toBalance = acc.balances[currency] ?? 0;
+          return { ...acc, balances: { ...acc.balances, [currency]: toBalance + amount } };
+        }
+        return acc;
+      });
+    });
+    
+    return { success, message };
+  }, [showToast]);
+
 
   const handleBuyOrder = useCallback((symbol: string, amount: number, price: number): { success: boolean; message: string } => {
     if (!activeAccount) return { success: false, message: 'No active account selected.' };
@@ -276,7 +396,6 @@ export default function App() {
   const handleCustomIntervalSubmit = () => { if (customInterval.trim()) { setActiveTimeframe(customInterval.trim()); setShowCustomInterval(false); setCustomInterval(''); } };
 
   // --- Derived State ---
-  // This is the single, correct definition
   const activeUsdBalance = activeAccount?.balances[activeAccount.currency] ?? 0;
   const activeAccountCurrency = activeAccount?.currency ?? 'USD';
   const activeCryptoHoldings = useMemo(() => {
@@ -295,7 +414,6 @@ export default function App() {
           setIsDarkMode={setIsDarkMode}
           usdBalance={activeUsdBalance}
           accountCurrency={activeAccountCurrency}
-          onDeposit={handleDeposit}
           navigateTo={navigateTo}
           activeAccountId={activeAccountId}
           activeAccountType={activeAccount?.type}
@@ -303,14 +421,12 @@ export default function App() {
         
         {/* === START: HYBRID LAYOUT LOGIC === */}
         
-        {/* Show correct sidebar based on the current page */}
         {currentPage === 'trading' ? (
           <LeftToolbar onToolSelect={handleToolSelect} activeTool={activeTool} />
         ) : (
           <MainSidebar currentPage={currentPage} navigateTo={navigateTo} />
         )}
         
-        {/* Analytics panel is only for the trading page */}
         {currentPage === 'trading' && (
           <AnalyticsPanel isOpen={showAnalyticsPanel} onClose={handleAnalyticsPanelClose} symbol={activeInstrument} />
         )}
@@ -359,9 +475,21 @@ export default function App() {
                   formatBalance={formatBalance}
                 />
               )}
+              {/* Render Wallet Page */}
+              {currentPage === 'wallet' && (
+                <WalletPage
+                  accounts={accounts}
+                  activeAccountId={activeAccountId}
+                  activeWalletTab={activeWalletTab}
+                  setActiveWalletTab={setActiveWalletTab}
+                  onDeposit={handleDeposit}
+                  onWithdraw={handleWithdrawal}
+                  onTransfer={handleTransfer}
+                  formatBalance={formatBalance}
+                  showToast={showToast}
+                />
+              )}
               {/* Add placeholders for future pages */}
-              {currentPage === 'deposit' && <div className="p-8"><h1>Deposit Page (Coming Soon)</h1></div>}
-              {currentPage === 'withdrawal' && <div className="p-8"><h1>Withdrawal Page (Coming Soon)</h1></div>}
               {currentPage === 'history' && <div className="p-8"><h1>History Page (Coming Soon)</h1></div>}
             </div>
           )}

@@ -1,10 +1,9 @@
-// Define Page Type used for navigation
-type Page = 'trading' | 'account';
+import type { Page } from '../App';
 
 type ProfileDropdownProps = {
   isOpen: boolean;
-  navigateTo: (page: Page) => void; // Function to switch pages
-  closeDropdown: () => void; // Function to close the dropdown
+  navigateTo: (page: Page) => void; // Updated type
+  closeDropdown: () => void;
   activeAccountId: string | null;
   activeAccountType: 'live' | 'demo' | undefined;
 };

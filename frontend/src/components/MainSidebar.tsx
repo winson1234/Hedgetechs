@@ -1,4 +1,4 @@
-type Page = 'trading' | 'account' | 'deposit' | 'withdrawal' | 'history';
+import type { Page } from '../App';
 
 type MainSidebarProps = {
   currentPage: Page;
@@ -13,12 +13,8 @@ const NavIcon = ({ iconName }: { iconName: string }) => {
         <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
       </svg>
     ),
-    deposit: (
-       <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-      </svg>
-    ),
-    withdrawal: (
+    // New Wallet Icon
+    wallet: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
       </svg>
@@ -84,21 +80,13 @@ export default function MainSidebar({ currentPage, navigateTo }: MainSidebarProp
           currentPage={currentPage}
           navigateTo={navigateTo}
         />
+        {/* Replaced Deposit/Withdraw with Wallet */}
         <NavLink
-          icon="deposit"
-          label="Deposit"
-          page="deposit"
+          icon="wallet"
+          label="Wallet"
+          page="wallet"
           currentPage={currentPage}
           navigateTo={navigateTo}
-          disabled={true}
-        />
-        <NavLink
-          icon="withdrawal"
-          label="Withdrawal"
-          page="withdrawal"
-          currentPage={currentPage}
-          navigateTo={navigateTo}
-          disabled={true}
         />
         <NavLink
           icon="history"

@@ -10,6 +10,7 @@ import LeftToolbar from './components/LeftToolbar';
 import AnalyticsPanel from './components/AnalyticsPanel';
 import AccountPage from './components/AccountPage';
 import ToastNotification from './components/ToastNotification';
+import MainSidebar from './components/MainSidebar'; 
 
 // --- Type Definitions ---
 export type Account = {
@@ -20,7 +21,7 @@ export type Account = {
   createdAt: number;
 };
 
-type Page = 'trading' | 'account';
+type Page = 'trading' | 'account' | 'deposit' | 'withdrawal' | 'history';
 
 type ToastState = {
   id: number;
@@ -206,7 +207,7 @@ export default function App() {
   // --- Trading Functions ---
 
   const activeAccount = useMemo(() => {
-      return accounts.find(acc => acc.id === activeAccountId);
+    return accounts.find(acc => acc.id === activeAccountId);
   }, [accounts, activeAccountId]);
 
   const handleDeposit = useCallback((amount: number) => {
@@ -221,7 +222,7 @@ export default function App() {
       })
     );
      showToast(`${formatBalance(amount, activeAccount.currency)} deposited to ${activeAccount.id}.`, 'success');
-  }, [activeAccount, activeAccountId, showToast]);
+  }, [activeAccount, activeAccountId, showToast]); // <-- CORRECTED: formatBalance removed
 
   const handleBuyOrder = useCallback((symbol: string, amount: number, price: number): { success: boolean; message: string } => {
     if (!activeAccount) return { success: false, message: 'No active account selected.' };
@@ -290,55 +291,84 @@ export default function App() {
     <div className={isDarkMode ? 'dark' : ''}>
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         <Header
-          isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode}
-          usdBalance={activeUsdBalance} accountCurrency={activeAccountCurrency}
-          onDeposit={handleDeposit} navigateTo={navigateTo}
-          // Pass the active account info down
+          isDarkMode={isDarkMode}
+          setIsDarkMode={setIsDarkMode}
+          usdBalance={activeUsdBalance}
+          accountCurrency={activeAccountCurrency}
+          onDeposit={handleDeposit}
+          navigateTo={navigateTo}
           activeAccountId={activeAccountId}
           activeAccountType={activeAccount?.type}
         />
-        {currentPage === 'trading' && <LeftToolbar onToolSelect={handleToolSelect} activeTool={activeTool} />}
-        {currentPage === 'trading' && <AnalyticsPanel isOpen={showAnalyticsPanel} onClose={handleAnalyticsPanelClose} symbol={activeInstrument} />}
+        
+        {/* === START: HYBRID LAYOUT LOGIC === */}
+        
+        {/* Show correct sidebar based on the current page */}
+        {currentPage === 'trading' ? (
+          <LeftToolbar onToolSelect={handleToolSelect} activeTool={activeTool} />
+        ) : (
+          <MainSidebar currentPage={currentPage} navigateTo={navigateTo} />
+        )}
+        
+        {/* Analytics panel is only for the trading page */}
+        {currentPage === 'trading' && (
+          <AnalyticsPanel isOpen={showAnalyticsPanel} onClose={handleAnalyticsPanelClose} symbol={activeInstrument} />
+        )}
 
         {/* Main Content Area */}
-        {currentPage === 'trading' ? (
-          // Trading Page Layout
-           <div className="ml-14 px-4 py-4">
-             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-               {/* Panels for Trading Page */}
-               <div className="lg:col-span-2 space-y-4"> {/* Chart + OrderBook */}
-                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
+        <main>
+          {currentPage === 'trading' ? (
+            // Trading Page Layout (with ml-14 for LeftToolbar)
+            <div className="ml-14 px-4 py-4">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                {/* Panels for Trading Page */}
+                <div className="lg:col-span-2 space-y-4"> {/* Chart + OrderBook */}
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
                     {/* Timeframe */}
                     <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-800">
-                     <div className="flex items-center gap-2 md:gap-3">
-                       <span className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400">Timeframe:</span>
-                       {['1h', '4h', '1d'].map(tf => (<button key={tf} onClick={() => setActiveTimeframe(tf)} className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium rounded transition ${activeTimeframe === tf? 'bg-indigo-600 text-white shadow-sm': 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>{tf}</button>))}
-                       {!showCustomInterval ? (<button onClick={() => setShowCustomInterval(true)} className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium rounded text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition border border-slate-300 dark:border-slate-700">Custom</button>) : (<div className="flex items-center gap-1 sm:gap-2"><input type="text" value={customInterval} onChange={(e) => setCustomInterval(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCustomIntervalSubmit()} placeholder="e.g., 15m" className="px-2 py-1 text-xs sm:text-sm border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-16 sm:w-20" autoFocus /><button onClick={handleCustomIntervalSubmit} className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 transition">OK</button><button onClick={() => { setShowCustomInterval(false); setCustomInterval(''); }} className="px-2 py-1 text-xs font-medium rounded text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">X</button></div>)}
-                     </div>
-                     <div className="hidden sm:flex items-center gap-3 text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400"><button className="hover:text-slate-700 dark:hover:text-slate-200 transition opacity-50 cursor-not-allowed" title="Coming soon" disabled>Indicators</button><button className="hover:text-slate-700 dark:hover:text-slate-200 transition opacity-50 cursor-not-allowed" title="Coming soon" disabled>Compare</button></div>
-                   </div>
-                   <div className="mb-5"><LivePriceDisplay symbol={activeInstrument} /></div>
-                   <div className="h-[480px] md:h-[520px] lg:h-[566px]"><ChartComponent timeframe={activeTimeframe} symbol={activeInstrument} /></div>
-                 </div>
-                 <div className="h-[300px] md:h-[360px] lg:h-[440px]"><OrderBookPanel activeInstrument={activeInstrument} /></div>
-               </div>
-               <div className="lg:col-span-1"><div className="h-full min-h-[800px] lg:min-h-[1000px] xl:min-h-[1100px]"><TradingPanel activeInstrument={activeInstrument} usdBalance={activeUsdBalance} cryptoHoldings={activeCryptoHoldings} onBuyOrder={handleBuyOrder} onSellOrder={handleSellOrder}/></div></div>
-               <div className="lg:col-span-1 space-y-4">
-                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[500px] md:h-[600px] lg:h-[735px] overflow-y-auto"><InstrumentsPanel activeInstrument={activeInstrument} onInstrumentChange={setActiveInstrument}/></div>
-                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[400px] md:h-[450px] lg:h-[549px]"><NewsPanel /></div>
-               </div>
-             </div>
-           </div>
-        ) : (
-          // Account Page - FIX: Remove navigateTo prop
-          <AccountPage
-            accounts={accounts} activeAccountId={activeAccountId}
-            setActiveAccount={setActiveAccount} openAccount={openAccount}
-            editDemoBalance={editDemoBalance}
-            showToast={showToast} formatBalance={formatBalance}
-            // navigateTo={navigateTo} // REMOVED
-          />
-        )}
+                      <div className="flex items-center gap-2 md:gap-3">
+                        <span className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400">Timeframe:</span>
+                        {['1h', '4h', '1d'].map(tf => (<button key={tf} onClick={() => setActiveTimeframe(tf)} className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium rounded transition ${activeTimeframe === tf? 'bg-indigo-600 text-white shadow-sm': 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>{tf}</button>))}
+                        {!showCustomInterval ? (<button onClick={() => setShowCustomInterval(true)} className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium rounded text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition border border-slate-300 dark:border-slate-700">Custom</button>) : (<div className="flex items-center gap-1 sm:gap-2"><input type="text" value={customInterval} onChange={(e) => setCustomInterval(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCustomIntervalSubmit()} placeholder="e.g., 15m" className="px-2 py-1 text-xs sm:text-sm border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-16 sm:w-20" autoFocus /><button onClick={handleCustomIntervalSubmit} className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 transition">OK</button><button onClick={() => { setShowCustomInterval(false); setCustomInterval(''); }} className="px-2 py-1 text-xs font-medium rounded text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">X</button></div>)}
+                      </div>
+                      <div className="hidden sm:flex items-center gap-3 text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400"><button className="hover:text-slate-700 dark:hover:text-slate-200 transition opacity-50 cursor-not-allowed" title="Coming soon" disabled>Indicators</button><button className="hover:text-slate-700 dark:hover:text-slate-200 transition opacity-50 cursor-not-allowed" title="Coming soon" disabled>Compare</button></div>
+                    </div>
+                    <div className="mb-5"><LivePriceDisplay symbol={activeInstrument} /></div>
+                    <div className="h-[480px] md:h-[520px] lg:h-[566px]"><ChartComponent timeframe={activeTimeframe} symbol={activeInstrument} /></div>
+                  </div>
+                  <div className="h-[300px] md:h-[360px] lg:h-[440px]"><OrderBookPanel activeInstrument={activeInstrument} /></div>
+                </div>
+                <div className="lg:col-span-1"><div className="h-full min-h-[800px] lg:min-h-[1000px] xl:min-h-[1100px]"><TradingPanel activeInstrument={activeInstrument} usdBalance={activeUsdBalance} cryptoHoldings={activeCryptoHoldings} onBuyOrder={handleBuyOrder} onSellOrder={handleSellOrder}/></div></div>
+                <div className="lg:col-span-1 space-y-4">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[500px] md:h-[600px] lg:h-[735px] overflow-y-auto"><InstrumentsPanel activeInstrument={activeInstrument} onInstrumentChange={setActiveInstrument}/></div>
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[400px] md:h-[450px] lg:h-[549px]"><NewsPanel /></div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Administrative Page Layout (with ml-24 for MainSidebar)
+            <div className="ml-24">
+              {currentPage === 'account' && (
+                <AccountPage
+                  accounts={accounts}
+                  activeAccountId={activeAccountId}
+                  setActiveAccount={setActiveAccount}
+                  openAccount={openAccount}
+                  editDemoBalance={editDemoBalance}
+                  showToast={showToast}
+                  formatBalance={formatBalance}
+                />
+              )}
+              {/* Add placeholders for future pages */}
+              {currentPage === 'deposit' && <div className="p-8"><h1>Deposit Page (Coming Soon)</h1></div>}
+              {currentPage === 'withdrawal' && <div className="p-8"><h1>Withdrawal Page (Coming Soon)</h1></div>}
+              {currentPage === 'history' && <div className="p-8"><h1>History Page (Coming Soon)</h1></div>}
+            </div>
+          )}
+        </main>
+        
+        {/* === END: HYBRID LAYOUT LOGIC === */}
+
         {toast && (<ToastNotification key={toast.id} message={toast.message} type={toast.type} onClose={() => setToast(null)}/>)}
       </div>
     </div>

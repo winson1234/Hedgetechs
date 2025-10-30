@@ -96,6 +96,7 @@ export default function AccountPage({
         </p>
         <div className="border-t border-slate-200 dark:border-slate-700/80 pt-3 mt-3 text-xs space-y-1.5 text-slate-600 dark:text-slate-400 min-h-[5rem]">
            <span className="font-medium text-slate-500 dark:text-slate-500 block mb-1"><WalletIcon /> Holdings:</span>
+           {/* === THIS IS THE CORRECTED LINE === */}
            {Object.entries(acc.balances).filter(([k,v]) => k !== acc.currency && v > 0).slice(0, 4).map(([k,v]) => (<div key={k} className="flex justify-between items-center pl-4"><span>{k}</span><span className="font-mono tabular-nums">{v.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span></div>))}
            {Object.entries(acc.balances).filter(([k,v]) => k !== acc.currency && v > 0).length === 0 && (<p className="italic text-slate-400 dark:text-slate-600 pl-4">No holdings</p>)}
         </div>
@@ -115,7 +116,8 @@ export default function AccountPage({
   );
 
   return (
-    <div className="ml-14 px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 bg-slate-50 dark:bg-slate-950 min-h-[calc(100vh-61px)]">
+    // REMOVED ml-14 from this div
+    <div className="px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 bg-slate-50 dark:bg-slate-950 min-h-[calc(100vh-61px)]">
       {/* Page Header - Removed Back Button */}
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100">My Accounts</h1>

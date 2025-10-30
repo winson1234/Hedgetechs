@@ -12,7 +12,7 @@ type OpenAccountModalProps = {
 };
 
 // Supported Currencies (Example)
-const supportedCurrencies = ['USD', 'EUR', 'GBP', 'JPY'];
+const supportedCurrencies = ['USD', 'EUR', 'MYR', 'JPY'];
 const demoInitialBalancePresets = [1000, 5000, 10000, 50000, 100000];
 const MIN_DEMO_BALANCE = 100;
 const MAX_DEMO_BALANCE = 1000000;

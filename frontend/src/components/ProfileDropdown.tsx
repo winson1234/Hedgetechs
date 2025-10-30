@@ -18,13 +18,11 @@ export default function ProfileDropdown({ isOpen, navigateTo, closeDropdown }: P
   if (!isOpen) return null;
 
   const handleLogOut = () => {
-    console.log('Log out clicked - Auth system not implemented yet');
     closeDropdown(); // Close dropdown after action
   };
 
   const handleAccountClick = () => {
     navigateTo('account');
-    console.log('Navigating to Account page...');
     closeDropdown(); // Close dropdown after navigation starts
   };
 

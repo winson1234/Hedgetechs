@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import ProfileDropdown from './ProfileDropdown';
 
 // Define Page Type used for navigation
-type Page = 'trading' | 'account';
+// This should match the comprehensive Page type in App.tsx
+type Page = 'trading' | 'account' | 'deposit' | 'withdrawal' | 'history';
 
 type Props = {
   isDarkMode: boolean;
@@ -108,62 +109,35 @@ export default function Header({
             )}
           </button>
 
-          <div className="flex items-center gap-2">
-             {/* Trading Page Navigation Button */}
-             <button
-              onClick={() => navigateTo('trading')}
-              className="p-2 border border-slate-300 dark:border-slate-700 rounded text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-              title="Go to Trading"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M2 11h16v2H2v-2z"/>
-                <path fillRule="evenodd" d="M4 4a1 1 0 011-1h1V2a1 1 0 112 0v1h1V2a1 1 0 112 0v1h1V2a1 1 0 112 0v1h1a1 1 0 011 1v5H4V4zm0 1v3h12V5H5a1 1 0 00-1 1z" clipRule="evenodd"/>
-                <path d="M2 15h1v2H2v-2zm2 0h1v2H4v-2zm2 0h1v2H6v-2zm2 0h1v2H8v-2zm2 0h1v2h-1v-2zm2 0h1v2h-1v-2zm2 0h1v2h-1v-2zm2 0h1v2h-1v-2z"/>
-              </svg>
-            </button>
-
-            {/* Grid/Menu Button - Placeholder */}
+          {/* User Profile Button with CLICK Dropdown */}
+          <div
+            className="relative"
+            ref={profileRef}
+          >
             <button
-              className="p-2 border border-slate-300 dark:border-slate-700 rounded text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition opacity-50 cursor-not-allowed"
-              title="Menu (Coming soon)"
-              disabled
+              onClick={() => setIsProfileOpen(prev => !prev)}
+              className={`p-2 border rounded transition ${
+                isProfileOpen
+                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                  : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+              title="Profile"
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <circle cx="5" cy="5" r="2" /> <circle cx="12" cy="5" r="2" /> <circle cx="19" cy="5" r="2" />
-                <circle cx="5" cy="12" r="2" /> <circle cx="12" cy="12" r="2" /> <circle cx="19" cy="12" r="2" />
-                <circle cx="5" cy="19" r="2" /> <circle cx="12" cy="19" r="2" /> <circle cx="19" cy="19" r="2" />
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </button>
 
-            {/* User Profile Button with CLICK Dropdown */}
-            <div
-              className="relative"
-              ref={profileRef}
-            >
-              <button
-                onClick={() => setIsProfileOpen(prev => !prev)}
-                className={`p-2 border rounded transition ${
-                  isProfileOpen
-                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
-                    : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-                title="Profile"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </button>
-
-              {/* Profile Dropdown - Pass new props down */}
-              <ProfileDropdown
-                isOpen={isProfileOpen}
-                navigateTo={navigateTo}
-                closeDropdown={() => setIsProfileOpen(false)}
-                activeAccountId={activeAccountId}
-                activeAccountType={activeAccountType}
-               />
-            </div>
+            {/* Profile Dropdown - Pass new props down */}
+            <ProfileDropdown
+              isOpen={isProfileOpen}
+              navigateTo={navigateTo}
+              closeDropdown={() => setIsProfileOpen(false)}
+              activeAccountId={activeAccountId}
+              activeAccountType={activeAccountType}
+             />
           </div>
+          
         </div>
       </div>
 

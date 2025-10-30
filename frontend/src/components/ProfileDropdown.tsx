@@ -5,12 +5,9 @@ type ProfileDropdownProps = {
   isOpen: boolean;
   navigateTo: (page: Page) => void; // Function to switch pages
   closeDropdown: () => void; // Function to close the dropdown
-  // Props passed from Header
   activeAccountId: string | null;
   activeAccountType: 'live' | 'demo' | undefined;
 };
-
-// No longer need the hardcoded userData object
 
 export default function ProfileDropdown({
   isOpen,
@@ -22,23 +19,39 @@ export default function ProfileDropdown({
   if (!isOpen) return null;
 
   const handleLogOut = () => {
-    closeDropdown(); // Close dropdown after action
-    // In the future, this will handle user logout
+    closeDropdown();
   };
 
   const handleAccountClick = () => {
     navigateTo('account');
-    closeDropdown(); // Close dropdown after navigation starts
+    closeDropdown();
   };
 
-  // Prepare the dynamic data
   const accountId = activeAccountId || 'No Account';
-  const accountTypeDisplay = activeAccountType
-    ? `${activeAccountType.charAt(0).toUpperCase()}${activeAccountType.slice(1)} Account`
-    : 'No Type';
-  
-  // Use the first letter of the account type for the avatar
   const avatarLetter = activeAccountType ? activeAccountType.charAt(0).toUpperCase() : '?';
+
+  // Create a renderable element for the account type badge
+  const accountTypeDisplay = () => {
+    if (activeAccountType === 'live') {
+      return (
+        <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
+          Live Account
+        </span>
+      );
+    }
+    if (activeAccountType === 'demo') {
+      return (
+        <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
+          Demo Account
+        </span>
+      );
+    }
+    return (
+      <span className="text-xs text-slate-500 dark:text-slate-400">
+        No Active Account
+      </span>
+    );
+  };
 
   return (
     <div
@@ -55,12 +68,11 @@ export default function ProfileDropdown({
             <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
               {accountId}
             </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">
-              {accountTypeDisplay}
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              {accountTypeDisplay()}
             </div>
           </div>
         </div>
-        {/* Hardcoded verification status removed for accuracy */}
       </div>
 
       {/* Menu Items */}

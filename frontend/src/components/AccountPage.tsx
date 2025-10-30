@@ -13,7 +13,6 @@ const WalletIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-3
 
 type EditBalanceResult = { success: boolean; message?: string };
 
-// FIX: Removed navigateTo from props definition
 type AccountPageProps = {
   accounts: Account[];
   activeAccountId: string | null;
@@ -31,7 +30,6 @@ export default function AccountPage({
   activeAccountId,
   setActiveAccount,
   openAccount,
-  // navigateTo, // Removed parameter destructuring
   editDemoBalance,
   showToast,
   formatBalance

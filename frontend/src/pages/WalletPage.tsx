@@ -1,83 +1,27 @@
-import type { Account, WalletTab } from '../App';
-import type { AssetPriceMap } from '../hooks/useAssetPrices';
+import type { WalletTab } from '../types';
+import { useUIStore } from '../stores/uiStore';
 import WalletOverview from '../components/wallet/WalletOverview';
 import DepositTab from '../components/wallet/DepositTab';
 import WithdrawTab from '../components/wallet/WithdrawTab';
 import TransferTab from '../components/wallet/TransferTab';
 
-type WalletPageProps = {
-  accounts: Account[];
-  activeAccountId: string | null;
-  activeWalletTab: WalletTab;
-  setActiveWalletTab: (tab: WalletTab) => void;
-  onDeposit: (accountId: string, amount: number, currency: string) => { success: boolean; message: string };
-  onWithdraw: (accountId: string, amount: number, currency: string) => { success: boolean; message: string };
-  onTransfer: (fromAccountId: string, toAccountId: string, amount: number, currency: string) => { success: boolean; message: string };
-  formatBalance: (balance: number | undefined, currency: string | undefined) => string;
-  showToast: (message: string, type: 'success' | 'error') => void;
-  assetPrices: AssetPriceMap;
-  pricesLoading: boolean;
-};
-
-export default function WalletPage({
-  accounts,
-  activeAccountId,
-  activeWalletTab,
-  setActiveWalletTab,
-  onDeposit,
-  onWithdraw,
-  onTransfer,
-  formatBalance,
-  showToast,
-  assetPrices,
-  pricesLoading,
-}: WalletPageProps) {
-
-  const activeAccount = accounts.find(acc => acc.id === activeAccountId) || null;
+export default function WalletPage() {
+  // Access stores
+  const activeWalletTab = useUIStore(state => state.activeWalletTab);
+  const setActiveWalletTab = useUIStore(state => state.setActiveWalletTab);
 
   const renderTabContent = () => {
     switch (activeWalletTab) {
       case 'overview':
-        return (
-          <WalletOverview
-            accounts={accounts}
-            formatBalance={formatBalance}
-            assetPrices={assetPrices}
-            pricesLoading={pricesLoading}
-          />
-        );
+        return <WalletOverview />;
       case 'deposit':
-        return (
-          <DepositTab
-            accounts={accounts}
-            activeAccount={activeAccount}
-            onDeposit={onDeposit}
-            formatBalance={formatBalance}
-            showToast={showToast}
-          />
-        );
+        return <DepositTab />;
       case 'withdraw':
-        return (
-          <WithdrawTab
-            accounts={accounts}
-            activeAccount={activeAccount}
-            onWithdraw={onWithdraw}
-            formatBalance={formatBalance}
-            showToast={showToast}
-          />
-        );
+        return <WithdrawTab />;
       case 'transfer':
-        return (
-          <TransferTab
-            accounts={accounts}
-            activeAccount={activeAccount}
-            onTransfer={onTransfer}
-            formatBalance={formatBalance}
-            showToast={showToast}
-          />
-        );
+        return <TransferTab />;
       default:
-        return <WalletOverview accounts={accounts} formatBalance={formatBalance} assetPrices={assetPrices} pricesLoading={pricesLoading} />;
+        return <WalletOverview />;
     }
   };
 

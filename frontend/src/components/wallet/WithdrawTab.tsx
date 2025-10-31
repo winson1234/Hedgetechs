@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
-import type { Account } from '../../App';
+import { useAccountStore, formatBalance } from '../../stores/accountStore';
+import { useUIStore } from '../../stores/uiStore';
 
-type WithdrawTabProps = {
-  accounts: Account[];
-  activeAccount: Account | null;
-  onWithdraw: (accountId: string, amount: number, currency: string) => { success: boolean; message: string };
-  formatBalance: (balance: number | undefined, currency: string | undefined) => string;
-  showToast: (message: string, type: 'success' | 'error') => void;
-};
+export default function WithdrawTab() {
+  // Access stores
+  const accounts = useAccountStore(state => state.accounts);
+  const activeAccountId = useAccountStore(state => state.activeAccountId);
+  const getActiveAccount = useAccountStore(state => state.getActiveAccount);
+  const withdraw = useAccountStore(state => state.withdraw);
+  const showToast = useUIStore(state => state.showToast);
 
-export default function WithdrawTab({ accounts, activeAccount, onWithdraw, formatBalance, showToast }: WithdrawTabProps) {
-  const [selectedAccountId, setSelectedAccountId] = useState(activeAccount?.id || accounts[0]?.id || '');
+  const activeAccount = getActiveAccount();
+
+  const [selectedAccountId, setSelectedAccountId] = useState(activeAccount?.id || accounts.find(a => a.type === 'live')?.id || '');
   const [amount, setAmount] = useState('');
 
   // Update selected account if active account changes
@@ -18,7 +20,7 @@ export default function WithdrawTab({ accounts, activeAccount, onWithdraw, forma
     if (activeAccount) {
       setSelectedAccountId(activeAccount.id);
     }
-  }, [activeAccount]);
+  }, [activeAccountId, activeAccount]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,8 +41,8 @@ export default function WithdrawTab({ accounts, activeAccount, onWithdraw, forma
        return;
     }
     
-    // Simulate withdrawal logic
-    const result = onWithdraw(selectedAccountId, amountNum, account.currency);
+    // Execute withdrawal
+    const result = withdraw(selectedAccountId, amountNum, account.currency);
     if (result.success) {
       setAmount(''); // Clear form
     } else {

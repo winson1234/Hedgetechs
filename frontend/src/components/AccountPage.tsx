@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import type { Account, Page, WalletTab } from '../App';
-import type { AssetPriceMap } from '../hooks/useAssetPrices';
+import type { Account } from '../types';
+import { useAssetPrices } from '../hooks/useAssetPrices';
+import { useUIStore } from '../stores/uiStore';
+import { useAccountStore, formatBalance } from '../stores/accountStore';
 import OpenAccountModal from './OpenAccountModal';
 import EditBalanceModal from './EditBalanceModal';
 
@@ -11,37 +13,21 @@ const ArrowDownTrayIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fill="
 const ArrowUpTrayIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg> );
 // --- End Icons ---
 
-type EditBalanceResult = { success: boolean; message?: string };
-
-type AccountPageProps = {
-  accounts: Account[];
-  activeAccountId: string | null;
-  setActiveAccount: (id: string) => void;
-  openAccount: (type: 'live' | 'demo', currency: string, initialBalance?: number, platformType?: 'integrated' | 'external', platform?: string, server?: string) => { success: boolean, message?: string };
-  editDemoBalance: (accountId: string, newBalance: number) => EditBalanceResult;
-  toggleAccountStatus: (accountId: string) => void;
-  showToast: (message: string, type: 'success' | 'error') => void;
-  formatBalance: (balance: number | undefined, currency: string | undefined) => string;
-  assetPrices: AssetPriceMap;
-  pricesLoading: boolean;
-  navigateTo: (page: Page, tab?: WalletTab) => void;
-};
-
 type AccountTab = 'live' | 'demo';
 
-export default function AccountPage({
-  accounts,
-  activeAccountId,
-  setActiveAccount,
-  openAccount,
-  editDemoBalance,
-  toggleAccountStatus,
-  showToast,
-  formatBalance,
-  assetPrices,
-  pricesLoading,
-  navigateTo
-}: AccountPageProps) {
+export default function AccountPage() {
+  // Access stores
+  const accounts = useAccountStore(state => state.accounts);
+  const activeAccountId = useAccountStore(state => state.activeAccountId);
+  const setActiveAccount = useAccountStore(state => state.setActiveAccount);
+  const openAccount = useAccountStore(state => state.openAccount);
+  const editDemoBalance = useAccountStore(state => state.editDemoBalance);
+  const toggleAccountStatus = useAccountStore(state => state.toggleAccountStatus);
+  const navigateTo = useUIStore(state => state.navigateTo);
+  const showToast = useUIStore(state => state.showToast);
+
+  // Get asset prices
+  const { prices: assetPrices, loading: pricesLoading } = useAssetPrices();
   const [activeTab, setActiveTab] = useState<AccountTab>('live');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);

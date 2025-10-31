@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useContext, useCallback } from 'react';
-// Correct the import path again - ensure it points correctly from components dir to context dir
 import { WebSocketContext } from '../context/WebSocketContext';
+import { useUIStore } from '../stores/uiStore';
+import { useAccountStore } from '../stores/accountStore';
+import { useOrderStore } from '../stores/orderStore';
 
 // Define the expected structure for a price update message from WebSocket
-// (Can be refined based on actual message structure if needed)
 type PriceUpdate = {
   symbol: string;
   price: string | number;
@@ -12,35 +13,23 @@ type PriceUpdate = {
   isBuyerMaker?: boolean;
 };
 
-type TradingPanelProps = {
-  activeInstrument: string;
-  usdBalance: number;
-  cryptoHoldings: Record<string, number>;
-  onBuyOrder: (symbol: string, amount: number, price: number) => { success: boolean; message: string };
-  onSellOrder: (symbol: string, amount: number, price: number) => { success: boolean; message: string };
-};
-
 type TradingMode = 'spot' | 'cross' | 'isolated' | 'grid';
 type OrderType = 'limit' | 'market' | 'stop-limit';
 
-type PendingOrder = {
-  id: string;
-  type: 'limit' | 'stop-limit';
-  side: 'buy' | 'sell';
-  symbol: string;
-  price: number; // The limit price for execution
-  amount: number;
-  stopPrice?: number; // The trigger price for stop-limit orders
-  timestamp: number;
-};
+export default function TradingPanel() {
+  // Access stores
+  const activeInstrument = useUIStore(state => state.activeInstrument);
+  const activeAccountId = useAccountStore(state => state.activeAccountId);
+  const getActiveUsdBalance = useAccountStore(state => state.getActiveUsdBalance);
+  const getActiveCryptoHoldings = useAccountStore(state => state.getActiveCryptoHoldings);
+  const executeBuy = useAccountStore(state => state.executeBuy);
+  const executeSell = useAccountStore(state => state.executeSell);
 
-export default function TradingPanel({
-  activeInstrument,
-  usdBalance,
-  cryptoHoldings,
-  onBuyOrder,
-  onSellOrder,
-}: TradingPanelProps) {
+  const addPendingOrder = useOrderStore(state => state.addPendingOrder);
+  const getPendingOrdersBySymbol = useOrderStore(state => state.getPendingOrdersBySymbol);
+
+  const usdBalance = getActiveUsdBalance();
+  const cryptoHoldings = getActiveCryptoHoldings();
   const ws = useContext(WebSocketContext);
   // Ensure lastMessage is treated as potentially having different shapes
   const lastMessage = ws?.lastMessage ?? null;
@@ -73,8 +62,8 @@ export default function TradingPanel({
   const [margin, setMargin] = useState<number>(0);
   const [pipValue, setPipValue] = useState<number>(0);
 
-  // Pending orders state
-  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
+  // Get pending orders for the current symbol from orderStore
+  const pendingOrders = getPendingOrdersBySymbol(activeInstrument);
 
   // Extract base and quote currencies from symbol (e.g., BTCUSDT -> BTC, USDT)
   const baseCurrency = activeInstrument.replace(/USDT?$/, '');
@@ -84,93 +73,8 @@ export default function TradingPanel({
   const currentHolding = cryptoHoldings[baseCurrency] || 0;
 
   // --- Start of Pending Order Execution Logic ---
-
-  // Effect to process pending orders based on live price updates
-  const processPendingOrders = useCallback(
-    (latestPrice: number) => {
-      // Avoid processing if price is invalid or no pending orders
-      if (isNaN(latestPrice) || latestPrice <= 0 || pendingOrders.length === 0) {
-        return;
-      }
-
-      let ordersWereExecuted = false; // Flag to check if state needs updating
-      const ordersToExecute: PendingOrder[] = [];
-      const remainingOrders: PendingOrder[] = [];
-
-
-      pendingOrders.forEach((order) => {
-        let shouldExecute = false;
-
-        // Only process orders for the currently active instrument
-        if (order.symbol !== activeInstrument) {
-          remainingOrders.push(order);
-          return;
-        }
-
-        switch (order.type) {
-          case 'limit':
-            if (order.side === 'buy' && latestPrice <= order.price) {
-              shouldExecute = true;
-            } else if (order.side === 'sell' && latestPrice >= order.price) {
-              shouldExecute = true;
-            }
-            break;
-          case 'stop-limit':
-            // Check stop condition first
-            if (order.stopPrice && order.side === 'buy' && latestPrice >= order.stopPrice) {
-                // Stop triggered, now check limit condition (buy at or below limit price)
-                // For simplicity, we execute immediately at the limit price when stop is hit
-                shouldExecute = true;
-            } else if (order.stopPrice && order.side === 'sell' && latestPrice <= order.stopPrice) {
-                // Stop triggered, now check limit condition (sell at or above limit price)
-                // For simplicity, we execute immediately at the limit price when stop is hit
-                shouldExecute = true;
-            }
-            break;
-        }
-
-        if (shouldExecute) {
-          ordersToExecute.push(order);
-          ordersWereExecuted = true; // Mark that at least one order will be processed
-        } else {
-          remainingOrders.push(order);
-        }
-      });
-
-      // Execute triggered orders only if needed
-      if (ordersToExecute.length > 0) {
-        ordersToExecute.forEach((order) => {
-          console.log(`Executing pending order ID: ${order.id}, Type: ${order.type}, Side: ${order.side}, Price: ${order.price}, Current Market Price: ${latestPrice}`);
-          const result =
-            order.side === 'buy'
-              ? onBuyOrder(order.symbol, order.amount, order.price) // Execute at the order's limit price
-              : onSellOrder(order.symbol, order.amount, order.price); // Execute at the order's limit price
-
-          if (result.success) {
-            // NOTE: Avoid using alert(). Replace with a proper notification system.
-            console.log( // Log instead of alert
-              `Pending ${order.type.toUpperCase()} ${order.side.toUpperCase()} order filled!\nSymbol: ${order.symbol}\nAmount: ${order.amount.toFixed(6)}\nPrice: ${order.price.toFixed(2)} ${quoteCurrency}`
-            );
-          } else {
-             // NOTE: Avoid using alert(). Replace with a proper notification system.
-            console.error( // Log error instead of alert
-              `Failed to fill pending ${order.type.toUpperCase()} ${order.side.toUpperCase()} order ID ${order.id}:\n${result.message}`
-            );
-            // If execution failed, put the order back into remaining orders
-            remainingOrders.push(order);
-            // Ensure flag is still true if some succeeded and some failed
-            // ordersWereExecuted = true; // (already true if we are in this block)
-          }
-        });
-      }
-
-       // Update the pending orders state only if orders were actually processed/removed/re-added
-       if(ordersWereExecuted) {
-           setPendingOrders(remainingOrders);
-       }
-    },
-    [pendingOrders, onBuyOrder, onSellOrder, activeInstrument, quoteCurrency] // Dependencies
-  );
+  // Use orderStore's processPendingOrders method
+  const processPendingOrdersFromStore = useOrderStore(state => state.processPendingOrders);
 
 
   // Listen to live price updates AND trigger pending order checks
@@ -195,15 +99,15 @@ export default function TradingPanel({
           // Check if the price has actually changed to avoid unnecessary processing
           if (price !== currentPrice) {
               setCurrentPrice(price);
-              // ---> Call the pending order processing function <---
-              processPendingOrders(price);
+              // ---> Call the orderStore's pending order processing function <---
+              processPendingOrdersFromStore(activeInstrument, price);
           }
         } else {
           console.warn("Received invalid price in WebSocket message:", msg.price);
         }
       }
     }
-  }, [lastMessage, activeInstrument, processPendingOrders, currentPrice]); // Added currentPrice dependency
+  }, [lastMessage, activeInstrument, processPendingOrdersFromStore, currentPrice]);
 
   // --- End of Pending Order Execution Logic ---
 
@@ -241,8 +145,7 @@ export default function TradingPanel({
     setIsRecurring(false);
     setBuyWithEUR(false);
     setEnableTPSL(false);
-    // Clear pending orders when instrument changes to avoid executing old orders
-    setPendingOrders([]);
+    // Note: Pending orders are managed by orderStore, no need to clear them here
   }, [activeInstrument]);
 
 
@@ -416,45 +319,43 @@ export default function TradingPanel({
     }
 
 
-    // For limit and stop-limit orders, add to pending orders
+    // For limit and stop-limit orders, add to pending orders via orderStore
     if (orderType === 'limit' || orderType === 'stop-limit') {
-      const newOrder: PendingOrder = {
-        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`, // More robust ID
+      if (!activeAccountId) {
+        console.error('No active account selected');
+        return;
+      }
+
+      const result = addPendingOrder({
+        accountId: activeAccountId,
         type: orderType,
         side,
         symbol: activeInstrument,
         price, // Limit price
         amount: qty,
         stopPrice: orderType === 'stop-limit' ? stopPriceNum : undefined,
-        timestamp: Date.now(),
-      };
+      });
 
-      setPendingOrders((prev) => [...prev, newOrder]);
-
-      console.log( // Log instead of alert
-        `${orderType.toUpperCase()} ${side.toUpperCase()} order placed successfully!\nSymbol: ${activeInstrument}\nAmount: ${qty.toFixed(6)} ${baseCurrency}\n${orderType === 'stop-limit' ? `Stop: ${stopPriceNum.toFixed(2)} ` : ''}Price: ${price.toFixed(2)} ${quoteCurrency}`
-      );
+      if (!result.success) {
+        console.error('Failed to place pending order:', result.message);
+      }
     } else {
-      // Market orders execute immediately
-      // Note: Market orders use the 'currentPrice' state variable for execution price confirmation/logging
+      // Market orders execute immediately via accountStore
       // Ensure currentPrice is valid before executing market order
        if (isNaN(currentPrice) || currentPrice <= 0) {
            console.error("Cannot execute market order: Invalid current price.");
            return;
        }
+
       const result =
         side === 'buy'
-          ? onBuyOrder(activeInstrument, qty, currentPrice) // Pass currentPrice for market buy
-          : onSellOrder(activeInstrument, qty, currentPrice); // Pass currentPrice for market sell
+          ? executeBuy(activeInstrument, qty, currentPrice)
+          : executeSell(activeInstrument, qty, currentPrice);
 
       if (!result.success) {
-        console.error("Market order execution failed:", result.message); // Log error instead of alert
+        console.error("Market order execution failed:", result.message);
         return;
       }
-
-      console.log( // Log instead of alert
-        `MARKET ${side.toUpperCase()} order executed successfully!\nSymbol: ${activeInstrument}\nAmount: ${qty.toFixed(6)} ${baseCurrency}\nApprox. Price: ${currentPrice.toFixed(2)} ${quoteCurrency}`
-      );
     }
 
     // Reset form after placing order
@@ -466,9 +367,10 @@ export default function TradingPanel({
   };
 
   // Cancel pending order
+  const cancelPendingOrderFromStore = useOrderStore(state => state.cancelPendingOrder);
+
   const cancelPendingOrder = (orderId: string) => {
-    setPendingOrders((prev) => prev.filter((order) => order.id !== orderId));
-    console.log(`Pending order ${orderId} cancelled successfully.`); // Log instead of alert
+    cancelPendingOrderFromStore(orderId);
   };
 
   return (
@@ -857,7 +759,14 @@ export default function TradingPanel({
                Pending Orders ({pendingOrders.filter(o => o.symbol === activeInstrument).length}) {/* Show count for active instrument */}
              </h4>
              <button
-               onClick={() => setPendingOrders(prev => prev.filter(o => o.symbol !== activeInstrument))} // Cancel only for active instrument
+               onClick={() => {
+                 // Cancel all pending orders for the active instrument
+                 pendingOrders.forEach(order => {
+                   if (order.symbol === activeInstrument) {
+                     cancelPendingOrderFromStore(order.id);
+                   }
+                 });
+               }}
                className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
              >
                Cancel All ({activeInstrument})

@@ -1,20 +1,22 @@
-import type { Page } from '../App';
+import { useUIStore } from '../stores/uiStore';
+import { useAccountStore } from '../stores/accountStore';
 
 type ProfileDropdownProps = {
   isOpen: boolean;
-  navigateTo: (page: Page) => void; // Updated type
   closeDropdown: () => void;
-  activeAccountId: string | null;
-  activeAccountType: 'live' | 'demo' | undefined;
 };
 
 export default function ProfileDropdown({
   isOpen,
-  navigateTo,
   closeDropdown,
-  activeAccountId,
-  activeAccountType,
 }: ProfileDropdownProps) {
+  // Access stores
+  const navigateTo = useUIStore(state => state.navigateTo);
+  const activeAccountId = useAccountStore(state => state.activeAccountId);
+  const getActiveAccount = useAccountStore(state => state.getActiveAccount);
+
+  const activeAccount = getActiveAccount();
+  const activeAccountType = activeAccount?.type;
   if (!isOpen) return null;
 
   const handleLogOut = () => {

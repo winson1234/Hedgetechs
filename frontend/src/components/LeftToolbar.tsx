@@ -1,15 +1,14 @@
 import React from 'react'
+import { useUIStore } from '../stores/uiStore'
 
-interface LeftToolbarProps {
-  onToolSelect: (toolId: string | null) => void
-  activeTool: string | null
-}
+export default function LeftToolbar() {
+  const activeTool = useUIStore(state => state.activeTool)
+  const setActiveTool = useUIStore(state => state.setActiveTool)
 
-export default function LeftToolbar({ onToolSelect, activeTool }: LeftToolbarProps) {
   const handleToolClick = (toolId: string) => {
     // Toggle tool - if already active, deactivate it
     const newActiveTool = activeTool === toolId ? null : toolId
-    onToolSelect(newActiveTool)
+    setActiveTool(newActiveTool)
   }
 
   return (

@@ -1,16 +1,12 @@
-import type { Account } from '../../App';
-import type { AssetPriceMap } from '../../hooks/useAssetPrices';
-import PortfolioAllocation from './PortfolioAllocation';
 import { useMemo } from 'react';
+import { useAccountStore, formatBalance } from '../../stores/accountStore';
+import { useAssetPrices } from '../../hooks/useAssetPrices';
+import PortfolioAllocation from './PortfolioAllocation';
 
-type WalletOverviewProps = {
-  accounts: Account[];
-  formatBalance: (balance: number | undefined, currency: string | undefined) => string;
-  assetPrices: AssetPriceMap;
-  pricesLoading: boolean;
-};
-
-export default function WalletOverview({ accounts, formatBalance, assetPrices, pricesLoading }: WalletOverviewProps) {
+export default function WalletOverview() {
+  // Access stores
+  const accounts = useAccountStore(state => state.accounts);
+  const { prices: assetPrices, loading: pricesLoading } = useAssetPrices();
 
   // Calculate total portfolio value in USD
   const totalPortfolioValue = useMemo(() => {

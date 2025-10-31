@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
-import type { Account } from '../../App';
+import { useAccountStore, formatBalance } from '../../stores/accountStore';
+import { useUIStore } from '../../stores/uiStore';
 
-type TransferTabProps = {
-  accounts: Account[];
-  activeAccount: Account | null;
-  onTransfer: (fromAccountId: string, toAccountId: string, amount: number, currency: string) => { success: boolean; message: string };
-  formatBalance: (balance: number | undefined, currency: string | undefined) => string;
-  showToast: (message: string, type: 'success' | 'error') => void;
-};
+export default function TransferTab() {
+  // Access stores
+  const accounts = useAccountStore(state => state.accounts);
+  const activeAccountId = useAccountStore(state => state.activeAccountId);
+  const getActiveAccount = useAccountStore(state => state.getActiveAccount);
+  const transfer = useAccountStore(state => state.transfer);
+  const showToast = useUIStore(state => state.showToast);
 
-export default function TransferTab({ accounts, activeAccount, onTransfer, formatBalance, showToast }: TransferTabProps) {
+  const activeAccount = getActiveAccount();
+
   const [fromAccountId, setFromAccountId] = useState(activeAccount?.id || accounts[0]?.id || '');
   const [toAccountId, setToAccountId] = useState('');
   const [amount, setAmount] = useState('');
-  
+
   const fromAccount = accounts.find(a => a.id === fromAccountId);
   const transferCurrency = fromAccount?.currency || 'USD';
 
@@ -21,7 +23,7 @@ export default function TransferTab({ accounts, activeAccount, onTransfer, forma
     if (activeAccount) {
       setFromAccountId(activeAccount.id);
     }
-  }, [activeAccount]);
+  }, [activeAccountId, activeAccount]);
 
   const toAccounts = accounts.filter(acc =>
     acc.id !== fromAccountId &&
@@ -63,7 +65,7 @@ export default function TransferTab({ accounts, activeAccount, onTransfer, forma
       return;
     }
 
-    const result = onTransfer(fromAccountId, toAccountId, amountNum, transferCurrency);
+    const result = transfer(fromAccountId, toAccountId, amountNum, transferCurrency);
     if (result.success) {
       setAmount(''); // Clear form
       setToAccountId('');

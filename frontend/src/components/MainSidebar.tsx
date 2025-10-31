@@ -1,9 +1,5 @@
-import type { Page } from '../App';
-
-type MainSidebarProps = {
-  currentPage: Page;
-  navigateTo: (page: Page) => void;
-};
+import type { Page } from '../types';
+import { useUIStore } from '../stores/uiStore';
 
 // Icon component for navigation links
 const NavIcon = ({ iconName }: { iconName: string }) => {
@@ -40,11 +36,11 @@ type NavLinkProps = {
   label: string;
   page: Page;
   currentPage: Page;
-  navigateTo: (page: Page) => void;
   disabled?: boolean;
 };
 
-const NavLink = ({ icon, label, page, currentPage, navigateTo, disabled = false }: NavLinkProps) => {
+const NavLink = ({ icon, label, page, currentPage, disabled = false }: NavLinkProps) => {
+  const navigateTo = useUIStore(state => state.navigateTo);
   const isActive = currentPage === page;
 
   return (
@@ -68,7 +64,8 @@ const NavLink = ({ icon, label, page, currentPage, navigateTo, disabled = false 
   );
 };
 
-export default function MainSidebar({ currentPage, navigateTo }: MainSidebarProps) {
+export default function MainSidebar() {
+  const currentPage = useUIStore(state => state.currentPage);
   return (
     <nav className="fixed left-0 top-[60px] z-40 flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-sm w-24 h-[calc(100vh-60px)]">
       {/* Navigation Links */}
@@ -78,7 +75,6 @@ export default function MainSidebar({ currentPage, navigateTo }: MainSidebarProp
           label="Account"
           page="account"
           currentPage={currentPage}
-          navigateTo={navigateTo}
         />
         {/* Replaced Deposit/Withdraw with Wallet */}
         <NavLink
@@ -86,14 +82,12 @@ export default function MainSidebar({ currentPage, navigateTo }: MainSidebarProp
           label="Wallet"
           page="wallet"
           currentPage={currentPage}
-          navigateTo={navigateTo}
         />
         <NavLink
           icon="history"
           label="History"
           page="history"
           currentPage={currentPage}
-          navigateTo={navigateTo}
           disabled={true}
         />
       </div>
@@ -105,7 +99,6 @@ export default function MainSidebar({ currentPage, navigateTo }: MainSidebarProp
           label="Trading"
           page="trading"
           currentPage={currentPage}
-          navigateTo={navigateTo}
         />
       </div>
     </nav>

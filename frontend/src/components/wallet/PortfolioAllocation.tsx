@@ -1,6 +1,6 @@
-import type { Account } from '../../App';
-import type { AssetPriceMap } from '../../hooks/useAssetPrices';
 import { useMemo } from 'react';
+import type { Account } from '../../types';
+import type { AssetPriceMap } from '../../hooks/useAssetPrices';
 
 type PortfolioAllocationProps = {
   accounts: Account[];

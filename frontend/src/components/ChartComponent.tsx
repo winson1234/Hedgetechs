@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useContext, useState } from 'react'
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp, CandlestickData, IPriceLine } from 'lightweight-charts'
 import { WebSocketContext } from '../context/WebSocketContext'
 import type { PriceMessage } from '../hooks/useWebSocket'
+import { useUIStore } from '../stores/uiStore'
 
 type Kline = {
   openTime: number
@@ -12,11 +13,6 @@ type Kline = {
   volume: string
 }
 
-type ChartComponentProps = {
-  timeframe: string
-  symbol: string
-}
-
 type OHLCVData = {
   open: number
   high: number
@@ -25,7 +21,10 @@ type OHLCVData = {
   volume: number
 }
 
-export default function ChartComponent({ timeframe, symbol }: ChartComponentProps) {
+export default function ChartComponent() {
+  // Access stores
+  const timeframe = useUIStore(state => state.activeTimeframe)
+  const symbol = useUIStore(state => state.activeInstrument)
   const ref = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)

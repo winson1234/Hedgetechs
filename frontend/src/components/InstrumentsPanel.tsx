@@ -1,12 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react'
-import type { AssetPriceMap } from '../hooks/useAssetPrices'
-
-type InstrumentsPanelProps = {
-  activeInstrument: string
-  onInstrumentChange: (symbol: string) => void
-  assetPrices: AssetPriceMap
-  pricesLoading: boolean
-}
+import { useAssetPrices } from '../hooks/useAssetPrices'
+import { useUIStore } from '../stores/uiStore'
 
 const instrumentSymbols = [
   { symbol: 'BTCUSDT', displayName: 'BTC/USD', baseCurrency: 'BTC', iconUrl: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png' },
@@ -15,7 +9,13 @@ const instrumentSymbols = [
   { symbol: 'EURUSDT', displayName: 'EUR/USD', baseCurrency: '€', iconUrl: '' }
 ]
 
-export default function InstrumentsPanel({ activeInstrument, onInstrumentChange, assetPrices, pricesLoading }: InstrumentsPanelProps) {
+export default function InstrumentsPanel() {
+  // Access stores
+  const activeInstrument = useUIStore(state => state.activeInstrument)
+  const setActiveInstrument = useUIStore(state => state.setActiveInstrument)
+
+  // Get asset prices
+  const { prices: assetPrices, loading: pricesLoading } = useAssetPrices()
   const [searchQuery, setSearchQuery] = useState('')
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
@@ -164,7 +164,7 @@ export default function InstrumentsPanel({ activeInstrument, onInstrumentChange,
                     : 'hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
                 }`}
               >
-                <div className="flex items-center gap-3" onClick={() => onInstrumentChange(item.symbol)}>
+                <div className="flex items-center gap-3" onClick={() => setActiveInstrument(item.symbol)}>
                   {/* Icon */}
                   <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                     {item.iconUrl ? (

@@ -1,9 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react'
 import { WebSocketContext } from '../context/WebSocketContext'
-
-type OrderBookPanelProps = {
-  activeInstrument: string
-}
+import { useUIStore } from '../stores/uiStore'
 
 type Trade = {
   price: string
@@ -12,7 +9,8 @@ type Trade = {
   isBuyerMaker: boolean
 }
 
-export default function OrderBookPanel({ activeInstrument }: OrderBookPanelProps) {
+export default function OrderBookPanel() {
+  const activeInstrument = useUIStore(state => state.activeInstrument)
   const ws = useContext(WebSocketContext)
   const lastMessage = ws?.lastMessage ?? null
   const [activeTab, setActiveTab] = useState<'orderbook' | 'trades'>('orderbook')

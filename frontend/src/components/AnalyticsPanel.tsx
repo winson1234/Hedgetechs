@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-
-interface AnalyticsPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
-  symbol: string;
-}
+import { useUIStore } from '../stores/uiStore';
 
 // Alpha Vantage API response types (dynamic structure from API)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AlphaVantageData = Record<string, any>;
 
-const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, symbol }) => {
+const AnalyticsPanel: React.FC = () => {
+  // Access stores
+  const isOpen = useUIStore(state => state.showAnalyticsPanel);
+  const setShowAnalyticsPanel = useUIStore(state => state.setShowAnalyticsPanel);
+  const symbol = useUIStore(state => state.activeInstrument);
+
+  const onClose = () => setShowAnalyticsPanel(false);
   const [loading, setLoading] = useState(false);
   const [quoteData, setQuoteData] = useState<AlphaVantageData | null>(null);
   const [rsiData, setRsiData] = useState<AlphaVantageData | null>(null);

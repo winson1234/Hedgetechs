@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { Account } from '../App'; // Import Account type
+import type { Account } from '../types';
 
 // Define expected return type from edit function
 type EditBalanceResult = { success: boolean; message?: string };

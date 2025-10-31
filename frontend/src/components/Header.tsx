@@ -1,26 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import ProfileDropdown from './ProfileDropdown';
-import type { Page, WalletTab } from '../App';
+import { useUIStore } from '../stores/uiStore';
+import { useAccountStore } from '../stores/accountStore';
 
-type Props = {
-  isDarkMode: boolean;
-  setIsDarkMode: (v: boolean) => void;
-  usdBalance: number;
-  accountCurrency: string;
-  navigateTo: (page: Page, tab?: WalletTab) => void; // Updated type
-  activeAccountId: string | null;
-  activeAccountType: 'live' | 'demo' | undefined;
-};
+export default function Header() {
+  // Access stores
+  const isDarkMode = useUIStore(state => state.isDarkMode);
+  const setDarkMode = useUIStore(state => state.setDarkMode);
+  const navigateTo = useUIStore(state => state.navigateTo);
 
-export default function Header({
-  isDarkMode,
-  setIsDarkMode,
-  usdBalance,
-  accountCurrency,
-  navigateTo,
-  activeAccountId,
-  activeAccountType,
-}: Props) {
+  const getActiveUsdBalance = useAccountStore(state => state.getActiveUsdBalance);
+  const getActiveAccountCurrency = useAccountStore(state => state.getActiveAccountCurrency);
+
+  const usdBalance = getActiveUsdBalance();
+  const accountCurrency = getActiveAccountCurrency();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -71,7 +64,7 @@ export default function Header({
           {/* Theme Toggle Button */}
           <button
             className="p-2 border border-slate-300 dark:border-slate-700 rounded text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-            onClick={() => setIsDarkMode(!isDarkMode)}
+            onClick={() => setDarkMode(!isDarkMode)}
             title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
             {isDarkMode ? (
@@ -107,10 +100,7 @@ export default function Header({
             {/* Profile Dropdown */}
             <ProfileDropdown
               isOpen={isProfileOpen}
-              navigateTo={navigateTo}
               closeDropdown={() => setIsProfileOpen(false)}
-              activeAccountId={activeAccountId}
-              activeAccountType={activeAccountType}
              />
           </div>
           

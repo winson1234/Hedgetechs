@@ -1,5 +1,3 @@
-// frontend/src/App.tsx
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import LivePriceDisplay from './components/LivePriceDisplay';
 import ChartComponent from './components/ChartComponent';

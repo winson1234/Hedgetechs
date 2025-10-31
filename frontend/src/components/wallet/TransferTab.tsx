@@ -23,9 +23,10 @@ export default function TransferTab({ accounts, activeAccount, onTransfer, forma
     }
   }, [activeAccount]);
 
-  const toAccounts = accounts.filter(acc => 
-    acc.id !== fromAccountId && 
-    acc.currency === transferCurrency
+  const toAccounts = accounts.filter(acc =>
+    acc.id !== fromAccountId &&
+    acc.currency === transferCurrency &&
+    acc.type === fromAccount?.type
   );
 
   useEffect(() => {

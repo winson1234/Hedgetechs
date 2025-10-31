@@ -65,7 +65,7 @@ export default function WithdrawTab({ accounts, activeAccount, onWithdraw, forma
             onChange={(e) => setSelectedAccountId(e.target.value)}
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
-            {accounts.map(acc => (
+            {accounts.filter(acc => acc.type === 'live').map(acc => (
               <option key={acc.id} value={acc.id}>
                 {acc.id} ({acc.type}) - {formatBalance(acc.balances[acc.currency], acc.currency)}
               </option>

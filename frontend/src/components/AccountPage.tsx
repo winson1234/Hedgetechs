@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Account, Page, WalletTab } from '../App';
 import type { AssetPriceMap } from '../hooks/useAssetPrices';
 import OpenAccountModal from './OpenAccountModal';
@@ -39,6 +39,7 @@ export default function AccountPage({
   showToast,
   formatBalance,
   assetPrices,
+  pricesLoading,
   navigateTo
 }: AccountPageProps) {
   const [activeTab, setActiveTab] = useState<AccountTab>('live');
@@ -59,7 +60,7 @@ export default function AccountPage({
   const selectedAccount = useMemo(() => accounts.find(acc => acc.id === selectedAccountId), [accounts, selectedAccountId]);
 
   // Helper function to calculate asset allocations for any account
-  const calculateAllocations = (account: Account) => {
+  const calculateAllocations = useCallback((account: Account) => {
     if (!account || account.platformType === 'external') return [];
 
     const holdings = Object.entries(account.balances).filter(
@@ -94,7 +95,13 @@ export default function AccountPage({
       usdValue: h.usdValue,
       percentage: totalUsd > 0 ? (h.usdValue / totalUsd) * 100 : 0,
     }));
-  };
+  }, [assetPrices]);
+
+  // Calculate allocations for selected account
+  const selectedAccountAllocations = useMemo(() => {
+    if (!selectedAccount) return [];
+    return calculateAllocations(selectedAccount);
+  }, [selectedAccount, calculateAllocations]);
 
   const handleOpenCreateModal = (type: 'live' | 'demo') => {
     setActiveTab(type);
@@ -333,19 +340,50 @@ export default function AccountPage({
                             <div className="font-semibold text-2xl text-slate-900 dark:text-slate-100">{formatBalance(selectedAccount.balances[selectedAccount.currency], selectedAccount.currency)}</div>
                         </div>
 
-                        {/* Holdings (only for integrated accounts) */}
+                        {/* Holdings Allocation (only for integrated accounts) */}
                         {selectedAccount.platformType === 'integrated' && (
                             <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
-                                <div className="text-slate-500 dark:text-slate-400 font-semibold mb-2">Holdings</div>
-                                {Object.entries(selectedAccount.balances).filter(([k,v]) => k !== selectedAccount.currency && v > 0).length > 0 ? (
-                                    <div className="space-y-1">
-                                        {Object.entries(selectedAccount.balances).filter(([k,v]) => k !== selectedAccount.currency && v > 0).map(([k,v]) => (
-                                            <div key={k} className="flex justify-between text-xs">
-                                                <span className="text-slate-600 dark:text-slate-400">{k}</span>
-                                                <span className="font-mono tabular-nums text-slate-700 dark:text-slate-300">{v.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
-                                            </div>
-                                        ))}
+                                <div className="text-slate-500 dark:text-slate-400 font-semibold mb-3">Holdings Allocation</div>
+
+                                {pricesLoading ? (
+                                    <div className="text-center py-6">
+                                        <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-solid border-indigo-600 border-r-transparent"></div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Loading prices...</p>
                                     </div>
+                                ) : selectedAccountAllocations.length > 0 ? (
+                                    <>
+                                        {/* Micro Donut Chart */}
+                                        <div className="flex justify-center mb-4">
+                                            <MicroDonutChart allocations={selectedAccountAllocations} size={120} />
+                                        </div>
+
+                                        {/* Detailed Holdings List */}
+                                        <div className="space-y-2">
+                                            {selectedAccountAllocations.map((asset, index) => (
+                                                <div key={asset.currency} className="flex items-center gap-2">
+                                                    {/* Color indicator */}
+                                                    <div
+                                                        className="w-3 h-3 rounded-full flex-shrink-0"
+                                                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                                    />
+
+                                                    {/* Asset info */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-baseline text-xs">
+                                                            <span className="font-medium text-slate-700 dark:text-slate-300">{asset.currency}</span>
+                                                            <span className="font-semibold text-slate-900 dark:text-slate-100">{asset.percentage.toFixed(1)}%</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-baseline text-[10px] text-slate-500 dark:text-slate-400">
+                                                            <span className="font-mono tabular-nums">{asset.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
+                                                            <span className="font-mono tabular-nums">
+                                                                {asset.usdValue > 0 ? `$${asset.usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Price unavailable'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
                                 ) : (
                                     <div className="italic text-xs text-slate-400 dark:text-slate-600">No other holdings</div>
                                 )}

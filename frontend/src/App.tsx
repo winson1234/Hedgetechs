@@ -59,7 +59,7 @@ export default function App() {
           {/* Trading Page */}
           {currentPage === 'trading' && (
             <div className="px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8">
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                 <div className="lg:col-span-2 space-y-4">
                   <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
                     <div className="mb-5">
@@ -78,7 +78,7 @@ export default function App() {
                     <TradingPanel />
                   </div>
                 </div>
-                <div className="lg:col-span-2 space-y-4">
+                <div className="lg:col-span-1 space-y-4">
                   <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[500px] md:h-[600px] lg:h-[735px] overflow-y-auto">
                     <InstrumentsPanel />
                   </div>

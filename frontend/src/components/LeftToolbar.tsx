@@ -4,11 +4,17 @@ import { useUIStore } from '../stores/uiStore'
 export default function LeftToolbar() {
   const activeTool = useUIStore(state => state.activeTool)
   const setActiveTool = useUIStore(state => state.setActiveTool)
+  const setShowAnalyticsPanel = useUIStore(state => state.setShowAnalyticsPanel)
 
   const handleToolClick = (toolId: string) => {
     // Toggle tool - if already active, deactivate it
     const newActiveTool = activeTool === toolId ? null : toolId
     setActiveTool(newActiveTool)
+
+    // Open/close AnalyticsPanel based on tool selection
+    if (toolId === 'alpha-vantage') {
+      setShowAnalyticsPanel(newActiveTool !== null)
+    }
   }
 
   return (

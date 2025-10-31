@@ -71,49 +71,147 @@ export default function AccountPage({
     catch (e) { return 'N/A'; }
   };
 
-   const calculateTotalPortfolioValue = (type: 'live' | 'demo') => {
-        const relevantAccounts = type === 'live' ? liveAccounts : demoAccounts;
-        return relevantAccounts.reduce((sum, acc) => sum + (acc.balances[acc.currency] ?? 0), 0);
-   };
-
   // --- Render Account Card ---
-  const renderAccountCard = (acc: Account) => (
-    <div
-      key={acc.id}
-      className={`relative p-5 rounded-xl border transition-all duration-150 ease-in-out shadow-sm group flex flex-col justify-between min-h-[270px] ${ activeAccountId === acc.id ? 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/40 dark:to-purple-900/30 border-indigo-400 dark:border-indigo-600 ring-2 ring-indigo-500/50 dark:ring-indigo-500/70' : 'bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-800 hover:shadow-lg hover:border-slate-300 dark:hover:border-slate-700' }`}
-    >
-      <div> {/* Top section */}
-        <div className="flex justify-between items-start mb-2">
-            <div className="flex items-center gap-2">
-                {acc.type === 'live' ? ( <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-2 py-0.5 rounded uppercase tracking-wider">Live</span> )
-                 : ( <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded uppercase tracking-wider">Demo</span> )}
-               <p className={`text-sm font-semibold truncate ${activeAccountId === acc.id ? 'text-indigo-800 dark:text-indigo-200' : 'text-slate-600 dark:text-slate-300'}`}>{acc.id}</p>
+  const renderAccountCard = (acc: Account) => {
+    const isDeactivated = acc.status === 'deactivated' || acc.status === 'suspended';
+    const isExternal = acc.platformType === 'external';
+
+    return (
+      <div
+        key={acc.id}
+        className={`relative p-5 rounded-xl border transition-all duration-150 ease-in-out shadow-sm group flex flex-col justify-between min-h-[270px] ${
+          isDeactivated ? 'opacity-60 grayscale' : ''
+        } ${
+          activeAccountId === acc.id
+            ? 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/40 dark:to-purple-900/30 border-indigo-400 dark:border-indigo-600 ring-2 ring-indigo-500/50 dark:ring-indigo-500/70'
+            : 'bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-800 hover:shadow-lg hover:border-slate-300 dark:hover:border-slate-700'
+        }`}
+      >
+        <div>
+          <div className="flex justify-between items-start mb-2 flex-wrap gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {acc.type === 'live' ? (
+                <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
+                  Live
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
+                  Demo
+                </span>
+              )}
+              {isDeactivated && (
+                <span className="text-[10px] font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
+                  {acc.status}
+                </span>
+              )}
+              {isExternal && (
+                <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
+                  External
+                </span>
+              )}
+              <p className={`text-sm font-semibold truncate ${activeAccountId === acc.id ? 'text-indigo-800 dark:text-indigo-200' : 'text-slate-600 dark:text-slate-300'}`}>
+                {acc.id}
+              </p>
             </div>
-             {activeAccountId === acc.id && (<span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">Active</span>)}
+            {activeAccountId === acc.id && (
+              <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+                Active
+              </span>
+            )}
+          </div>
+          <p className={`text-3xl font-bold mb-4 ${activeAccountId === acc.id ? 'text-indigo-900 dark:text-indigo-100' : 'text-slate-900 dark:text-slate-100'}`}>
+            {formatBalance(acc.balances[acc.currency], acc.currency)}
+          </p>
+          <div className="border-t border-slate-200 dark:border-slate-700/80 pt-3 mt-3 text-xs space-y-1.5 text-slate-600 dark:text-slate-400 min-h-[5rem]">
+            {isExternal ? (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-slate-500 dark:text-slate-500">Platform:</span>
+                  <span className="font-semibold">{acc.platform}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-slate-500 dark:text-slate-500">Server:</span>
+                  <span className="font-semibold">{acc.server}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="font-medium text-slate-500 dark:text-slate-500 block mb-1">
+                  <WalletIcon /> Holdings:
+                </span>
+                {Object.entries(acc.balances)
+                  .filter(([k, v]) => k !== acc.currency && v > 0)
+                  .slice(0, 4)
+                  .map(([k, v]) => (
+                    <div key={k} className="flex justify-between items-center pl-4">
+                      <span>{k}</span>
+                      <span className="font-mono tabular-nums">{v.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
+                    </div>
+                  ))}
+                {Object.entries(acc.balances).filter(([k, v]) => k !== acc.currency && v > 0).length === 0 && (
+                  <p className="italic text-slate-400 dark:text-slate-600 pl-4">No holdings</p>
+                )}
+              </>
+            )}
+          </div>
         </div>
-        <p className={`text-3xl font-bold mb-4 ${activeAccountId === acc.id ? 'text-indigo-900 dark:text-indigo-100' : 'text-slate-900 dark:text-slate-100'}`}>
-          {formatBalance(acc.balances[acc.currency], acc.currency)}
-        </p>
-        <div className="border-t border-slate-200 dark:border-slate-700/80 pt-3 mt-3 text-xs space-y-1.5 text-slate-600 dark:text-slate-400 min-h-[5rem]">
-           <span className="font-medium text-slate-500 dark:text-slate-500 block mb-1"><WalletIcon /> Holdings:</span>
-           {/* === THIS IS THE CORRECTED LINE === */}
-           {Object.entries(acc.balances).filter(([k,v]) => k !== acc.currency && v > 0).slice(0, 4).map(([k,v]) => (<div key={k} className="flex justify-between items-center pl-4"><span>{k}</span><span className="font-mono tabular-nums">{v.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span></div>))}
-           {Object.entries(acc.balances).filter(([k,v]) => k !== acc.currency && v > 0).length === 0 && (<p className="italic text-slate-400 dark:text-slate-600 pl-4">No holdings</p>)}
+        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/80">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-500 dark:text-slate-500">Created: {formatDate(acc.createdAt)}</span>
+            {activeAccountId === acc.id ? (
+              <div className="flex items-center gap-2">
+                {acc.type === 'live' && !isExternal && (
+                  <>
+                    <button
+                      className="flex items-center text-green-600 dark:text-green-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                      disabled={isDeactivated}
+                      title={isDeactivated ? 'Account is deactivated' : 'Coming soon'}
+                    >
+                      <ArrowDownTrayIcon /> Deposit
+                    </button>
+                    <button
+                      className="flex items-center text-red-600 dark:text-red-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                      disabled={isDeactivated}
+                      title={isDeactivated ? 'Account is deactivated' : 'Coming soon'}
+                    >
+                      <ArrowUpTrayIcon /> Withdraw
+                    </button>
+                  </>
+                )}
+                {acc.type === 'demo' && !isExternal && (
+                  <button
+                    onClick={() => handleOpenEditModal(acc)}
+                    className="flex items-center text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                    disabled={isDeactivated}
+                    title={isDeactivated ? 'Account is deactivated' : ''}
+                  >
+                    <PencilSquareIcon /> Edit Balance
+                  </button>
+                )}
+                {isExternal && (
+                  <button
+                    className="flex items-center text-blue-600 dark:text-blue-400 hover:underline"
+                    onClick={() => showToast('External platform trading coming soon!', 'success')}
+                  >
+                    Trade on {acc.platform}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => setActiveAccount(acc.id)}
+                className="px-3 py-1 font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-md transition-colors border border-slate-200 dark:border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
+                disabled={isDeactivated || isExternal}
+                title={isDeactivated ? 'Account is deactivated' : isExternal ? 'External accounts cannot be set as active' : ''}
+              >
+                Set Active
+              </button>
+            )}
+          </div>
         </div>
-      </div> {/* End Top section */}
-       <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/80">
-           <div className="flex justify-between items-center text-xs">
-                 <span className="text-slate-500 dark:text-slate-500">Created: {formatDate(acc.createdAt)}</span>
-                 {activeAccountId === acc.id ? (
-                     <div className="flex items-center gap-2">
-                        {acc.type === 'live' && (<><button className="flex items-center text-green-600 dark:text-green-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline" disabled title="Coming soon"><ArrowDownTrayIcon /> Deposit</button><button className="flex items-center text-red-600 dark:text-red-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline" disabled title="Coming soon"><ArrowUpTrayIcon /> Withdraw</button></>)}
-                        {acc.type === 'demo' && (<button onClick={() => handleOpenEditModal(acc)} className="flex items-center text-indigo-600 dark:text-indigo-400 hover:underline"><PencilSquareIcon /> Edit Balance</button>)}
-                     </div>
-                 ) : ( <button onClick={() => setActiveAccount(acc.id)} className="px-3 py-1 font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-md transition-colors border border-slate-200 dark:border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity duration-150">Set Active</button> )}
-           </div>
-       </div>
-    </div>
-  );
+      </div>
+    );
+  };
 
   return (
     // REMOVED ml-14 from this div
@@ -123,20 +221,7 @@ export default function AccountPage({
         <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100">My Accounts</h1>
       </div>
       <div className="lg:grid lg:grid-cols-5 lg:gap-8 space-y-8 lg:space-y-0">
-        <div className="lg:col-span-3 space-y-8">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-sm">
-                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 pb-3 border-b border-slate-200 dark:border-slate-700">Portfolio Overview</h2>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                     <div className="p-4 rounded-md bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700/50">
-                        <div className="flex justify-between items-center mb-1"><span className="font-medium text-slate-600 dark:text-slate-300">Total Live Value</span><span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-2 py-0.5 rounded uppercase">Live</span></div>
-                        <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatBalance(calculateTotalPortfolioValue('live'), 'USD')}</p>
-                     </div>
-                      <div className="p-4 rounded-md bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700/50">
-                        <div className="flex justify-between items-center mb-1"><span className="font-medium text-slate-600 dark:text-slate-300">Total Demo Value</span><span className="text-xs font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded uppercase">Demo</span></div>
-                         <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatBalance(calculateTotalPortfolioValue('demo'), 'USD')}</p>
-                     </div>
-                 </div>
-            </div>
+        <div className="lg:col-span-3">
            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm">
              <div className="border-b border-slate-200 dark:border-slate-700 px-5 md:px-6 lg:px-8 pt-3">
                <nav className="flex -mb-px space-x-8" aria-label="Tabs">

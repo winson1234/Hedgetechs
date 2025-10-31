@@ -6,16 +6,31 @@ type OpenAccountResult = { success: boolean; message?: string };
 type OpenAccountModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  // accountType: 'live' | 'demo'; // No longer needed - type is selected inside
-  openAccount: (type: 'live' | 'demo', currency: string, initialBalance?: number) => OpenAccountResult;
-  onAccountCreated: (message: string) => void; // Callback with success message for toast
+  openAccount: (
+    type: 'live' | 'demo',
+    currency: string,
+    initialBalance?: number,
+    platformType?: 'integrated' | 'external',
+    platform?: string,
+    server?: string
+  ) => OpenAccountResult;
+  onAccountCreated: (message: string) => void;
 };
 
-// Supported Currencies (Example)
+// Supported Currencies
 const supportedCurrencies = ['USD', 'EUR', 'MYR', 'JPY'];
 const demoInitialBalancePresets = [1000, 5000, 10000, 50000, 100000];
 const MIN_DEMO_BALANCE = 100;
 const MAX_DEMO_BALANCE = 1000000;
+
+// Platform options for external accounts
+const externalPlatforms = ['MT4', 'MT5', 'cTrader', 'TradingView'];
+const externalServers = [
+  'FPBroker-Live01',
+  'FPBroker-Live02',
+  'FPBroker-Demo01',
+  'FPBroker-Demo02',
+];
 
 
 export default function OpenAccountModal({
@@ -24,19 +39,24 @@ export default function OpenAccountModal({
   openAccount,
   onAccountCreated,
 }: OpenAccountModalProps) {
-  const [accountType, setAccountType] = useState<'live' | 'demo'>('live'); // Default to Live
-  const [selectedCurrency, setSelectedCurrency] = useState<string>('USD'); // Default currency
-  const [initialBalance, setInitialBalance] = useState<string>('10000'); // Default demo balance as string
+  const [accountType, setAccountType] = useState<'live' | 'demo'>('live');
+  const [platformType, setPlatformType] = useState<'integrated' | 'external'>('integrated');
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('USD');
+  const [initialBalance, setInitialBalance] = useState<string>('10000');
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('MT4');
+  const [selectedServer, setSelectedServer] = useState<string>('FPBroker-Live01');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [balanceError, setBalanceError] = useState<string | null>(null); // Specific validation error state
+  const [balanceError, setBalanceError] = useState<string | null>(null);
 
-  // Reset form when modal opens or type changes
+  // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      // setAccountType('live'); // Keep selected type
+      setPlatformType('integrated');
       setSelectedCurrency('USD');
       setInitialBalance('10000');
+      setSelectedPlatform('MT4');
+      setSelectedServer('FPBroker-Live01');
       setError(null);
       setBalanceError(null);
       setIsLoading(false);
@@ -61,23 +81,30 @@ export default function OpenAccountModal({
 
 
   const handleSubmit = async () => {
-    setError(null); // Clear previous errors
+    setError(null);
     // Ensure demo balance is valid before proceeding
     if (accountType === 'demo' && balanceError) {
-        return; // Stop submission if there's a balance error
+        return;
     }
 
     setIsLoading(true);
 
     // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500)); // 0.5 second delay
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     const balanceNum = accountType === 'demo' ? parseFloat(initialBalance) : undefined;
 
-    const result = openAccount(accountType, selectedCurrency, balanceNum);
+    const result = openAccount(
+      accountType,
+      selectedCurrency,
+      balanceNum,
+      platformType,
+      platformType === 'external' ? selectedPlatform : 'Brokerage Web',
+      platformType === 'external' ? selectedServer : 'Primary Server'
+    );
 
     if (result.success) {
-      onAccountCreated(result.message || 'Account created successfully!'); // Trigger success toast via callback
+      onAccountCreated(result.message || 'Account created successfully!');
     } else {
       setError(result.message || 'Failed to open account. Please try again.');
     }
@@ -146,6 +173,42 @@ export default function OpenAccountModal({
             </div>
           </div>
 
+          {/* Platform Type Toggle */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Platform Type
+            </label>
+            <div className="flex gap-1 bg-slate-100 dark:bg-slate-900 rounded-lg p-1">
+              <button
+                onClick={() => setPlatformType('integrated')}
+                disabled={isLoading}
+                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition ${
+                  platformType === 'integrated'
+                    ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
+                }`}
+              >
+                Integrated
+              </button>
+              <button
+                onClick={() => setPlatformType('external')}
+                disabled={isLoading}
+                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition ${
+                  platformType === 'external'
+                    ? 'bg-white dark:bg-slate-700 text-orange-700 dark:text-orange-300 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
+                }`}
+              >
+                External
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {platformType === 'integrated'
+                ? 'Trade directly on our web platform'
+                : 'Connect an external trading platform (e.g., MT4, MT5)'}
+            </p>
+          </div>
+
           {/* Currency Selection */}
           <div>
             <label htmlFor="currency" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -162,13 +225,52 @@ export default function OpenAccountModal({
                 <option key={curr} value={curr}>{curr}</option>
               ))}
             </select>
-            {accountType === 'live' && (
+            {accountType === 'live' && platformType === 'integrated' && (
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Live accounts start with a 0 balance. Use the Deposit function after creation.</p>
             )}
           </div>
 
-          {/* Initial Balance (Demo Only) */}
-          {accountType === 'demo' && (
+          {/* Platform Selection (External Only) */}
+          {platformType === 'external' && (
+            <>
+              <div>
+                <label htmlFor="platform" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Trading Platform
+                </label>
+                <select
+                  id="platform"
+                  value={selectedPlatform}
+                  onChange={(e) => setSelectedPlatform(e.target.value)}
+                  disabled={isLoading}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm disabled:opacity-70"
+                >
+                  {externalPlatforms.map(platform => (
+                    <option key={platform} value={platform}>{platform}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="server" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Server
+                </label>
+                <select
+                  id="server"
+                  value={selectedServer}
+                  onChange={(e) => setSelectedServer(e.target.value)}
+                  disabled={isLoading}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm disabled:opacity-70"
+                >
+                  {externalServers.map(server => (
+                    <option key={server} value={server}>{server}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          {/* Initial Balance (Demo Only, Integrated Only) */}
+          {accountType === 'demo' && platformType === 'integrated' && (
             <div>
               <label htmlFor="initialBalance" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Starting Balance ({selectedCurrency})

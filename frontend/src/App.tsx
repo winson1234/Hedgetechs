@@ -16,12 +16,18 @@ import ToastNotification from './components/ToastNotification';
 import WalletPage from './pages/WalletPage';
 
 // --- Type Definitions ---
+export type AccountStatus = 'active' | 'deactivated' | 'suspended';
+
 export type Account = {
   id: string;
   type: 'live' | 'demo';
   currency: string;
   balances: Record<string, number>;
   createdAt: number;
+  status: AccountStatus;
+  platformType: 'integrated' | 'external';
+  platform?: string;
+  server?: string;
 };
 
 // Page type
@@ -48,6 +54,10 @@ const getDefaultAccounts = (): Account[] => [
     currency: 'USD',
     balances: { USD: 10000, BTC: 1, ETH: 5, SOL: 100 },
     createdAt: Date.now() - 200000,
+    status: 'active',
+    platformType: 'integrated',
+    platform: 'Brokerage Web',
+    server: 'Primary Server',
   },
   {
     id: generateAccountId('demo'),
@@ -55,6 +65,32 @@ const getDefaultAccounts = (): Account[] => [
     currency: 'USD',
     balances: { USD: 50000 },
     createdAt: Date.now(),
+    status: 'active',
+    platformType: 'integrated',
+    platform: 'Brokerage Web',
+    server: 'Primary Server',
+  },
+  {
+    id: 'M-8032415',
+    type: 'live',
+    currency: 'USD',
+    balances: { USD: 5000.00 },
+    createdAt: Date.now() - 400000,
+    status: 'active',
+    platformType: 'external',
+    platform: 'MT4',
+    server: 'FPBroker-Live01',
+  },
+  {
+    id: generateAccountId('demo'),
+    type: 'demo',
+    currency: 'EUR',
+    balances: { EUR: 25000 },
+    createdAt: Date.now() - 100000,
+    status: 'deactivated',
+    platformType: 'integrated',
+    platform: 'Brokerage Web',
+    server: 'Primary Server',
   },
 ];
 
@@ -162,16 +198,36 @@ export default function App() {
   }, []);
 
   const setActiveAccount = useCallback((id: string) => {
-    if (accounts.some(acc => acc.id === id)) {
-        setActiveAccountId(id);
-        showToast(`Switched to account ${id}`, 'success');
-    } else {
+    const accountToSet = accounts.find(acc => acc.id === id);
+
+    if (!accountToSet) {
         console.error(`Attempted switch to non-existent account: ${id}`);
         showToast(`Could not find account ${id}`, 'error');
+        return;
     }
+
+    if (accountToSet.status !== 'active') {
+        showToast('Deactivated or suspended accounts cannot be set as active.', 'error');
+        return;
+    }
+
+    if (accountToSet.platformType === 'external') {
+        showToast('External platform accounts cannot be used for integrated trading.', 'error');
+        return;
+    }
+
+    setActiveAccountId(id);
+    showToast(`Switched to account ${id}`, 'success');
   }, [accounts, showToast]);
 
-  const openAccount = useCallback((type: 'live' | 'demo', currency: string, initialBalance?: number) => {
+  const openAccount = useCallback((
+    type: 'live' | 'demo',
+    currency: string,
+    initialBalance?: number,
+    platformType?: 'integrated' | 'external',
+    platform?: string,
+    server?: string
+  ) => {
     if (type === 'demo') {
       const demoCount = accounts.filter(acc => acc.type === 'demo').length;
       if (demoCount >= 5) {
@@ -184,9 +240,15 @@ export default function App() {
       }
     }
     const newAccount: Account = {
-      id: generateAccountId(type), type, currency,
+      id: generateAccountId(type),
+      type,
+      currency,
       balances: { [currency]: type === 'demo' ? (initialBalance!) : 0 },
       createdAt: Date.now(),
+      status: 'active',
+      platformType: platformType || 'integrated',
+      platform: platform || 'Brokerage Web',
+      server: server || 'Primary Server',
     };
     setAccounts(prev => [...prev, newAccount]);
     showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} account ${newAccount.id} created.`, 'success');

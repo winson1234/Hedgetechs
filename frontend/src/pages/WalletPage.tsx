@@ -1,4 +1,5 @@
 import type { Account, WalletTab } from '../App';
+import type { AssetPriceMap } from '../hooks/useAssetPrices';
 import WalletOverview from '../components/wallet/WalletOverview';
 import DepositTab from '../components/wallet/DepositTab';
 import WithdrawTab from '../components/wallet/WithdrawTab';
@@ -14,6 +15,8 @@ type WalletPageProps = {
   onTransfer: (fromAccountId: string, toAccountId: string, amount: number, currency: string) => { success: boolean; message: string };
   formatBalance: (balance: number | undefined, currency: string | undefined) => string;
   showToast: (message: string, type: 'success' | 'error') => void;
+  assetPrices: AssetPriceMap;
+  pricesLoading: boolean;
 };
 
 export default function WalletPage({
@@ -26,6 +29,8 @@ export default function WalletPage({
   onTransfer,
   formatBalance,
   showToast,
+  assetPrices,
+  pricesLoading,
 }: WalletPageProps) {
 
   const activeAccount = accounts.find(acc => acc.id === activeAccountId) || null;
@@ -37,6 +42,8 @@ export default function WalletPage({
           <WalletOverview
             accounts={accounts}
             formatBalance={formatBalance}
+            assetPrices={assetPrices}
+            pricesLoading={pricesLoading}
           />
         );
       case 'deposit':
@@ -70,7 +77,7 @@ export default function WalletPage({
           />
         );
       default:
-        return <WalletOverview accounts={accounts} formatBalance={formatBalance} />;
+        return <WalletOverview accounts={accounts} formatBalance={formatBalance} assetPrices={assetPrices} pricesLoading={pricesLoading} />;
     }
   };
 

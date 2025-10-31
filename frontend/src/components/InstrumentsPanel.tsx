@@ -1,23 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
+import type { AssetPriceMap } from '../hooks/useAssetPrices'
 
 type InstrumentsPanelProps = {
   activeInstrument: string
   onInstrumentChange: (symbol: string) => void
-}
-
-type Instrument = {
-  symbol: string
-  displayName: string
-  baseCurrency: string
-  price: string
-  change: string
-  iconUrl: string
-}
-
-type TickerData = {
-  symbol: string
-  lastPrice: string
-  priceChangePercent: string
+  assetPrices: AssetPriceMap
+  pricesLoading: boolean
 }
 
 const instrumentSymbols = [
@@ -27,9 +15,7 @@ const instrumentSymbols = [
   { symbol: 'EURUSDT', displayName: 'EUR/USD', baseCurrency: '€', iconUrl: '' }
 ]
 
-export default function InstrumentsPanel({ activeInstrument, onInstrumentChange }: InstrumentsPanelProps) {
-  const [instruments, setInstruments] = useState<Instrument[]>([])
-  const [loading, setLoading] = useState(true)
+export default function InstrumentsPanel({ activeInstrument, onInstrumentChange, assetPrices, pricesLoading }: InstrumentsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
@@ -67,39 +53,20 @@ export default function InstrumentsPanel({ activeInstrument, onInstrumentChange 
     })
   }
 
-  useEffect(() => {
-    const fetchTickers = async () => {
-      try {
-        const symbols = instrumentSymbols.map(i => i.symbol).join(',')
-        const response = await fetch(`/api/v1/ticker?symbols=${symbols}`)
-        const data: TickerData[] = await response.json()
-        
-        // Combine ticker data with display names
-        const combined = instrumentSymbols.map(inst => {
-          const ticker = data.find((t) => t.symbol === inst.symbol)
-          return {
-            symbol: inst.symbol,
-            displayName: inst.displayName,
-            baseCurrency: inst.baseCurrency,
-            iconUrl: inst.iconUrl,
-            price: ticker?.lastPrice || '0.00',
-            change: ticker?.priceChangePercent || '0.00'
-          }
-        })
-        
-        setInstruments(combined)
-        setLoading(false)
-      } catch (error) {
-        console.error('Failed to fetch ticker data:', error)
-        setLoading(false)
+  // Build instruments from shared assetPrices prop
+  const instruments = useMemo(() => {
+    return instrumentSymbols.map(inst => {
+      const price = assetPrices[inst.symbol] || 0
+      return {
+        symbol: inst.symbol,
+        displayName: inst.displayName,
+        baseCurrency: inst.baseCurrency,
+        iconUrl: inst.iconUrl,
+        price: price.toFixed(2),
+        change: '0.00'
       }
-    }
-
-    fetchTickers()
-    // Refresh every 10 seconds
-    const interval = setInterval(fetchTickers, 10000)
-    return () => clearInterval(interval)
-  }, [])
+    })
+  }, [assetPrices])
 
   // Filter instruments based on search and favorites
   const filteredInstruments = instruments.filter(item => {
@@ -173,8 +140,8 @@ export default function InstrumentsPanel({ activeInstrument, onInstrumentChange 
           </button>
         )}
       </div>
-      
-      {loading ? (
+
+      {pricesLoading ? (
         <div className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">Loading...</div>
       ) : filteredInstruments.length === 0 ? (
         <div className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">

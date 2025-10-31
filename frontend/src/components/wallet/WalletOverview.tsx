@@ -1,20 +1,67 @@
 import type { Account } from '../../App';
+import type { AssetPriceMap } from '../../hooks/useAssetPrices';
 import PortfolioAllocation from './PortfolioAllocation';
+import { useMemo } from 'react';
 
 type WalletOverviewProps = {
   accounts: Account[];
   formatBalance: (balance: number | undefined, currency: string | undefined) => string;
+  assetPrices: AssetPriceMap;
+  pricesLoading: boolean;
 };
 
-export default function WalletOverview({ accounts, formatBalance }: WalletOverviewProps) {
+export default function WalletOverview({ accounts, formatBalance, assetPrices, pricesLoading }: WalletOverviewProps) {
 
-  const totalLiveValue = accounts
-    .filter(acc => acc.type === 'live')
-    .reduce((sum, acc) => sum + (acc.balances[acc.currency] ?? 0), 0);
+  // Calculate total portfolio value in USD
+  const totalPortfolioValue = useMemo(() => {
+    return accounts.reduce((total, acc) => {
+      let accountValue = 0;
 
-  const totalDemoValue = accounts
-    .filter(acc => acc.type === 'demo')
-    .reduce((sum, acc) => sum + (acc.balances[acc.currency] ?? 0), 0);
+      // Add base currency (fiat currencies are 1:1 USD for now, can enhance later)
+      accountValue += acc.balances[acc.currency] ?? 0;
+
+      // Add crypto holdings converted to USD
+      Object.entries(acc.balances).forEach(([currency, amount]) => {
+        if (currency !== acc.currency && amount > 0) {
+          const symbol = `${currency}USDT`;
+          const price = assetPrices[symbol] || 0;
+          accountValue += amount * price;
+        }
+      });
+
+      return total + accountValue;
+    }, 0);
+  }, [accounts, assetPrices]);
+
+  const totalLiveValue = useMemo(() => {
+    return accounts.filter(acc => acc.type === 'live').reduce((total, acc) => {
+      let accountValue = 0;
+      accountValue += acc.balances[acc.currency] ?? 0;
+      Object.entries(acc.balances).forEach(([currency, amount]) => {
+        if (currency !== acc.currency && amount > 0) {
+          const symbol = `${currency}USDT`;
+          const price = assetPrices[symbol] || 0;
+          accountValue += amount * price;
+        }
+      });
+      return total + accountValue;
+    }, 0);
+  }, [accounts, assetPrices]);
+
+  const totalDemoValue = useMemo(() => {
+    return accounts.filter(acc => acc.type === 'demo').reduce((total, acc) => {
+      let accountValue = 0;
+      accountValue += acc.balances[acc.currency] ?? 0;
+      Object.entries(acc.balances).forEach(([currency, amount]) => {
+        if (currency !== acc.currency && amount > 0) {
+          const symbol = `${currency}USDT`;
+          const price = assetPrices[symbol] || 0;
+          accountValue += amount * price;
+        }
+      });
+      return total + accountValue;
+    }, 0);
+  }, [accounts, assetPrices]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -46,7 +93,13 @@ export default function WalletOverview({ accounts, formatBalance }: WalletOvervi
         </div>
       </div>
 
-      <PortfolioAllocation accounts={accounts} formatBalance={formatBalance} />
+      <PortfolioAllocation
+        accounts={accounts}
+        formatBalance={formatBalance}
+        assetPrices={assetPrices}
+        pricesLoading={pricesLoading}
+        totalPortfolioValue={totalPortfolioValue}
+      />
     </div>
   );
 }

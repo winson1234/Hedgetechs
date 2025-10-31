@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
-import type { Account } from '../App';
+import { useState, useMemo, useEffect } from 'react';
+import type { Account, Page, WalletTab } from '../App';
+import type { AssetPriceMap } from '../hooks/useAssetPrices';
 import OpenAccountModal from './OpenAccountModal';
 import EditBalanceModal from './EditBalanceModal';
 
@@ -8,7 +9,6 @@ const PlusIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 
 const PencilSquareIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg> );
 const ArrowDownTrayIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg> );
 const ArrowUpTrayIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg> );
-const WalletIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 inline mr-1 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>);
 // --- End Icons ---
 
 type EditBalanceResult = { success: boolean; message?: string };
@@ -17,10 +17,14 @@ type AccountPageProps = {
   accounts: Account[];
   activeAccountId: string | null;
   setActiveAccount: (id: string) => void;
-  openAccount: (type: 'live' | 'demo', currency: string, initialBalance?: number) => { success: boolean, message?: string };
+  openAccount: (type: 'live' | 'demo', currency: string, initialBalance?: number, platformType?: 'integrated' | 'external', platform?: string, server?: string) => { success: boolean, message?: string };
   editDemoBalance: (accountId: string, newBalance: number) => EditBalanceResult;
+  toggleAccountStatus: (accountId: string) => void;
   showToast: (message: string, type: 'success' | 'error') => void;
   formatBalance: (balance: number | undefined, currency: string | undefined) => string;
+  assetPrices: AssetPriceMap;
+  pricesLoading: boolean;
+  navigateTo: (page: Page, tab?: WalletTab) => void;
 };
 
 type AccountTab = 'live' | 'demo';
@@ -31,17 +35,28 @@ export default function AccountPage({
   setActiveAccount,
   openAccount,
   editDemoBalance,
+  toggleAccountStatus,
   showToast,
-  formatBalance
+  formatBalance,
+  navigateTo
 }: AccountPageProps) {
+  // Note: assetPrices and pricesLoading props available for future micro chart implementation
   const [activeTab, setActiveTab] = useState<AccountTab>('live');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [accountToEdit, setAccountToEdit] = useState<Account | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+
+  // Set selectedAccountId to activeAccountId on mount
+  useEffect(() => {
+    if (activeAccountId && !selectedAccountId) {
+      setSelectedAccountId(activeAccountId);
+    }
+  }, [activeAccountId, selectedAccountId]);
 
   const liveAccounts = useMemo(() => accounts.filter(acc => acc.type === 'live'), [accounts]);
   const demoAccounts = useMemo(() => accounts.filter(acc => acc.type === 'demo'), [accounts]);
-  const activeAccount = useMemo(() => accounts.find(acc => acc.id === activeAccountId), [accounts, activeAccountId]);
+  const selectedAccount = useMemo(() => accounts.find(acc => acc.id === selectedAccountId), [accounts, selectedAccountId]);
 
   const handleOpenCreateModal = (type: 'live' | 'demo') => {
     setActiveTab(type);
@@ -71,144 +86,57 @@ export default function AccountPage({
     catch (e) { return 'N/A'; }
   };
 
-  // --- Render Account Card ---
+  // --- Render Thin Account Card (List View) ---
   const renderAccountCard = (acc: Account) => {
     const isDeactivated = acc.status === 'deactivated' || acc.status === 'suspended';
     const isExternal = acc.platformType === 'external';
+    const isSelected = selectedAccountId === acc.id;
+    const isActive = activeAccountId === acc.id;
 
     return (
       <div
         key={acc.id}
-        className={`relative p-5 rounded-xl border transition-all duration-150 ease-in-out shadow-sm group flex flex-col justify-between min-h-[270px] ${
+        onClick={() => setSelectedAccountId(acc.id)}
+        className={`relative p-4 rounded-lg border transition-all cursor-pointer ${
           isDeactivated ? 'opacity-60 grayscale' : ''
         } ${
-          activeAccountId === acc.id
-            ? 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/40 dark:to-purple-900/30 border-indigo-400 dark:border-indigo-600 ring-2 ring-indigo-500/50 dark:ring-indigo-500/70'
-            : 'bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-800 hover:shadow-lg hover:border-slate-300 dark:hover:border-slate-700'
+          isSelected
+            ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-indigo-500/50'
+            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-600'
         }`}
       >
-        <div>
-          <div className="flex justify-between items-start mb-2 flex-wrap gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              {acc.type === 'live' ? (
-                <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
-                  Live
-                </span>
-              ) : (
-                <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
-                  Demo
-                </span>
-              )}
-              {isDeactivated && (
-                <span className="text-[10px] font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
-                  {acc.status}
-                </span>
-              )}
-              {isExternal && (
-                <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
-                  External
-                </span>
-              )}
-              <p className={`text-sm font-semibold truncate ${activeAccountId === acc.id ? 'text-indigo-800 dark:text-indigo-200' : 'text-slate-600 dark:text-slate-300'}`}>
-                {acc.id}
-              </p>
-            </div>
-            {activeAccountId === acc.id && (
-              <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {acc.type === 'live' ? (
+              <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
+                Live
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
+                Demo
+              </span>
+            )}
+            {isActive && (
+              <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded-full uppercase tracking-wider">
                 Active
               </span>
             )}
-          </div>
-          <p className={`text-3xl font-bold mb-4 ${activeAccountId === acc.id ? 'text-indigo-900 dark:text-indigo-100' : 'text-slate-900 dark:text-slate-100'}`}>
-            {formatBalance(acc.balances[acc.currency], acc.currency)}
-          </p>
-          <div className="border-t border-slate-200 dark:border-slate-700/80 pt-3 mt-3 text-xs space-y-1.5 text-slate-600 dark:text-slate-400 min-h-[5rem]">
-            {isExternal ? (
-              <>
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-slate-500 dark:text-slate-500">Platform:</span>
-                  <span className="font-semibold">{acc.platform}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-slate-500 dark:text-slate-500">Server:</span>
-                  <span className="font-semibold">{acc.server}</span>
-                </div>
-              </>
-            ) : (
-              <>
-                <span className="font-medium text-slate-500 dark:text-slate-500 block mb-1">
-                  <WalletIcon /> Holdings:
-                </span>
-                {Object.entries(acc.balances)
-                  .filter(([k, v]) => k !== acc.currency && v > 0)
-                  .slice(0, 4)
-                  .map(([k, v]) => (
-                    <div key={k} className="flex justify-between items-center pl-4">
-                      <span>{k}</span>
-                      <span className="font-mono tabular-nums">{v.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
-                    </div>
-                  ))}
-                {Object.entries(acc.balances).filter(([k, v]) => k !== acc.currency && v > 0).length === 0 && (
-                  <p className="italic text-slate-400 dark:text-slate-600 pl-4">No holdings</p>
-                )}
-              </>
+            {isExternal && (
+              <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
+                External
+              </span>
+            )}
+            {isDeactivated && (
+              <span className="text-[10px] font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
+                {acc.status}
+              </span>
             )}
           </div>
         </div>
-        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/80">
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-slate-500 dark:text-slate-500">Created: {formatDate(acc.createdAt)}</span>
-            {activeAccountId === acc.id ? (
-              <div className="flex items-center gap-2">
-                {acc.type === 'live' && !isExternal && (
-                  <>
-                    <button
-                      className="flex items-center text-green-600 dark:text-green-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
-                      disabled={isDeactivated}
-                      title={isDeactivated ? 'Account is deactivated' : 'Coming soon'}
-                    >
-                      <ArrowDownTrayIcon /> Deposit
-                    </button>
-                    <button
-                      className="flex items-center text-red-600 dark:text-red-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
-                      disabled={isDeactivated}
-                      title={isDeactivated ? 'Account is deactivated' : 'Coming soon'}
-                    >
-                      <ArrowUpTrayIcon /> Withdraw
-                    </button>
-                  </>
-                )}
-                {acc.type === 'demo' && !isExternal && (
-                  <button
-                    onClick={() => handleOpenEditModal(acc)}
-                    className="flex items-center text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
-                    disabled={isDeactivated}
-                    title={isDeactivated ? 'Account is deactivated' : ''}
-                  >
-                    <PencilSquareIcon /> Edit Balance
-                  </button>
-                )}
-                {isExternal && (
-                  <button
-                    className="flex items-center text-blue-600 dark:text-blue-400 hover:underline"
-                    onClick={() => showToast('External platform trading coming soon!', 'success')}
-                  >
-                    Trade on {acc.platform}
-                  </button>
-                )}
-              </div>
-            ) : (
-              <button
-                onClick={() => setActiveAccount(acc.id)}
-                className="px-3 py-1 font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-md transition-colors border border-slate-200 dark:border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
-                disabled={isDeactivated || isExternal}
-                title={isDeactivated ? 'Account is deactivated' : isExternal ? 'External accounts cannot be set as active' : ''}
-              >
-                Set Active
-              </button>
-            )}
-          </div>
-        </div>
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 truncate">{acc.id}</p>
+        <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+          {formatBalance(acc.balances[acc.currency], acc.currency)}
+        </p>
       </div>
     );
   };
@@ -239,29 +167,138 @@ export default function AccountPage({
            </div>
         </div>
         <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-sm lg:sticky lg:top-[77px] h-fit">
-                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 pb-3 border-b border-slate-200 dark:border-slate-700">Active Account Details</h2>
-                {activeAccount ? (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-sm lg:sticky lg:top-[77px] h-fit max-h-[calc(100vh-100px)] overflow-y-auto">
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 pb-3 border-b border-slate-200 dark:border-slate-700">Account Details</h2>
+                {selectedAccount ? (
                     <div className="space-y-4 text-sm">
-                         <div>
-                            <label htmlFor="active-account-switcher-sidebar" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Current Active Account</label>
-                            <select id="active-account-switcher-sidebar" value={activeAccountId ?? ''} onChange={(e) => setActiveAccount(e.target.value)} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs">{!activeAccountId && <option value="" disabled>Select account</option>}{accounts.map((acc) => (<option key={acc.id} value={acc.id}>{acc.id} ({acc.type === 'live' ? 'Live' : 'Demo'})</option>))}</select>
-                         </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2">
-                             <div className="text-slate-500 dark:text-slate-400">Account ID:</div><div className="font-medium text-slate-700 dark:text-slate-300 truncate text-right">{activeAccount.id}</div>
-                             <div className="text-slate-500 dark:text-slate-400">Type:</div><div className="text-right"><span className={`font-medium px-2 py-0.5 rounded text-[10px] ${activeAccount.type === 'live' ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300' : 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'}`}>{activeAccount.type.toUpperCase()}</span></div>
-                            <div className="text-slate-500 dark:text-slate-400">Base Currency:</div><div className="font-medium text-slate-700 dark:text-slate-300 text-right">{activeAccount.currency}</div>
-                            <div className="text-slate-500 dark:text-slate-400 col-span-2 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700/60 font-semibold">Balance ({activeAccount.currency}):</div><div className="font-semibold text-xl text-slate-900 dark:text-slate-100 col-span-2 text-right -mt-2 mb-2">{formatBalance(activeAccount.balances[activeAccount.currency], activeAccount.currency)}</div>
-                            <div className="text-slate-500 dark:text-slate-400 col-span-2 pt-2 border-t border-slate-200 dark:border-slate-700/60 font-semibold">Holdings:</div>
-                            {Object.entries(activeAccount.balances).filter(([k,v]) => k !== activeAccount.currency && v > 0).length > 0 ? ( Object.entries(activeAccount.balances).filter(([k,v]) => k !== activeAccount.currency && v > 0).map(([k,v]) => ( <React.Fragment key={k}><div className="text-xs text-slate-600 dark:text-slate-400 pl-2">{k}</div><div className="text-xs font-mono tabular-nums text-slate-700 dark:text-slate-300 text-right">{v.toLocaleString(undefined, { maximumFractionDigits: 6 })}</div></React.Fragment> ))) : (<div className="col-span-2 italic text-xs text-slate-400 dark:text-slate-600 pl-2">No other holdings</div>)}
-                            <div className="text-slate-500 dark:text-slate-400 col-span-2 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700/60">Created On:</div><div className="font-medium text-slate-700 dark:text-slate-300 col-span-2 text-right -mt-2">{formatDate(activeAccount.createdAt)}</div>
-                         </div>
-                         <div className="pt-4 space-y-2">
-                            {activeAccount.type === 'live' && (<><button className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled title="Coming soon"><ArrowDownTrayIcon /> Deposit Funds</button><button className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-md transition-colors border border-slate-200 dark:border-slate-600 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled title="Coming soon"><ArrowUpTrayIcon /> Withdraw Funds</button></>)}
-                            {activeAccount.type === 'demo' && (<button onClick={() => handleOpenEditModal(activeAccount)} className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-md transition-colors border border-indigo-200 dark:border-indigo-700"><PencilSquareIcon /> Edit Balance</button>)}
-                         </div>
+                        {/* Account Information */}
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                             <div className="text-slate-500 dark:text-slate-400">Account ID:</div>
+                             <div className="font-medium text-slate-700 dark:text-slate-300 truncate text-right">{selectedAccount.id}</div>
+
+                             <div className="text-slate-500 dark:text-slate-400">Type:</div>
+                             <div className="text-right">
+                                <span className={`font-medium px-2 py-0.5 rounded text-[10px] ${selectedAccount.type === 'live' ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300' : 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'}`}>{selectedAccount.type.toUpperCase()}</span>
+                             </div>
+
+                            <div className="text-slate-500 dark:text-slate-400">Status:</div>
+                            <div className="text-right">
+                                <span className={`font-medium px-2 py-0.5 rounded text-[10px] ${selectedAccount.status === 'active' ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300'}`}>{selectedAccount.status.toUpperCase()}</span>
+                            </div>
+
+                            <div className="text-slate-500 dark:text-slate-400">Platform:</div>
+                            <div className="font-medium text-slate-700 dark:text-slate-300 text-right">{selectedAccount.platform || 'N/A'}</div>
+
+                            <div className="text-slate-500 dark:text-slate-400">Server:</div>
+                            <div className="font-medium text-slate-700 dark:text-slate-300 text-right">{selectedAccount.server || 'N/A'}</div>
+
+                            <div className="text-slate-500 dark:text-slate-400">Created On:</div>
+                            <div className="font-medium text-slate-700 dark:text-slate-300 text-right">{formatDate(selectedAccount.createdAt)}</div>
+                        </div>
+
+                        {/* Balance */}
+                        <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
+                            <div className="text-slate-500 dark:text-slate-400 font-semibold mb-1">Balance ({selectedAccount.currency})</div>
+                            <div className="font-semibold text-2xl text-slate-900 dark:text-slate-100">{formatBalance(selectedAccount.balances[selectedAccount.currency], selectedAccount.currency)}</div>
+                        </div>
+
+                        {/* Holdings (only for integrated accounts) */}
+                        {selectedAccount.platformType === 'integrated' && (
+                            <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
+                                <div className="text-slate-500 dark:text-slate-400 font-semibold mb-2">Holdings</div>
+                                {Object.entries(selectedAccount.balances).filter(([k,v]) => k !== selectedAccount.currency && v > 0).length > 0 ? (
+                                    <div className="space-y-1">
+                                        {Object.entries(selectedAccount.balances).filter(([k,v]) => k !== selectedAccount.currency && v > 0).map(([k,v]) => (
+                                            <div key={k} className="flex justify-between text-xs">
+                                                <span className="text-slate-600 dark:text-slate-400">{k}</span>
+                                                <span className="font-mono tabular-nums text-slate-700 dark:text-slate-300">{v.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="italic text-xs text-slate-400 dark:text-slate-600">No other holdings</div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                            {/* Set Active Button - only for integrated, active accounts */}
+                            {selectedAccount.platformType === 'integrated' && selectedAccount.status === 'active' && selectedAccount.id !== activeAccountId && (
+                                <button
+                                    onClick={() => setActiveAccount(selectedAccount.id)}
+                                    className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors shadow-sm"
+                                >
+                                    Set as Active Account
+                                </button>
+                            )}
+
+                            {/* Deposit Button */}
+                            <button
+                                onClick={() => navigateTo('wallet', 'deposit')}
+                                className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={selectedAccount.status !== 'active'}
+                                title={selectedAccount.status !== 'active' ? 'Account must be active' : 'Navigate to Deposit'}
+                            >
+                              <ArrowDownTrayIcon /> Deposit
+                            </button>
+
+                            {/* Withdraw Button */}
+                            <button
+                                onClick={() => navigateTo('wallet', 'withdraw')}
+                                className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-md transition-colors border border-slate-200 dark:border-slate-600 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={selectedAccount.status !== 'active'}
+                                title={selectedAccount.status !== 'active' ? 'Account must be active' : 'Navigate to Withdraw'}
+                            >
+                              <ArrowUpTrayIcon /> Withdraw
+                            </button>
+
+                            {/* Edit Balance Button - only for demo accounts */}
+                            {selectedAccount.type === 'demo' && selectedAccount.status === 'active' && (
+                                <button
+                                    onClick={() => handleOpenEditModal(selectedAccount)}
+                                    className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-md transition-colors border border-indigo-200 dark:border-indigo-700"
+                                >
+                                  <PencilSquareIcon /> Edit Balance
+                                </button>
+                            )}
+
+                            {/* Trade Button - only for external accounts */}
+                            {selectedAccount.platformType === 'external' && (
+                                <button
+                                    onClick={() => showToast(`Trade on ${selectedAccount.platform} coming soon!`, 'success')}
+                                    className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors shadow-sm"
+                                >
+                                  Trade on {selectedAccount.platform}
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Danger Zone */}
+                        <div className="pt-4 mt-4 border-t-2 border-red-200 dark:border-red-900/50">
+                            <div className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2">Account Management</div>
+                            {selectedAccount.status === 'active' ? (
+                                <button
+                                    onClick={() => toggleAccountStatus(selectedAccount.id)}
+                                    className="w-full px-3 py-2 text-xs font-medium bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md transition-colors border border-red-200 dark:border-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={selectedAccount.id === activeAccountId}
+                                    title={selectedAccount.id === activeAccountId ? 'Cannot deactivate the active trading account' : 'Deactivate this account'}
+                                >
+                                  Deactivate Account
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => toggleAccountStatus(selectedAccount.id)}
+                                    className="w-full px-3 py-2 text-xs font-medium bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 rounded-md transition-colors border border-green-200 dark:border-green-800"
+                                >
+                                  Reactivate Account
+                                </button>
+                            )}
+                        </div>
                     </div>
-                ) : ( <p className="text-slate-500 dark:text-slate-400 text-sm text-center py-6">Select an account to view details.</p> )}
+                ) : (
+                    <p className="text-slate-500 dark:text-slate-400 text-sm text-center py-6">Click on an account to view details.</p>
+                )}
             </div>
         </div>
       </div>

@@ -14,6 +14,7 @@ import MainSidebar from './components/MainSidebar';
 import AccountPage from './components/AccountPage';
 import ToastNotification from './components/ToastNotification';
 import WalletPage from './pages/WalletPage';
+import { useAssetPrices } from './hooks/useAssetPrices';
 
 // --- Type Definitions ---
 export type AccountStatus = 'active' | 'deactivated' | 'suspended';
@@ -126,6 +127,9 @@ export default function App() {
   
   // Add state for the active wallet tab
   const [activeWalletTab, setActiveWalletTab] = useState<WalletTab>('overview');
+
+  // Fetch asset prices (single source of truth)
+  const { prices: assetPrices, loading: pricesLoading } = useAssetPrices(['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'EURUSDT']);
 
   // Effects
   useEffect(() => {
@@ -278,6 +282,24 @@ export default function App() {
          return { success: false, message: 'Account not found or is not a Demo account.' };
     }
   }, [showToast]);
+
+  const toggleAccountStatus = useCallback((accountId: string) => {
+    if (accountId === activeAccountId) {
+      showToast('Cannot deactivate the active trading account.', 'error');
+      return;
+    }
+
+    setAccounts(prevAccounts =>
+      prevAccounts.map(acc => {
+        if (acc.id === accountId) {
+          const newStatus: AccountStatus = acc.status === 'active' ? 'deactivated' : 'active';
+          showToast(`Account ${accountId} ${newStatus === 'active' ? 'reactivated' : 'deactivated'}.`, 'success');
+          return { ...acc, status: newStatus };
+        }
+        return acc;
+      })
+    );
+  }, [activeAccountId, showToast]);
 
   // --- Trading & Wallet Functions ---
 
@@ -518,7 +540,7 @@ export default function App() {
                 </div>
                 <div className="lg:col-span-1"><div className="h-full min-h-[800px] lg:min-h-[1000px] xl:min-h-[1100px]"><TradingPanel activeInstrument={activeInstrument} usdBalance={activeUsdBalance} cryptoHoldings={activeCryptoHoldings} onBuyOrder={handleBuyOrder} onSellOrder={handleSellOrder}/></div></div>
                 <div className="lg:col-span-1 space-y-4">
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[500px] md:h-[600px] lg:h-[735px] overflow-y-auto"><InstrumentsPanel activeInstrument={activeInstrument} onInstrumentChange={setActiveInstrument}/></div>
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[500px] md:h-[600px] lg:h-[735px] overflow-y-auto"><InstrumentsPanel activeInstrument={activeInstrument} onInstrumentChange={setActiveInstrument} assetPrices={assetPrices} pricesLoading={pricesLoading}/></div>
                   <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 h-[400px] md:h-[450px] lg:h-[549px]"><NewsPanel /></div>
                 </div>
               </div>
@@ -533,8 +555,12 @@ export default function App() {
                   setActiveAccount={setActiveAccount}
                   openAccount={openAccount}
                   editDemoBalance={editDemoBalance}
+                  toggleAccountStatus={toggleAccountStatus}
                   showToast={showToast}
                   formatBalance={formatBalance}
+                  assetPrices={assetPrices}
+                  pricesLoading={pricesLoading}
+                  navigateTo={navigateTo}
                 />
               )}
               {/* Render Wallet Page */}
@@ -549,6 +575,8 @@ export default function App() {
                   onTransfer={handleTransfer}
                   formatBalance={formatBalance}
                   showToast={showToast}
+                  assetPrices={assetPrices}
+                  pricesLoading={pricesLoading}
                 />
               )}
               {/* Add placeholders for future pages */}

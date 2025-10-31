@@ -16,6 +16,7 @@ frontend/.cache/
 .vscode/
 .idea/
 .github/copilot-instructions.md
+CLAUDE.md
 
 # OS
 .DS_Store

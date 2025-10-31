@@ -5,7 +5,7 @@ import TradingPanel from './components/TradingPanel';
 import InstrumentsPanel from './components/InstrumentsPanel';
 import NewsPanel from './components/NewsPanel';
 import Header from './components/Header';
-import OrderBookPanel from './components/OrderBookPanel';
+import MarketActivityPanel from './components/MarketActivityPanel';
 import LeftToolbar from './components/LeftToolbar';
 import AnalyticsPanel from './components/AnalyticsPanel';
 import MainSidebar from './components/MainSidebar';
@@ -14,6 +14,7 @@ import ToastNotification from './components/ToastNotification';
 import WalletPage from './pages/WalletPage';
 import { usePriceStore } from './stores/priceStore';
 import { useUIStore } from './stores/uiStore';
+import { useOrderStore } from './stores/orderStore';
 
 export default function App() {
   // Access stores
@@ -37,6 +38,26 @@ export default function App() {
       }
     };
     hydratePrices();
+  }, []);
+
+  // Periodic pending order processing (every 5 seconds)
+  useEffect(() => {
+    const processPendingOrders = useOrderStore.getState().processPendingOrders;
+    const getPrices = () => usePriceStore.getState().prices;
+
+    const interval = setInterval(() => {
+      const prices = getPrices();
+      const symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'EURUSDT'];
+
+      symbols.forEach(symbol => {
+        const priceData = prices[symbol];
+        if (priceData && priceData.current) {
+          processPendingOrders(symbol, priceData.current);
+        }
+      });
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -70,7 +91,7 @@ export default function App() {
                     </div>
                   </div>
                   <div className="h-[300px] md:h-[360px] lg:h-[440px]">
-                    <OrderBookPanel />
+                    <MarketActivityPanel />
                   </div>
                 </div>
                 <div className="lg:col-span-1">

@@ -26,7 +26,7 @@ export default function TradingPanel() {
   const executeSell = useAccountStore(state => state.executeSell);
 
   const addPendingOrder = useOrderStore(state => state.addPendingOrder);
-  const getPendingOrdersBySymbol = useOrderStore(state => state.getPendingOrdersBySymbol);
+  const processPendingOrdersFromStore = useOrderStore(state => state.processPendingOrders);
 
   const usdBalance = getActiveUsdBalance();
   const cryptoHoldings = getActiveCryptoHoldings();
@@ -62,9 +62,6 @@ export default function TradingPanel() {
   const [margin, setMargin] = useState<number>(0);
   const [pipValue, setPipValue] = useState<number>(0);
 
-  // Get pending orders for the current symbol from orderStore
-  const pendingOrders = getPendingOrdersBySymbol(activeInstrument);
-
   // Extract base and quote currencies from symbol (e.g., BTCUSDT -> BTC, USDT)
   const baseCurrency = activeInstrument.replace(/USDT?$/, '');
   const quoteCurrency = activeInstrument.match(/USDT?$/)?.[0] || 'USDT';
@@ -73,10 +70,6 @@ export default function TradingPanel() {
   const currentHolding = cryptoHoldings[baseCurrency] || 0;
 
   // --- Start of Pending Order Execution Logic ---
-  // Use orderStore's processPendingOrders method
-  const processPendingOrdersFromStore = useOrderStore(state => state.processPendingOrders);
-
-
   // Listen to live price updates AND trigger pending order checks
   useEffect(() => {
     if (!lastMessage) return;
@@ -364,13 +357,6 @@ export default function TradingPanel() {
     // Reset limit price to current price for convenience, keep stop price as is
     setLimitPrice(currentPrice > 0 ? currentPrice.toFixed(2) : '');
     // setStopPrice(''); // User might want to reuse stop price
-  };
-
-  // Cancel pending order
-  const cancelPendingOrderFromStore = useOrderStore(state => state.cancelPendingOrder);
-
-  const cancelPendingOrder = (orderId: string) => {
-    cancelPendingOrderFromStore(orderId);
   };
 
   return (
@@ -749,105 +735,6 @@ export default function TradingPanel() {
           </button>
         </div>
       </div>
-
-       {/* Pending Orders Section */}
-       {/* Filter pending orders by active instrument BEFORE checking length */}
-       {pendingOrders.filter(o => o.symbol === activeInstrument).length > 0 && (
-         <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-           <div className="flex items-center justify-between mb-3">
-             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-               Pending Orders ({pendingOrders.filter(o => o.symbol === activeInstrument).length}) {/* Show count for active instrument */}
-             </h4>
-             <button
-               onClick={() => {
-                 // Cancel all pending orders for the active instrument
-                 pendingOrders.forEach(order => {
-                   if (order.symbol === activeInstrument) {
-                     cancelPendingOrderFromStore(order.id);
-                   }
-                 });
-               }}
-               className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
-             >
-               Cancel All ({activeInstrument})
-             </button>
-           </div>
-           {/* Scrollable container for orders */}
-           <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1"> {/* Adjusted max height */}
-             {pendingOrders
-               .filter(order => order.symbol === activeInstrument) // Filter to show only orders for the active instrument
-               .map((order) => {
-                 const fee = order.price * order.amount * (feeLevel / 100);
-                 const totalWithFee = order.price * order.amount + fee;
-                 return (
-                   <div
-                     key={order.id}
-                     className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-xs" // Made text smaller
-                   >
-                     <div className="flex items-start justify-between mb-1.5"> {/* Reduced margin */}
-                       <div className="flex items-center gap-1.5 flex-wrap"> {/* Reduced gap, added wrap */}
-                         <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${ /* Smaller badge */
-                           order.side === 'buy'
-                             ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                             : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                         }`}>
-                           {order.side.toUpperCase()}
-                         </span>
-                         <span className="font-medium text-slate-700 dark:text-slate-300">
-                           {order.symbol}
-                         </span>
-                         <span className="text-slate-500 dark:text-slate-400 uppercase text-[10px]"> {/* Smaller text */}
-                           {order.type}
-                         </span>
-                       </div>
-                       <button
-                         onClick={() => cancelPendingOrder(order.id)}
-                         className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium text-[10px] flex-shrink-0 ml-2" /* Smaller text, prevent shrinking */
-                       >
-                         Cancel
-                       </button>
-                     </div>
-                     {/* Simplified grid layout */}
-                     <div className="grid grid-cols-2 gap-x-2 gap-y-0.5"> {/* Reduced gap */}
-                       {order.stopPrice && (
-                         <div className="col-span-1 truncate"> {/* Added truncate */}
-                           <span className="text-slate-500 dark:text-slate-400">Stop:</span>
-                           <span className="ml-1 font-semibold text-slate-700 dark:text-slate-300">
-                             ${order.stopPrice.toFixed(2)}
-                           </span>
-                         </div>
-                       )}
-                       <div className="col-span-1 truncate"> {/* Added truncate */}
-                         <span className="text-slate-500 dark:text-slate-400">Price:</span>
-                         <span className="ml-1 font-semibold text-slate-700 dark:text-slate-300">
-                           ${order.price.toFixed(2)}
-                         </span>
-                       </div>
-                       <div className="col-span-1 truncate"> {/* Added truncate */}
-                         <span className="text-slate-500 dark:text-slate-400">Amount:</span>
-                         <span className="ml-1 font-semibold text-slate-700 dark:text-slate-300">
-                           {order.amount.toFixed(6)}
-                         </span>
-                       </div>
-                         <div className="col-span-1 truncate"> {/* Added truncate */}
-                           <span className="text-slate-500 dark:text-slate-400">Fee:</span>
-                           <span className="ml-1 font-semibold text-slate-700 dark:text-slate-300">
-                             ${fee.toFixed(2)}
-                           </span>
-                         </div>
-                       <div className="col-span-2 truncate"> {/* Total spans both columns, added truncate */}
-                         <span className="text-slate-500 dark:text-slate-400">Total:</span>
-                         <span className="ml-1 font-semibold text-blue-700 dark:text-blue-300">
-                           ${totalWithFee.toFixed(2)}
-                         </span>
-                       </div>
-                     </div>
-                   </div>
-                 );
-               })}
-           </div>
-         </div>
-       )}
     </div>
   );
 }

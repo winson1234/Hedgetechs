@@ -6,13 +6,13 @@ type TransferTabProps = {
   activeAccount: Account | null;
   onTransfer: (fromAccountId: string, toAccountId: string, amount: number, currency: string) => { success: boolean; message: string };
   formatBalance: (balance: number | undefined, currency: string | undefined) => string;
+  showToast: (message: string, type: 'success' | 'error') => void;
 };
 
-export default function TransferTab({ accounts, activeAccount, onTransfer, formatBalance }: TransferTabProps) {
+export default function TransferTab({ accounts, activeAccount, onTransfer, formatBalance, showToast }: TransferTabProps) {
   const [fromAccountId, setFromAccountId] = useState(activeAccount?.id || accounts[0]?.id || '');
   const [toAccountId, setToAccountId] = useState('');
   const [amount, setAmount] = useState('');
-  const [error, setError] = useState<string | null>(null);
   
   const fromAccount = accounts.find(a => a.id === fromAccountId);
   const transferCurrency = fromAccount?.currency || 'USD';
@@ -37,29 +37,28 @@ export default function TransferTab({ accounts, activeAccount, onTransfer, forma
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
 
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      setError('Please enter a valid amount.');
+      showToast('Please enter a valid amount.', 'error');
       return;
     }
     if (!fromAccountId) {
-      setError('Please select an account to transfer from.');
+      showToast('Please select an account to transfer from.', 'error');
       return;
     }
     if (!toAccountId) {
-      setError('Please select an account to transfer to.');
+      showToast('Please select an account to transfer to.', 'error');
       return;
     }
     if (fromAccountId === toAccountId) {
-      setError('Cannot transfer to the same account.');
+      showToast('Cannot transfer to the same account.', 'error');
       return;
     }
     
     const toAccount = accounts.find(a => a.id === toAccountId);
     if (fromAccount?.currency !== toAccount?.currency) {
-      setError('Account currencies do not match. Cross-currency transfers are not supported.');
+      showToast('Account currencies do not match. Cross-currency transfers are not supported.', 'error');
       return;
     }
 
@@ -68,7 +67,7 @@ export default function TransferTab({ accounts, activeAccount, onTransfer, forma
       setAmount(''); // Clear form
       setToAccountId('');
     } else {
-      setError(result.message);
+      showToast(result.message, 'error');
     }
   };
 
@@ -147,10 +146,6 @@ export default function TransferTab({ accounts, activeAccount, onTransfer, forma
             </span>
           </div>
         </div>
-        
-        {error && (
-          <p className="text-sm text-red-600 dark:text-red-500">{error}</p>
-        )}
 
         <button
           type="submit"

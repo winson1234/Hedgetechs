@@ -10,9 +10,9 @@ import Header from './components/Header';
 import OrderBookPanel from './components/OrderBookPanel';
 import LeftToolbar from './components/LeftToolbar';
 import AnalyticsPanel from './components/AnalyticsPanel';
+import MainSidebar from './components/MainSidebar';
 import AccountPage from './components/AccountPage';
 import ToastNotification from './components/ToastNotification';
-// Import the new Wallet page
 import WalletPage from './pages/WalletPage';
 
 // --- Type Definitions ---
@@ -24,7 +24,7 @@ export type Account = {
   createdAt: number;
 };
 
-// CORRECTED Page type
+// Page type
 export type Page = 'trading' | 'account' | 'wallet' | 'history';
 // Type for the wallet tabs
 export type WalletTab = 'overview' | 'deposit' | 'withdraw' | 'transfer';

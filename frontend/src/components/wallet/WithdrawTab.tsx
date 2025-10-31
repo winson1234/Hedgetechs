@@ -12,7 +12,6 @@ type WithdrawTabProps = {
 export default function WithdrawTab({ accounts, activeAccount, onWithdraw, formatBalance, showToast }: WithdrawTabProps) {
   const [selectedAccountId, setSelectedAccountId] = useState(activeAccount?.id || accounts[0]?.id || '');
   const [amount, setAmount] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
   // Update selected account if active account changes
   useEffect(() => {
@@ -23,21 +22,20 @@ export default function WithdrawTab({ accounts, activeAccount, onWithdraw, forma
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
 
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      setError('Please enter a valid amount.');
+      showToast('Please enter a valid amount.', 'error');
       return;
     }
     if (!selectedAccountId) {
-      setError('Please select an account to withdraw from.');
+      showToast('Please select an account to withdraw from.', 'error');
       return;
     }
     
     const account = accounts.find(a => a.id === selectedAccountId);
     if (!account) {
-       setError('Selected account not found.');
+       showToast('Selected account not found.', 'error');
        return;
     }
     
@@ -46,7 +44,7 @@ export default function WithdrawTab({ accounts, activeAccount, onWithdraw, forma
     if (result.success) {
       setAmount(''); // Clear form
     } else {
-      setError(result.message);
+      showToast(result.message, 'error');
     }
   };
 
@@ -102,10 +100,6 @@ export default function WithdrawTab({ accounts, activeAccount, onWithdraw, forma
           <input type="text" placeholder="Bank Account Holder's Name" className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
           <input type="text" placeholder="Bank Account Number" className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
         </div>
-        
-        {error && (
-          <p className="text-sm text-red-600 dark:text-red-500">{error}</p>
-        )}
 
         <button
           type="submit"

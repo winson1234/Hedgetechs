@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useEffect, useRef, useState } from 'react'
 import type { PriceMessage } from '../hooks/useWebSocket'
+import { usePriceStore } from '../stores/priceStore'
 
 type WSState = {
   connecting: boolean
@@ -44,6 +45,17 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     ws.onmessage = (ev) => {
       try {
         const obj = JSON.parse(ev.data) as PriceMessage
+
+        // Update price store for price messages (real-time price updates)
+        if (obj.symbol && obj.price) {
+          const price = typeof obj.price === 'string' ? parseFloat(obj.price) : obj.price
+          if (!isNaN(price)) {
+            usePriceStore.getState().updateCurrentPrice(obj.symbol, price)
+          }
+        }
+
+        // Keep lastMessage for components that need raw WebSocket data
+        // (ChartComponent for klines, OrderBookPanel for depth/trades)
         setLastMessage(obj)
       } catch (err) {
         // ignore parse errors for now

@@ -13,6 +13,7 @@ import AccountPage from './components/AccountPage';
 import ToastNotification from './components/ToastNotification';
 import WalletPage from './pages/WalletPage';
 import { useAssetPrices } from './hooks/useAssetPrices';
+import { usePriceStore } from './stores/priceStore';
 
 // --- Type Definitions ---
 export type AccountStatus = 'active' | 'deactivated' | 'suspended';
@@ -167,6 +168,26 @@ export default function App() {
         if (accounts.length > 0) { localStorage.setItem('tradingAccounts', JSON.stringify(accounts)); }
     } catch (e) { console.error('Failed to save accounts:', e); }
   }, [accounts]);
+
+  // Hydrate price store with 24h ticker data on mount
+  useEffect(() => {
+    const hydratePrices = async () => {
+      try {
+        const response = await fetch('/api/v1/ticker?symbols=BTCUSDT,ETHUSDT,SOLUSDT,EURUSDT');
+        if (!response.ok) {
+          throw new Error('Failed to fetch 24h ticker data');
+        }
+        const data = await response.json();
+        usePriceStore.getState().hydrateFrom24hData(data);
+      } catch (err) {
+        console.error('Failed to hydrate price store:', err);
+        // Set loading to false even on error to prevent infinite loading state
+        usePriceStore.setState({ loading: false });
+      }
+    };
+
+    hydratePrices();
+  }, []);
   useEffect(() => {
     try {
       if (activeAccountId) { localStorage.setItem('activeAccountId', activeAccountId); }

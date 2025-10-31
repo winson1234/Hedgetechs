@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { usePriceStore } from '../stores/priceStore'
 
 export type AssetPriceMap = Record<string, number>
 
@@ -7,44 +7,34 @@ interface UseAssetPricesReturn {
   loading: boolean
 }
 
-export const useAssetPrices = (symbols: string[]): UseAssetPricesReturn => {
-  const [prices, setPrices] = useState<AssetPriceMap>({})
-  const [loading, setLoading] = useState<boolean>(true)
+/**
+ * Hook that provides real-time asset prices from the unified price store.
+ * Prices are hydrated once on app load from REST API, then updated in real-time via WebSocket.
+ *
+ * @param symbols - Array of symbols (kept for backward compatibility, but now retrieves all available prices)
+ * @returns Object with prices map and loading state
+ */
+export const useAssetPrices = (symbols?: string[]): UseAssetPricesReturn => {
+  // Get all prices from the store and convert to simple price map
+  const allPrices = usePriceStore(state => state.prices)
+  const loading = usePriceStore(state => state.loading)
 
-  useEffect(() => {
-    const fetchPrices = async () => {
-      try {
-        const symbolsParam = symbols.join(',')
-        const response = await fetch(`/api/v1/ticker?symbols=${symbolsParam}`)
+  // Convert PriceData objects to simple number map for backward compatibility
+  const prices: AssetPriceMap = Object.fromEntries(
+    Object.entries(allPrices).map(([symbol, data]) => [symbol, data.current])
+  )
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch asset prices')
-        }
-
-        const data = await response.json()
-
-        const priceMap: AssetPriceMap = {}
-        if (Array.isArray(data)) {
-          data.forEach((ticker: { symbol?: string; lastPrice?: string }) => {
-            if (ticker.symbol && ticker.lastPrice) {
-              priceMap[ticker.symbol] = parseFloat(ticker.lastPrice)
-            }
-          })
-        }
-
-        setPrices(priceMap)
-        setLoading(false)
-      } catch (error) {
-        console.error('Error fetching asset prices:', error)
-        setLoading(false)
+  // If symbols array was provided (legacy usage), filter to only those symbols
+  // Otherwise return all available prices
+  if (symbols && symbols.length > 0) {
+    const filtered: AssetPriceMap = {}
+    symbols.forEach(symbol => {
+      if (prices[symbol] !== undefined) {
+        filtered[symbol] = prices[symbol]
       }
-    }
-
-    fetchPrices()
-    const interval = setInterval(fetchPrices, 10000)
-
-    return () => clearInterval(interval)
-  }, [symbols])
+    })
+    return { prices: filtered, loading }
+  }
 
   return { prices, loading }
 }

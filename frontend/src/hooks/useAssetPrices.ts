@@ -15,7 +15,7 @@ export const useAssetPrices = (symbols: string[]): UseAssetPricesReturn => {
     const fetchPrices = async () => {
       try {
         const symbolsParam = symbols.join(',')
-        const response = await fetch(`http://localhost:8080/api/v1/ticker?symbols=${symbolsParam}`)
+        const response = await fetch(`/api/v1/ticker?symbols=${symbolsParam}`)
 
         if (!response.ok) {
           throw new Error('Failed to fetch asset prices')

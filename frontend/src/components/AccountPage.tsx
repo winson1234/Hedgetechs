@@ -38,9 +38,9 @@ export default function AccountPage({
   toggleAccountStatus,
   showToast,
   formatBalance,
+  assetPrices,
   navigateTo
 }: AccountPageProps) {
-  // Note: assetPrices and pricesLoading props available for future micro chart implementation
   const [activeTab, setActiveTab] = useState<AccountTab>('live');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -57,6 +57,44 @@ export default function AccountPage({
   const liveAccounts = useMemo(() => accounts.filter(acc => acc.type === 'live'), [accounts]);
   const demoAccounts = useMemo(() => accounts.filter(acc => acc.type === 'demo'), [accounts]);
   const selectedAccount = useMemo(() => accounts.find(acc => acc.id === selectedAccountId), [accounts, selectedAccountId]);
+
+  // Helper function to calculate asset allocations for any account
+  const calculateAllocations = (account: Account) => {
+    if (!account || account.platformType === 'external') return [];
+
+    const holdings = Object.entries(account.balances).filter(
+      ([currency, amount]) => currency !== account.currency && amount > 0
+    );
+
+    if (holdings.length === 0) return [];
+
+    // Calculate USD values for each holding
+    const fiatCurrencies = ['USD', 'EUR', 'MYR', 'JPY'];
+    const holdingsWithUsd = holdings.map(([currency, amount]) => {
+      const isFiat = fiatCurrencies.includes(currency);
+      let usdValue = 0;
+
+      if (isFiat) {
+        usdValue = amount; // 1:1 for fiat
+      } else {
+        const symbol = `${currency}USDT`;
+        const price = assetPrices[symbol] || 0;
+        usdValue = amount * price;
+      }
+
+      return { currency, amount, usdValue };
+    });
+
+    const totalUsd = holdingsWithUsd.reduce((sum, h) => sum + h.usdValue, 0);
+
+    // Calculate percentages
+    return holdingsWithUsd.map(h => ({
+      currency: h.currency,
+      amount: h.amount,
+      usdValue: h.usdValue,
+      percentage: totalUsd > 0 ? (h.usdValue / totalUsd) * 100 : 0,
+    }));
+  };
 
   const handleOpenCreateModal = (type: 'live' | 'demo') => {
     setActiveTab(type);
@@ -86,12 +124,92 @@ export default function AccountPage({
     catch (e) { return 'N/A'; }
   };
 
+  // Color palette for chart segments
+  const COLORS = [
+    '#6366f1', // indigo
+    '#10b981', // green
+    '#f59e0b', // amber
+    '#3b82f6', // blue
+    '#ef4444', // red
+    '#8b5cf6', // purple
+    '#ec4899', // pink
+    '#14b8a6', // teal
+  ];
+
+  // --- Micro Donut Chart Component ---
+  type MicroDonutChartProps = {
+    allocations: Array<{ currency: string; percentage: number }>;
+    size?: number;
+  };
+
+  // eslint-disable-next-line react/prop-types
+  const MicroDonutChart = ({ allocations, size = 80 }: MicroDonutChartProps) => {
+    if (allocations.length === 0) return null;
+
+    const strokeWidth = Math.floor(size / 4);
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const centerX = size / 2;
+    const centerY = size / 2;
+
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="transform -rotate-90">
+        {/* Base circle */}
+        <circle
+          cx={centerX}
+          cy={centerY}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          className="text-slate-200 dark:text-slate-700"
+        />
+
+        {/* Colored segments */}
+        {allocations.map((asset, index) => {
+          const dashLength = (asset.percentage / 100) * circumference;
+          const dashArray = `${dashLength} ${circumference}`;
+          const prevPercentages = allocations.slice(0, index).reduce((sum, a) => sum + a.percentage, 0);
+          const rotation = (prevPercentages / 100) * 360;
+
+          return (
+            <circle
+              key={asset.currency}
+              cx={centerX}
+              cy={centerY}
+              r={radius}
+              fill="none"
+              stroke={COLORS[index % COLORS.length]}
+              strokeWidth={strokeWidth}
+              strokeDasharray={dashArray}
+              strokeLinecap="round"
+              style={{ transform: `rotate(${rotation}deg)`, transformOrigin: 'center' }}
+            />
+          );
+        })}
+
+        {/* Center text */}
+        <text
+          x={centerX}
+          y={centerY}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className="text-sm font-bold fill-slate-700 dark:fill-slate-300 transform rotate-90"
+          style={{ transform: 'rotate(90deg)', transformOrigin: 'center' }}
+        >
+          {allocations.length}
+        </text>
+      </svg>
+    );
+  };
+
   // --- Render Thin Account Card (List View) ---
   const renderAccountCard = (acc: Account) => {
     const isDeactivated = acc.status === 'deactivated' || acc.status === 'suspended';
     const isExternal = acc.platformType === 'external';
     const isSelected = selectedAccountId === acc.id;
     const isActive = activeAccountId === acc.id;
+    const allocations = calculateAllocations(acc);
 
     return (
       <div
@@ -134,9 +252,22 @@ export default function AccountPage({
           </div>
         </div>
         <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 truncate">{acc.id}</p>
-        <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-          {formatBalance(acc.balances[acc.currency], acc.currency)}
-        </p>
+
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {formatBalance(acc.balances[acc.currency], acc.currency)}
+            </p>
+          </div>
+
+          {/* Micro Chart - only for integrated accounts with holdings */}
+          {/* eslint-disable-next-line react/prop-types */}
+          {acc.platformType === 'integrated' && allocations.length > 0 && (
+            <div className="flex-shrink-0">
+              <MicroDonutChart allocations={allocations} size={80} />
+            </div>
+          )}
+        </div>
       </div>
     );
   };

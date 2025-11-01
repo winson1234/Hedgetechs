@@ -1,11 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useTransactionStore } from '../stores/transactionStore';
 import { useOrderStore, type ExecutedOrder, type PendingOrder } from '../stores/orderStore';
 import { useAccountStore, formatBalance } from '../stores/accountStore';
-import type { Transaction } from '../types';
+import type { Transaction, TransactionStatus, TransactionType } from '../types';
+import TransactionDetailModal from '../components/TransactionDetailModal';
+import HistorySummaryCards from '../components/HistorySummaryCards';
 
 type HistoryTab = 'all' | 'trades' | 'transactions';
 type HistoryItem = (Transaction | ExecutedOrder | PendingOrder) & { itemType: 'transaction' | 'executedOrder' | 'pendingOrder' };
+type SortOption = 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc';
+type DateRangeOption = 'all' | 'today' | 'week' | 'month' | 'custom';
 
 // Helper function to format timestamp
 const formatDate = (timestamp: number): string => {
@@ -41,9 +45,75 @@ const getStatusColor = (status: string) => {
   }
 };
 
+// Export to CSV helper
+const exportToCSV = (items: HistoryItem[], filename: string) => {
+  const headers = ['Type', 'ID', 'Symbol', 'Amount', 'Status', 'Date'];
+  const rows = items.map(item => {
+    if (item.itemType === 'transaction') {
+      const txn = item as Transaction;
+      return [
+        txn.type,
+        txn.id,
+        '-',
+        txn.amount.toString(),
+        txn.status,
+        new Date(txn.timestamp).toISOString(),
+      ];
+    } else if (item.itemType === 'executedOrder') {
+      const order = item as ExecutedOrder;
+      return [
+        `${order.side} (executed)`,
+        order.id,
+        order.symbol,
+        order.amount.toString(),
+        'completed',
+        new Date(order.timestamp).toISOString(),
+      ];
+    } else {
+      const order = item as PendingOrder;
+      return [
+        `${order.side} (pending)`,
+        order.id,
+        order.symbol,
+        order.amount.toString(),
+        'pending',
+        new Date(order.timestamp).toISOString(),
+      ];
+    }
+  });
+
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 export default function HistoryPage() {
+  // State
   const [activeTab, setActiveTab] = useState<HistoryTab>('all');
-  // const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null); // TODO: Will be used for detail modal
+  const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOption, setSortOption] = useState<SortOption>('date-desc');
+  const [dateRange, setDateRange] = useState<DateRangeOption>('all');
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
+  const [statusFilter, setStatusFilter] = useState<TransactionStatus | 'all'>('all');
+  const [typeFilter, setTypeFilter] = useState<TransactionType | 'all'>('all');
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Get data from stores
   const transactions = useTransactionStore(state => state.transactions);
@@ -63,7 +133,7 @@ export default function HistoryPage() {
   }, [transactions, executedOrders, pendingOrders]);
 
   // Filter by tab
-  const filteredHistory = useMemo(() => {
+  const tabFilteredHistory = useMemo(() => {
     switch (activeTab) {
       case 'trades':
         return allHistory.filter(item =>
@@ -75,6 +145,156 @@ export default function HistoryPage() {
         return allHistory;
     }
   }, [activeTab, allHistory]);
+
+  // Apply all filters
+  const filteredHistory = useMemo(() => {
+    let filtered = [...tabFilteredHistory];
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item => {
+        const id = item.id.toLowerCase();
+        if (item.itemType === 'transaction') {
+          const txn = item as Transaction;
+          return id.includes(query) ||
+                 txn.type.includes(query) ||
+                 txn.amount.toString().includes(query) ||
+                 txn.accountId.toLowerCase().includes(query);
+        } else {
+          const order = item as ExecutedOrder | PendingOrder;
+          return id.includes(query) ||
+                 order.symbol.toLowerCase().includes(query) ||
+                 order.amount.toString().includes(query);
+        }
+      });
+    }
+
+    // Date range filter
+    if (dateRange !== 'all') {
+      const now = Date.now();
+      const oneDayMs = 24 * 60 * 60 * 1000;
+
+      if (dateRange === 'today') {
+        const startOfDay = new Date().setHours(0, 0, 0, 0);
+        filtered = filtered.filter(item => item.timestamp >= startOfDay);
+      } else if (dateRange === 'week') {
+        filtered = filtered.filter(item => item.timestamp >= now - (7 * oneDayMs));
+      } else if (dateRange === 'month') {
+        filtered = filtered.filter(item => item.timestamp >= now - (30 * oneDayMs));
+      } else if (dateRange === 'custom' && customDateStart && customDateEnd) {
+        const start = new Date(customDateStart).getTime();
+        const end = new Date(customDateEnd).setHours(23, 59, 59, 999);
+        filtered = filtered.filter(item => item.timestamp >= start && item.timestamp <= end);
+      }
+    }
+
+    // Status filter (only for transactions)
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(item => {
+        if (item.itemType === 'transaction') {
+          return (item as Transaction).status === statusFilter;
+        }
+        return true; // Keep all orders when status filter is active
+      });
+    }
+
+    // Type filter (only for transactions)
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(item => {
+        if (item.itemType === 'transaction') {
+          return (item as Transaction).type === typeFilter;
+        }
+        return false; // Exclude orders when type filter is active
+      });
+    }
+
+    // Amount range filter
+    const min = parseFloat(minAmount);
+    const max = parseFloat(maxAmount);
+    if (!isNaN(min) || !isNaN(max)) {
+      filtered = filtered.filter(item => {
+        let amount = 0;
+        if (item.itemType === 'transaction') {
+          amount = (item as Transaction).amount;
+        } else if (item.itemType === 'executedOrder') {
+          amount = (item as ExecutedOrder).total;
+        } else {
+          amount = (item as PendingOrder).amount * (item as PendingOrder).price;
+        }
+
+        if (!isNaN(min) && amount < min) return false;
+        if (!isNaN(max) && amount > max) return false;
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [tabFilteredHistory, searchQuery, dateRange, customDateStart, customDateEnd, statusFilter, typeFilter, minAmount, maxAmount]);
+
+  // Sort filtered history
+  const sortedHistory = useMemo(() => {
+    const sorted = [...filteredHistory];
+
+    switch (sortOption) {
+      case 'date-desc':
+        return sorted.sort((a, b) => b.timestamp - a.timestamp);
+      case 'date-asc':
+        return sorted.sort((a, b) => a.timestamp - b.timestamp);
+      case 'amount-desc':
+        return sorted.sort((a, b) => {
+          const amountA = a.itemType === 'transaction' ? (a as Transaction).amount :
+                          a.itemType === 'executedOrder' ? (a as ExecutedOrder).total :
+                          (a as PendingOrder).amount * (a as PendingOrder).price;
+          const amountB = b.itemType === 'transaction' ? (b as Transaction).amount :
+                          b.itemType === 'executedOrder' ? (b as ExecutedOrder).total :
+                          (b as PendingOrder).amount * (b as PendingOrder).price;
+          return amountB - amountA;
+        });
+      case 'amount-asc':
+        return sorted.sort((a, b) => {
+          const amountA = a.itemType === 'transaction' ? (a as Transaction).amount :
+                          a.itemType === 'executedOrder' ? (a as ExecutedOrder).total :
+                          (a as PendingOrder).amount * (a as PendingOrder).price;
+          const amountB = b.itemType === 'transaction' ? (b as Transaction).amount :
+                          b.itemType === 'executedOrder' ? (b as ExecutedOrder).total :
+                          (b as PendingOrder).amount * (b as PendingOrder).price;
+          return amountA - amountB;
+        });
+      default:
+        return sorted;
+    }
+  }, [filteredHistory, sortOption]);
+
+  // Pagination
+  const totalPages = Math.ceil(sortedHistory.length / itemsPerPage);
+  const paginatedHistory = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return sortedHistory.slice(start, end);
+  }, [sortedHistory, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, dateRange, statusFilter, typeFilter, minAmount, maxAmount, activeTab]);
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchQuery('');
+    setDateRange('all');
+    setCustomDateStart('');
+    setCustomDateEnd('');
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setMinAmount('');
+    setMaxAmount('');
+    setSortOption('date-desc');
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = searchQuery || dateRange !== 'all' || statusFilter !== 'all' ||
+                           typeFilter !== 'all' || minAmount || maxAmount;
 
   // Helper to render icon
   const renderIcon = (item: HistoryItem) => {
@@ -244,13 +464,226 @@ export default function HistoryPage() {
   return (
     <div className="px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 bg-slate-50 dark:bg-slate-950 min-h-[calc(100vh-61px)]">
       {/* Page Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
           Transaction History
         </h1>
         <p className="text-slate-600 dark:text-slate-400">
-          View all your trades, deposits, withdrawals, and transfers
+          View and manage all your trades, deposits, withdrawals, and transfers
         </p>
+      </div>
+
+      {/* Summary Cards */}
+      <HistorySummaryCards transactions={transactions} totalItems={allHistory.length} />
+
+      {/* Search and Controls */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm p-4 mb-4">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Search Bar */}
+          <div className="flex-1">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by symbol, ID, amount, or account..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-10 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <svg className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter Toggle Button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2 border rounded-md transition-colors flex items-center gap-2 ${
+              showFilters
+                ? 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300'
+                : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            Filters
+            {hasActiveFilters && (
+              <span className="bg-indigo-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                !
+              </span>
+            )}
+          </button>
+
+          {/* Export Button */}
+          <button
+            onClick={() => exportToCSV(sortedHistory, `transaction-history-${Date.now()}.csv`)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export CSV
+          </button>
+        </div>
+
+        {/* Advanced Filters */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Date Range */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Date Range
+                </label>
+                <select
+                  value={dateRange}
+                  onChange={(e) => setDateRange(e.target.value as DateRangeOption)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All Time</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">Last 30 Days</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Status
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as TransactionStatus | 'all')}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="processing">Processing</option>
+                  <option value="completed">Completed</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+
+              {/* Type Filter */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Type
+                </label>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value as TransactionType | 'all')}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All Types</option>
+                  <option value="deposit">Deposits</option>
+                  <option value="withdraw">Withdrawals</option>
+                  <option value="transfer">Transfers</option>
+                </select>
+              </div>
+
+              {/* Sort */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Sort By
+                </label>
+                <select
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value as SortOption)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="date-desc">Date (Newest)</option>
+                  <option value="date-asc">Date (Oldest)</option>
+                  <option value="amount-desc">Amount (High to Low)</option>
+                  <option value="amount-asc">Amount (Low to High)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Custom Date Range */}
+            {dateRange === 'custom' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={customDateStart}
+                    onChange={(e) => setCustomDateStart(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={customDateEnd}
+                    onChange={(e) => setCustomDateEnd(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Amount Range */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Min Amount
+                </label>
+                <input
+                  type="number"
+                  placeholder="0.00"
+                  value={minAmount}
+                  onChange={(e) => setMinAmount(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Max Amount
+                </label>
+                <input
+                  type="number"
+                  placeholder="10000.00"
+                  value={maxAmount}
+                  onChange={(e) => setMaxAmount(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Clear Filters Button */}
+            {hasActiveFilters && (
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={clearFilters}
+                  className="px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Clear All Filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -292,60 +725,161 @@ export default function HistoryPage() {
 
         {/* History List */}
         <div className="p-5 md:p-6 lg:p-8">
-          {filteredHistory.length === 0 ? (
-            <div className="text-center py-12">
-              <svg className="mx-auto h-12 w-12 text-slate-400 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          {paginatedHistory.length === 0 ? (
+            <div className="text-center py-16">
+              <svg className="mx-auto h-16 w-16 text-slate-400 dark:text-slate-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <h3 className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">No history</h3>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {activeTab === 'trades' && 'You haven\'t made any trades yet.'}
-                {activeTab === 'transactions' && 'You haven\'t made any deposits, withdrawals, or transfers yet.'}
-                {activeTab === 'all' && 'Your transaction history will appear here.'}
+              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+                {hasActiveFilters ? 'No results found' : 'No history yet'}
+              </h3>
+              <p className="text-slate-500 dark:text-slate-400 mb-6">
+                {hasActiveFilters
+                  ? 'Try adjusting your filters to see more results'
+                  : activeTab === 'trades'
+                    ? "You haven't made any trades yet. Start trading to see your order history here."
+                    : activeTab === 'transactions'
+                      ? "You haven't made any deposits, withdrawals, or transfers yet."
+                      : 'Your transaction history will appear here.'}
               </p>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredHistory.map((item, index) => (
-                <div
-                  key={`${item.itemType}-${item.id}-${index}`}
-                  className="flex items-center gap-4 p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
-                  // onClick={() => setSelectedItem(item)} // TODO: Will be used for detail modal
-                >
-                  {/* Icon */}
-                  {renderIcon(item)}
+            <>
+              <div className="space-y-3">
+                {paginatedHistory.map((item, index) => (
+                  <div
+                    key={`${item.itemType}-${item.id}-${index}`}
+                    className="flex items-center gap-4 p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                    onClick={() => setSelectedItem(item)}
+                  >
+                    {/* Icon */}
+                    {renderIcon(item)}
 
-                  {/* Description */}
-                  <div className="flex-1 min-w-0">
-                    {renderDescription(item)}
-                  </div>
-
-                  {/* Status (for transactions) */}
-                  {item.itemType === 'transaction' && (
-                    <div className="hidden sm:block">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor((item as Transaction).status)}`}>
-                        {(item as Transaction).status}
-                      </span>
+                    {/* Description */}
+                    <div className="flex-1 min-w-0">
+                      {renderDescription(item)}
                     </div>
-                  )}
 
-                  {/* Amount */}
-                  <div className="hidden md:block">
-                    {renderAmount(item)}
+                    {/* Status (for transactions) */}
+                    {item.itemType === 'transaction' && (
+                      <div className="hidden sm:block">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor((item as Transaction).status)}`}>
+                          {(item as Transaction).status}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Amount */}
+                    <div className="hidden md:block">
+                      {renderAmount(item)}
+                    </div>
+
+                    {/* Date */}
+                    <div className="text-right">
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        {formatDate(item.timestamp)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  {/* Items per page */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-slate-600 dark:text-slate-400">Items per page:</label>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
                   </div>
 
-                  {/* Date */}
-                  <div className="text-right">
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      {formatDate(item.timestamp)}
-                    </p>
+                  {/* Page info */}
+                  <div className="text-sm text-slate-600 dark:text-slate-400">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, sortedHistory.length)} of {sortedHistory.length} results
+                  </div>
+
+                  {/* Page navigation */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </button>
+
+                    {/* Page numbers */}
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`w-8 h-8 rounded-md transition-colors ${
+                              currentPage === pageNum
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
+
+      {/* Transaction Detail Modal */}
+      {selectedItem && (
+        <TransactionDetailModal
+          item={selectedItem}
+          onClose={() => setSelectedItem(null)}
+        />
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import MainSidebar from './components/MainSidebar';
 import AccountPage from './components/AccountPage';
 import ToastNotification from './components/ToastNotification';
 import WalletPage from './pages/WalletPage';
+import HistoryPage from './pages/HistoryPage';
 import { usePriceStore } from './stores/priceStore';
 import { useUIStore } from './stores/uiStore';
 import { useOrderStore } from './stores/orderStore';
@@ -119,6 +120,7 @@ export default function App() {
             <div className="ml-24">
               {currentPage === 'account' && <AccountPage />}
               {currentPage === 'wallet' && <WalletPage />}
+              {currentPage === 'history' && <HistoryPage />}
             </div>
           )}
         </div>

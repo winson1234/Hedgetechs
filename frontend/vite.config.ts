@@ -1,9 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Load .env file from parent directory (project root)
+  envDir: path.resolve(__dirname, '..'),
   server: {
     port: 5173,
     proxy: {

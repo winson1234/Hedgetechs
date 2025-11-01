@@ -1,78 +1,169 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useAccountStore, formatBalance } from '../../stores/accountStore';
 import { useUIStore } from '../../stores/uiStore';
+
+// Base validation schema
+const transferSchemaBase = z.object({
+  fromAccountId: z.string().min(1, 'Please select a source account'),
+  toAccountId: z.string().min(1, 'Please select a destination account'),
+  amount: z.number().positive('Amount must be positive'),
+});
+
+type TransferFormData = z.infer<typeof transferSchemaBase>;
 
 export default function TransferTab() {
   // Access stores
   const accounts = useAccountStore(state => state.accounts);
   const activeAccountId = useAccountStore(state => state.activeAccountId);
   const getActiveAccount = useAccountStore(state => state.getActiveAccount);
-  const transfer = useAccountStore(state => state.transfer);
+  const processTransfer = useAccountStore(state => state.processTransfer);
   const showToast = useUIStore(state => state.showToast);
 
   const activeAccount = getActiveAccount();
 
-  const [fromAccountId, setFromAccountId] = useState(activeAccount?.id || accounts[0]?.id || '');
-  const [toAccountId, setToAccountId] = useState('');
-  const [amount, setAmount] = useState('');
+  // State
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const fromAccount = accounts.find(a => a.id === fromAccountId);
-  const transferCurrency = fromAccount?.currency || 'USD';
+  // React Hook Form
+  const { register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<TransferFormData>({
+    resolver: zodResolver(transferSchemaBase),
+    defaultValues: {
+      fromAccountId: activeAccount?.id || accounts[0]?.id || '',
+      toAccountId: '',
+      amount: 0,
+    },
+  });
 
-  useEffect(() => {
-    if (activeAccount) {
-      setFromAccountId(activeAccount.id);
-    }
-  }, [activeAccountId, activeAccount]);
+  const fromAccountId = watch('fromAccountId');
+  const toAccountId = watch('toAccountId');
 
-  const toAccounts = accounts.filter(acc =>
-    acc.id !== fromAccountId &&
-    acc.currency === transferCurrency &&
-    acc.type === fromAccount?.type
+  // Get selected accounts
+  const fromAccount = useMemo(() =>
+    accounts.find(a => a.id === fromAccountId),
+    [accounts, fromAccountId]
   );
 
+  const toAccount = useMemo(() =>
+    accounts.find(a => a.id === toAccountId),
+    [accounts, toAccountId]
+  );
+
+  const availableBalance = useMemo(() =>
+    fromAccount ? (fromAccount.balances[fromAccount.currency] || 0) : 0,
+    [fromAccount]
+  );
+
+  const transferCurrency = fromAccount?.currency || 'USD';
+
+  // Filter "To" accounts: same currency, same type, not the same account
+  const toAccounts = useMemo(() =>
+    accounts.filter(acc =>
+      acc.id !== fromAccountId &&
+      acc.currency === transferCurrency &&
+      acc.type === fromAccount?.type
+    ),
+    [accounts, fromAccountId, transferCurrency, fromAccount?.type]
+  );
+
+  // Create dynamic schema with validation rules
+  const transferSchema = useMemo(() =>
+    transferSchemaBase
+      .refine(
+        (data) => data.fromAccountId !== data.toAccountId,
+        {
+          message: 'Cannot transfer to the same account',
+          path: ['toAccountId'],
+        }
+      )
+      .refine(
+        (data) => data.amount <= availableBalance,
+        {
+          message: `Insufficient funds. Available: ${formatBalance(availableBalance, fromAccount?.currency)}`,
+          path: ['amount'],
+        }
+      ),
+    [availableBalance, fromAccount?.currency]
+  );
+
+  // Update from account when active account changes
+  useEffect(() => {
+    if (activeAccount) {
+      setValue('fromAccountId', activeAccount.id);
+    }
+  }, [activeAccountId, activeAccount, setValue]);
+
+  // Reset "To" account if it becomes invalid after "From" account change
   useEffect(() => {
     if (toAccountId && !toAccounts.some(a => a.id === toAccountId)) {
-      setToAccountId('');
+      setValue('toAccountId', '');
     }
-  }, [fromAccountId, toAccounts, toAccountId]);
+  }, [fromAccountId, toAccounts, toAccountId, setValue]);
 
+  const onSubmit = async (data: TransferFormData) => {
+    const fromAcc = accounts.find(a => a.id === data.fromAccountId);
+    const toAcc = accounts.find(a => a.id === data.toAccountId);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      showToast('Please enter a valid amount.', 'error');
-      return;
-    }
-    if (!fromAccountId) {
-      showToast('Please select an account to transfer from.', 'error');
-      return;
-    }
-    if (!toAccountId) {
-      showToast('Please select an account to transfer to.', 'error');
-      return;
-    }
-    if (fromAccountId === toAccountId) {
-      showToast('Cannot transfer to the same account.', 'error');
-      return;
-    }
-    
-    const toAccount = accounts.find(a => a.id === toAccountId);
-    if (fromAccount?.currency !== toAccount?.currency) {
-      showToast('Account currencies do not match. Cross-currency transfers are not supported.', 'error');
+    if (!fromAcc || !toAcc) {
+      showToast('One or both accounts not found.', 'error');
       return;
     }
 
-    const result = transfer(fromAccountId, toAccountId, amountNum, transferCurrency);
-    if (result.success) {
-      setAmount(''); // Clear form
-      setToAccountId('');
-    } else {
-      showToast(result.message, 'error');
+    // Validate against dynamic schema
+    const validation = transferSchema.safeParse(data);
+    if (!validation.success) {
+      const error = validation.error.issues[0];
+      showToast(error.message, 'error');
+      return;
+    }
+
+    // Check currency match
+    if (fromAcc.currency !== toAcc.currency) {
+      showToast('Cross-currency transfers are not supported.', 'error');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      // Process transfer
+      const result = await processTransfer(
+        data.fromAccountId,
+        data.toAccountId,
+        data.amount,
+        fromAcc.currency
+      );
+
+      if (result.success) {
+        // Clear form
+        reset({
+          fromAccountId: data.fromAccountId,
+          toAccountId: '',
+          amount: 0,
+        });
+        showToast('Transfer completed successfully!', 'success');
+      } else {
+        showToast(result.message, 'error');
+      }
+    } catch (error) {
+      console.error('Transfer error:', error);
+      showToast(error instanceof Error ? error.message : 'Transfer failed', 'error');
+    } finally {
+      setIsProcessing(false);
     }
   };
+
+  if (accounts.length === 0) {
+    return (
+      <div className="max-w-md mx-auto text-center py-8">
+        <p className="text-slate-500 dark:text-slate-400">
+          No accounts available. Please create an account first.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto">
@@ -80,46 +171,48 @@ export default function TransferTab() {
         Internal Transfer
       </h2>
       <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-        Move funds between your trading accounts.
+        Move funds between your trading accounts (same currency only).
       </p>
-      
-      <form onSubmit={handleSubmit} className="space-y-4">
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {/* From Account */}
         <div>
           <label htmlFor="fromAccount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             From Account
           </label>
           <select
             id="fromAccount"
-            value={fromAccountId}
-            onChange={(e) => setFromAccountId(e.target.value)}
+            {...register('fromAccountId')}
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            disabled={accounts.length === 0}
           >
-            {accounts.length === 0 ? (
-                <option>No accounts available</option>
-            ) : (
-                accounts.map(acc => (
-                <option key={acc.id} value={acc.id}>
-                    {acc.id} ({acc.type}) - {formatBalance(acc.balances[acc.currency], acc.currency)}
-                </option>
-                ))
-            )}
+            {accounts.map(acc => (
+              <option key={acc.id} value={acc.id}>
+                {acc.id} ({acc.type}) - {formatBalance(acc.balances[acc.currency], acc.currency)}
+              </option>
+            ))}
           </select>
+          {errors.fromAccountId && (
+            <p className="text-xs text-red-500 mt-1">{errors.fromAccountId.message}</p>
+          )}
         </div>
 
+        {/* To Account */}
         <div>
           <label htmlFor="toAccount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             To Account
           </label>
           <select
             id="toAccount"
-            value={toAccountId}
-            onChange={(e) => setToAccountId(e.target.value)}
+            {...register('toAccountId')}
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             disabled={toAccounts.length === 0}
           >
-            <option value="" disabled>
-              {fromAccountId ? (toAccounts.length > 0 ? 'Select an account (same currency)' : 'No accounts with same currency') : 'Select account'}
+            <option value="">
+              {fromAccountId
+                ? toAccounts.length > 0
+                  ? 'Select an account (same currency & type)'
+                  : 'No matching accounts available'
+                : 'Select source account first'}
             </option>
             {toAccounts.map(acc => (
               <option key={acc.id} value={acc.id}>
@@ -127,35 +220,77 @@ export default function TransferTab() {
               </option>
             ))}
           </select>
+          {errors.toAccountId && (
+            <p className="text-xs text-red-500 mt-1">{errors.toAccountId.message}</p>
+          )}
+          {toAccounts.length === 0 && fromAccount && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              No other {fromAccount.type} accounts with {fromAccount.currency} currency found.
+            </p>
+          )}
         </div>
 
+        {/* Amount */}
         <div>
-          <label htmlFor="transferAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Amount to Transfer
-          </label>
+          <div className="flex justify-between items-baseline mb-2">
+            <label htmlFor="transferAmount" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Amount to Transfer
+            </label>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Available: {formatBalance(availableBalance, fromAccount?.currency)}
+            </span>
+          </div>
           <div className="relative">
             <input
               type="number"
               id="transferAmount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              {...register('amount', { valueAsNumber: true })}
               placeholder="0.00"
               min="0"
-              step="any"
+              step="0.01"
               className="w-full px-3 py-2 pr-16 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
             <span className="absolute right-3 top-2.5 text-sm font-medium text-slate-500 dark:text-slate-400">
               {transferCurrency}
             </span>
           </div>
+          {errors.amount && (
+            <p className="text-xs text-red-500 mt-1">{errors.amount.message}</p>
+          )}
         </div>
 
+        {/* Transfer Summary */}
+        {fromAccount && toAccount && (
+          <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md p-3">
+            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Transfer Summary</p>
+            <div className="space-y-1 text-xs text-slate-600 dark:text-slate-400">
+              <div className="flex justify-between">
+                <span>From:</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{fromAccount.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>To:</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{toAccount.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Fee:</span>
+                <span className="font-medium text-green-600 dark:text-green-400">Free</span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-slate-200 dark:border-slate-700">
+                <span>Processing:</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">Instant</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Submit Button */}
         <button
           type="submit"
+          disabled={isProcessing || toAccounts.length === 0}
           className="w-full px-4 py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!fromAccountId || !toAccountId || amount === ''}
         >
-          Confirm Transfer
+          {isProcessing ? 'Processing...' : 'Confirm Transfer'}
         </button>
       </form>
     </div>

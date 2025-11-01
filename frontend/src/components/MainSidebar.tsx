@@ -88,7 +88,6 @@ export default function MainSidebar() {
           label="History"
           page="history"
           currentPage={currentPage}
-          disabled={true}
         />
       </div>
 

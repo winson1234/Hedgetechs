@@ -8,6 +8,7 @@ import (
 	"brokerageProject/internal/services"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/joho/godotenv"
@@ -15,15 +16,37 @@ import (
 
 func main() {
 	// Load environment variables from .env file at root directory
-	// Go up two directories from cmd/server/ to reach the project root
-	envPath := filepath.Join("..", "..", ".env")
-	if err := godotenv.Load(envPath); err != nil {
-		log.Println("Warning: .env file not found at", envPath)
-		log.Println("Trying to load from current directory...")
-		if err := godotenv.Load(); err != nil {
-			log.Println("Warning: .env file not found, using system environment variables")
+	// Try multiple paths to find .env file
+	envPaths := []string{
+		filepath.Join("..", "..", ".env"),  // When run from cmd/server/
+		".env",                               // When run from project root
+		filepath.Join(".", ".env"),          // Alternative for project root
+	}
+
+	envLoaded := false
+	for _, envPath := range envPaths {
+		if err := godotenv.Load(envPath); err == nil {
+			log.Printf("Successfully loaded .env file from: %s", envPath)
+			envLoaded = true
+			break
 		}
 	}
+
+	if !envLoaded {
+		log.Println("Warning: .env file not found in any expected location")
+		log.Println("Searched paths:", envPaths)
+		log.Println("Using system environment variables")
+	}
+
+	// Log Stripe configuration status (without revealing the key)
+	if stripeKey := os.Getenv("STRIPE_SECRET_KEY"); stripeKey != "" {
+		log.Printf("STRIPE_SECRET_KEY loaded successfully (length: %d)", len(stripeKey))
+	} else {
+		log.Println("WARNING: STRIPE_SECRET_KEY is not set!")
+	}
+
+	// Initialize Stripe after loading environment variables
+	api.InitializeStripe()
 
 	log.Println("Starting Market Data Relay Server on", config.LocalServerAddress)
 
@@ -53,6 +76,8 @@ func main() {
 	http.HandleFunc(config.NewsAPIPath, api.HandleNews)
 	// REST handler for Alpha Vantage analytics
 	http.HandleFunc(config.AlphaVantageAPIPath, alphaVantageHandler.HandleAlphaVantage)
+	// REST handler for Stripe payment intent creation
+	http.HandleFunc(config.PaymentIntentAPIPath, api.HandleCreatePaymentIntent)
 
 	// Start the local HTTP server
 	log.Fatal(http.ListenAndServe(config.LocalServerAddress, nil))

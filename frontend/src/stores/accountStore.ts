@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Account, AccountStatus } from '../types'
+import type { Account, AccountStatus, PaymentMethodMetadata } from '../types'
 import { useUIStore } from './uiStore'
+import { useTransactionStore } from './transactionStore'
 
 // Helper Functions
 const generateAccountId = (type: 'live' | 'demo'): string => {
@@ -85,10 +86,15 @@ interface AccountStore {
   editDemoBalance: (accountId: string, newBalance: number) => { success: boolean; message?: string }
   toggleAccountStatus: (accountId: string) => void
 
-  // Wallet Operations
-  deposit: (accountId: string, amount: number, currency: string) => { success: boolean; message: string }
-  withdraw: (accountId: string, amount: number, currency: string) => { success: boolean; message: string }
-  transfer: (fromAccountId: string, toAccountId: string, amount: number, currency: string) => { success: boolean; message: string }
+  // Wallet Operations (internal - called by async wrappers)
+  _executeDeposit: (accountId: string, amount: number, currency: string) => { success: boolean; message: string }
+  _executeWithdraw: (accountId: string, amount: number, currency: string) => { success: boolean; message: string }
+  _executeTransfer: (fromAccountId: string, toAccountId: string, amount: number, currency: string) => { success: boolean; message: string }
+
+  // Async Wallet Operations (for UI - creates transactions)
+  processDeposit: (accountId: string, amount: number, currency: string, paymentIntentId?: string, metadata?: PaymentMethodMetadata) => Promise<{ success: boolean; message: string; transactionId?: string }>
+  processWithdrawal: (accountId: string, amount: number, currency: string, bankDetails?: PaymentMethodMetadata) => Promise<{ success: boolean; message: string; transactionId?: string }>
+  processTransfer: (fromAccountId: string, toAccountId: string, amount: number, currency: string) => Promise<{ success: boolean; message: string; transactionId?: string }>
 
   // Trading Operations
   executeBuy: (symbol: string, amount: number, price: number) => { success: boolean; message: string }
@@ -237,12 +243,9 @@ export const useAccountStore = create<AccountStore>()(
         }))
       },
 
-      // Wallet Operations
-      deposit: (accountId, amount, currency) => {
-        const showToast = useUIStore.getState().showToast
-
+      // Wallet Operations (internal)
+      _executeDeposit: (accountId, amount, currency) => {
         if (amount <= 0) {
-          showToast('Deposit amount must be positive.', 'error')
           return { success: false, message: 'Invalid amount.' }
         }
 
@@ -262,19 +265,14 @@ export const useAccountStore = create<AccountStore>()(
         }))
 
         if (accountFound) {
-          showToast(`${formatBalance(amount, currency)} deposited to ${accountId}.`, 'success')
           return { success: true, message: 'Deposit successful!' }
         } else {
-          showToast(`Account ${accountId} not found.`, 'error')
           return { success: false, message: 'Account not found.' }
         }
       },
 
-      withdraw: (accountId, amount, currency) => {
-        const showToast = useUIStore.getState().showToast
-
+      _executeWithdraw: (accountId, amount, currency) => {
         if (amount <= 0) {
-          showToast('Withdrawal amount must be positive.', 'error')
           return { success: false, message: 'Invalid amount.' }
         }
 
@@ -287,13 +285,11 @@ export const useAccountStore = create<AccountStore>()(
               const currentBalance = acc.balances[currency] ?? 0
               if (currentBalance < amount) {
                 message = `Insufficient funds. You only have ${formatBalance(currentBalance, currency)}.`
-                showToast(message, 'error')
                 return acc
               }
 
               success = true
-              message = `Withdrew ${formatBalance(amount, currency)} from ${accountId}.`
-              showToast(message, 'success')
+              message = 'Withdrawal successful!'
 
               return {
                 ...acc,
@@ -307,17 +303,14 @@ export const useAccountStore = create<AccountStore>()(
         return { success, message }
       },
 
-      transfer: (fromAccountId, toAccountId, amount, currency) => {
+      _executeTransfer: (fromAccountId, toAccountId, amount, currency) => {
         const { accounts } = get()
-        const showToast = useUIStore.getState().showToast
 
         if (amount <= 0) {
-          showToast('Transfer amount must be positive.', 'error')
           return { success: false, message: 'Invalid amount.' }
         }
 
         if (fromAccountId === toAccountId) {
-          showToast('Cannot transfer to the same account.', 'error')
           return { success: false, message: 'Cannot transfer to the same account.' }
         }
 
@@ -325,22 +318,16 @@ export const useAccountStore = create<AccountStore>()(
         const toAcc = accounts.find(a => a.id === toAccountId)
 
         if (!fromAcc || !toAcc) {
-          const message = 'One or both accounts not found.'
-          showToast(message, 'error')
-          return { success: false, message }
+          return { success: false, message: 'One or both accounts not found.' }
         }
 
         if (fromAcc.currency !== toAcc.currency) {
-          const message = 'Cross-currency transfers are not supported.'
-          showToast(message, 'error')
-          return { success: false, message }
+          return { success: false, message: 'Cross-currency transfers are not supported.' }
         }
 
         const fromBalance = fromAcc.balances[currency] ?? 0
         if (fromBalance < amount) {
-          const message = `Insufficient funds in account ${fromAccountId}.`
-          showToast(message, 'error')
-          return { success: false, message }
+          return { success: false, message: `Insufficient funds in account ${fromAccountId}.` }
         }
 
         set(state => ({
@@ -356,9 +343,133 @@ export const useAccountStore = create<AccountStore>()(
           })
         }))
 
-        const message = `Transferred ${formatBalance(amount, currency)} from ${fromAccountId} to ${toAccountId}.`
-        showToast(message, 'success')
-        return { success: true, message }
+        return { success: true, message: 'Transfer successful!' }
+      },
+
+      // Async Wallet Operations (for UI)
+      processDeposit: async (accountId, amount, currency, paymentIntentId, metadata) => {
+        const showToast = useUIStore.getState().showToast
+        const addTransaction = useTransactionStore.getState().addTransaction
+        const updateTransactionStatus = useTransactionStore.getState().updateTransactionStatus
+
+        // Create pending transaction
+        const transaction = addTransaction({
+          type: 'deposit',
+          status: 'pending',
+          accountId,
+          amount,
+          currency,
+          paymentIntentId,
+          metadata,
+        })
+
+        try {
+          // Simulate async processing (Stripe payment confirmation)
+          await new Promise(resolve => setTimeout(resolve, 1500))
+
+          // Execute the deposit
+          const result = get()._executeDeposit(accountId, amount, currency)
+
+          if (result.success) {
+            // Update transaction to completed
+            updateTransactionStatus(transaction.id, 'completed')
+            showToast(`${formatBalance(amount, currency)} deposited to ${accountId}.`, 'success')
+            return { success: true, message: result.message, transactionId: transaction.id }
+          } else {
+            // Update transaction to failed
+            updateTransactionStatus(transaction.id, 'failed', result.message)
+            showToast(result.message, 'error')
+            return { success: false, message: result.message, transactionId: transaction.id }
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Deposit failed'
+          updateTransactionStatus(transaction.id, 'failed', errorMessage)
+          showToast(errorMessage, 'error')
+          return { success: false, message: errorMessage, transactionId: transaction.id }
+        }
+      },
+
+      processWithdrawal: async (accountId, amount, currency, bankDetails) => {
+        const showToast = useUIStore.getState().showToast
+        const addTransaction = useTransactionStore.getState().addTransaction
+        const updateTransactionStatus = useTransactionStore.getState().updateTransactionStatus
+
+        // Create pending transaction
+        const transaction = addTransaction({
+          type: 'withdraw',
+          status: 'pending',
+          accountId,
+          amount,
+          currency,
+          metadata: bankDetails,
+        })
+
+        try {
+          // Simulate async processing (bank transfer initiation)
+          await new Promise(resolve => setTimeout(resolve, 1500))
+
+          // Execute the withdrawal
+          const result = get()._executeWithdraw(accountId, amount, currency)
+
+          if (result.success) {
+            // Update transaction to completed
+            updateTransactionStatus(transaction.id, 'completed')
+            showToast(`Withdrew ${formatBalance(amount, currency)} from ${accountId}.`, 'success')
+            return { success: true, message: result.message, transactionId: transaction.id }
+          } else {
+            // Update transaction to failed
+            updateTransactionStatus(transaction.id, 'failed', result.message)
+            showToast(result.message, 'error')
+            return { success: false, message: result.message, transactionId: transaction.id }
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Withdrawal failed'
+          updateTransactionStatus(transaction.id, 'failed', errorMessage)
+          showToast(errorMessage, 'error')
+          return { success: false, message: errorMessage, transactionId: transaction.id }
+        }
+      },
+
+      processTransfer: async (fromAccountId, toAccountId, amount, currency) => {
+        const showToast = useUIStore.getState().showToast
+        const addTransaction = useTransactionStore.getState().addTransaction
+        const updateTransactionStatus = useTransactionStore.getState().updateTransactionStatus
+
+        // Create pending transaction
+        const transaction = addTransaction({
+          type: 'transfer',
+          status: 'pending',
+          accountId: fromAccountId,
+          amount,
+          currency,
+          fromAccountId,
+          toAccountId,
+        })
+
+        try {
+          // Simulate async processing
+          await new Promise(resolve => setTimeout(resolve, 1000))
+
+          // Execute the transfer
+          const result = get()._executeTransfer(fromAccountId, toAccountId, amount, currency)
+
+          if (result.success) {
+            // Update transaction to completed
+            updateTransactionStatus(transaction.id, 'completed')
+            showToast(`Transferred ${formatBalance(amount, currency)} from ${fromAccountId} to ${toAccountId}.`, 'success')
+            return { success: true, message: result.message, transactionId: transaction.id }
+          } else {
+            // Update transaction to failed
+            updateTransactionStatus(transaction.id, 'failed', result.message)
+            showToast(result.message, 'error')
+            return { success: false, message: result.message, transactionId: transaction.id }
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Transfer failed'
+          updateTransactionStatus(transaction.id, 'failed', errorMessage)
+          showToast(errorMessage, 'error')
+          return { success: false, message: errorMessage, transactionId: transaction.id }
+        }
       },
 
       // Trading Operations

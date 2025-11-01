@@ -66,7 +66,20 @@ export default function WalletOverview() {
           Portfolio Overview
         </h2>
 
-        {/* Summary Cards */}
+        {/* Total Portfolio Value - Primary Card */}
+        <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+          <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">
+            Total Portfolio Value
+          </p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+            {formatBalance(totalPortfolioValue, 'USD')}
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Across all accounts
+          </p>
+        </div>
+
+        {/* Summary Cards - Live and Demo */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div className="p-5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700/50">
             <div className="flex justify-between items-center mb-1">

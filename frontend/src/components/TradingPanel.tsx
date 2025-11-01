@@ -28,6 +28,7 @@ export default function TradingPanel() {
   const executeSell = useAccountStore(state => state.executeSell);
 
   const addPendingOrder = useOrderStore(state => state.addPendingOrder);
+  const recordExecutedOrder = useOrderStore(state => state.recordExecutedOrder);
   const processPendingOrdersFromStore = useOrderStore(state => state.processPendingOrders);
 
   const usdBalance = getActiveUsdBalance();
@@ -350,6 +351,23 @@ export default function TradingPanel() {
       if (!result.success) {
         console.error("Market order execution failed:", result.message);
         return;
+      }
+
+      // Record the executed market order in order history
+      if (activeAccountId) {
+        const fee = getFeeAmount();
+        const total = qty * currentPrice;
+        recordExecutedOrder({
+          accountId: activeAccountId,
+          symbol: activeInstrument,
+          side,
+          type: 'market',
+          amount: qty,
+          executionPrice: currentPrice,
+          fee,
+          total: total + fee,
+          wasFromPending: false,
+        });
       }
     }
 

@@ -1,6 +1,18 @@
-import { useMemo } from 'react';
+import { useMemo, memo, lazy, Suspense, useState, useEffect } from 'react';
 import type { Account } from '../../types';
 import type { AssetPriceMap } from '../../hooks/useAssetPrices';
+import { getAssetColor } from '../../utils/colors';
+import PortfolioLegend from './PortfolioLegend';
+
+// Lazy load the chart component to improve initial load time
+const DonutChartRenderer = lazy(() => import('./DonutChartRenderer'));
+
+// Refresh icon
+const RefreshIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+  </svg>
+);
 
 type PortfolioAllocationProps = {
   accounts: Account[];
@@ -10,7 +22,7 @@ type PortfolioAllocationProps = {
   totalPortfolioValue: number;
 };
 
-type AssetAllocation = {
+export type AssetAllocation = {
   currency: string;
   amount: number;
   usdValue: number;
@@ -18,24 +30,17 @@ type AssetAllocation = {
   isFiat: boolean;
 };
 
-const COLORS = [
-  '#6366f1', // indigo
-  '#10b981', // green
-  '#f59e0b', // amber
-  '#3b82f6', // blue
-  '#ef4444', // red
-  '#8b5cf6', // purple
-  '#ec4899', // pink
-  '#14b8a6', // teal
-];
-
-export default function PortfolioAllocation({
+function PortfolioAllocation({
   accounts,
   formatBalance,
   assetPrices,
   pricesLoading,
   totalPortfolioValue,
 }: PortfolioAllocationProps) {
+  // Store a snapshot of allocations to prevent continuous re-renders
+  const [chartSnapshot, setChartSnapshot] = useState<AssetAllocation[]>([]);
+  const [snapshotValue, setSnapshotValue] = useState<number>(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const assetAllocations = useMemo((): AssetAllocation[] => {
     const assetTotals: Record<string, number> = {};
@@ -83,68 +88,24 @@ export default function PortfolioAllocation({
     return allocations;
   }, [accounts, assetPrices, totalPortfolioValue]);
 
-  // Simple Donut Chart (SVG)
-  const DonutChart = () => {
-    if (assetAllocations.length === 0) return null;
+  // Initialize snapshot on mount and when data changes significantly
+  useEffect(() => {
+    if (!pricesLoading && assetAllocations.length > 0 && chartSnapshot.length === 0) {
+      setChartSnapshot(assetAllocations);
+      setSnapshotValue(totalPortfolioValue);
+    }
+  }, [pricesLoading, assetAllocations, totalPortfolioValue, chartSnapshot.length]);
 
-    const size = 200;
-    const strokeWidth = 30;
-    const radius = (size - strokeWidth) / 2;
-    const circumference = 2 * Math.PI * radius;
-    let currentAngle = 0;
+  // Manual refresh function
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setChartSnapshot(assetAllocations);
+    setSnapshotValue(totalPortfolioValue);
 
-    return (
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="mx-auto">
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="#e2e8f0"
-          strokeWidth={strokeWidth}
-          className="dark:stroke-slate-700"
-        />
-        {assetAllocations.map((asset, index) => {
-          const angle = (asset.percentage / 100) * 360;
-          const dashArray = `${(asset.percentage / 100) * circumference} ${circumference}`;
-          const rotation = currentAngle - 90;
-          currentAngle += angle;
-
-          return (
-            <circle
-              key={asset.currency}
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              fill="none"
-              stroke={COLORS[index % COLORS.length]}
-              strokeWidth={strokeWidth}
-              strokeDasharray={dashArray}
-              strokeDashoffset={0}
-              transform={`rotate(${rotation} ${size / 2} ${size / 2})`}
-              className="transition-all duration-300"
-            />
-          );
-        })}
-        <text
-          x={size / 2}
-          y={size / 2}
-          textAnchor="middle"
-          dy=".3em"
-          className="text-2xl font-bold fill-slate-900 dark:fill-slate-100"
-        >
-          {assetAllocations.length}
-        </text>
-        <text
-          x={size / 2}
-          y={size / 2 + 20}
-          textAnchor="middle"
-          className="text-xs fill-slate-500 dark:fill-slate-400"
-        >
-          Assets
-        </text>
-      </svg>
-    );
+    // Reset refreshing state after animation
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 500);
   };
 
   if (pricesLoading) {
@@ -162,9 +123,24 @@ export default function PortfolioAllocation({
 
   return (
     <div className="max-w-4xl mx-auto">
-      <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">
-        Portfolio Allocation
-      </h3>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+          Portfolio Allocation
+        </h3>
+        {chartSnapshot.length > 0 && (
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh chart with latest prices"
+          >
+            <span className={isRefreshing ? 'animate-spin' : ''}>
+              <RefreshIcon />
+            </span>
+            Refresh
+          </button>
+        )}
+      </div>
 
       {assetAllocations.length === 0 ? (
         <p className="text-slate-500 dark:text-slate-400 text-center py-8 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg">
@@ -172,85 +148,44 @@ export default function PortfolioAllocation({
         </p>
       ) : (
         <div className="space-y-6">
-          {/* Donut Chart */}
+          {/* Recharts Donut Chart + Detailed Legend */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6">
-            <DonutChart />
-          </div>
-
-          {/* Detailed List */}
-          <div className="space-y-3">
-            {assetAllocations.map((asset, index) => (
-              <div
-                key={asset.currency}
-                className="p-4 border border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              {/* Left Column: Interactive Donut Chart */}
+              <Suspense
+                fallback={
+                  <div className="h-64 min-h-[256px] flex items-center justify-center">
+                    <div className="animate-pulse flex flex-col items-center gap-3">
+                      <div className="w-48 h-48 rounded-full border-8 border-slate-200 dark:border-slate-700"></div>
+                      <div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                    </div>
+                  </div>
+                }
               >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    />
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                      asset.isFiat
-                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                    }`}>
-                      {asset.currency.substring(0, 3)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">
-                        {asset.currency}
-                      </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {asset.isFiat ? 'Fiat Currency' : 'Cryptocurrency'}
-                      </p>
-                    </div>
-                  </div>
+                <DonutChartRenderer
+                  assetAllocations={chartSnapshot}
+                  totalPortfolioValue={snapshotValue}
+                  formatBalance={formatBalance}
+                />
+              </Suspense>
 
-                  <div className="text-right shrink-0">
-                    <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                      {asset.isFiat
-                        ? formatBalance(asset.amount, asset.currency)
-                        : asset.amount.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 6,
-                          })
-                      }
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      {formatBalance(asset.usdValue, 'USD')} ({asset.percentage.toFixed(2)}%)
-                    </p>
-                  </div>
-                </div>
-
-                {/* Percentage Bar */}
-                <div className="mt-3 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full transition-all duration-300"
-                    style={{
-                      width: `${asset.percentage}%`,
-                      backgroundColor: COLORS[index % COLORS.length],
-                    }}
-                  />
-                </div>
+              {/* Right Column: Detailed Legend */}
+              <div>
+                <PortfolioLegend
+                  payload={chartSnapshot.map((asset) => ({
+                    value: asset.currency,
+                    color: getAssetColor(asset.currency),
+                    payload: asset,
+                  }))}
+                  formatBalance={formatBalance}
+                />
               </div>
-            ))}
-          </div>
-
-          {/* Summary Card */}
-          <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-            <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">
-              Total Portfolio Value
-            </p>
-            <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-              {formatBalance(totalPortfolioValue, 'USD')}
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Aggregated across {assetAllocations.length} {assetAllocations.length === 1 ? 'asset' : 'assets'}
-            </p>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+export default memo(PortfolioAllocation);

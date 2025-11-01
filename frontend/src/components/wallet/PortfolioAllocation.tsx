@@ -39,7 +39,6 @@ function PortfolioAllocation({
 }: PortfolioAllocationProps) {
   // Store a snapshot of allocations to prevent continuous re-renders
   const [chartSnapshot, setChartSnapshot] = useState<AssetAllocation[]>([]);
-  const [snapshotValue, setSnapshotValue] = useState<number>(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const assetAllocations = useMemo((): AssetAllocation[] => {
@@ -92,15 +91,13 @@ function PortfolioAllocation({
   useEffect(() => {
     if (!pricesLoading && assetAllocations.length > 0 && chartSnapshot.length === 0) {
       setChartSnapshot(assetAllocations);
-      setSnapshotValue(totalPortfolioValue);
     }
-  }, [pricesLoading, assetAllocations, totalPortfolioValue, chartSnapshot.length]);
+  }, [pricesLoading, assetAllocations, chartSnapshot.length]);
 
   // Manual refresh function
   const handleRefresh = () => {
     setIsRefreshing(true);
     setChartSnapshot(assetAllocations);
-    setSnapshotValue(totalPortfolioValue);
 
     // Reset refreshing state after animation
     setTimeout(() => {
@@ -164,7 +161,7 @@ function PortfolioAllocation({
               >
                 <DonutChartRenderer
                   assetAllocations={chartSnapshot}
-                  totalPortfolioValue={snapshotValue}
+                  liveValue={totalPortfolioValue}
                   formatBalance={formatBalance}
                 />
               </Suspense>

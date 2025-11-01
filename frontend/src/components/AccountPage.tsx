@@ -5,6 +5,7 @@ import { useUIStore } from '../stores/uiStore';
 import { useAccountStore, formatBalance } from '../stores/accountStore';
 import OpenAccountModal from './OpenAccountModal';
 import EditBalanceModal from './EditBalanceModal';
+import AccountHoldingsChart from './AccountHoldingsChart';
 
 // --- Icons ---
 const PlusIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg> );
@@ -88,6 +89,21 @@ export default function AccountPage() {
     if (!selectedAccount) return [];
     return calculateAllocations(selectedAccount);
   }, [selectedAccount, calculateAllocations]);
+
+  // Calculate total account value (base currency + holdings)
+  const selectedAccountTotalValue = useMemo(() => {
+    if (!selectedAccount) return 0;
+
+    // Start with base currency balance
+    let total = selectedAccount.balances[selectedAccount.currency] ?? 0;
+
+    // Add all other holdings converted to USD
+    selectedAccountAllocations.forEach(holding => {
+      total += holding.usdValue;
+    });
+
+    return total;
+  }, [selectedAccount, selectedAccountAllocations]);
 
   const handleOpenCreateModal = (type: 'live' | 'demo') => {
     setActiveTab(type);
@@ -291,7 +307,7 @@ export default function AccountPage() {
            </div>
         </div>
         <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-sm lg:sticky lg:top-[77px] h-fit max-h-[calc(100vh-100px)] overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-sm">
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 pb-3 border-b border-slate-200 dark:border-slate-700">Account Details</h2>
                 {selectedAccount ? (
                     <div className="space-y-4 text-sm">
@@ -329,49 +345,17 @@ export default function AccountPage() {
                         {/* Holdings Allocation (only for integrated accounts) */}
                         {selectedAccount.platformType === 'integrated' && (
                             <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
-                                <div className="text-slate-500 dark:text-slate-400 font-semibold mb-3">Holdings Allocation</div>
-
                                 {pricesLoading ? (
                                     <div className="text-center py-6">
                                         <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-solid border-indigo-600 border-r-transparent"></div>
                                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Loading prices...</p>
                                     </div>
-                                ) : selectedAccountAllocations.length > 0 ? (
-                                    <>
-                                        {/* Micro Donut Chart */}
-                                        <div className="flex justify-center mb-4">
-                                            <MicroDonutChart allocations={selectedAccountAllocations} size={120} />
-                                        </div>
-
-                                        {/* Detailed Holdings List */}
-                                        <div className="space-y-2">
-                                            {selectedAccountAllocations.map((asset, index) => (
-                                                <div key={asset.currency} className="flex items-center gap-2">
-                                                    {/* Color indicator */}
-                                                    <div
-                                                        className="w-3 h-3 rounded-full flex-shrink-0"
-                                                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                                                    />
-
-                                                    {/* Asset info */}
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex justify-between items-baseline text-xs">
-                                                            <span className="font-medium text-slate-700 dark:text-slate-300">{asset.currency}</span>
-                                                            <span className="font-semibold text-slate-900 dark:text-slate-100">{asset.percentage.toFixed(1)}%</span>
-                                                        </div>
-                                                        <div className="flex justify-between items-baseline text-[10px] text-slate-500 dark:text-slate-400">
-                                                            <span className="font-mono tabular-nums">{asset.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
-                                                            <span className="font-mono tabular-nums">
-                                                                {asset.usdValue > 0 ? `$${asset.usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Price unavailable'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </>
                                 ) : (
-                                    <div className="italic text-xs text-slate-400 dark:text-slate-600">No other holdings</div>
+                                    <AccountHoldingsChart
+                                        allocations={selectedAccountAllocations}
+                                        totalValue={selectedAccountTotalValue}
+                                        formatBalance={formatBalance}
+                                    />
                                 )}
                             </div>
                         )}
@@ -388,25 +372,29 @@ export default function AccountPage() {
                                 </button>
                             )}
 
-                            {/* Deposit Button */}
-                            <button
-                                onClick={() => navigateTo('wallet', 'deposit')}
-                                className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={selectedAccount.status !== 'active'}
-                                title={selectedAccount.status !== 'active' ? 'Account must be active' : 'Navigate to Deposit'}
-                            >
-                              <ArrowDownTrayIcon /> Deposit
-                            </button>
+                            {/* Deposit Button - only for live accounts */}
+                            {selectedAccount.type !== 'demo' && (
+                                <button
+                                    onClick={() => navigateTo('wallet', 'deposit')}
+                                    className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={selectedAccount.status !== 'active'}
+                                    title={selectedAccount.status !== 'active' ? 'Account must be active' : 'Navigate to Deposit'}
+                                >
+                                  <ArrowDownTrayIcon /> Deposit
+                                </button>
+                            )}
 
-                            {/* Withdraw Button */}
-                            <button
-                                onClick={() => navigateTo('wallet', 'withdraw')}
-                                className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-md transition-colors border border-slate-200 dark:border-slate-600 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={selectedAccount.status !== 'active'}
-                                title={selectedAccount.status !== 'active' ? 'Account must be active' : 'Navigate to Withdraw'}
-                            >
-                              <ArrowUpTrayIcon /> Withdraw
-                            </button>
+                            {/* Withdraw Button - only for live accounts */}
+                            {selectedAccount.type !== 'demo' && (
+                                <button
+                                    onClick={() => navigateTo('wallet', 'withdraw')}
+                                    className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-md transition-colors border border-slate-200 dark:border-slate-600 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={selectedAccount.status !== 'active'}
+                                    title={selectedAccount.status !== 'active' ? 'Account must be active' : 'Navigate to Withdraw'}
+                                >
+                                  <ArrowUpTrayIcon /> Withdraw
+                                </button>
+                            )}
 
                             {/* Edit Balance Button - only for demo accounts */}
                             {selectedAccount.type === 'demo' && selectedAccount.status === 'active' && (

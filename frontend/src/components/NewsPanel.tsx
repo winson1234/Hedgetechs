@@ -238,10 +238,10 @@ export default function NewsPanel() {
       </div>
         
       {/* Filter Toggle */}
-      <div className="flex justify-between gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1 mb-3">
+      <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1 mb-3">
         <button
           onClick={() => setFilter('all')}
-          className={`flex-1 px-3 py-1 text-xs font-medium rounded transition-colors ${
+          className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
             filter === 'all'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -251,7 +251,7 @@ export default function NewsPanel() {
         </button>
         <button
           onClick={() => setFilter('crypto')}
-          className={`flex-1 px-3 py-1 text-xs font-medium rounded transition-colors ${
+          className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
             filter === 'crypto'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -261,7 +261,7 @@ export default function NewsPanel() {
         </button>
         <button
           onClick={() => setFilter('forex')}
-          className={`flex-1 px-3 py-1 text-xs font-medium rounded transition-colors ${
+          className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
             filter === 'forex'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -271,7 +271,7 @@ export default function NewsPanel() {
         </button>
         <button
           onClick={() => setFilter('market')}
-          className={`flex-1 px-3 py-1 text-xs font-medium rounded transition-colors ${
+          className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
             filter === 'market'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -281,7 +281,7 @@ export default function NewsPanel() {
         </button>
         <button
           onClick={() => setFilter('system')}
-          className={`flex-1 px-3 py-1 text-xs font-medium rounded transition-colors ${
+          className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
             filter === 'system'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'

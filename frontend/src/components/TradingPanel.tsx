@@ -19,7 +19,9 @@ type OrderType = 'limit' | 'market' | 'stop-limit';
 export default function TradingPanel() {
   // Access stores
   const activeInstrument = useUIStore(state => state.activeInstrument);
+  const accounts = useAccountStore(state => state.accounts);
   const activeAccountId = useAccountStore(state => state.activeAccountId);
+  const setActiveAccount = useAccountStore(state => state.setActiveAccount);
   const getActiveUsdBalance = useAccountStore(state => state.getActiveUsdBalance);
   const getActiveCryptoHoldings = useAccountStore(state => state.getActiveCryptoHoldings);
   const executeBuy = useAccountStore(state => state.executeBuy);
@@ -364,6 +366,8 @@ export default function TradingPanel() {
       {/* Header with Fee Level */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">Trading</h3>
+
+        {/* Fee Level */}
         <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           <span className="font-medium">% Fee Level</span>
           <span className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded font-semibold text-slate-700 dark:text-slate-300">
@@ -378,7 +382,7 @@ export default function TradingPanel() {
           <button
             key={mode}
             onClick={() => setTradingMode(mode)}
-            className={`flex-1 px-3 py-2 text-sm font-semibold rounded-md transition capitalize ${
+            className={`flex-1 px-2 py-2 text-xs sm:text-sm font-semibold rounded-md transition capitalize ${
               tradingMode === mode
                 ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
                 // Apply subtle styling for non-spot modes instead of disabling
@@ -400,7 +404,7 @@ export default function TradingPanel() {
         {/* ... Limit, Market, Stop-Limit buttons ... */}
          <button
           onClick={() => setOrderType('limit')}
-          className={`flex-1 px-3 py-2 text-sm font-semibold rounded-md transition ${
+          className={`flex-1 px-2 py-2 text-xs sm:text-sm font-semibold rounded-md transition ${
             orderType === 'limit'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -410,7 +414,7 @@ export default function TradingPanel() {
         </button>
         <button
           onClick={() => setOrderType('market')}
-          className={`flex-1 px-3 py-2 text-sm font-semibold rounded-md transition ${
+          className={`flex-1 px-2 py-2 text-xs sm:text-sm font-semibold rounded-md transition ${
             orderType === 'market'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -420,7 +424,7 @@ export default function TradingPanel() {
         </button>
         <button
           onClick={() => setOrderType('stop-limit')}
-          className={`flex-1 px-3 py-2 text-sm font-semibold rounded-md transition ${
+          className={`flex-1 px-2 py-2 text-xs sm:text-sm font-semibold rounded-md transition ${
             orderType === 'stop-limit'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -463,7 +467,21 @@ export default function TradingPanel() {
 
       {/* Available Balance Breakdown */}
        <div className="mb-5 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-        <div className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">Available Balance</div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-bold text-slate-700 dark:text-slate-300">Available Balance</div>
+          {/* Account Switcher */}
+          <select
+            value={activeAccountId || ''}
+            onChange={(e) => setActiveAccount(e.target.value)}
+            className="px-2.5 py-1 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-700 dark:text-slate-300 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.id.substring(0, 12)}... ({account.type === 'live' ? 'Live' : 'Demo'})
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-slate-600 dark:text-slate-400">USD Balance:</span>

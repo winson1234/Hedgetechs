@@ -95,12 +95,8 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
       return
     }
 
-    // Update current price and recalculate change
-    const changeValue = price - existingData.open24h
-    const changePercent = existingData.open24h > 0
-      ? (changeValue / existingData.open24h) * 100
-      : 0
-
+    // Update current price only - preserve 24h change data from hydration
+    // This prevents recalculation errors and keeps the official Binance 24h change percentage
     set((state) => ({
       prices: {
         ...state.prices,
@@ -108,8 +104,6 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
           ...existingData,
           current: price,
           timestamp: Date.now(),
-          change24h: changePercent,
-          changeValue24h: changeValue,
         },
       },
     }))

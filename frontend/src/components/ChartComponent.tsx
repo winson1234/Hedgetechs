@@ -3,6 +3,7 @@ import { createChart, IChartApi, ISeriesApi, UTCTimestamp, CandlestickData, IPri
 import { WebSocketContext } from '../context/WebSocketContext'
 import type { PriceMessage } from '../hooks/useWebSocket'
 import { useUIStore } from '../stores/uiStore'
+import ChartHeader from './ChartHeader'
 
 type Kline = {
   openTime: number
@@ -25,6 +26,8 @@ export default function ChartComponent() {
   // Access stores
   const timeframe = useUIStore(state => state.activeTimeframe)
   const symbol = useUIStore(state => state.activeInstrument)
+  const setShowAnalyticsPanel = useUIStore(state => state.setShowAnalyticsPanel)
+  const activeDrawingTool = useUIStore(state => state.activeDrawingTool)
   const ref = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
@@ -79,9 +82,9 @@ export default function ChartComponent() {
     
     const isDark = document.documentElement.classList.contains('dark')
     
-    chartRef.current = createChart(ref.current, { 
-      width: ref.current.clientWidth, 
-      height: 480,
+    chartRef.current = createChart(ref.current, {
+      width: ref.current.clientWidth,
+      height: 500,
       layout: {
         background: { color: 'transparent' },
         textColor: isDark ? '#94a3b8' : '#64748b',
@@ -258,6 +261,21 @@ export default function ChartComponent() {
     }
   }, [lastMessage, timeframeSeconds, symbol])
 
+  // PLACEHOLDER: Drawing tool functionality
+  // TODO: Implement drawing tool interactions on the chart
+  useEffect(() => {
+    if (activeDrawingTool) {
+      console.log(`Drawing tool selected: ${activeDrawingTool}`)
+      // Future implementation: Enable drawing mode on the chart
+      // - Add mouse event listeners to the chart
+      // - Create drawing shapes (trendlines, rectangles, etc.)
+      // - Store drawing data in a state or local storage
+    } else {
+      console.log('Drawing tool deselected')
+      // Future implementation: Disable drawing mode
+    }
+  }, [activeDrawingTool])
+
   // Format symbol for display (e.g., BTCUSDT -> BTC/USDT)
   const displaySymbol = symbol.replace(/USDT?$/, match => `/${match}`)
 
@@ -269,14 +287,19 @@ export default function ChartComponent() {
     })
   }
 
+  const handleAnalyticsClick = () => {
+    setShowAnalyticsPanel(true)
+  }
+
   return (
-    <div className="w-full h-full">
-      <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+    <div className="w-full">
+      <ChartHeader onAnalyticsClick={handleAnalyticsClick} />
+      <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-2 truncate">
         {displaySymbol} - {timeframe} (last 200)
       </div>
-      <div className="relative overflow-hidden" style={{ height: '480px' }}>
+      <div className="relative overflow-hidden w-full" style={{ height: '500px' }}>
         <div ref={ref} className="w-full h-full" />
-        
+
         {isLoading && (
           <div className="absolute inset-0 bg-slate-300/70 dark:bg-slate-700/70 flex items-center justify-center pointer-events-none z-10">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-slate-400/40 to-transparent animate-shimmer" />
@@ -286,36 +309,36 @@ export default function ChartComponent() {
           </div>
         )}
       </div>
-      
+
       {ohlcv && (
-        <div className="mt-3 grid grid-cols-5 gap-3 text-sm">
-          <div className="flex flex-col">
-            <span className="text-slate-500 dark:text-slate-400 text-xs mb-1">Open</span>
-            <span className="font-medium text-slate-900 dark:text-white">
+        <div className="mt-3 grid grid-cols-5 gap-2 text-xs overflow-hidden">
+          <div className="flex flex-col min-w-0">
+            <span className="text-slate-500 dark:text-slate-400 text-[10px] mb-0.5">Open</span>
+            <span className="font-semibold text-slate-900 dark:text-white truncate text-[11px]">
               ${formatNumber(ohlcv.open)}
             </span>
           </div>
-          <div className="flex flex-col">
-            <span className="text-slate-500 dark:text-slate-400 text-xs mb-1">High</span>
-            <span className="font-medium text-green-600 dark:text-green-400">
+          <div className="flex flex-col min-w-0">
+            <span className="text-slate-500 dark:text-slate-400 text-[10px] mb-0.5">High</span>
+            <span className="font-semibold text-green-600 dark:text-green-400 truncate text-[11px]">
               ${formatNumber(ohlcv.high)}
             </span>
           </div>
-          <div className="flex flex-col">
-            <span className="text-slate-500 dark:text-slate-400 text-xs mb-1">Low</span>
-            <span className="font-medium text-red-600 dark:text-red-400">
+          <div className="flex flex-col min-w-0">
+            <span className="text-slate-500 dark:text-slate-400 text-[10px] mb-0.5">Low</span>
+            <span className="font-semibold text-red-600 dark:text-red-400 truncate text-[11px]">
               ${formatNumber(ohlcv.low)}
             </span>
           </div>
-          <div className="flex flex-col">
-            <span className="text-slate-500 dark:text-slate-400 text-xs mb-1">Close</span>
-            <span className="font-medium text-slate-900 dark:text-white">
+          <div className="flex flex-col min-w-0">
+            <span className="text-slate-500 dark:text-slate-400 text-[10px] mb-0.5">Close</span>
+            <span className="font-semibold text-slate-900 dark:text-white truncate text-[11px]">
               ${formatNumber(ohlcv.close)}
             </span>
           </div>
-          <div className="flex flex-col">
-            <span className="text-slate-500 dark:text-slate-400 text-xs mb-1">Volume</span>
-            <span className="font-medium text-blue-600 dark:text-blue-400">
+          <div className="flex flex-col min-w-0">
+            <span className="text-slate-500 dark:text-slate-400 text-[10px] mb-0.5">Volume</span>
+            <span className="font-semibold text-blue-600 dark:text-blue-400 truncate text-[11px]">
               {formatNumber(ohlcv.volume, 0)}
             </span>
           </div>

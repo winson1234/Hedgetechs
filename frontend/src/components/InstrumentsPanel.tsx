@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { useAssetPrices } from '../hooks/useAssetPrices'
 import { useUIStore } from '../stores/uiStore'
+import { usePriceStore } from '../stores/priceStore'
 
 const instrumentSymbols = [
   { symbol: 'BTCUSDT', displayName: 'BTC/USD', baseCurrency: 'BTC', iconUrl: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png' },
@@ -16,6 +17,7 @@ export default function InstrumentsPanel() {
 
   // Get asset prices
   const { prices: assetPrices, loading: pricesLoading } = useAssetPrices()
+  const priceData = usePriceStore(state => state.prices)
   const [searchQuery, setSearchQuery] = useState('')
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
@@ -57,16 +59,19 @@ export default function InstrumentsPanel() {
   const instruments = useMemo(() => {
     return instrumentSymbols.map(inst => {
       const price = assetPrices[inst.symbol] || 0
+      const priceInfo = priceData[inst.symbol]
+      const changePercent = priceInfo?.change24h || 0
+
       return {
         symbol: inst.symbol,
         displayName: inst.displayName,
         baseCurrency: inst.baseCurrency,
         iconUrl: inst.iconUrl,
         price: price.toFixed(2),
-        change: '0.00'
+        change: changePercent.toFixed(2)
       }
     })
-  }, [assetPrices])
+  }, [assetPrices, priceData])
 
   // Filter instruments based on search and favorites
   const filteredInstruments = instruments.filter(item => {

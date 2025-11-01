@@ -514,12 +514,15 @@ func HandleNews(w http.ResponseWriter, r *http.Request) {
 
 		for _, item := range feed.Channel.Items {
 			// Parse pubDate (RFC1123 format: "Mon, 02 Jan 2006 15:04:05 MST")
-			pubDate, err := time.Parse(time.RFC1123, item.PubDate)
+			// Handle "Z" timezone by replacing with "+0000"
+			dateStr := strings.Replace(item.PubDate, " Z", " +0000", 1)
+
+			pubDate, err := time.Parse(time.RFC1123, dateStr)
 			if err != nil {
 				// Try RFC1123Z if RFC1123 fails
-				pubDate, err = time.Parse(time.RFC1123Z, item.PubDate)
+				pubDate, err = time.Parse(time.RFC1123Z, dateStr)
 				if err != nil {
-					log.Printf("Error parsing pubDate '%s': %v", item.PubDate, err)
+					log.Printf("Error parsing pubDate '%s': %v. Check the output from backend.", item.PubDate, err)
 					pubDate = time.Now() // fallback to current time
 				}
 			}

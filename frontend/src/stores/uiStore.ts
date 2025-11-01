@@ -19,11 +19,13 @@ interface UIStore {
   activeInstrument: string
   setActiveInstrument: (instrument: string) => void
 
-  // Analytics & Tools
+  // Analytics
   showAnalyticsPanel: boolean
   setShowAnalyticsPanel: (show: boolean) => void
-  activeTool: string | null
-  setActiveTool: (tool: string | null) => void
+
+  // Drawing Tools
+  activeDrawingTool: string | null
+  setActiveDrawingTool: (tool: string | null) => void
 
   // Navigation
   currentPage: Page
@@ -61,11 +63,13 @@ export const useUIStore = create<UIStore>()(
       activeInstrument: 'BTCUSDT',
       setActiveInstrument: (instrument) => set({ activeInstrument: instrument }),
 
-      // Analytics & Tools
+      // Analytics
       showAnalyticsPanel: false,
       setShowAnalyticsPanel: (show) => set({ showAnalyticsPanel: show }),
-      activeTool: null,
-      setActiveTool: (tool) => set({ activeTool: tool }),
+
+      // Drawing Tools
+      activeDrawingTool: null,
+      setActiveDrawingTool: (tool) => set({ activeDrawingTool: tool }),
 
       // Navigation
       currentPage: 'trading',

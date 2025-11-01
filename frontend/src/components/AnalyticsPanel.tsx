@@ -9,12 +9,10 @@ const AnalyticsPanel: React.FC = () => {
   // Access stores
   const isOpen = useUIStore(state => state.showAnalyticsPanel);
   const setShowAnalyticsPanel = useUIStore(state => state.setShowAnalyticsPanel);
-  const setActiveTool = useUIStore(state => state.setActiveTool);
   const symbol = useUIStore(state => state.activeInstrument);
 
   const onClose = () => {
     setShowAnalyticsPanel(false);
-    setActiveTool(null); // Clear active tool when closing panel
   };
   const [loading, setLoading] = useState(false);
   const [quoteData, setQuoteData] = useState<AlphaVantageData | null>(null);

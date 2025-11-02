@@ -128,11 +128,12 @@ func HandleCreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 
 // PaymentStatusResponse defines the response structure for payment status
 type PaymentStatusResponse struct {
-	Status           string `json:"status"`
-	PaymentIntentID  string `json:"payment_intent_id"`
-	Amount           int64  `json:"amount,omitempty"`
-	Currency         string `json:"currency,omitempty"`
-	LastPaymentError string `json:"last_payment_error,omitempty"`
+	Status           string            `json:"status"`
+	PaymentIntentID  string            `json:"payment_intent_id"`
+	Amount           int64             `json:"amount,omitempty"`
+	Currency         string            `json:"currency,omitempty"`
+	LastPaymentError string            `json:"last_payment_error,omitempty"`
+	Metadata         map[string]string `json:"metadata,omitempty"`
 }
 
 // HandlePaymentStatus checks the status of a Stripe Payment Intent
@@ -187,6 +188,7 @@ func HandlePaymentStatus(w http.ResponseWriter, r *http.Request) {
 		PaymentIntentID: pi.ID,
 		Amount:          pi.Amount,
 		Currency:        string(pi.Currency),
+		Metadata:        pi.Metadata,
 	}
 
 	// Include error message if payment failed
@@ -197,5 +199,5 @@ func HandlePaymentStatus(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 
-	log.Printf("Payment status check for %s: %s", paymentIntentID, pi.Status)
+	log.Printf("Payment status check for %s: %s (metadata: %v)", paymentIntentID, pi.Status, pi.Metadata)
 }

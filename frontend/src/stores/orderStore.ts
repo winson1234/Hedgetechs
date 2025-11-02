@@ -245,14 +245,14 @@ export const useOrderStore = create<OrderStore>()(
 
             case 'stop-limit':
               // Stop-limit orders have two prices: stop price and limit price
-              // Buy stop-limit: triggers when price rises to stop price, executes at limit price
-              // Sell stop-limit: triggers when price falls to stop price, executes at limit price
+              // Buy stop-limit: triggers when price rises to stop, executes if price at/below limit
+              // Sell stop-limit: triggers when price falls to stop, executes if price at/above limit
               if (order.stopPrice) {
-                if (order.side === 'buy' && currentPrice >= order.stopPrice) {
-                  // Stop triggered for buy, execute at limit price
+                if (order.side === 'buy' && currentPrice >= order.stopPrice && currentPrice <= order.price) {
+                  // Stop triggered AND price within limit (don't pay more than limit)
                   shouldExecute = true
-                } else if (order.side === 'sell' && currentPrice <= order.stopPrice) {
-                  // Stop triggered for sell, execute at limit price
+                } else if (order.side === 'sell' && currentPrice <= order.stopPrice && currentPrice >= order.price) {
+                  // Stop triggered AND price within limit (don't sell below limit)
                   shouldExecute = true
                 }
               }

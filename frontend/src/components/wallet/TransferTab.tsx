@@ -26,6 +26,7 @@ export default function TransferTab() {
 
   // State
   const [isProcessing, setIsProcessing] = useState(false);
+  const [transferType, setTransferType] = useState<'live' | 'demo'>('live');
 
   // React Hook Form
   const { register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<TransferFormData>({
@@ -57,6 +58,12 @@ export default function TransferTab() {
   );
 
   const transferCurrency = fromAccount?.currency || 'USD';
+
+  // Filter "From" accounts by selected transfer type
+  const fromAccounts = useMemo(() =>
+    accounts.filter(acc => acc.type === transferType),
+    [accounts, transferType]
+  );
 
   // Filter "To" accounts: same currency, same type, not the same account
   const toAccounts = useMemo(() =>
@@ -101,6 +108,14 @@ export default function TransferTab() {
       setValue('toAccountId', '');
     }
   }, [fromAccountId, toAccounts, toAccountId, setValue]);
+
+  // Reset "From" account when transfer type changes if current selection is invalid
+  useEffect(() => {
+    if (fromAccountId && !fromAccounts.some(a => a.id === fromAccountId)) {
+      const firstAccount = fromAccounts[0];
+      setValue('fromAccountId', firstAccount?.id || '');
+    }
+  }, [transferType, fromAccounts, fromAccountId, setValue]);
 
   const onSubmit = async (data: TransferFormData) => {
     const fromAcc = accounts.find(a => a.id === data.fromAccountId);
@@ -174,6 +189,37 @@ export default function TransferTab() {
         Move funds between your trading accounts (same currency only).
       </p>
 
+      {/* Transfer Type Toggle */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+          Account Type
+        </label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setTransferType('live')}
+            className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              transferType === 'live'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+            }`}
+          >
+            Live
+          </button>
+          <button
+            type="button"
+            onClick={() => setTransferType('demo')}
+            className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              transferType === 'demo'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+            }`}
+          >
+            Demo
+          </button>
+        </div>
+      </div>
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* From Account */}
         <div>
@@ -185,7 +231,7 @@ export default function TransferTab() {
             {...register('fromAccountId')}
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
-            {accounts.map(acc => (
+            {fromAccounts.map(acc => (
               <option key={acc.id} value={acc.id}>
                 {acc.id} ({acc.type}) - {formatBalance(acc.balances[acc.currency], acc.currency)}
               </option>

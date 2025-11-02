@@ -95,8 +95,12 @@ export const useUIStore = create<UIStore>()(
     }),
     {
       name: 'ui-store',
-      // Only persist theme preference
-      partialize: (state) => ({ isDarkMode: state.isDarkMode }),
+      // Persist theme, page navigation, and wallet tab
+      partialize: (state) => ({
+        isDarkMode: state.isDarkMode,
+        currentPage: state.currentPage,
+        activeWalletTab: state.activeWalletTab
+      }),
     }
   )
 )

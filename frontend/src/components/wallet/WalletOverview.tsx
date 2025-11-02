@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useAccountStore, formatBalance } from '../../stores/accountStore';
 import { useAssetPrices } from '../../hooks/useAssetPrices';
 import PortfolioAllocation from './PortfolioAllocation';
@@ -6,15 +6,26 @@ import PortfolioAllocation from './PortfolioAllocation';
 export default function WalletOverview() {
   // Access stores
   const accounts = useAccountStore(state => state.accounts);
+  const getFXRates = useAccountStore(state => state.getFXRates);
   const { prices: assetPrices, loading: pricesLoading } = useAssetPrices();
+
+  // FX rates for converting non-USD fiat currencies
+  const [fxRates, setFxRates] = useState<Record<string, number>>({});
+
+  // Fetch FX rates on mount
+  useEffect(() => {
+    getFXRates().then(rates => setFxRates(rates));
+  }, [getFXRates]);
 
   // Calculate total portfolio value in USD
   const totalPortfolioValue = useMemo(() => {
     return accounts.reduce((total, acc) => {
       let accountValue = 0;
 
-      // Add base currency (fiat currencies are 1:1 USD for now, can enhance later)
-      accountValue += acc.balances[acc.currency] ?? 0;
+      // Add base currency converted to USD using FX rates
+      const baseCurrencyAmount = acc.balances[acc.currency] ?? 0;
+      const fxRate = fxRates[acc.currency] || 1.0; // rates are X-to-USD
+      accountValue += baseCurrencyAmount * fxRate;
 
       // Add crypto holdings converted to USD
       Object.entries(acc.balances).forEach(([currency, amount]) => {
@@ -27,12 +38,18 @@ export default function WalletOverview() {
 
       return total + accountValue;
     }, 0);
-  }, [accounts, assetPrices]);
+  }, [accounts, assetPrices, fxRates]);
 
   const totalLiveValue = useMemo(() => {
     return accounts.filter(acc => acc.type === 'live').reduce((total, acc) => {
       let accountValue = 0;
-      accountValue += acc.balances[acc.currency] ?? 0;
+
+      // Convert base currency to USD using FX rates
+      const baseCurrencyAmount = acc.balances[acc.currency] ?? 0;
+      const fxRate = fxRates[acc.currency] || 1.0; // rates are X-to-USD
+      accountValue += baseCurrencyAmount * fxRate;
+
+      // Add crypto holdings converted to USD
       Object.entries(acc.balances).forEach(([currency, amount]) => {
         if (currency !== acc.currency && amount > 0) {
           const symbol = `${currency}USDT`;
@@ -42,12 +59,18 @@ export default function WalletOverview() {
       });
       return total + accountValue;
     }, 0);
-  }, [accounts, assetPrices]);
+  }, [accounts, assetPrices, fxRates]);
 
   const totalDemoValue = useMemo(() => {
     return accounts.filter(acc => acc.type === 'demo').reduce((total, acc) => {
       let accountValue = 0;
-      accountValue += acc.balances[acc.currency] ?? 0;
+
+      // Convert base currency to USD using FX rates
+      const baseCurrencyAmount = acc.balances[acc.currency] ?? 0;
+      const fxRate = fxRates[acc.currency] || 1.0; // rates are X-to-USD
+      accountValue += baseCurrencyAmount * fxRate;
+
+      // Add crypto holdings converted to USD
       Object.entries(acc.balances).forEach(([currency, amount]) => {
         if (currency !== acc.currency && amount > 0) {
           const symbol = `${currency}USDT`;
@@ -57,7 +80,7 @@ export default function WalletOverview() {
       });
       return total + accountValue;
     }, 0);
-  }, [accounts, assetPrices]);
+  }, [accounts, assetPrices, fxRates]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">

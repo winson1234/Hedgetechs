@@ -53,6 +53,7 @@ export default function DepositTab() {
   const activeAccountId = useAccountStore(state => state.activeAccountId);
   const getActiveAccount = useAccountStore(state => state.getActiveAccount);
   const processDeposit = useAccountStore(state => state.processDeposit);
+  const getFXRates = useAccountStore(state => state.getFXRates);
   const showToast = useUIStore(state => state.showToast);
 
   const activeAccount = getActiveAccount();
@@ -89,55 +90,59 @@ export default function DepositTab() {
     const paymentIntentClientSecret = urlParams.get('payment_intent_client_secret');
     const redirectStatus = urlParams.get('redirect_status');
 
-    if (paymentIntentClientSecret && redirectStatus && stripe) {
+    if (paymentIntentClientSecret && redirectStatus) {
       // User returned from FPX payment
       setIsProcessing(true);
 
-      stripe.retrievePaymentIntent(paymentIntentClientSecret).then(({ paymentIntent }) => {
-        if (paymentIntent && paymentIntent.status === 'succeeded') {
-          // Check if this payment has already been processed (de-duplication)
-          if (processedPayments.current.has(paymentIntent.id)) {
-            console.log('Payment already processed, skipping:', paymentIntent.id);
-            setIsProcessing(false);
-            // Clean up URL and navigate to history
-            window.history.replaceState({}, document.title, '/wallet');
-            useUIStore.getState().setCurrentPage('wallet');
-            return;
-          }
+      // Extract payment intent ID from client secret (format: pi_xxx_secret_yyy)
+      const paymentIntentId = paymentIntentClientSecret.split('_secret_')[0];
 
-          // Mark as processed IMMEDIATELY to prevent duplicates
-          processedPayments.current.add(paymentIntent.id);
+      // Fetch payment intent from backend (which includes metadata)
+      fetch(`/api/v1/payment/status?payment_intent_id=${paymentIntentId}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === 'succeeded') {
+            // Check if this payment has already been processed (de-duplication)
+            if (processedPayments.current.has(paymentIntentId)) {
+              console.log('Payment already processed, skipping:', paymentIntentId);
+              setIsProcessing(false);
+              // Clean up URL and navigate to history
+              window.history.replaceState({}, document.title, '/wallet');
+              useUIStore.getState().setCurrentPage('wallet');
+              return;
+            }
 
-          // Payment succeeded, process deposit
-          // Get the ORIGINAL account ID from payment intent metadata
-          const paymentIntentWithMeta = paymentIntent as PaymentIntentWithMetadata;
-          const metadata = paymentIntentWithMeta.metadata || {};
-          const accountId = metadata.account_id;
-          const originalAmount = parseFloat(metadata.original_amount || '0');
-          const originalCurrency = metadata.original_currency || 'USD';
+            // Mark as processed IMMEDIATELY to prevent duplicates
+            processedPayments.current.add(paymentIntentId);
 
-          if (!accountId) {
-            showToast('Unable to identify deposit account. Please contact support.', 'error');
-            setIsProcessing(false);
-            window.history.replaceState({}, document.title, window.location.pathname);
-            return;
-          }
+            // Payment succeeded, process deposit
+            // Get the ORIGINAL account ID from payment intent metadata (from backend)
+            const metadata = data.metadata || {};
+            const accountId = metadata.account_id;
+            const originalAmount = parseFloat(metadata.original_amount || '0');
+            const originalCurrency = metadata.original_currency || 'USD';
 
-          // Verify the account still exists
-          const account = accounts.find(a => a.id === accountId);
-          if (!account) {
-            showToast('Deposit account not found. Please contact support.', 'error');
-            setIsProcessing(false);
-            window.history.replaceState({}, document.title, window.location.pathname);
-            return;
-          }
+            if (!accountId) {
+              showToast('Unable to identify deposit account. Please contact support.', 'error');
+              setIsProcessing(false);
+              window.history.replaceState({}, document.title, window.location.pathname);
+              return;
+            }
 
-          // Use the original amount and currency from metadata (not the payment intent amount)
-          const amount = originalAmount;
-          const accountCurrency = originalCurrency;
+            // Verify the account still exists
+            const account = accounts.find(a => a.id === accountId);
+            if (!account) {
+              showToast('Deposit account not found. Please contact support.', 'error');
+              setIsProcessing(false);
+              window.history.replaceState({}, document.title, window.location.pathname);
+              return;
+            }
 
-          if (accountId) {
-            processDeposit(accountId, amount, accountCurrency, paymentIntent.id, {
+            // Use the original amount and currency from metadata (not the payment intent amount)
+            const amount = originalAmount;
+            const accountCurrency = originalCurrency;
+
+            processDeposit(accountId, amount, accountCurrency, paymentIntentId, {
               fpxBank: redirectStatus || 'fpx',
             }).then((result) => {
               if (result.success) {
@@ -154,23 +159,19 @@ export default function DepositTab() {
               setIsProcessing(false);
             });
           } else {
-            showToast('No account found to deposit funds', 'error');
+            showToast(`Payment ${data.status}. Please try again.`, 'error');
             setIsProcessing(false);
             window.history.replaceState({}, document.title, window.location.pathname);
           }
-        } else if (paymentIntent) {
-          showToast(`Payment ${paymentIntent.status}. Please try again.`, 'error');
+        })
+        .catch((error) => {
+          console.error('Error retrieving payment intent:', error);
+          showToast('Failed to verify payment status', 'error');
           setIsProcessing(false);
           window.history.replaceState({}, document.title, window.location.pathname);
-        }
-      }).catch((error) => {
-        console.error('Error retrieving payment intent:', error);
-        showToast('Failed to verify payment status', 'error');
-        setIsProcessing(false);
-        window.history.replaceState({}, document.title, window.location.pathname);
-      });
+        });
     }
-  }, [stripe, activeAccount, accounts, processDeposit, showToast]);
+  }, [activeAccount, accounts, processDeposit, showToast]);
 
   // Handle Stripe card brand detection
   useEffect(() => {
@@ -207,14 +208,26 @@ export default function DepositTab() {
       // Step 1: Create payment intent on backend
       const paymentMethodTypes = selectedTab === 'banking' ? ['fpx'] : ['card'];
 
-      // FPX requires MYR currency, convert from USD if needed
+      // FPX requires MYR currency, convert from account currency if needed
       let paymentCurrency = account.currency.toLowerCase();
       let paymentAmount = Math.round(data.amount * 100); // Convert to cents
 
-      if (selectedTab === 'banking' && paymentCurrency === 'usd') {
-        // Convert USD to MYR (approximate rate: 1 USD = 4.5 MYR)
+      if (selectedTab === 'banking') {
+        // FPX only supports MYR, convert from any currency to MYR
         paymentCurrency = 'myr';
-        paymentAmount = Math.round(data.amount * 4.5 * 100); // Convert USD to MYR cents
+
+        // Fetch live FX rates
+        const rates = await getFXRates();
+
+        // Convert account currency → USD → MYR
+        // Step 1: Convert to USD (rates are X-to-USD, so multiply)
+        const usdAmount = data.amount * (rates[account.currency] || 1.0);
+
+        // Step 2: Convert USD to MYR (divide by MYR rate)
+        const myrRate = rates['MYR'] || 0.22;
+        const myrAmount = usdAmount / myrRate;
+
+        paymentAmount = Math.round(myrAmount * 100); // Convert to cents
       }
 
       const response = await fetch('/api/v1/deposit/create-payment-intent', {
@@ -578,7 +591,7 @@ export default function DepositTab() {
                   After completing the payment, you&apos;ll be redirected back to this page.
                 </p>
                 <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                  💱 Payment will be processed in MYR (Malaysian Ringgit). Conversion rate: 1 USD ≈ 4.5 MYR
+                  💱 Payment will be processed in MYR (Malaysian Ringgit) using live exchange rates.
                 </p>
               </div>
             </div>

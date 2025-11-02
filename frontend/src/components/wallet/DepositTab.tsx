@@ -5,16 +5,7 @@ import { z } from 'zod';
 import { useAccountStore, formatBalance } from '../../stores/accountStore';
 import { useUIStore } from '../../stores/uiStore';
 import { CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import type { StripeCardNumberElement, PaymentIntent } from '@stripe/stripe-js';
-
-// Extended PaymentIntent type with metadata
-interface PaymentIntentWithMetadata extends PaymentIntent {
-  metadata?: {
-    account_id?: string;
-    original_amount?: string;
-    original_currency?: string;
-  };
-}
+import type { StripeCardNumberElement } from '@stripe/stripe-js';
 
 // Validation schema
 const depositSchema = z.object({

@@ -15,7 +15,6 @@ import WalletPage from './pages/WalletPage';
 import HistoryPage from './pages/HistoryPage';
 import { usePriceStore } from './stores/priceStore';
 import { useUIStore } from './stores/uiStore';
-import { useOrderStore } from './stores/orderStore';
 
 export default function App() {
   // Access stores
@@ -41,25 +40,8 @@ export default function App() {
     hydratePrices();
   }, []);
 
-  // Periodic pending order processing (every 5 seconds)
-  useEffect(() => {
-    const processPendingOrders = useOrderStore.getState().processPendingOrders;
-    const getPrices = () => usePriceStore.getState().prices;
-
-    const interval = setInterval(() => {
-      const prices = getPrices();
-      const symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'EURUSDT'];
-
-      symbols.forEach(symbol => {
-        const priceData = prices[symbol];
-        if (priceData && priceData.current) {
-          processPendingOrders(symbol, priceData.current);
-        }
-      });
-    }, 5000); // Check every 5 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+  // Note: Pending order processing is now handled in real-time by WebSocketContext
+  // Orders are matched immediately on every price tick, not every 5 seconds
 
   return (
     <div className={isDarkMode ? 'dark' : ''}>

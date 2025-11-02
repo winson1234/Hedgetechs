@@ -3,6 +3,7 @@ import type { Account } from '../../types';
 import type { AssetPriceMap } from '../../hooks/useAssetPrices';
 import { getAssetColor } from '../../utils/colors';
 import PortfolioLegend from './PortfolioLegend';
+import { useAccountStore } from '../../stores/accountStore';
 
 // Lazy load the chart component to improve initial load time
 const DonutChartRenderer = lazy(() => import('./DonutChartRenderer'));
@@ -40,6 +41,17 @@ function PortfolioAllocation({
   // Store a snapshot of allocations to prevent continuous re-renders
   const [chartSnapshot, setChartSnapshot] = useState<AssetAllocation[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [fxRates, setFxRates] = useState<Record<string, number>>({ USD: 1.0 });
+  const getFXRates = useAccountStore((state) => state.getFXRates);
+
+  // Fetch FX rates on mount
+  useEffect(() => {
+    getFXRates().then(rates => {
+      setFxRates(rates);
+    }).catch(error => {
+      console.error('Failed to load FX rates:', error);
+    });
+  }, [getFXRates]);
 
   const assetAllocations = useMemo((): AssetAllocation[] => {
     const assetTotals: Record<string, number> = {};
@@ -63,10 +75,11 @@ function PortfolioAllocation({
         let usdValue = 0;
 
         if (isFiat) {
-          // For now, treat all fiat as 1:1 USD (can enhance with real forex rates later)
-          usdValue = amount;
+          // Convert fiat to USD using real forex rates from Massive API
+          const rate = fxRates[currency] || 1.0;
+          usdValue = amount * rate;
         } else {
-          // Convert crypto to USD using asset prices
+          // Convert crypto to USD using asset prices from Binance
           const symbol = `${currency}USDT`;
           const price = assetPrices[symbol] || 0;
           usdValue = amount * price;
@@ -85,7 +98,7 @@ function PortfolioAllocation({
       .sort((a, b) => b.usdValue - a.usdValue); // Sort by USD value descending
 
     return allocations;
-  }, [accounts, assetPrices, totalPortfolioValue]);
+  }, [accounts, assetPrices, totalPortfolioValue, fxRates]);
 
   // Initialize snapshot on mount and when data changes significantly
   useEffect(() => {

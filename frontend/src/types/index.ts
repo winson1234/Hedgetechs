@@ -38,6 +38,8 @@ export type PaymentMethodMetadata = {
   bankName?: string
   accountLast4?: string
   routingNumber?: string
+  // For FPX payments (Malaysia online banking)
+  fpxBank?: string // e.g., 'maybank2u', 'cimbclicks', etc.
 }
 
 export type Transaction = {

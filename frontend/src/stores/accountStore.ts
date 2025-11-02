@@ -49,6 +49,19 @@ const getDefaultAccounts = (): Account[] => [
 export const formatBalance = (balance: number | undefined, currency: string | undefined): string => {
   const numBalance = balance ?? 0
   const displayCurrency = currency || 'USD'
+
+  // Custom symbols for currencies that don't render well with Intl
+  const customSymbols: Record<string, string> = {
+    'MYR': 'RM',  // Malaysian Ringgit
+    'JPY': '¥',   // Japanese Yen
+    'CNY': '¥',   // Chinese Yuan
+  }
+
+  // If we have a custom symbol, use it
+  if (customSymbols[displayCurrency.toUpperCase()]) {
+    return `${customSymbols[displayCurrency.toUpperCase()]} ${numBalance.toFixed(2)}`
+  }
+
   try {
     return numBalance.toLocaleString('en-US', {
       style: 'currency',
@@ -72,6 +85,9 @@ interface AccountStore {
   getActiveUsdBalance: () => number
   getActiveAccountCurrency: () => string
   getActiveCryptoHoldings: () => Record<string, number>
+
+  // FX Rates Helper
+  getFXRates: () => Promise<Record<string, number>>
 
   // Account Management Actions
   setActiveAccount: (id: string) => void
@@ -133,6 +149,63 @@ export const useAccountStore = create<AccountStore>()(
             obj[key] = value
             return obj
           }, {} as Record<string, number>)
+      },
+
+      // FX Rates Helper
+      getFXRates: async () => {
+        const fxRates: Record<string, number> = { USD: 1.0 } // USD to USD is always 1:1
+
+        // Cache for 5 minutes
+        const cacheKey = 'fx_rates_cache'
+        const cacheTimeKey = 'fx_rates_cache_time'
+        const cacheExpiry = 5 * 60 * 1000 // 5 minutes in milliseconds
+
+        // Check if we have valid cached data
+        const cachedTime = localStorage.getItem(cacheTimeKey)
+        const cachedData = localStorage.getItem(cacheKey)
+
+        if (cachedTime && cachedData) {
+          const timeElapsed = Date.now() - parseInt(cachedTime)
+          if (timeElapsed < cacheExpiry) {
+            // Return cached data
+            return JSON.parse(cachedData) as Record<string, number>
+          }
+        }
+
+        // Fetch fresh FX rates from backend
+        const currenciesToFetch = ['EUR', 'JPY', 'MYR'] // Add more currencies as needed
+
+        try {
+          await Promise.all(
+            currenciesToFetch.map(async (currency) => {
+              try {
+                const response = await fetch(`/api/v1/analytics?type=fx_rate&from=${currency}&to=USD`)
+                const data = await response.json()
+
+                if (data.status === 'success' && data.data?.rate) {
+                  fxRates[currency] = data.data.rate
+                }
+              } catch (error) {
+                console.error(`Failed to fetch ${currency}/USD rate:`, error)
+                // Use fallback rates if API fails
+                const fallbackRates: Record<string, number> = {
+                  EUR: 1.08,
+                  JPY: 0.0067,
+                  MYR: 0.22,
+                }
+                fxRates[currency] = fallbackRates[currency] || 1.0
+              }
+            })
+          )
+
+          // Cache the results
+          localStorage.setItem(cacheKey, JSON.stringify(fxRates))
+          localStorage.setItem(cacheTimeKey, Date.now().toString())
+        } catch (error) {
+          console.error('Failed to fetch FX rates:', error)
+        }
+
+        return fxRates
       },
 
       // Account Management Actions
@@ -394,7 +467,17 @@ export const useAccountStore = create<AccountStore>()(
         const addTransaction = useTransactionStore.getState().addTransaction
         const updateTransactionStatus = useTransactionStore.getState().updateTransactionStatus
 
-        // Create pending transaction
+        // CRITICAL: Execute the withdrawal IMMEDIATELY to prevent double-spending
+        // This debits the user's balance and places a "hold" on the funds
+        const result = get()._executeWithdraw(accountId, amount, currency)
+
+        if (!result.success) {
+          // If withdrawal fails (e.g., insufficient funds), don't create transaction
+          showToast(result.message, 'error')
+          return { success: false, message: result.message }
+        }
+
+        // Balance is now debited. Create pending transaction to track the withdrawal
         const transaction = addTransaction({
           type: 'withdraw',
           status: 'pending',
@@ -404,26 +487,22 @@ export const useAccountStore = create<AccountStore>()(
           metadata: bankDetails,
         })
 
+        showToast(`Withdrawal request for ${formatBalance(amount, currency)} is being processed.`, 'success')
+
         try {
-          // Simulate async processing (bank transfer initiation)
-          await new Promise(resolve => setTimeout(resolve, 1500))
-
-          // Execute the withdrawal
-          const result = get()._executeWithdraw(accountId, amount, currency)
-
-          if (result.success) {
-            // Update transaction to completed
+          // Auto-approval after 45 seconds (simulates admin review)
+          setTimeout(() => {
+            // Update transaction status to completed
+            // Do NOT call _executeWithdraw again - balance was already debited
             updateTransactionStatus(transaction.id, 'completed')
-            showToast(`Withdrew ${formatBalance(amount, currency)} from ${accountId}.`, 'success')
-            return { success: true, message: result.message, transactionId: transaction.id }
-          } else {
-            // Update transaction to failed
-            updateTransactionStatus(transaction.id, 'failed', result.message)
-            showToast(result.message, 'error')
-            return { success: false, message: result.message, transactionId: transaction.id }
-          }
+            showToast(`Withdrawal of ${formatBalance(amount, currency)} completed.`, 'success')
+          }, 45000) // 45 seconds
+
+          return { success: true, message: 'Withdrawal is being processed', transactionId: transaction.id }
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Withdrawal failed'
+          const errorMessage = error instanceof Error ? error.message : 'Withdrawal processing error'
+          // Note: Balance has already been debited, so we still mark as completed
+          // In a real system, you'd need to refund if processing fails
           updateTransactionStatus(transaction.id, 'failed', errorMessage)
           showToast(errorMessage, 'error')
           return { success: false, message: errorMessage, transactionId: transaction.id }

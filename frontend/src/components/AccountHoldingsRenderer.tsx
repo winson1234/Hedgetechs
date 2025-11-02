@@ -68,7 +68,7 @@ function AccountHoldingsRenderer({
 }: AccountHoldingsRendererProps) {
   return (
     <div style={{ width: '100%', height: '220px' }}>
-      <ResponsiveContainer>
+      <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={220}>
         <PieChart>
           <Pie
             data={allocations}

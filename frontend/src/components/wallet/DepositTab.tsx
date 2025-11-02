@@ -1,11 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAccountStore, formatBalance } from '../../stores/accountStore';
 import { useUIStore } from '../../stores/uiStore';
 import { CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import type { StripeCardNumberElement } from '@stripe/stripe-js';
+import type { StripeCardNumberElement, PaymentIntent } from '@stripe/stripe-js';
+
+// Extended PaymentIntent type with metadata
+interface PaymentIntentWithMetadata extends PaymentIntent {
+  metadata?: {
+    account_id?: string;
+    original_amount?: string;
+    original_currency?: string;
+  };
+}
 
 // Validation schema
 const depositSchema = z.object({
@@ -53,6 +62,9 @@ export default function DepositTab() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [cardBrand, setCardBrand] = useState<string>('');
 
+  // Track processed payment intents to prevent duplicate deposits
+  const processedPayments = useRef<Set<string>>(new Set());
+
   // React Hook Form
   const { register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
@@ -70,6 +82,95 @@ export default function DepositTab() {
       setValue('accountId', activeAccount.id);
     }
   }, [activeAccountId, activeAccount, setValue]);
+
+  // Handle FPX return redirect
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentIntentClientSecret = urlParams.get('payment_intent_client_secret');
+    const redirectStatus = urlParams.get('redirect_status');
+
+    if (paymentIntentClientSecret && redirectStatus && stripe) {
+      // User returned from FPX payment
+      setIsProcessing(true);
+
+      stripe.retrievePaymentIntent(paymentIntentClientSecret).then(({ paymentIntent }) => {
+        if (paymentIntent && paymentIntent.status === 'succeeded') {
+          // Check if this payment has already been processed (de-duplication)
+          if (processedPayments.current.has(paymentIntent.id)) {
+            console.log('Payment already processed, skipping:', paymentIntent.id);
+            setIsProcessing(false);
+            // Clean up URL and navigate to history
+            window.history.replaceState({}, document.title, '/wallet');
+            useUIStore.getState().setCurrentPage('wallet');
+            return;
+          }
+
+          // Mark as processed IMMEDIATELY to prevent duplicates
+          processedPayments.current.add(paymentIntent.id);
+
+          // Payment succeeded, process deposit
+          // Get the ORIGINAL account ID from payment intent metadata
+          const paymentIntentWithMeta = paymentIntent as PaymentIntentWithMetadata;
+          const metadata = paymentIntentWithMeta.metadata || {};
+          const accountId = metadata.account_id;
+          const originalAmount = parseFloat(metadata.original_amount || '0');
+          const originalCurrency = metadata.original_currency || 'USD';
+
+          if (!accountId) {
+            showToast('Unable to identify deposit account. Please contact support.', 'error');
+            setIsProcessing(false);
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return;
+          }
+
+          // Verify the account still exists
+          const account = accounts.find(a => a.id === accountId);
+          if (!account) {
+            showToast('Deposit account not found. Please contact support.', 'error');
+            setIsProcessing(false);
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return;
+          }
+
+          // Use the original amount and currency from metadata (not the payment intent amount)
+          const amount = originalAmount;
+          const accountCurrency = originalCurrency;
+
+          if (accountId) {
+            processDeposit(accountId, amount, accountCurrency, paymentIntent.id, {
+              fpxBank: redirectStatus || 'fpx',
+            }).then((result) => {
+              if (result.success) {
+                showToast('FPX payment successful!', 'success');
+
+                // Navigate to History page to show the transaction
+                window.history.replaceState({}, document.title, '/wallet');
+                useUIStore.getState().setCurrentPage('wallet');
+              } else {
+                showToast(result.message, 'error');
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+              }
+              setIsProcessing(false);
+            });
+          } else {
+            showToast('No account found to deposit funds', 'error');
+            setIsProcessing(false);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        } else if (paymentIntent) {
+          showToast(`Payment ${paymentIntent.status}. Please try again.`, 'error');
+          setIsProcessing(false);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }).catch((error) => {
+        console.error('Error retrieving payment intent:', error);
+        showToast('Failed to verify payment status', 'error');
+        setIsProcessing(false);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      });
+    }
+  }, [stripe, activeAccount, accounts, processDeposit, showToast]);
 
   // Handle Stripe card brand detection
   useEffect(() => {
@@ -89,8 +190,8 @@ export default function DepositTab() {
       return;
     }
 
-    if (selectedTab !== 'card') {
-      showToast('Only card payments are currently supported.', 'error');
+    if (selectedTab !== 'card' && selectedTab !== 'banking') {
+      showToast('Only card and online banking payments are currently supported.', 'error');
       return;
     }
 
@@ -104,12 +205,30 @@ export default function DepositTab() {
 
     try {
       // Step 1: Create payment intent on backend
+      const paymentMethodTypes = selectedTab === 'banking' ? ['fpx'] : ['card'];
+
+      // FPX requires MYR currency, convert from USD if needed
+      let paymentCurrency = account.currency.toLowerCase();
+      let paymentAmount = Math.round(data.amount * 100); // Convert to cents
+
+      if (selectedTab === 'banking' && paymentCurrency === 'usd') {
+        // Convert USD to MYR (approximate rate: 1 USD = 4.5 MYR)
+        paymentCurrency = 'myr';
+        paymentAmount = Math.round(data.amount * 4.5 * 100); // Convert USD to MYR cents
+      }
+
       const response = await fetch('/api/v1/deposit/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: Math.round(data.amount * 100), // Convert to cents
-          currency: account.currency.toLowerCase(),
+          amount: paymentAmount,
+          currency: paymentCurrency,
+          payment_method_types: paymentMethodTypes,
+          metadata: {
+            account_id: data.accountId,
+            original_amount: data.amount.toString(),
+            original_currency: account.currency,
+          },
         }),
       });
 
@@ -120,13 +239,40 @@ export default function DepositTab() {
 
       const { clientSecret } = await response.json();
 
-      // Step 2: Confirm card payment with Stripe
-      const cardElement = elements.getElement(CardNumberElement) as StripeCardNumberElement;
-      const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: cardElement,
-        },
-      });
+      // Step 2: Confirm payment with Stripe (card or FPX)
+      let stripeError;
+      let paymentIntent;
+
+      if (selectedTab === 'card') {
+        // Card payment
+        const cardElement = elements.getElement(CardNumberElement) as StripeCardNumberElement;
+        const result = await stripe.confirmCardPayment(clientSecret, {
+          payment_method: {
+            card: cardElement,
+          },
+        });
+        stripeError = result.error;
+        paymentIntent = result.paymentIntent;
+      } else if (selectedTab === 'banking') {
+        // FPX payment (redirect-based)
+        const result = await stripe.confirmFpxPayment(clientSecret, {
+          payment_method: {
+            fpx: {
+              bank: 'maybank2u', // Default to Maybank, can be made selectable
+            },
+          },
+          return_url: window.location.origin + '/wallet?payment=fpx',
+        });
+        stripeError = result.error;
+        paymentIntent = result.paymentIntent;
+
+        // FPX redirects to bank, so if we get here without error, show message
+        if (!stripeError) {
+          showToast('Redirecting to your bank...', 'success');
+          // User will be redirected, processing will continue after return
+          return;
+        }
+      }
 
       if (stripeError) {
         showToast(stripeError.message || 'Payment failed', 'error');
@@ -134,30 +280,86 @@ export default function DepositTab() {
         return;
       }
 
-      if (paymentIntent?.status === 'succeeded') {
-        // Step 3: Process deposit in account store
-        const result = await processDeposit(
-          data.accountId,
-          data.amount,
-          account.currency,
-          paymentIntent.id,
-          {
-            cardBrand: cardBrand,
-            last4: '****', // Card last4 not directly available from PaymentIntent in this flow
-          }
-        );
+      // Step 3: Poll payment status from backend
+      if (paymentIntent?.id) {
+        showToast('Processing payment...', 'success');
 
-        if (result.success) {
-          // Clear form
-          reset();
-          cardElement.clear();
-          setCardBrand('');
-          showToast('Deposit successful!', 'success');
-        } else {
-          showToast(result.message, 'error');
-        }
+        // Poll the backend endpoint every 3 seconds for up to 60 seconds
+        const maxAttempts = 20; // 20 attempts * 3 seconds = 60 seconds
+        let attempts = 0;
+        let depositProcessed = false; // Flag to prevent duplicate processing
+
+        const pollInterval = setInterval(async () => {
+          attempts++;
+
+          // Skip if deposit already processed in this session
+          if (depositProcessed || processedPayments.current.has(paymentIntent.id)) {
+            return;
+          }
+
+          try {
+            const statusResponse = await fetch(`/api/v1/payment/status?payment_intent_id=${paymentIntent.id}`);
+
+            if (!statusResponse.ok) {
+              clearInterval(pollInterval);
+              showToast('Failed to check payment status', 'error');
+              setIsProcessing(false);
+              return;
+            }
+
+            const statusData = await statusResponse.json();
+
+            if (statusData.status === 'succeeded') {
+              // Mark as processed IMMEDIATELY before any async operations
+              depositProcessed = true;
+              processedPayments.current.add(paymentIntent.id);
+              clearInterval(pollInterval);
+
+              // Process deposit in account store
+              const result = await processDeposit(
+                data.accountId,
+                data.amount,
+                account.currency,
+                paymentIntent.id,
+                {
+                  cardBrand: cardBrand,
+                  last4: '****',
+                }
+              );
+
+              if (result.success) {
+                reset();
+                // Clear card elements only for card payments
+                if (selectedTab === 'card' && elements) {
+                  const cardNumberElement = elements.getElement(CardNumberElement);
+                  cardNumberElement?.clear();
+                  setCardBrand('');
+                }
+                showToast('Deposit successful!', 'success');
+
+                // Navigate to Wallet/History page to show the transaction
+                useUIStore.getState().setCurrentPage('wallet');
+              } else {
+                showToast(result.message, 'error');
+              }
+              setIsProcessing(false);
+            } else if (statusData.status === 'requires_payment_method' || statusData.status === 'canceled') {
+              clearInterval(pollInterval);
+              showToast(`Payment ${statusData.status}. Please try again.`, 'error');
+              setIsProcessing(false);
+            } else if (attempts >= maxAttempts) {
+              clearInterval(pollInterval);
+              showToast('Payment processing timeout. Please check your transaction history.', 'error');
+              setIsProcessing(false);
+            }
+          } catch (error) {
+            clearInterval(pollInterval);
+            showToast('Failed to check payment status', 'error');
+            setIsProcessing(false);
+          }
+        }, 3000); // Poll every 3 seconds
       } else {
-        showToast(`Payment status: ${paymentIntent?.status}`, 'error');
+        showToast('Payment intent not found', 'error');
       }
     } catch (error) {
       console.error('Deposit error:', error);
@@ -313,16 +515,88 @@ export default function DepositTab() {
         </form>
       )}
 
-      {/* Online Banking Placeholder */}
+      {/* Online Banking - FPX (Malaysia) */}
       {selectedTab === 'banking' && (
-        <div className="text-center py-12 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
-          <p className="text-slate-500 dark:text-slate-400">
-            Online Banking deposits coming soon!
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Account Selection */}
+          <div>
+            <label htmlFor="bankingDepositAccount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Trading Account
+            </label>
+            <select
+              id="bankingDepositAccount"
+              {...register('accountId')}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              {liveAccounts.map(acc => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.id} - {formatBalance(acc.balances[acc.currency], acc.currency)}
+                </option>
+              ))}
+            </select>
+            {errors.accountId && (
+              <p className="text-xs text-red-500 mt-1">{errors.accountId.message}</p>
+            )}
+          </div>
+
+          {/* Amount */}
+          <div>
+            <label htmlFor="bankingDepositAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Amount of Deposit (Minimum: $5.00)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                id="bankingDepositAmount"
+                {...register('amount', { valueAsNumber: true })}
+                placeholder="0.00"
+                min="5"
+                step="0.01"
+                className="w-full px-3 py-2 pr-16 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              <span className="absolute right-3 top-2.5 text-sm font-medium text-slate-500 dark:text-slate-400">
+                {accounts.find(a => a.id === selectedAccountId)?.currency || 'USD'}
+              </span>
+            </div>
+            {errors.amount && (
+              <p className="text-xs text-red-500 mt-1">{errors.amount.message}</p>
+            )}
+          </div>
+
+          {/* FPX Payment Method Info */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start gap-2">
+              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                  FPX Online Banking (Malaysia)
+                </h4>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                  You will be redirected to your bank&apos;s website to complete the payment securely.
+                  After completing the payment, you&apos;ll be redirected back to this page.
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                  💱 Payment will be processed in MYR (Malaysian Ringgit). Conversion rate: 1 USD ≈ 4.5 MYR
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={isProcessing || !stripe || !elements}
+            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          >
+            {isProcessing ? 'Processing...' : 'Pay with FPX Online Banking'}
+          </button>
+
+          <p className="text-xs text-center text-slate-500 dark:text-slate-400">
+            Secure payment powered by Stripe. Your bank details are never stored on our servers.
           </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
-            We&apos;re working on integrating FPX and other banking methods.
-          </p>
-        </div>
+        </form>
       )}
 
       {/* eWallet Placeholder */}

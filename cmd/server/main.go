@@ -59,9 +59,10 @@ func main() {
 	// Start listening to the Binance depth stream for order book data
 	go binance.StreamDepth(h)
 
-	// Initialize Alpha Vantage service
-	alphaVantageService := services.NewAlphaVantageService()
-	alphaVantageHandler := api.NewAlphaVantageHandler(alphaVantageService)
+	// Initialize forex service using Frankfurter API (free, no API key required)
+	log.Println("Initializing forex service with Frankfurter API (no API key required)")
+	forexService := services.NewMassiveService("")
+	analyticsHandler := api.NewAnalyticsHandler(forexService)
 
 	// Configure the HTTP server
 	// WebSocket handler uses the hub instance
@@ -74,10 +75,12 @@ func main() {
 	http.HandleFunc(config.TickerAPIPath, api.HandleTicker)
 	// REST handler for news feed
 	http.HandleFunc(config.NewsAPIPath, api.HandleNews)
-	// REST handler for Alpha Vantage analytics
-	http.HandleFunc(config.AlphaVantageAPIPath, alphaVantageHandler.HandleAlphaVantage)
+	// REST handler for forex rates analytics (powered by Frankfurter API)
+	http.HandleFunc(config.AnalyticsAPIPath, analyticsHandler.HandleAnalytics)
 	// REST handler for Stripe payment intent creation
 	http.HandleFunc(config.PaymentIntentAPIPath, api.HandleCreatePaymentIntent)
+	// REST handler for Stripe payment status check
+	http.HandleFunc(config.PaymentStatusAPIPath, api.HandlePaymentStatus)
 
 	// Start the local HTTP server
 	log.Fatal(http.ListenAndServe(config.LocalServerAddress, nil))

@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useEffect, useRef, useState } from 'react'
 import type { PriceMessage } from '../hooks/useWebSocket'
 import { usePriceStore } from '../stores/priceStore'
+import { useOrderStore } from '../stores/orderStore'
 
 type WSState = {
   connecting: boolean
@@ -51,6 +52,9 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
           const price = typeof obj.price === 'string' ? parseFloat(obj.price) : obj.price
           if (!isNaN(price)) {
             usePriceStore.getState().updateCurrentPrice(obj.symbol, price)
+
+            // Real-time order matching: check pending orders immediately on every price tick
+            useOrderStore.getState().processPendingOrders(obj.symbol, price)
           }
         }
 

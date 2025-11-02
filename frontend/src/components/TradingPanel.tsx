@@ -23,17 +23,43 @@ export default function TradingPanel() {
   const activeAccountId = useAccountStore(state => state.activeAccountId);
   const setActiveAccount = useAccountStore(state => state.setActiveAccount);
   const getActiveUsdBalance = useAccountStore(state => state.getActiveUsdBalance);
+  const getActiveAccountCurrency = useAccountStore(state => state.getActiveAccountCurrency);
   const getActiveCryptoHoldings = useAccountStore(state => state.getActiveCryptoHoldings);
   const executeBuy = useAccountStore(state => state.executeBuy);
   const executeSell = useAccountStore(state => state.executeSell);
+  const getFXRates = useAccountStore(state => state.getFXRates);
 
   const addPendingOrder = useOrderStore(state => state.addPendingOrder);
   const recordExecutedOrder = useOrderStore(state => state.recordExecutedOrder);
   const processPendingOrdersFromStore = useOrderStore(state => state.processPendingOrders);
 
-  const usdBalance = getActiveUsdBalance();
+  const accountBalance = getActiveUsdBalance(); // This is in the account's currency, NOT USD
+  const accountCurrency = getActiveAccountCurrency();
   const cryptoHoldings = getActiveCryptoHoldings();
   const ws = useContext(WebSocketContext);
+
+  // FX rates state for currency conversion
+  const [usdBalance, setUsdBalance] = useState<number>(accountBalance);
+
+  // Fetch FX rates and convert balance to USD
+  useEffect(() => {
+    const convertToUSD = async () => {
+      if (accountCurrency === 'USD') {
+        setUsdBalance(accountBalance);
+      } else {
+        try {
+          const rates = await getFXRates();
+          const rate = rates[accountCurrency] || 1.0;
+          setUsdBalance(accountBalance * rate);
+        } catch (error) {
+          console.error('Failed to convert balance to USD:', error);
+          setUsdBalance(accountBalance); // Fallback to raw balance
+        }
+      }
+    };
+
+    convertToUSD();
+  }, [accountBalance, accountCurrency, getFXRates]);
   // Ensure lastMessage is treated as potentially having different shapes
   const lastMessage = ws?.lastMessage ?? null;
 
@@ -502,11 +528,21 @@ export default function TradingPanel() {
         </div>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-slate-600 dark:text-slate-400">USD Balance:</span>
+            <span className="text-slate-600 dark:text-slate-400">
+              {accountCurrency} Balance:
+            </span>
             <span className="font-bold text-slate-900 dark:text-slate-100">
-              {usdBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+              {accountBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {accountCurrency}
             </span>
           </div>
+          {accountCurrency !== 'USD' && (
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-500 dark:text-slate-500">≈ USD Equivalent:</span>
+              <span className="text-slate-600 dark:text-slate-400">
+                {usdBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+              </span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-slate-600 dark:text-slate-400">{baseCurrency} Holdings:</span>
             <span className="font-bold text-slate-900 dark:text-slate-100">

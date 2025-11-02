@@ -17,7 +17,7 @@ function DonutChartRenderer({
 }: DonutChartRendererProps) {
   return (
     <div style={{ width: '100%', height: '256px' }}>
-      <ResponsiveContainer>
+      <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={256}>
         <PieChart>
           <Pie
             data={assetAllocations}

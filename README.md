@@ -3,6 +3,10 @@
 Real-time cryptocurrency and forex trading platform with live charts, order books, news, and analytics.
 
 ---
+## Cloudflare Deployment
+Deployed at: [https://brokerageproject.pages.dev/](https://brokerageproject.pages.dev/)
+
+---
 
 ## Commands
 

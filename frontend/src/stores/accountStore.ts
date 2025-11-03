@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Account, AccountStatus, PaymentMethodMetadata } from '../types'
 import { useUIStore } from './uiStore'
 import { useTransactionStore } from './transactionStore'
+import { getApiUrl } from '../config/api'
 
 // Helper Functions
 const generateAccountId = (type: 'live' | 'demo'): string => {
@@ -179,7 +180,7 @@ export const useAccountStore = create<AccountStore>()(
           await Promise.all(
             currenciesToFetch.map(async (currency) => {
               try {
-                const response = await fetch(`/api/v1/analytics?type=fx_rate&from=${currency}&to=USD`)
+                const response = await fetch(getApiUrl(`/api/v1/analytics?type=fx_rate&from=${currency}&to=USD`))
                 const data = await response.json()
 
                 if (data.status === 'success' && data.data?.rate) {

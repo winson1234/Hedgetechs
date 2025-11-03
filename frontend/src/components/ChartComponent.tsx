@@ -4,6 +4,7 @@ import { WebSocketContext } from '../context/WebSocketContext'
 import type { PriceMessage } from '../hooks/useWebSocket'
 import { useUIStore } from '../stores/uiStore'
 import ChartHeader from './ChartHeader'
+import { getApiUrl } from '../config/api'
 
 type Kline = {
   openTime: number
@@ -138,7 +139,7 @@ export default function ChartComponent() {
     window.addEventListener('resize', onResize)
 
     // Fetch klines with dynamic timeframe and symbol
-    fetch(`/api/v1/klines?symbol=${symbol}&interval=${timeframe}&limit=200`)
+    fetch(getApiUrl(`/api/v1/klines?symbol=${symbol}&interval=${timeframe}&limit=200`))
       .then((r) => r.json())
       .then((data: Kline[]) => {
         // Store volume data

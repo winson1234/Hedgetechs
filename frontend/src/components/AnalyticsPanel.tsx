@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useUIStore } from '../stores/uiStore';
+import { getApiUrl } from '../config/api';
 
 // Forex rate data type
 type ForexRate = {
@@ -54,7 +55,7 @@ const AnalyticsPanel: React.FC = () => {
         forexPairs.map(async (pair) => {
           try {
             const endpoint = `/api/v1/analytics?type=fx_rate&from=${pair.from}&to=${pair.to}`;
-            const response = await fetch(endpoint);
+            const response = await fetch(getApiUrl(endpoint));
 
             if (!response.ok) {
               throw new Error(`HTTP ${response.status}`);
@@ -89,7 +90,7 @@ const AnalyticsPanel: React.FC = () => {
     setError(null);
     try {
       const endpoint = `/api/v1/analytics?type=${type}&symbol=${symbol}&period=${periodVal}`;
-      const response = await fetch(endpoint);
+      const response = await fetch(getApiUrl(endpoint));
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);

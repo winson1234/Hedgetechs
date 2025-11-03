@@ -90,7 +90,7 @@ function DepositTab() {
       const paymentIntentId = paymentIntentClientSecret.split('_secret_')[0];
 
       // Fetch payment intent from backend (which includes metadata)
-      fetch(`/api/v1/payment/status?payment_intent_id=${paymentIntentId}`)
+      fetch(getApiUrl(`/api/v1/payment/status?payment_intent_id=${paymentIntentId}`))
         .then(response => response.json())
         .then(data => {
           if (data.status === 'succeeded') {
@@ -303,7 +303,7 @@ function DepositTab() {
           }
 
           try {
-            const statusResponse = await fetch(`/api/v1/payment/status?payment_intent_id=${paymentIntent.id}`);
+            const statusResponse = await fetch(getApiUrl(`/api/v1/payment/status?payment_intent_id=${paymentIntent.id}`));
 
             if (!statusResponse.ok) {
               clearInterval(pollInterval);

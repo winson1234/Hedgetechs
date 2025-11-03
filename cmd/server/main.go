@@ -57,6 +57,19 @@ func main() {
 	serverAddress := ":" + port
 	log.Println("Starting Market Data Relay Server on", serverAddress)
 
+	// Middleware to support HEAD requests for UptimeRobot health checks
+	allowHEAD := func(handler http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodHead {
+				// HEAD requests: return 200 OK without body (for health checks)
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			// All other methods: pass through to original handler
+			handler(w, r)
+		}
+	}
+
 	// Create and run the central hub
 	h := hub.NewHub()
 	go h.Run()
@@ -76,14 +89,14 @@ func main() {
 	http.HandleFunc(config.LocalWebSocketPath, func(w http.ResponseWriter, r *http.Request) {
 		api.HandleWebSocket(h, w, r)
 	})
-	// REST handler for klines
-	http.HandleFunc(config.KlinesAPIPath, api.HandleKlines)
-	// REST handler for 24h ticker data
-	http.HandleFunc(config.TickerAPIPath, api.HandleTicker)
-	// REST handler for news feed
-	http.HandleFunc(config.NewsAPIPath, api.HandleNews)
-	// REST handler for forex rates analytics (powered by Frankfurter API)
-	http.HandleFunc(config.AnalyticsAPIPath, analyticsHandler.HandleAnalytics)
+	// REST handler for klines (with HEAD support for health checks)
+	http.HandleFunc(config.KlinesAPIPath, allowHEAD(api.HandleKlines))
+	// REST handler for 24h ticker data (with HEAD support for health checks)
+	http.HandleFunc(config.TickerAPIPath, allowHEAD(api.HandleTicker))
+	// REST handler for news feed (with HEAD support for health checks)
+	http.HandleFunc(config.NewsAPIPath, allowHEAD(api.HandleNews))
+	// REST handler for forex rates analytics (with HEAD support for health checks)
+	http.HandleFunc(config.AnalyticsAPIPath, allowHEAD(analyticsHandler.HandleAnalytics))
 	// REST handler for Stripe payment intent creation
 	http.HandleFunc(config.PaymentIntentAPIPath, api.HandleCreatePaymentIntent)
 	// REST handler for Stripe payment status check

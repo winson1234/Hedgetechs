@@ -2,170 +2,263 @@
 
 ## Overview
 
-React-based SPA providing real-time trading interface with live price updates, interactive charts, order books, news aggregation, and analytics.
+React-based SPA providing comprehensive trading platform with real-time price updates, interactive charts, multi-account management, wallet operations with Stripe payments, transaction history, and analytics.
 
-**Tech:** React 18, TypeScript 5, Vite 5, Tailwind CSS, lightweight-charts
+**Tech:** React 18, TypeScript 5, Vite 5, Tailwind CSS, lightweight-charts, Zustand, Stripe
 
 ---
 
 ## Key Components
 
 ### App.tsx
-**Purpose:** Main container and layout manager
+**Purpose:** Main container and multi-page layout manager
 
-**State:**
-- `isDarkMode` - Theme (persisted to localStorage)
-- `activeTimeframe` - Chart timeframe (1h, 4h, 1d, custom)
-- `activeInstrument` - Selected instrument (BTCUSDT, ETHUSDT, SOLUSDT, EURUSDT)
-- `showAnalyticsPanel` - Analytics panel visibility
-- `activeTool` - Selected toolbar tool
+**Pages:**
+- `trading` - Main trading interface with charts and order execution
+- `account` - Multi-account management with portfolio visualization
+- `wallet` - Deposit/withdraw/transfer with Stripe integration
+- `history` - Transaction history and analytics
+
+**State Management (Zustand stores):**
+- `uiStore` - Theme, navigation, active instrument, timeframe, toast notifications
+- `priceStore` - Real-time price data hydration from WebSocket
+- `accountStore` - Multi-account management, balances, currency conversion
+- `orderStore` - Pending orders, order history, auto-execution logic
+- `transactionStore` - Transaction history tracking
 
 **Features:**
-- Dark/light mode with system preference detection
-- Left toolbar for tool selection
-- Responsive grid layout
+- Multi-page navigation with persistent state
+- Dark/light mode with localStorage persistence
+- Responsive layout with conditional sidebars
+- Toast notification system
 
 ---
 
 ### ChartComponent.tsx
-**Purpose:** Candlestick chart with OHLC/Volume display
-
-**Props:** `activeTimeframe`, `activeInstrument`
-
-**State:** `chartData`, `loading`, `error`, `ohlcv`, `volumeDataRef`
+**Purpose:** Advanced candlestick chart with technical analysis
 
 **Features:**
-- Lightweight-charts candlestick chart
-- Fetches historical data from `/api/v1/klines`
-- WebSocket integration for live candle updates
-- OHLC and Volume display below chart (5-column grid)
-- Real-time OHLCV updates synchronized with WebSocket
-- Color-coded values (High: green, Low: red, Volume: blue)
-- Formatted numbers with `toLocaleString()`
+- Lightweight-charts candlestick chart with custom timeframes
+- Fetches historical data from `/api/v1/klines` (200 candles)
+- WebSocket integration for real-time candle updates
+- Multiple timeframes: 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M
+- OHLCV display with live updates
+- Drawing tools support (horizontal/vertical lines)
+- Drawing persistence per symbol (localStorage)
+- Real-time price line with color indicators
+- Timestamp validation to prevent "oldest data" errors
+- Symbol-specific message filtering
 - Dark/light theme support
 
 ---
 
-### OrderBookPanel.tsx
-**Purpose:** Order book and recent trades display
+### MarketActivityPanel.tsx
+**Purpose:** Combined order book and trade history display
 
-**Props:** `activeInstrument`
-
-**State:** `bids`, `asks`, `trades`, `activeTab`
+**Tabs:**
+- Order Book - Live bid/ask levels from Binance depth stream
+- Pending Orders - User's limit and stop-limit orders
+- Trade History - Executed orders for active account
 
 **Features:**
-- Two tabs: Order Book and Recent Trades
-- Order book: 10 levels (bids/asks) from WebSocket depth stream
-- Recent trades: Last 50 trades with color-coded buy/sell
-- Real-time updates via WebSocket
-- Price levels with quantities and totals
+- Real-time order book updates (20 levels each side)
+- Pending order management (cancel functionality)
+- Account-specific order filtering
+- Color-coded price changes
+- Formatted prices and quantities
 
 ---
 
 ### TradingPanel.tsx
-**Purpose:** Trading interface with live price, quick order entry and advanced order controls
-
-**Props:** `activeInstrument`, `usdBalance`, `cryptoHoldings`, `onBuyOrder`, `onSellOrder`
-
-**State / Behavior:** Holds price and order inputs; supports limit/market/stop-limit, TP/SL, recurring orders, fee display and pending orders.
+**Purpose:** Comprehensive order execution interface
 
 **Features:**
-- Live price updates via WebSocket
-- Order types: Limit, Market, Stop-Limit
-- TP/SL (Take Profit / Stop Loss) advanced options with trigger & limit offsets
-- Fee displayed and applied to totals
-- Pending orders list for limit and stop-limit orders
-- Quick percentage buttons to calculate buy amounts from USD balance
-- Trading mode tabs (spot, cross, isolated, grid)
+- Live price display with WebSocket updates
+- Order types: Market, Limit, Stop-Limit
+- Buy/Sell tabs with balance display
+- Quick percentage buttons (25%, 50%, 75%, 100%)
+- Fee calculation (0.1% trading fee)
+- Real-time total calculation
+- Account-specific balance tracking
+- Order validation and execution
+- Integration with accountStore for balance updates
+- Integration with orderStore for pending orders
 
 ---
 
 ### InstrumentsPanel.tsx
-**Purpose:** List of tradable instruments with live ticker data
-
-**Props:** `activeInstrument`, `setActiveInstrument`
-
-**State:** `instruments`, `loading`, `error`
+**Purpose:** Tradable instruments list with live market data
 
 **Features:**
-- Fetches 24h ticker data from `/api/v1/ticker`
-- Auto-refresh every 10 seconds
-- Displays symbol, price, 24h change
-- Color-coded change indicators
-- Click-to-select instrument
-- Data source badges (Binance/Alpha Vantage)
+- Displays BTCUSDT, ETHUSDT, SOLUSDT, EURUSDT
+- Real-time price from priceStore (WebSocket-powered)
+- 24h change percentage with color indicators
+- High/Low 24h prices
+- 24h volume display
+- Click to switch active instrument
+- Active instrument highlighting
+- Auto-updates without API polling
 
 ---
 
 ### NewsPanel.tsx
-**Purpose:** Multi-source news aggregation
-
-**State:** `articles`, `filter`, `searchQuery`, `selectedArticle`, `readArticles`
+**Purpose:** Multi-source financial news aggregation
 
 **Features:**
-- Fetches news from `/api/v1/news` (6 RSS sources)
-- Search functionality
-- Category filters (All, Crypto, Forex, Market, Alerts)
-- Pagination (3 articles per page)
-- Unread indicators (blue dots)
-- Expandable modal for full article view
-- Auto-refresh every 2 minutes
-- Time-ago timestamps
+- Fetches from `/api/v1/news` (CoinDesk, CryptoNews, CoinTelegraph, FXStreet, Investing.com, Yahoo Finance)
+- Search functionality across titles and descriptions
+- Category filters: All, Crypto, Forex, Market
+- Pagination (5 articles per page)
+- Unread indicators with localStorage tracking
+- Expandable modal for full articles
+- External links to original sources
+- Relative time display (e.g., "2 hours ago")
+- Manual refresh button
 
 ---
 
 ### AnalyticsPanel.tsx
-**Purpose:** Alpha Vantage analytics integration
+**Purpose:** Technical indicators and forex rates panel
 
-**Props:** `isOpen`, `onClose`, `symbol`
-
-**State:** `quoteData`, `rsiData`, `loading`, `error`
+**Tabs:**
+- Forex - Real-time forex conversion rates (EUR/USD, GBP/USD, JPY/USD, etc.)
+- RSI - Relative Strength Index
+- SMA - Simple Moving Average
+- EMA - Exponential Moving Average
+- MACD - Moving Average Convergence Divergence
 
 **Features:**
-- Global Quote: Real-time price, change, volume
-- Technical Indicators: RSI, SMA, EMA, MACD, Stochastic
-- Tabbed interface for different indicators
-- Support for both crypto (BTC, ETH, SOL) and forex (EUR/USD)
+- Fetches from `/api/v1/analytics` (powered by Frankfurter API)
+- Symbol and period selection
+- Real-time rate calculations
+- Slide-out panel with close functionality
+- Instrument-aware analytics
 - Dark/light theme support
 
 ---
 
-### LeftToolbar.tsx
-**Purpose:** Tool selector for additional features
-
-**Props:** `activeTool`, `onToolSelect`
+### AccountPage.tsx
+**Purpose:** Multi-account management and portfolio visualization
 
 **Features:**
-- Vertical toolbar on left side
-- Alpha Vantage analytics button
-- Highlights active tool
+- Account switcher with Live/Demo/External accounts
+- Total portfolio value across all accounts
+- Account creation modal (Live/Demo)
+- Currency selection (USD, EUR, MYR, JPY)
+- Platform type selection (Integrated/External)
+- Portfolio allocation chart (Recharts donut chart)
+- Account holdings breakdown
+- Balance editing modal
+- FX rate conversion for multi-currency accounts
 
----
+### WalletPage.tsx
+**Purpose:** Financial operations hub
+
+**Tabs:**
+- Deposit - Stripe card payments with FPX banking support
+- Withdraw - Account-to-account withdrawals
+- Transfer - Inter-account transfers
+
+**Features:**
+- Stripe Elements integration for card payments
+- Real-time payment status tracking
+- Payment intent de-duplication
+- Account balance updates
+- Currency conversion support
+- Transaction history integration
+
+### HistoryPage.tsx
+**Purpose:** Transaction history and analytics
+
+**Features:**
+- Transaction list with filtering (All/Deposit/Withdraw/Transfer/Trade)
+- Date range filtering
+- Summary cards (total deposits, withdrawals, trades)
+- Transaction detail modal
+- CSV export functionality
+- Account-specific filtering
+
+### MainSidebar.tsx
+**Purpose:** Navigation sidebar for non-trading pages
+
+**Features:**
+- Page navigation (Trading, Account, Wallet, History)
+- Active page highlighting
+- Profile dropdown with account info
+- Theme toggle
+- Fixed positioning
+
+### LeftToolbar.tsx
+**Purpose:** Trading page tool selector
+
+**Features:**
+- Analytics panel toggle
+- Drawing tools selector (horizontal/vertical lines)
+- Active tool highlighting
+- Icon-based vertical toolbar
 
 ### Header.tsx
 **Purpose:** Top navigation bar
 
-**Props:** `isDarkMode`, `setIsDarkMode`
-
 **Features:**
-- Application title display
-- Theme toggle button
+- Application branding
+- Live price ticker
+- Theme toggle
+- Profile dropdown (on non-trading pages)
 
 ---
 
 ### WebSocketContext.tsx
-**Purpose:** Global WebSocket context provider
-
-**Provides:**
-- `ws` - WebSocket connection
-- `lastMessage` - Last received message
-- `isConnected` - Connection state
+**Purpose:** Global WebSocket connection manager
 
 **Features:**
-- Connects to `/ws` on mount
-- Parses incoming JSON messages
-- Auto-reconnect on disconnect
-- Broadcasts messages to all consuming components
+- Connects to backend WebSocket (`ws://localhost:8080/ws` dev, `wss://brokerageproject.onrender.com/ws` prod)
+- Price message broadcasting to priceStore
+- Order execution triggering via orderStore
+- Auto-reconnect with exponential backoff (1s → 60s)
+- Connection state management
+- Message parsing and distribution
+
+---
+
+## State Management
+
+### Zustand Stores
+
+**priceStore:**
+- Real-time price data for all instruments
+- 24h statistics (high, low, open, volume, change)
+- WebSocket-driven updates
+- Initial hydration from REST API
+
+**accountStore:**
+- Multi-account management (Live/Demo/External)
+- Multi-currency balances (USD, EUR, MYR, JPY, BTC, ETH, SOL)
+- Deposit/withdraw/transfer operations
+- FX rate fetching from backend
+- Balance calculations with currency conversion
+- Account status tracking
+
+**orderStore:**
+- Pending order management (limit, stop-limit)
+- Order execution logic with price matching
+- Order history tracking
+- Account-specific order filtering
+- Real-time order processing via WebSocket
+
+**transactionStore:**
+- Transaction history (Deposit/Withdraw/Transfer/Trade)
+- Filtering and search functionality
+- Summary statistics
+
+**uiStore:**
+- Dark/light theme with persistence
+- Page navigation state
+- Active instrument and timeframe
+- Analytics panel visibility
+- Drawing tool selection
+- Toast notifications
+- Wallet tab state
 
 ---
 
@@ -173,32 +266,56 @@ React-based SPA providing real-time trading interface with live price updates, i
 
 ### WebSocket
 ```
-Binance → Backend Hub → /ws → WebSocketContext → Components
+Binance → Backend Hub → /ws → WebSocketContext → priceStore/orderStore → Components
 ```
 
-**Components using WebSocket:**
-- ChartComponent (live candle updates)
-- TradingPanel (live price)
-- OrderBookPanel (depth updates + trades)
-- LivePriceDisplay (price ticker)
+**Real-time Updates:**
+- ChartComponent - Live candle updates with timestamp validation
+- TradingPanel - Current price display
+- MarketActivityPanel - Order book depth (20 levels)
+- LivePriceDisplay - Price ticker
+- InstrumentsPanel - All instrument prices
+- orderStore - Automatic pending order execution
 
 ### REST API
 ```
-Component → API Request → Backend Handler → Cache/External API → Response → State Update
+Component → getApiUrl() → API Request → Backend Handler → Response → Store Update
 ```
 
-**Auto-refresh intervals:**
-- InstrumentsPanel: Every 10 seconds
-- NewsPanel: Every 2 minutes
+**API Configuration:**
+- Development: Relative paths with Vite proxy
+- Production: Direct to `https://brokerageproject.onrender.com`
+- CORS-enabled for Cloudflare Pages (`*.pages.dev`)
+
+**Key Endpoints:**
+- `/api/v1/ticker` - Initial price hydration
+- `/api/v1/klines` - Historical chart data
+- `/api/v1/news` - News articles
+- `/api/v1/analytics` - Forex rates and indicators
+- `/api/v1/deposit/create-payment-intent` - Stripe payments
+- `/api/v1/payment/status` - Payment verification
 
 ---
 
 ## Styling
 
-- **Framework:** Tailwind CSS with dark mode support
-- **Theme:** Class-based dark mode with localStorage persistence
-- **Colors:** Financial color scheme (red/green for gains/losses)
-- **Layout:** Responsive grid with fixed-height panels
+- **Framework:** Tailwind CSS with JIT mode
+- **Theme:** Dark mode with `dark:` variants and localStorage persistence
+- **Colors:** Financial UI (green for buy/up, red for sell/down)
+- **Components:** Custom styled with Tailwind utilities
+- **Stripe Elements:** Dynamic styling based on theme
+- **Layout:** Responsive grid (mobile-first approach)
+
+---
+
+## Payment Integration
+
+### Stripe Setup
+- **Elements:** CardNumberElement, CardExpiryElement, CardCvcElement
+- **Payment Methods:** Card, FPX Banking (Malaysia)
+- **Flow:** Create payment intent → Confirm → Poll status → Update balance
+- **Security:** Client-side tokenization, server-side processing
+- **De-duplication:** Prevents duplicate deposits on page refresh
 
 ---
 
@@ -208,26 +325,25 @@ Component → API Request → Backend Handler → Cache/External API → Respons
 cd frontend
 pnpm install          # Install dependencies
 pnpm run dev          # Start dev server (http://localhost:5173)
-pnpm run typecheck    # Type checking
-pnpm run lint         # Linting
-pnpm run build        # Production build
+pnpm run typecheck    # TypeScript type checking
+pnpm run lint         # ESLint
+pnpm run build        # Production build for Cloudflare Pages
 ```
 
 ---
 
-## Vite Configuration
+## Environment Variables
 
-Proxy configuration for development:
-```typescript
-{
-  server: {
-    proxy: {
-      '/api': 'http://localhost:8080',
-      '/ws': {
-        target: 'ws://localhost:8080',
-        ws: true
-      }
-    }
-  }
-}
+Create `.env`:
 ```
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
+```
+
+---
+
+## Deployment
+
+**Platform:** Cloudflare Pages  
+**Build Command:** `pnpm run build`  
+**Output Directory:** `dist`  
+**Live URL:** https://brokerageproject.pages.dev

@@ -41,9 +41,10 @@ func HandleWebSocket(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Create a hub client with a per-client send channel
+	// Increased buffer size to handle high-frequency trading data from Binance
 	client := &hub.Client{
 		Conn: conn,
-		Send: make(chan []byte, 64), // per-client buffer
+		Send: make(chan []byte, 256), // per-client buffer (increased from 64)
 	}
 
 	// Register the new client with the hub
@@ -513,18 +514,36 @@ func HandleNews(w http.ResponseWriter, r *http.Request) {
 		successCount++
 
 		for _, item := range feed.Channel.Items {
-			// Parse pubDate (RFC1123 format: "Mon, 02 Jan 2006 15:04:05 MST")
-			// Handle "Z" timezone by replacing with "+0000"
-			dateStr := strings.Replace(item.PubDate, " Z", " +0000", 1)
+			// Parse pubDate - RSS feeds use various date formats
+			// Try multiple formats in order of commonality
+			dateStr := strings.TrimSpace(item.PubDate)
 
-			pubDate, err := time.Parse(time.RFC1123, dateStr)
-			if err != nil {
-				// Try RFC1123Z if RFC1123 fails
-				pubDate, err = time.Parse(time.RFC1123Z, dateStr)
-				if err != nil {
-					log.Printf("Error parsing pubDate '%s': %v. Check the output from backend.", item.PubDate, err)
-					pubDate = time.Now() // fallback to current time
+			// List of common RSS date formats
+			dateFormats := []string{
+				time.RFC1123Z,  // "Mon, 02 Jan 2006 15:04:05 -0700"
+				time.RFC1123,   // "Mon, 02 Jan 2006 15:04:05 MST"
+				time.RFC3339,   // "2006-01-02T15:04:05Z07:00" (ISO8601)
+				"2006-01-02T15:04:05Z",     // ISO8601 with Z
+				"Mon, 2 Jan 2006 15:04:05 MST",      // RFC1123 with single-digit day
+				"Mon, 2 Jan 2006 15:04:05 -0700",    // RFC1123Z with single-digit day
+				"2 Jan 2006 15:04:05 MST",           // Without weekday
+				"2 Jan 2006 15:04:05 -0700",         // Without weekday, with timezone offset
+			}
+
+			// Try each format
+			var pubDate time.Time
+			var err error
+			for _, format := range dateFormats {
+				pubDate, err = time.Parse(format, dateStr)
+				if err == nil {
+					break // Successfully parsed
 				}
+			}
+
+			// If all formats fail, log and use current time as fallback
+			if err != nil {
+				log.Printf("Warning: Could not parse pubDate '%s' with any known format. Using current time as fallback.", item.PubDate)
+				pubDate = time.Now()
 			}
 
 			allArticles = append(allArticles, models.NewsArticle{

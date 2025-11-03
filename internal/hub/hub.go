@@ -26,8 +26,9 @@ type Client struct {
 // NewHub creates a new Hub instance.
 func NewHub() *Hub {
 	return &Hub{
-		// Buffered broadcast channel to absorb short bursts when clients are slow or absent
-		Broadcast:  make(chan []byte, 256),
+		// Buffered broadcast channel to absorb bursts of high-frequency trading data
+		// Increased to 512 to match increased client buffers and handle peak trading volume
+		Broadcast:  make(chan []byte, 512),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
@@ -66,7 +67,7 @@ func (h *Hub) Run() {
 				case client.Send <- message:
 					// enqueued
 				default:
-					log.Printf("Client send buffer full, skipping client")
+					log.Printf("WARNING: Client send buffer full (256 messages), dropping message for client %s", client.Conn.RemoteAddr())
 					// do not unregister here; client writePump will detect issues and unregister if needed
 				}
 			}

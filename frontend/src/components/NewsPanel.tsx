@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { getApiUrl } from '../config/api'
 
 type NewsArticle = {
   title: string
@@ -29,7 +30,7 @@ export default function NewsPanel() {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const response = await fetch('/api/v1/news')
+        const response = await fetch(getApiUrl('/api/v1/news'))
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }

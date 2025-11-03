@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { getApiUrl } from '../../config/api';
 import { useAccountStore, formatBalance } from '../../stores/accountStore';
 import { useUIStore } from '../../stores/uiStore';
 import { CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -221,7 +222,7 @@ export default function DepositTab() {
         paymentAmount = Math.round(myrAmount * 100); // Convert to cents
       }
 
-      const response = await fetch('/api/v1/deposit/create-payment-intent', {
+      const response = await fetch(getApiUrl('/api/v1/deposit/create-payment-intent'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

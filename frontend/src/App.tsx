@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { getApiUrl } from './config/api';
 import LivePriceDisplay from './components/LivePriceDisplay';
 import ChartComponent from './components/ChartComponent';
 import TradingPanel from './components/TradingPanel';
@@ -28,7 +29,7 @@ export default function App() {
   useEffect(() => {
     const hydratePrices = async () => {
       try {
-        const response = await fetch('/api/v1/ticker?symbols=BTCUSDT,ETHUSDT,SOLUSDT,EURUSDT');
+        const response = await fetch(getApiUrl('/api/v1/ticker?symbols=BTCUSDT,ETHUSDT,SOLUSDT,EURUSDT'));
         if (!response.ok) throw new Error('Failed to fetch 24h ticker data');
         const data = await response.json();
         usePriceStore.getState().hydrateFrom24hData(data);

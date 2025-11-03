@@ -1,3 +1,15 @@
+// --- AUTHENTICATION GUARD ---
+const loggedInUser = localStorage.getItem('loggedInUser');
+const currentPath = window.location.pathname;
+const isAuthPage = currentPath === '/login.html' ||
+                   currentPath === '/register.html' ||
+                   currentPath === '/forgotPassword.html';
+
+if (!loggedInUser && !isAuthPage) {
+  window.location.href = '/login.html';
+}
+// --- END GUARD ---
+
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
@@ -23,12 +35,15 @@ console.error = (...args) => {
 // Load Stripe publishable key from environment
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '')
 
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <Elements stripe={stripePromise}>
-      <WebSocketProvider>
-        <App />
-      </WebSocketProvider>
-    </Elements>
-  </React.StrictMode>
-)
+// Only mount the React app if the user is logged in
+if (localStorage.getItem('loggedInUser')) {
+  createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <Elements stripe={stripePromise}>
+        <WebSocketProvider>
+          <App />
+        </WebSocketProvider>
+      </Elements>
+    </React.StrictMode>
+  )
+}

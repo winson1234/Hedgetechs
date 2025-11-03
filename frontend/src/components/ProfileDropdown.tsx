@@ -20,7 +20,22 @@ export default function ProfileDropdown({
   if (!isOpen) return null;
 
   const handleLogOut = () => {
+    // 1. Clear auth key
+    localStorage.removeItem('loggedInUser');
+
+    // 2. Clear all Zustand persisted stores
+    localStorage.removeItem('account-store');
+    localStorage.removeItem('order-store');
+    localStorage.removeItem('transaction-storage');
+    localStorage.removeItem('ui-store');
+
+    // 3. Clear FX rate cache
+    localStorage.removeItem('fx_rates_cache');
+    localStorage.removeItem('fx_rates_cache_time');
+
+    // 4. Close dropdown and redirect
     closeDropdown();
+    window.location.href = '/login.html';
   };
 
   const handleAccountClick = () => {

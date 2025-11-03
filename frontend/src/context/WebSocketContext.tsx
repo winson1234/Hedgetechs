@@ -25,14 +25,12 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   const connect = useCallback(() => {
     if (closedRef.current) return
     setConnecting(true)
-    // In dev, connect directly to backend to avoid Vite proxy startup races.
-    // In production, use the same origin path so static hosting works.
-    // Vite exposes import.meta.env.DEV when running dev server.
+    // In dev, connect directly to local backend
+    // In production, connect to Render backend
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     const isDev = typeof import.meta !== 'undefined' && !!import.meta.env && import.meta.env.DEV
-    const origin = window.location.origin.replace(/^http/, 'ws')
-    const url = isDev ? 'ws://localhost:8080/ws' : origin + '/ws'
+    const url = isDev ? 'ws://localhost:8080/ws' : 'wss://brokerageproject.onrender.com/ws'
     const ws = new WebSocket(url)
     wsRef.current = ws
 

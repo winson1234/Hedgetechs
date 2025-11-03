@@ -28,3 +28,6 @@ Thumbs.db
 
 # Build artifacts
 *.exe
+
+# Files or Folders from other collaborators
+authentication/

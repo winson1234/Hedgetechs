@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// RENDER BACKEND URL
+const RENDER_BACKEND_URL = 'https://brokerageproject.onrender.com'
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -10,15 +13,15 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Proxy REST API calls to backend
+      // Proxy REST API calls to Render backend
       '/api': {
-        target: 'http://localhost:8080',
+        target: RENDER_BACKEND_URL,
         changeOrigin: true,
         secure: false
       },
-      // Proxy websocket endpoint to backend
+      // Proxy websocket endpoint to Render backend (HTTPS -> WSS)
       '/ws': {
-        target: 'ws://localhost:8080',
+        target: RENDER_BACKEND_URL.replace('https', 'wss'),
         ws: true
       }
     }

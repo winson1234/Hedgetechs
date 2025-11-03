@@ -48,7 +48,14 @@ func main() {
 	// Initialize Stripe after loading environment variables
 	api.InitializeStripe()
 
-	log.Println("Starting Market Data Relay Server on", config.LocalServerAddress)
+	// Get port from environment (required for Render deployment)
+	// Falls back to 8080 for local development
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	serverAddress := ":" + port
+	log.Println("Starting Market Data Relay Server on", serverAddress)
 
 	// Create and run the central hub
 	h := hub.NewHub()
@@ -82,6 +89,6 @@ func main() {
 	// REST handler for Stripe payment status check
 	http.HandleFunc(config.PaymentStatusAPIPath, api.HandlePaymentStatus)
 
-	// Start the local HTTP server
-	log.Fatal(http.ListenAndServe(config.LocalServerAddress, nil))
+	// Start the HTTP server on the configured port
+	log.Fatal(http.ListenAndServe(serverAddress, nil))
 }

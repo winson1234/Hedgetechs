@@ -9,18 +9,33 @@ type ForexRate = {
   lastUpdated?: string;
 };
 
+type IndicatorData = {
+  symbol: string;
+  value: number;
+  period?: number;
+  signal?: number;
+  histogram?: number;
+};
+
+type TabType = 'forex' | 'rsi' | 'sma' | 'ema' | 'macd';
+
 const AnalyticsPanel: React.FC = () => {
   // Access stores
   const isOpen = useUIStore(state => state.showAnalyticsPanel);
   const setShowAnalyticsPanel = useUIStore(state => state.setShowAnalyticsPanel);
+  const activeInstrument = useUIStore(state => state.activeInstrument);
 
   const onClose = () => {
     setShowAnalyticsPanel(false);
   };
 
+  const [activeTab, setActiveTab] = useState<TabType>('forex');
   const [loading, setLoading] = useState(false);
   const [forexRates, setForexRates] = useState<ForexRate[]>([]);
+  const [indicatorData, setIndicatorData] = useState<IndicatorData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedSymbol, setSelectedSymbol] = useState<string>(activeInstrument);
+  const [period, setPeriod] = useState<number>(14);
 
   const fetchForexRates = useCallback(async () => {
     // Forex pairs to track
@@ -69,20 +84,64 @@ const AnalyticsPanel: React.FC = () => {
     setLoading(false);
   }, []);
 
-  // Fetch data when panel opens and refresh every 30 seconds
+  const fetchIndicator = useCallback(async (type: string, symbol: string, periodVal: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const endpoint = `/api/v1/analytics?type=${type}&symbol=${symbol}&period=${periodVal}`;
+      const response = await fetch(endpoint);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.status === 'success' && data.data) {
+        if (type === 'macd') {
+          setIndicatorData({
+            symbol: data.data.symbol,
+            value: data.data.macd,
+            signal: data.data.signal,
+            histogram: data.data.histogram,
+          });
+        } else {
+          setIndicatorData({
+            symbol: data.data.symbol,
+            value: data.data[type], // rsi, sma, or ema
+            period: data.data.period,
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching ${type}:`, error);
+      setError(error instanceof Error ? error.message : `Failed to fetch ${type}`);
+    }
+    setLoading(false);
+  }, []);
+
+  // Sync selectedSymbol with activeInstrument
+  useEffect(() => {
+    setSelectedSymbol(activeInstrument);
+  }, [activeInstrument]);
+
+  // Fetch data when panel opens, tab changes, or symbol changes
   useEffect(() => {
     if (isOpen) {
       setError(null);
-      fetchForexRates();
-
-      // Refresh every 30 seconds
-      const interval = setInterval(() => {
+      if (activeTab === 'forex') {
         fetchForexRates();
-      }, 30000);
-
-      return () => clearInterval(interval);
+        // Refresh every 30 seconds for forex
+        const interval = setInterval(() => {
+          fetchForexRates();
+        }, 30000);
+        return () => clearInterval(interval);
+      } else {
+        // Fetch indicator data
+        fetchIndicator(activeTab, selectedSymbol, period);
+      }
     }
-  }, [isOpen, fetchForexRates]);
+  }, [isOpen, activeTab, selectedSymbol, period, fetchForexRates, fetchIndicator]);
 
   if (!isOpen) return null;
 
@@ -101,21 +160,37 @@ const AnalyticsPanel: React.FC = () => {
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
-          <div>
+        <div className="border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-between p-4">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
               Analytics
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Forex Rates</p>
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+            >
+              <svg className="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
-          >
-            <svg className="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+
+          {/* Tabs */}
+          <div className="flex px-4 gap-2 overflow-x-auto">
+            {(['forex', 'rsi', 'sma', 'ema', 'macd'] as TabType[]).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition ${
+                  activeTab === tab
+                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                {tab === 'forex' ? 'Forex Rates' : tab.toUpperCase()}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Content */}
@@ -126,9 +201,119 @@ const AnalyticsPanel: React.FC = () => {
             </div>
           )}
 
-          {loading && forexRates.length === 0 ? (
+          {loading && forexRates.length === 0 && !indicatorData ? (
             <div className="flex items-center justify-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : activeTab !== 'forex' ? (
+            /* Indicator Display */
+            <div className="space-y-4">
+              {/* Symbol Selector */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Symbol
+                </label>
+                <select
+                  value={selectedSymbol}
+                  onChange={(e) => setSelectedSymbol(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="BTCUSDT">BTC/USDT</option>
+                  <option value="ETHUSDT">ETH/USDT</option>
+                  <option value="SOLUSDT">SOL/USDT</option>
+                  <option value="EURUSDT">EUR/USDT</option>
+                </select>
+              </div>
+
+              {/* Period Input (except for MACD) */}
+              {activeTab !== 'macd' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Period
+                  </label>
+                  <input
+                    type="number"
+                    value={period}
+                    onChange={(e) => setPeriod(parseInt(e.target.value) || 14)}
+                    min="1"
+                    max="200"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+
+              {/* Indicator Card */}
+              {indicatorData && (
+                <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <div className="text-center">
+                    <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">
+                      {activeTab.toUpperCase()}
+                      {indicatorData.period && ` (${indicatorData.period})`}
+                    </div>
+                    <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2">
+                      {indicatorData.value.toFixed(2)}
+                    </div>
+
+                    {activeTab === 'rsi' && (
+                      <div className="mt-2">
+                        <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                          indicatorData.value > 70 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' :
+                          indicatorData.value < 30 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                          'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                        }`}>
+                          {indicatorData.value > 70 ? 'Overbought' : indicatorData.value < 30 ? 'Oversold' : 'Neutral'}
+                        </div>
+                      </div>
+                    )}
+
+                    {activeTab === 'macd' && indicatorData.signal !== undefined && (
+                      <div className="mt-4 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-slate-600 dark:text-slate-400">Signal:</span>
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            {indicatorData.signal.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-600 dark:text-slate-400">Histogram:</span>
+                          <span className={`font-semibold ${
+                            (indicatorData.histogram ?? 0) > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                          }`}>
+                            {(indicatorData.histogram ?? 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="mt-3">
+                          <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                            (indicatorData.histogram ?? 0) > 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                            'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                          }`}>
+                            {(indicatorData.histogram ?? 0) > 0 ? 'Bullish' : 'Bearish'}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => fetchIndicator(activeTab, selectedSymbol, period)}
+                disabled={loading}
+                className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white rounded font-medium text-sm transition"
+              >
+                {loading ? 'Loading...' : 'Refresh'}
+              </button>
+
+              {/* Info Box */}
+              <div className="mt-6 p-3 bg-slate-50 dark:bg-slate-800 rounded text-xs text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                <p className="font-semibold mb-1">About {activeTab.toUpperCase()}</p>
+                <p>
+                  {activeTab === 'rsi' && 'RSI measures momentum, ranging from 0-100. Above 70 indicates overbought, below 30 indicates oversold.'}
+                  {activeTab === 'sma' && 'Simple Moving Average smooths price data by calculating the average price over a specified period.'}
+                  {activeTab === 'ema' && 'Exponential Moving Average gives more weight to recent prices, making it more responsive to new information.'}
+                  {activeTab === 'macd' && 'MACD shows the relationship between two EMAs. Positive histogram indicates bullish momentum, negative indicates bearish.'}
+                </p>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">

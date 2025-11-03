@@ -15,6 +15,7 @@ export default function LeftToolbar() {
     {
       id: 'trendline',
       name: 'Trendline',
+      disabled: true,
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <line x1="4" y1="20" x2="20" y2="4" strokeWidth="2" strokeLinecap="round" />
@@ -24,6 +25,7 @@ export default function LeftToolbar() {
     {
       id: 'horizontal-line',
       name: 'Horizontal Line',
+      disabled: false,
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <line x1="4" y1="12" x2="20" y2="12" strokeWidth="2" strokeLinecap="round" />
@@ -33,6 +35,7 @@ export default function LeftToolbar() {
     {
       id: 'vertical-line',
       name: 'Vertical Line',
+      disabled: true,
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <line x1="12" y1="4" x2="12" y2="20" strokeWidth="2" strokeLinecap="round" />
@@ -42,6 +45,7 @@ export default function LeftToolbar() {
     {
       id: 'rectangle',
       name: 'Rectangle',
+      disabled: true,
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <rect x="5" y="7" width="14" height="10" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -51,6 +55,7 @@ export default function LeftToolbar() {
     {
       id: 'text-annotation',
       name: 'Text Annotation',
+      disabled: true,
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path d="M4 7h16M9 20V7M15 20V7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -65,13 +70,16 @@ export default function LeftToolbar() {
       {drawingTools.map((tool) => (
         <button
           key={tool.id}
-          onClick={() => handleToolClick(tool.id)}
+          onClick={() => !tool.disabled && handleToolClick(tool.id)}
+          disabled={tool.disabled}
           className={`w-full h-14 flex items-center justify-center border-b border-slate-200 dark:border-slate-800 transition-colors flex-shrink-0 ${
-            activeDrawingTool === tool.id
+            tool.disabled
+              ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed opacity-50'
+              : activeDrawingTool === tool.id
               ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
-          title={tool.name}
+          title={tool.disabled ? `${tool.name} (Coming in v2)` : tool.name}
           aria-label={`${tool.name} tool`}
         >
           {tool.icon}

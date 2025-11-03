@@ -16,6 +16,7 @@ export type PendingOrder = {
   price: number // The limit price for execution
   amount: number
   stopPrice?: number // The trigger price for stop-limit orders
+  linkedOrderId?: string // For OCO (One-Cancels-Other) linking - used for TP/SL pairs
   timestamp: number
 }
 
@@ -162,10 +163,27 @@ export const useOrderStore = create<OrderStore>()(
           return result
         }
 
-        // Remove from pending orders
-        set(state => ({
-          pendingOrders: state.pendingOrders.filter(o => o.id !== orderId)
-        }))
+        // OCO Logic: If this order has a linked order, cancel it
+        if (order.linkedOrderId) {
+          const linkedOrder = pendingOrders.find(o => o.linkedOrderId === order.linkedOrderId && o.id !== orderId)
+          if (linkedOrder) {
+            console.log(`OCO: Cancelling linked order ${linkedOrder.id} because ${orderId} executed`)
+            // Cancel the linked order silently (no toast)
+            set(state => ({
+              pendingOrders: state.pendingOrders.filter(o => o.id !== linkedOrder.id && o.id !== orderId)
+            }))
+          } else {
+            // Just remove the executed order
+            set(state => ({
+              pendingOrders: state.pendingOrders.filter(o => o.id !== orderId)
+            }))
+          }
+        } else {
+          // Remove from pending orders (no linked order)
+          set(state => ({
+            pendingOrders: state.pendingOrders.filter(o => o.id !== orderId)
+          }))
+        }
 
         // Record in order history
         const total = order.amount * executionPrice

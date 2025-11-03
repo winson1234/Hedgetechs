@@ -81,10 +81,8 @@ export default function TradingPanel() {
   // TP/SL inputs
   const [tpTrigger, setTpTrigger] = useState<string>('');
   const [tpLimit, setTpLimit] = useState<string>('');
-  const [tpOffset, setTpOffset] = useState<string>('');
   const [slTrigger, setSlTrigger] = useState<string>('');
   const [slLimit, setSlLimit] = useState<string>('');
-  const [slOffset, setSlOffset] = useState<string>('');
 
   // Trading info
   const [lots, setLots] = useState<number>(0);
@@ -159,10 +157,8 @@ export default function TradingPanel() {
     setPercentage(0);
     setTpTrigger('');
     setTpLimit('');
-    setTpOffset('');
     setSlTrigger('');
     setSlLimit('');
-    setSlOffset('');
     // Reset toggles as well
     setIsRecurring(false);
     setBuyWithEUR(false);
@@ -394,6 +390,70 @@ export default function TradingPanel() {
           total: total + fee,
           wasFromPending: false,
         });
+      }
+
+      // Create TP/SL orders if enabled
+      if (enableTPSL && activeAccountId) {
+        const tpTriggerNum = parseFloat(tpTrigger);
+        const tpLimitNum = parseFloat(tpLimit);
+        const slTriggerNum = parseFloat(slTrigger);
+        const slLimitNum = parseFloat(slLimit);
+
+        // Validate TP/SL prices with directional checks
+        let hasValidTP = !isNaN(tpTriggerNum) && tpTriggerNum > 0 && !isNaN(tpLimitNum) && tpLimitNum > 0;
+        let hasValidSL = !isNaN(slTriggerNum) && slTriggerNum > 0 && !isNaN(slLimitNum) && slLimitNum > 0;
+
+        // Additional validation: ensure TP is favorable and SL is unfavorable
+        if (hasValidTP) {
+          if (side === 'buy' && tpTriggerNum <= currentPrice) {
+            console.error('TP trigger must be above entry price for buy orders');
+            hasValidTP = false;
+          } else if (side === 'sell' && tpTriggerNum >= currentPrice) {
+            console.error('TP trigger must be below entry price for sell orders');
+            hasValidTP = false;
+          }
+        }
+
+        if (hasValidSL) {
+          if (side === 'buy' && slTriggerNum >= currentPrice) {
+            console.error('SL trigger must be below entry price for buy orders');
+            hasValidSL = false;
+          } else if (side === 'sell' && slTriggerNum <= currentPrice) {
+            console.error('SL trigger must be above entry price for sell orders');
+            hasValidSL = false;
+          }
+        }
+
+        // Generate a shared linkedOrderId for OCO functionality
+        const linkedOrderId = hasValidTP && hasValidSL ? crypto.randomUUID() : undefined;
+
+        // Create TP order (stop-limit order in opposite direction)
+        if (hasValidTP) {
+          addPendingOrder({
+            accountId: activeAccountId,
+            type: 'stop-limit',
+            side: side === 'buy' ? 'sell' : 'buy', // Opposite side to close position
+            symbol: activeInstrument,
+            price: tpLimitNum, // Limit price
+            amount: qty,
+            stopPrice: tpTriggerNum, // Trigger price
+            linkedOrderId,
+          });
+        }
+
+        // Create SL order (stop-limit order in opposite direction)
+        if (hasValidSL) {
+          addPendingOrder({
+            accountId: activeAccountId,
+            type: 'stop-limit',
+            side: side === 'buy' ? 'sell' : 'buy', // Opposite side to close position
+            symbol: activeInstrument,
+            price: slLimitNum, // Limit price
+            amount: qty,
+            stopPrice: slTriggerNum, // Trigger price
+            linkedOrderId,
+          });
+        }
       }
     }
 
@@ -671,65 +731,41 @@ export default function TradingPanel() {
             {/* Take Profit */}
             <div>
               <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-2">Take Profit</div>
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">TP Trigger</label>
-                    <input
-                      type="number" value={tpTrigger} onChange={(e) => setTpTrigger(e.target.value)} placeholder="0.00" min="0" step="any"
-                      className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">TP Limit</label>
-                    <input
-                      type="number" value={tpLimit} onChange={(e) => setTpLimit(e.target.value)} placeholder="0.00" min="0" step="any"
-                      className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                     />
-                  </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">TP Trigger</label>
+                  <input
+                    type="number" value={tpTrigger} onChange={(e) => setTpTrigger(e.target.value)} placeholder="0.00" min="0" step="any"
+                    className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                  />
                 </div>
-                 <div className="flex items-center gap-2">
-                   <label className="text-xs text-slate-600 dark:text-slate-400">Offset:</label>
-                   <input
-                     type="number" value={tpOffset} onChange={(e) => setTpOffset(e.target.value)} placeholder="0" min="0" step="any"
-                     className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">TP Limit</label>
+                  <input
+                    type="number" value={tpLimit} onChange={(e) => setTpLimit(e.target.value)} placeholder="0.00" min="0" step="any"
+                    className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                    />
-                   <button className="px-2 py-1.5 text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-300 dark:hover:bg-slate-600 transition">
-                     %
-                   </button>
-                 </div>
+                </div>
               </div>
             </div>
              {/* Stop Loss */}
             <div>
               <div className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2">Stop Loss</div>
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">SL Trigger</label>
-                    <input
-                       type="number" value={slTrigger} onChange={(e) => setSlTrigger(e.target.value)} placeholder="0.00" min="0" step="any"
-                       className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
-                     />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">SL Limit</label>
-                    <input
-                       type="number" value={slLimit} onChange={(e) => setSlLimit(e.target.value)} placeholder="0.00" min="0" step="any"
-                       className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
-                     />
-                  </div>
-                </div>
-                 <div className="flex items-center gap-2">
-                   <label className="text-xs text-slate-600 dark:text-slate-400">Offset:</label>
-                   <input
-                     type="number" value={slOffset} onChange={(e) => setSlOffset(e.target.value)} placeholder="0" min="0" step="any"
-                     className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">SL Trigger</label>
+                  <input
+                     type="number" value={slTrigger} onChange={(e) => setSlTrigger(e.target.value)} placeholder="0.00" min="0" step="any"
+                     className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
                    />
-                   <button className="px-2 py-1.5 text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-300 dark:hover:bg-slate-600 transition">
-                     %
-                   </button>
-                 </div>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">SL Limit</label>
+                  <input
+                     type="number" value={slLimit} onChange={(e) => setSlLimit(e.target.value)} placeholder="0.00" min="0" step="any"
+                     className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+                   />
+                </div>
               </div>
             </div>
           </div>

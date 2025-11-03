@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useContext, useState } from 'react'
-import { createChart, IChartApi, ISeriesApi, UTCTimestamp, CandlestickData, IPriceLine } from 'lightweight-charts'
+import { createChart, IChartApi, ISeriesApi, UTCTimestamp, CandlestickData, IPriceLine, MouseEventParams } from 'lightweight-charts'
 import { WebSocketContext } from '../context/WebSocketContext'
 import type { PriceMessage } from '../hooks/useWebSocket'
 import { useUIStore } from '../stores/uiStore'
@@ -37,6 +37,17 @@ export default function ChartComponent() {
   const volumeDataRef = useRef<Map<number, number>>(new Map())
   const [isLoading, setIsLoading] = useState(false)
   const loadingTimeoutRef = useRef<number | null>(null)
+
+  // Drawing storage
+  type Drawing = {
+    id: string
+    type: 'horizontal-line' | 'vertical-line'
+    price?: number
+    time?: number
+    color: string
+    lineRef?: IPriceLine
+  }
+  const drawingsRef = useRef<Drawing[]>([]) // Keep ref in sync for cleanup
   
   // Map timeframe to seconds for candle grouping
   const getTimeframeSeconds = (tf: string): number => {
@@ -261,20 +272,106 @@ export default function ChartComponent() {
     }
   }, [lastMessage, timeframeSeconds, symbol])
 
-  // PLACEHOLDER: Drawing tool functionality
-  // TODO: Implement drawing tool interactions on the chart
+  // Load drawings from localStorage when symbol changes
   useEffect(() => {
-    if (activeDrawingTool) {
-      console.log(`Drawing tool selected: ${activeDrawingTool}`)
-      // Future implementation: Enable drawing mode on the chart
-      // - Add mouse event listeners to the chart
-      // - Create drawing shapes (trendlines, rectangles, etc.)
-      // - Store drawing data in a state or local storage
-    } else {
-      console.log('Drawing tool deselected')
-      // Future implementation: Disable drawing mode
+    if (!seriesRef.current) return
+
+    // First, clear any existing drawings to prevent duplicates
+    drawingsRef.current.forEach(drawing => {
+      if (drawing.lineRef && seriesRef.current) {
+        seriesRef.current.removePriceLine(drawing.lineRef)
+      }
+    })
+    drawingsRef.current = []
+
+    // Then load drawings for the current symbol
+    const savedDrawings = localStorage.getItem(`chart-drawings-${symbol}`)
+    if (savedDrawings) {
+      try {
+        const parsedDrawings: Drawing[] = JSON.parse(savedDrawings)
+
+        // Re-create price lines from saved data
+        parsedDrawings.forEach(drawing => {
+          if (drawing.type === 'horizontal-line' && drawing.price && seriesRef.current) {
+            const line = seriesRef.current.createPriceLine({
+              price: drawing.price,
+              color: drawing.color,
+              lineWidth: 2,
+              lineStyle: 0,
+              axisLabelVisible: true,
+              title: '',
+            })
+            drawing.lineRef = line
+          }
+        })
+
+        drawingsRef.current = parsedDrawings
+      } catch (e) {
+        console.error('Failed to load drawings:', e)
+      }
     }
-  }, [activeDrawingTool])
+  }, [symbol])
+
+  // Handle drawing tool clicks
+  useEffect(() => {
+    if (!chartRef.current || !seriesRef.current) return
+    if (!activeDrawingTool || (activeDrawingTool !== 'horizontal-line' && activeDrawingTool !== 'vertical-line')) {
+      return
+    }
+
+    const handleChartClick = (param: MouseEventParams) => {
+      if (!param.point || !seriesRef.current) return
+
+      const price = seriesRef.current.coordinateToPrice(param.point.y)
+      if (price === null) return
+
+      const priceNum = Number(price)
+
+      // Only handle horizontal lines for now (vertical lines need more complex implementation)
+      if (activeDrawingTool === 'horizontal-line') {
+        const newDrawing: Drawing = {
+          id: crypto.randomUUID(),
+          type: 'horizontal-line',
+          price: priceNum,
+          color: '#3b82f6', // Blue color
+        }
+
+        const line = seriesRef.current!.createPriceLine({
+          price: priceNum,
+          color: newDrawing.color,
+          lineWidth: 2,
+          lineStyle: 0,
+          axisLabelVisible: true,
+          title: '',
+        })
+
+        newDrawing.lineRef = line
+
+        const updatedDrawings = [...drawingsRef.current, newDrawing]
+        drawingsRef.current = updatedDrawings
+
+        // Save to localStorage (exclude lineRef as it can't be serialized)
+        const drawingsToSave = updatedDrawings.map((drawing) => ({
+          id: drawing.id,
+          type: drawing.type,
+          price: drawing.price,
+          time: drawing.time,
+          color: drawing.color,
+        }))
+        localStorage.setItem(`chart-drawings-${symbol}`, JSON.stringify(drawingsToSave))
+
+        console.log(`Horizontal line created at price: ${priceNum.toFixed(2)}`)
+      }
+    }
+
+    chartRef.current.subscribeClick(handleChartClick)
+
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.unsubscribeClick(handleChartClick)
+      }
+    }
+  }, [activeDrawingTool, symbol])
 
   // Format symbol for display (e.g., BTCUSDT -> BTC/USDT)
   const displaySymbol = symbol.replace(/USDT?$/, match => `/${match}`)

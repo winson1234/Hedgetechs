@@ -603,15 +603,50 @@ export default function DepositTab() {
         </form>
       )}
 
-      {/* eWallet Placeholder */}
+      {/* eWallet Options */}
       {selectedTab === 'ewallet' && (
-        <div className="text-center py-12 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
-          <p className="text-slate-500 dark:text-slate-400">
-            eWallet deposits coming soon!
-          </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
-            We&apos;re working on integrating PayPal, Skrill, and other eWallets.
-          </p>
+        <div className="space-y-4">
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+            Select your preferred eWallet method:
+          </div>
+
+          {/* PayPal Option */}
+          <button
+            disabled
+            className="w-full py-4 px-6 border-2 border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/50 cursor-not-allowed opacity-60 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
+                P
+              </div>
+              <div className="text-left">
+                <div className="font-semibold text-slate-900 dark:text-slate-100">PayPal</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Fast and secure payments</div>
+              </div>
+            </div>
+            <span className="text-xs font-medium text-slate-400 dark:text-slate-600 bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded-full">
+              Coming Soon
+            </span>
+          </button>
+
+          {/* Skrill Option */}
+          <button
+            disabled
+            className="w-full py-4 px-6 border-2 border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/50 cursor-not-allowed opacity-60 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
+                S
+              </div>
+              <div className="text-left">
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Skrill</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Popular for trading</div>
+              </div>
+            </div>
+            <span className="text-xs font-medium text-slate-400 dark:text-slate-600 bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded-full">
+              Coming Soon
+            </span>
+          </button>
         </div>
       )}
     </div>

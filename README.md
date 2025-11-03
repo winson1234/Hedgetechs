@@ -126,7 +126,6 @@ frontend/src/
 **REST:** `/api/v1/klines` - Historical candlestick data  
 **REST:** `/api/v1/ticker` - 24h ticker statistics  
 **REST:** `/api/v1/news` - Aggregated news from 6 RSS sources  
-**REST:** `/api/v1/alphavantage` - Alpha Vantage analytics proxy
 
 ---
 

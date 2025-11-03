@@ -20,25 +20,28 @@ type DepositFormData = z.infer<typeof depositSchema>;
 
 type PaymentTab = 'card' | 'banking' | 'ewallet';
 
-// Stripe Elements custom styles
-const CARD_ELEMENT_OPTIONS = {
-  style: {
-    base: {
-      fontSize: '14px',
-      color: '#1e293b',
-      '::placeholder': {
-        color: '#94a3b8',
-      },
-    },
-    invalid: {
-      color: '#ef4444',
-    },
-  },
-};
-
 function DepositTab() {
   const stripe = useStripe();
   const elements = useElements();
+  
+  // Get dark mode state
+  const isDarkMode = useUIStore(state => state.isDarkMode);
+  
+  // Stripe Elements custom styles (dynamic based on dark mode)
+  const CARD_ELEMENT_OPTIONS = {
+    style: {
+      base: {
+        fontSize: '14px',
+        color: isDarkMode ? '#ffffff' : '#1e293b', // White text in dark mode, dark text in light mode
+        '::placeholder': {
+          color: isDarkMode ? '#94a3b8' : '#94a3b8',
+        },
+      },
+      invalid: {
+        color: '#ef4444',
+      },
+    },
+  };
 
   // Access stores
   const accounts = useAccountStore(state => state.accounts);

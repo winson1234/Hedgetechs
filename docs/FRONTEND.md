@@ -122,7 +122,6 @@ React-based SPA providing real-time trading interface with live price updates, i
 **State:** `quoteData`, `rsiData`, `loading`, `error`
 
 **Features:**
-- Fetches data from `/api/v1/alphavantage`
 - Global Quote: Real-time price, change, volume
 - Technical Indicators: RSI, SMA, EMA, MACD, Stochastic
 - Tabbed interface for different indicators

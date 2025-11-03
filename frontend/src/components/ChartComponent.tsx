@@ -233,6 +233,14 @@ export default function ChartComponent() {
     const candleTime = (Math.floor(tickSec / timeframeSeconds) * timeframeSeconds) as UTCTimestamp
 
     const current = lastBarRef.current
+    
+    // CRITICAL: Prevent updating with older timestamps (causes "Cannot update oldest data" error)
+    if (current && candleTime < current.time) {
+      // Ignore WebSocket updates that would create candles older than the last known candle
+      // This can happen with longer timeframes (1w, 1M) when switching timeframes
+      return
+    }
+    
     if (current && current.time === candleTime) {
       // update existing candle
       const updated: CandlestickData<UTCTimestamp> = {
@@ -255,13 +263,27 @@ export default function ChartComponent() {
         close: updated.close,
         volume: volume
       })
-    } else {
-      // new candle: create candle with open=close=price
+    } else if (current && candleTime > current.time) {
+      // new candle: only create if timestamp is newer than current
       const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
       seriesRef.current.update(newBar)
       lastBarRef.current = newBar
       
       // Initialize volume for new candle
+      volumeDataRef.current.set(candleTime, 0)
+      setOhlcv({
+        open: newBar.open,
+        high: newBar.high,
+        low: newBar.low,
+        close: newBar.close,
+        volume: 0
+      })
+    } else if (!current) {
+      // Handle case where we don't have any historical data yet
+      const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
+      seriesRef.current.update(newBar)
+      lastBarRef.current = newBar
+      
       volumeDataRef.current.set(candleTime, 0)
       setOhlcv({
         open: newBar.open,

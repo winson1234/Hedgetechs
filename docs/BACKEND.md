@@ -69,11 +69,6 @@ main.go → Hub → Binance WebSocket Streams (trades + depth) → HTTP Handlers
 **Sources:** CoinDesk, CryptoNews, CoinTelegraph, FXStreet, Investing.com, Yahoo Finance  
 **Returns:** Aggregated news articles
 
-#### HandleAlphaVantage(w, r)
-**Query:** `function`, `symbol`, `interval`, etc.  
-**Cache:** 60 seconds  
-**Purpose:** Proxy to Alpha Vantage API for analytics (RSI, SMA, EMA, MACD, Stochastic)
-
 ### config/config.go
 **Constants:**
 - Binance WebSocket URLs (trade + depth streams)
@@ -81,9 +76,6 @@ main.go → Hub → Binance WebSocket Streams (trades + depth) → HTTP Handlers
 - Alpha Vantage base URL
 - RSS feed URLs (6 sources)
 - Local server paths
-
-### services/
-**AlphaVantageService:** Handles Alpha Vantage API integration
 
 ---
 
@@ -95,7 +87,6 @@ main.go → Hub → Binance WebSocket Streams (trades + depth) → HTTP Handlers
 | `/api/v1/klines` | GET | Historical candlestick data |
 | `/api/v1/ticker` | GET | 24h ticker statistics |
 | `/api/v1/news` | GET | Aggregated news from 6 RSS sources |
-| `/api/v1/alphavantage` | GET | Alpha Vantage analytics proxy |
 
 ---
 

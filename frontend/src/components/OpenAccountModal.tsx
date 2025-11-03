@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 
 // Define expected return type from openAccount function
 type OpenAccountResult = { success: boolean; message?: string };
@@ -33,7 +33,7 @@ const externalServers = [
 ];
 
 
-export default function OpenAccountModal({
+function OpenAccountModal({
   isOpen,
   onClose,
   openAccount,
@@ -348,3 +348,6 @@ export default function OpenAccountModal({
     </div>
   );
 }
+
+// Memoize to prevent re-renders when modal is not open
+export default memo(OpenAccountModal);

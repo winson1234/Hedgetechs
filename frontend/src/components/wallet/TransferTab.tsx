@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,7 +14,7 @@ const transferSchemaBase = z.object({
 
 type TransferFormData = z.infer<typeof transferSchemaBase>;
 
-export default function TransferTab() {
+function TransferTab() {
   // Access stores
   const accounts = useAccountStore(state => state.accounts);
   const activeAccountId = useAccountStore(state => state.activeAccountId);
@@ -342,3 +342,6 @@ export default function TransferTab() {
     </div>
   );
 }
+
+// Memoize to prevent unnecessary re-renders from WebSocket updates
+export default memo(TransferTab);

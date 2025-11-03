@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -36,7 +36,7 @@ const CARD_ELEMENT_OPTIONS = {
   },
 };
 
-export default function DepositTab() {
+function DepositTab() {
   const stripe = useStripe();
   const elements = useElements();
 
@@ -653,3 +653,6 @@ export default function DepositTab() {
     </div>
   );
 }
+
+// Memoize to prevent unnecessary re-renders from WebSocket updates
+export default memo(DepositTab);

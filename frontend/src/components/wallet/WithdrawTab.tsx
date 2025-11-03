@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -17,7 +17,7 @@ const withdrawSchemaBase = z.object({
 
 type WithdrawFormData = z.infer<typeof withdrawSchemaBase>;
 
-export default function WithdrawTab() {
+function WithdrawTab() {
   // Access stores
   const accounts = useAccountStore(state => state.accounts);
   const activeAccountId = useAccountStore(state => state.activeAccountId);
@@ -260,3 +260,6 @@ export default function WithdrawTab() {
     </div>
   );
 }
+
+// Memoize to prevent unnecessary re-renders from WebSocket updates
+export default memo(WithdrawTab);

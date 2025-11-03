@@ -15,9 +15,18 @@ function DonutChartRenderer({
   liveValue,
   formatBalance,
 }: DonutChartRendererProps) {
+  // Guard against rendering before container is ready
+  if (!assetAllocations || assetAllocations.length === 0) {
+    return (
+      <div style={{ width: '100%', height: '256px' }} className="flex items-center justify-center">
+        <span className="text-sm text-slate-400">No data</span>
+      </div>
+    )
+  }
+
   return (
     <div style={{ width: '100%', height: '256px' }}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={256}>
+      <ResponsiveContainer width="100%" height={256} minWidth={200} minHeight={256} debounce={50}>
         <PieChart>
           <Pie
             data={assetAllocations}

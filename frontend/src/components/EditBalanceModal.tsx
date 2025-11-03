@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import type { Account } from '../types';
 
 // Define expected return type from edit function
@@ -16,7 +16,7 @@ type EditBalanceModalProps = {
 const MIN_DEMO_BALANCE = 100;
 const MAX_DEMO_BALANCE = 1000000;
 
-export default function EditBalanceModal({
+function EditBalanceModal({
   isOpen,
   onClose,
   account,
@@ -194,3 +194,6 @@ export default function EditBalanceModal({
     </div>
   );
 }
+
+// Memoize to prevent re-renders when modal is not open
+export default memo(EditBalanceModal);

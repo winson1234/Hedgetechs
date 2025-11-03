@@ -66,9 +66,18 @@ function AccountHoldingsRenderer({
   liveValue,
   formatBalance,
 }: AccountHoldingsRendererProps) {
+  // Guard against rendering before container is ready
+  if (!allocations || allocations.length === 0) {
+    return (
+      <div style={{ width: '100%', height: '220px' }} className="flex items-center justify-center">
+        <span className="text-sm text-slate-400">No data</span>
+      </div>
+    )
+  }
+
   return (
     <div style={{ width: '100%', height: '220px' }}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={220}>
+      <ResponsiveContainer width="100%" height={220} minWidth={200} minHeight={220} debounce={50}>
         <PieChart>
           <Pie
             data={allocations}

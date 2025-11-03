@@ -105,27 +105,30 @@ export default function AccountPage() {
     return total;
   }, [selectedAccount, selectedAccountAllocations]);
 
-  const handleOpenCreateModal = (type: 'live' | 'demo') => {
+  const handleOpenCreateModal = useCallback((type: 'live' | 'demo') => {
     setActiveTab(type);
     setIsCreateModalOpen(true);
-  };
+  }, []);
 
-  const handleOpenEditModal = (account: Account) => {
+  const handleOpenEditModal = useCallback((account: Account) => {
     if (account.type !== 'demo') return;
     setAccountToEdit(account);
     setIsEditModalOpen(true);
-  };
+  }, []);
 
-   const handleAccountCreated = (message: string) => {
+   const handleAccountCreated = useCallback((message: string) => {
     setIsCreateModalOpen(false);
     showToast(message, 'success');
-  };
+  }, [showToast]);
 
-   const handleBalanceEdited = (message: string) => {
+   const handleBalanceEdited = useCallback((message: string) => {
     setIsEditModalOpen(false);
     setAccountToEdit(null);
     showToast(message, 'success');
-  };
+  }, [showToast]);
+
+  const handleCloseCreateModal = useCallback(() => setIsCreateModalOpen(false), []);
+  const handleCloseEditModal = useCallback(() => setIsEditModalOpen(false), []);
 
   const formatDate = (timestamp: number) => {
     if (!timestamp || isNaN(timestamp)) return 'N/A';
@@ -446,8 +449,8 @@ export default function AccountPage() {
         </div>
       </div>
       {/* --- Modals --- */}
-      <OpenAccountModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} openAccount={openAccount} onAccountCreated={handleAccountCreated}/>
-      <EditBalanceModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} account={accountToEdit} editDemoBalance={editDemoBalance} onBalanceEdited={handleBalanceEdited}/>
+      <OpenAccountModal isOpen={isCreateModalOpen} onClose={handleCloseCreateModal} openAccount={openAccount} onAccountCreated={handleAccountCreated}/>
+      <EditBalanceModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} account={accountToEdit} editDemoBalance={editDemoBalance} onBalanceEdited={handleBalanceEdited}/>
     </div>
   );
 }

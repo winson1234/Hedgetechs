@@ -76,7 +76,12 @@ export default function MainSidebar() {
           page="account"
           currentPage={currentPage}
         />
-        {/* Replaced Deposit/Withdraw with Wallet */}
+        <NavLink
+          icon="trading"
+          label="Trading"
+          page="trading"
+          currentPage={currentPage}
+        />
         <NavLink
           icon="wallet"
           label="Wallet"
@@ -87,16 +92,6 @@ export default function MainSidebar() {
           icon="history"
           label="History"
           page="history"
-          currentPage={currentPage}
-        />
-      </div>
-
-      {/* Return to Trading Button */}
-      <div className="py-4 border-t border-slate-200 dark:border-slate-700">
-         <NavLink
-          icon="trading"
-          label="Trading"
-          page="trading"
           currentPage={currentPage}
         />
       </div>

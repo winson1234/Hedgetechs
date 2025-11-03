@@ -388,9 +388,26 @@ export default function ChartComponent() {
     setShowAnalyticsPanel(true)
   }
 
+  const handleClearDrawings = () => {
+    // Remove all price lines from chart
+    drawingsRef.current.forEach(drawing => {
+      if (drawing.lineRef && seriesRef.current) {
+        seriesRef.current.removePriceLine(drawing.lineRef)
+      }
+    })
+
+    // Clear from memory
+    drawingsRef.current = []
+
+    // Clear from localStorage
+    localStorage.removeItem(`chart-drawings-${symbol}`)
+
+    console.log('All drawings cleared')
+  }
+
   return (
     <div className="w-full">
-      <ChartHeader onAnalyticsClick={handleAnalyticsClick} />
+      <ChartHeader onAnalyticsClick={handleAnalyticsClick} onClearDrawings={handleClearDrawings} />
       <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-2 truncate">
         {displaySymbol} - {timeframe} (last 200)
       </div>

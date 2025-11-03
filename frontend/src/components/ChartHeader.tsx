@@ -2,9 +2,10 @@ import { useUIStore } from '../stores/uiStore'
 
 interface ChartHeaderProps {
   onAnalyticsClick?: () => void
+  onClearDrawings?: () => void
 }
 
-export default function ChartHeader({ onAnalyticsClick }: ChartHeaderProps) {
+export default function ChartHeader({ onAnalyticsClick, onClearDrawings }: ChartHeaderProps) {
   const activeTimeframe = useUIStore((state) => state.activeTimeframe)
   const setActiveTimeframe = useUIStore((state) => state.setActiveTimeframe)
   const showCustomInterval = useUIStore((state) => state.showCustomInterval)
@@ -96,6 +97,13 @@ export default function ChartHeader({ onAnalyticsClick }: ChartHeaderProps) {
           title="Analytics"
         >
           Analytics
+        </button>
+        <button
+          onClick={onClearDrawings}
+          className="px-2.5 py-1.5 text-xs sm:text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 rounded transition-colors"
+          title="Clear all drawings"
+        >
+          Clear Drawings
         </button>
         <button
           className="px-2.5 py-1.5 text-xs sm:text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded cursor-not-allowed"

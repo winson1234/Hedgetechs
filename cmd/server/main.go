@@ -18,9 +18,9 @@ func main() {
 	// Load environment variables from .env file at root directory
 	// Try multiple paths to find .env file
 	envPaths := []string{
-		filepath.Join("..", "..", ".env"),  // When run from cmd/server/
-		".env",                               // When run from project root
-		filepath.Join(".", ".env"),          // Alternative for project root
+		filepath.Join("..", "..", ".env"), // When run from cmd/server/
+		".env",                            // When run from project root
+		filepath.Join(".", ".env"),        // Alternative for project root
 	}
 
 	envLoaded := false
@@ -85,22 +85,22 @@ func main() {
 	analyticsHandler := api.NewAnalyticsHandler(forexService)
 
 	// Configure the HTTP server
-	// WebSocket handler uses the hub instance
-	http.HandleFunc(config.LocalWebSocketPath, func(w http.ResponseWriter, r *http.Request) {
+	// WebSocket handler uses the hub instance (with CORS)
+	http.HandleFunc(config.LocalWebSocketPath, api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		api.HandleWebSocket(h, w, r)
-	})
-	// REST handler for klines (with HEAD support for health checks)
-	http.HandleFunc(config.KlinesAPIPath, allowHEAD(api.HandleKlines))
-	// REST handler for 24h ticker data (with HEAD support for health checks)
-	http.HandleFunc(config.TickerAPIPath, allowHEAD(api.HandleTicker))
-	// REST handler for news feed (with HEAD support for health checks)
-	http.HandleFunc(config.NewsAPIPath, allowHEAD(api.HandleNews))
-	// REST handler for forex rates analytics (with HEAD support for health checks)
-	http.HandleFunc(config.AnalyticsAPIPath, allowHEAD(analyticsHandler.HandleAnalytics))
-	// REST handler for Stripe payment intent creation
-	http.HandleFunc(config.PaymentIntentAPIPath, api.HandleCreatePaymentIntent)
-	// REST handler for Stripe payment status check
-	http.HandleFunc(config.PaymentStatusAPIPath, api.HandlePaymentStatus)
+	}))
+	// REST handler for klines (with CORS and HEAD support for health checks)
+	http.HandleFunc(config.KlinesAPIPath, api.CORSMiddleware(allowHEAD(api.HandleKlines)))
+	// REST handler for 24h ticker data (with CORS and HEAD support for health checks)
+	http.HandleFunc(config.TickerAPIPath, api.CORSMiddleware(allowHEAD(api.HandleTicker)))
+	// REST handler for news feed (with CORS and HEAD support for health checks)
+	http.HandleFunc(config.NewsAPIPath, api.CORSMiddleware(allowHEAD(api.HandleNews)))
+	// REST handler for forex rates analytics (with CORS and HEAD support for health checks)
+	http.HandleFunc(config.AnalyticsAPIPath, api.CORSMiddleware(allowHEAD(analyticsHandler.HandleAnalytics)))
+	// REST handler for Stripe payment intent creation (with CORS)
+	http.HandleFunc(config.PaymentIntentAPIPath, api.CORSMiddleware(api.HandleCreatePaymentIntent))
+	// REST handler for Stripe payment status check (with CORS)
+	http.HandleFunc(config.PaymentStatusAPIPath, api.CORSMiddleware(api.HandlePaymentStatus))
 
 	// Start the HTTP server on the configured port
 	log.Fatal(http.ListenAndServe(serverAddress, nil))

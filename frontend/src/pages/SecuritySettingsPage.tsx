@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
 import './securitySettings.css';
 
@@ -15,9 +13,7 @@ interface Device {
 }
 
 export default function SecuritySettingsPage() {
-  const { user, logout } = useAuthStore();
-  const { isDarkMode, setDarkMode } = useUIStore();
-  const navigate = useNavigate();
+  const { isDarkMode } = useUIStore();
 
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [showTFAModal, setShowTFAModal] = useState(false);
@@ -67,17 +63,6 @@ export default function SecuritySettingsPage() {
     }
     return () => clearInterval(timer);
   }, [showTFAModal, timeLeft]);
-
-  const handleThemeToggle = () => {
-    setDarkMode(!isDarkMode);
-  };
-
-  const handleLogout = () => {
-    if (confirm('Are you sure you want to logout?')) {
-      logout();
-      navigate('/login');
-    }
-  };
 
   const generateOTP = () => {
     const newOTP = Math.floor(100000 + Math.random() * 900000).toString();
@@ -165,15 +150,6 @@ export default function SecuritySettingsPage() {
     setToastMessage(message);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 4000);
-  };
-
-  const getInitials = (name: string) => {
-    if (!name) return 'JD';
-    const names = name.trim().split(' ');
-    if (names.length >= 2) {
-      return (names[0][0] + names[names.length - 1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
   };
 
   return (

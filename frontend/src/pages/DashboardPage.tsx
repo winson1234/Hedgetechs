@@ -398,7 +398,7 @@ export default function DashboardPage() {
       <section className="market-section" id="market">
         <div className="container">
           <div className="section-header">
-            <h2 className="section-title">Today's Cryptocurrency Prices</h2>
+            <h2 className="section-title">Today&apos;s Cryptocurrency Prices</h2>
             <p className="section-subtitle">
               The global crypto market cap is <span className="market-cap-value">$2.89T</span> with 24h volume of <span className="market-volume-value">$120B</span>
             </p>

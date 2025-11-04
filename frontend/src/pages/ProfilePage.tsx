@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
 import './profile.css';
 
 export default function ProfilePage() {
-  const { user, logout } = useAuthStore();
-  const { isDarkMode, setDarkMode } = useUIStore();
+  const { user } = useAuthStore();
+  const { isDarkMode } = useUIStore();
   const navigate = useNavigate();
 
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
@@ -101,10 +101,6 @@ export default function ProfilePage() {
     return name.substring(0, 2).toUpperCase();
   };
 
-  const handleThemeToggle = () => {
-    setDarkMode(!isDarkMode);
-  };
-
   const handleChangePhoto = () => {
     photoInputRef.current?.click();
   };
@@ -119,13 +115,6 @@ export default function ProfilePage() {
         showSuccessMessage('Profile picture updated successfully!');
       };
       reader.readAsDataURL(file);
-    }
-  };
-
-  const handleLogout = () => {
-    if (confirm('Are you sure you want to logout?')) {
-      logout();
-      navigate('/login');
     }
   };
 

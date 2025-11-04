@@ -26,11 +26,11 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     if (closedRef.current) return
     setConnecting(true)
     // In dev, connect directly to local backend
-    // In production, connect to Render backend
+    // In production, connect to Fly.io backend
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     const isDev = typeof import.meta !== 'undefined' && !!import.meta.env && import.meta.env.DEV
-    const url = isDev ? 'ws://localhost:8080/ws' : 'wss://brokerageproject.onrender.com/ws'
+    const url = isDev ? 'ws://localhost:8080/ws' : 'wss://brokerageproject.fly.dev/ws'
     const ws = new WebSocket(url)
     wsRef.current = ws
 

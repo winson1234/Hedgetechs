@@ -15,8 +15,8 @@ Comprehensive cryptocurrency trading platform with real-time market data, multi-
 
 **Backend (Go)**
 ```bash
-go mod tidy                    # Install dependencies
-go build -o server ./cmd/server # Build binary
+go mod tidy                     # Install dependencies
+go build                        # Build binary
 cd cmd/server && go run main.go # Run server
 go test ./...                   # Run tests
 ```

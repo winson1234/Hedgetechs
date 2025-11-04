@@ -3,7 +3,6 @@ package main
 import (
 	"brokerageProject/internal/api"
 	"brokerageProject/internal/binance"
-	"brokerageProject/internal/coingecko"
 	"brokerageProject/internal/config"
 	"brokerageProject/internal/hub"
 	"brokerageProject/internal/services"
@@ -75,22 +74,10 @@ func main() {
 	h := hub.NewHub()
 	go h.Run()
 
-	// Check if running on Render (has PORT env var and no local indicators)
-	isRenderEnv := os.Getenv("RENDER") == "true" || (os.Getenv("PORT") != "" && os.Getenv("PORT") != "8080")
-
-	if isRenderEnv {
-		// On Render: Use CoinGecko API (Binance blocks US cloud IPs with HTTP 451)
-		log.Println("Render environment detected - using CoinGecko API for market data")
-		symbols := []string{"BTCUSDT", "ETHUSDT", "SOLUSDT", "EURUSDT"}
-		go coingecko.PollCoinGeckoPrices(h, symbols)
-	} else {
-		// Local development: Use Binance WebSocket streams
-		log.Println("Local environment - using Binance WebSocket streams")
-		// Start listening to the Binance stream and pass messages to the hub
-		go binance.StreamTrades(h)
-		// Start listening to the Binance depth stream for order book data
-		go binance.StreamDepth(h)
-	}
+	// Start Binance WebSocket streams for real-time market data
+	log.Println("Starting Binance WebSocket streams")
+	go binance.StreamTrades(h)
+	go binance.StreamDepth(h)
 
 	// Initialize forex service using Frankfurter API (free, no API key required)
 	log.Println("Initializing forex service with Frankfurter API (no API key required)")

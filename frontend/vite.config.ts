@@ -2,9 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-// Use localhost for development, Render for production preview
+// Use localhost for development, Fly.io for production preview
 const isDev = process.env.NODE_ENV !== 'production'
-const BACKEND_URL = isDev ? 'http://localhost:8080' : 'https://brokerageproject.onrender.com'
+const BACKEND_URL = isDev ? 'http://localhost:8080' : 'https://brokerageproject.fly.dev'
 
 // https://vitejs.dev/config/
 export default defineConfig({

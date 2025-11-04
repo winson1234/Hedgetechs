@@ -1,0 +1,35 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Frontend
+frontend/
+*.html
+*.css
+*.js
+*.ts
+*.tsx
+*.json
+
+# Environment
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# Build artifacts
+*.exe
+*.test
+*.out
+
+# Dependencies
+node_modules/
+
+# Cloudflare
+.wrangler/

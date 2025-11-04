@@ -4,6 +4,7 @@ import (
 	"brokerageProject/internal/config"
 	"brokerageProject/internal/hub" // Import local hub package
 	"brokerageProject/internal/models"
+	"crypto/tls"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -18,15 +19,30 @@ func StreamTrades(h *hub.Hub) {
 	backoff := 1 * time.Second
 	maxBackoff := 60 * time.Second
 
+	// Create a custom dialer with TLS config and timeout
+	dialer := &websocket.Dialer{
+		HandshakeTimeout: 45 * time.Second,
+		TLSClientConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
+	}
+
 	for {
 		// Attempt to connect with proper headers
 		headers := http.Header{}
-		headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-		headers.Add("Origin", "https://www.binance.com")
+		headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+		headers.Add("Accept-Encoding", "gzip, deflate, br")
+		headers.Add("Accept-Language", "en-US,en;q=0.9")
+		headers.Add("Cache-Control", "no-cache")
+		headers.Add("Pragma", "no-cache")
 
-		conn, _, err := websocket.DefaultDialer.Dial(config.BinanceWebSocketURL, headers)
+		conn, resp, err := dialer.Dial(config.BinanceWebSocketURL, headers)
 		if err != nil {
-			log.Printf("Binance dial error: %v. Reconnecting in %s", err, backoff)
+			if resp != nil {
+				log.Printf("Binance dial error: %v (HTTP %d). Reconnecting in %s", err, resp.StatusCode, backoff)
+			} else {
+				log.Printf("Binance dial error: %v. Reconnecting in %s", err, backoff)
+			}
 			time.Sleep(backoff)
 			backoff *= 2
 			if backoff > maxBackoff {
@@ -122,15 +138,30 @@ func StreamDepth(h *hub.Hub) {
 	backoff := 1 * time.Second
 	maxBackoff := 60 * time.Second
 
+	// Create a custom dialer with TLS config and timeout
+	dialer := &websocket.Dialer{
+		HandshakeTimeout: 45 * time.Second,
+		TLSClientConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
+	}
+
 	for {
 		// Attempt to connect with proper headers
 		headers := http.Header{}
-		headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-		headers.Add("Origin", "https://www.binance.com")
+		headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+		headers.Add("Accept-Encoding", "gzip, deflate, br")
+		headers.Add("Accept-Language", "en-US,en;q=0.9")
+		headers.Add("Cache-Control", "no-cache")
+		headers.Add("Pragma", "no-cache")
 
-		conn, _, err := websocket.DefaultDialer.Dial(config.BinanceDepthStreamURL, headers)
+		conn, resp, err := dialer.Dial(config.BinanceDepthStreamURL, headers)
 		if err != nil {
-			log.Printf("Binance depth dial error: %v. Reconnecting in %s", err, backoff)
+			if resp != nil {
+				log.Printf("Binance depth dial error: %v (HTTP %d). Reconnecting in %s", err, resp.StatusCode, backoff)
+			} else {
+				log.Printf("Binance depth dial error: %v. Reconnecting in %s", err, backoff)
+			}
 			time.Sleep(backoff)
 			backoff *= 2
 			if backoff > maxBackoff {

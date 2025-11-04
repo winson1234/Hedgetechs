@@ -231,7 +231,7 @@ function getInitials(name) {
 function handleLogout() {
     if (confirm("Are you sure you want to logout?")) {
         localStorage.removeItem("loggedInUser");
-        window.location.href = "../login/login.html";
+        window.location.href = "/dashboard.html";
     }
 }
 

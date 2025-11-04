@@ -14,6 +14,12 @@ export default function ProfileDropdown({
 }: ProfileDropdownProps) {
   const navigate = useNavigate();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState<{text: string; type: 'success' | 'error'} | null>(null);
+  const [passwordStrength, setPasswordStrength] = useState<{strength: string; class: string} | null>(null);
 
   // Access stores
   const activeAccountId = useAccountStore(state => state.activeAccountId);
@@ -25,6 +31,11 @@ export default function ProfileDropdown({
 
   const handleLogOut = () => {
     setShowLogoutModal(true);
+    closeDropdown();
+  };
+
+  const handleChangePassword = () => {
+    setShowChangePasswordModal(true);
     closeDropdown();
   };
 
@@ -49,6 +60,108 @@ export default function ProfileDropdown({
 
   const cancelLogout = () => {
     setShowLogoutModal(false);
+  };
+
+  const checkPasswordStrength = (password: string) => {
+    let strength = 0;
+    if (password.length >= 8) strength++;
+    if (password.length >= 12) strength++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+    if (/\d/.test(password)) strength++;
+    if (/[^a-zA-Z0-9]/.test(password)) strength++;
+
+    if (strength <= 2) return { strength: 'Weak', class: 'weak' };
+    else if (strength <= 4) return { strength: 'Medium', class: 'medium' };
+    else return { strength: 'Strong', class: 'strong' };
+  };
+
+  const handleNewPasswordChange = (value: string) => {
+    setNewPassword(value);
+    if (value) {
+      setPasswordStrength(checkPasswordStrength(value));
+    } else {
+      setPasswordStrength(null);
+    }
+  };
+
+  const handleSavePassword = () => {
+    // Get logged-in user
+    const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+    
+    if (!loggedInUser.email) {
+      setPasswordMessage({ text: 'User not found. Please log in again.', type: 'error' });
+      return;
+    }
+
+    // Get users array (this is where passwords are stored)
+    let users;
+    try {
+      users = JSON.parse(localStorage.getItem('users') || '[]');
+    } catch {
+      setPasswordMessage({ text: 'Unable to read user data.', type: 'error' });
+      return;
+    }
+
+    // Find the current user
+    const currentUser = users.find((u: any) => u.email === loggedInUser.email);
+    
+    if (!currentUser) {
+      setPasswordMessage({ text: 'User not found in database.', type: 'error' });
+      return;
+    }
+
+    console.log('Current user password:', currentUser.password, 'Input:', currentPassword);
+
+    // Validate current password
+    if (currentPassword !== currentUser.password) {
+      setPasswordMessage({ text: 'Current password is incorrect.', type: 'error' });
+      return;
+    }
+
+    // Prevent same password
+    if (newPassword === currentUser.password) {
+      setPasswordMessage({ text: 'New password cannot be the same as the old one.', type: 'error' });
+      return;
+    }
+
+    // Match validation
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({ text: 'New passwords do not match.', type: 'error' });
+      return;
+    }
+
+    // Length validation
+    if (newPassword.length < 6) {
+      setPasswordMessage({ text: 'Password must be at least 6 characters long.', type: 'error' });
+      return;
+    }
+
+    // Update password in users array
+    const userIndex = users.findIndex((u: any) => u.email === loggedInUser.email);
+    if (userIndex !== -1) {
+      users[userIndex].password = newPassword;
+      try {
+        localStorage.setItem('users', JSON.stringify(users));
+      } catch {
+        setPasswordMessage({ text: 'Failed to save password. Try again.', type: 'error' });
+        return;
+      }
+    }
+
+    // Show success and close
+    setPasswordMessage({ text: 'Password updated successfully!', type: 'success' });
+    setTimeout(() => {
+      handleCancelChangePassword();
+    }, 1500);
+  };
+
+  const handleCancelChangePassword = () => {
+    setShowChangePasswordModal(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordMessage(null);
+    setPasswordStrength(null);
   };
 
   const handleProfileClick = () => {
@@ -86,6 +199,113 @@ export default function ProfileDropdown({
       </span>
     );
   };
+
+  // Show change password modal
+  if (showChangePasswordModal) {
+    return (
+      <div 
+        className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        onClick={handleCancelChangePassword}
+      >
+        <div 
+          className="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-md w-[90%] shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6 text-center">
+            Change Password
+          </h3>
+
+          {/* Current Password */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Current Password
+            </label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Enter current password"
+              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* New Password */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              New Password
+            </label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => handleNewPasswordChange(e.target.value)}
+              placeholder="Enter new password"
+              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            {/* Password Strength Indicator */}
+            {passwordStrength && (
+              <div className="mt-2">
+                <div className="h-1 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-300 ${
+                      passwordStrength.class === 'weak' ? 'w-1/3 bg-red-500' :
+                      passwordStrength.class === 'medium' ? 'w-2/3 bg-yellow-500' :
+                      'w-full bg-green-500'
+                    }`}
+                  />
+                </div>
+                <p className={`text-xs mt-1 font-medium ${
+                  passwordStrength.class === 'weak' ? 'text-red-500' :
+                  passwordStrength.class === 'medium' ? 'text-yellow-500' :
+                  'text-green-500'
+                }`}>
+                  {passwordStrength.strength}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Confirm Password */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Retype Password
+            </label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter new password"
+              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* Message */}
+          {passwordMessage && (
+            <div className={`text-center text-sm font-medium mb-4 ${
+              passwordMessage.type === 'success' ? 'text-green-500' : 'text-red-500'
+            }`}>
+              {passwordMessage.text}
+            </div>
+          )}
+
+          {/* Buttons */}
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={handleCancelChangePassword}
+              className="px-6 py-3 rounded-lg font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSavePassword}
+              className="px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-br from-indigo-500 to-indigo-700 hover:from-indigo-600 hover:to-indigo-800 hover:-translate-y-0.5 transition shadow-lg hover:shadow-indigo-500/40"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show logout modal
   if (showLogoutModal) {
@@ -159,6 +379,17 @@ export default function ProfileDropdown({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
           <span>Profile</span>
+        </button>
+
+        {/* Change Password Button */}
+        <button
+          onClick={handleChangePassword}
+          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+        >
+          <svg className="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          </svg>
+          <span>Change Password</span>
         </button>
 
         {/* Settings Button */}

@@ -82,9 +82,9 @@ function setupProfileDropdown(profileData) {
     item.addEventListener("click", (e) => {
       e.preventDefault();
       const itemText = item.textContent.trim();
-      if (itemText === "My Profile") window.location.href = "../profile/profile.html";
-      else if (itemText === "Accounts") window.location.href = "accounts.html";
-      else if (itemText === "Settings") window.location.href = "../securitysettings/securitySettings.html";
+      if (itemText === "My Profile") window.location.href = "/profile.html";
+      else if (itemText === "Accounts") window.location.href = "/";
+      else if (itemText === "Settings") window.location.href = "/securitySettings.html";
       else if (itemText === "Logout") handleLogout();
     });
   });
@@ -110,7 +110,7 @@ function handleLogout() {
 
       setTimeout(() => {
         // Redirect after animation ends
-        window.location.href = "../dashboard/dashboard.html";
+        window.location.href = "/dashboard.html";
       }, 400);
     }, 1000);
   }
@@ -647,13 +647,13 @@ authButtons.forEach(button => {
         button.addEventListener('click', (e) => {
             if (!button.closest('.hero-cta') && !button.closest('.faq-cta-buttons')) {
                 e.preventDefault();
-                window.location.href = '../login/login.html';
+                window.location.href = '/login.html';
             }
         });
     } else if (button.textContent === 'Sign Up' && !button.closest('.hero-cta')) {
         button.addEventListener('click', (e) => {
             e.preventDefault();
-            window.location.href = '../register/register.html';
+            window.location.href = '/register.html';
         });
     }
 });

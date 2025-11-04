@@ -106,11 +106,11 @@ function setupProfileDropdown() {
             const itemText = item.textContent.trim();
             
             if (itemText === "My Profile") {
-                window.location.href = "../profile/profile.html";
+                window.location.href = "/profile.html";
             } else if (itemText === "Accounts") {
-                window.location.href = "../accounts/accounts.html";
+                window.location.href = "/";
             } else if (itemText === "Settings") {
-                window.location.href = "../securitysettings/securitySettings.html";
+                window.location.href = "/securitySettings.html";
             } else if (itemText === "Logout") {
                 handleLogout();
             }
@@ -138,7 +138,7 @@ function setupProfileDropdown() {
 
       setTimeout(() => {
         // Redirect after animation ends
-        window.location.href = "../dashboard/dashboard.html";
+        window.location.href = "/dashboard.html";
       }, 400);
     }, 1000);
   }

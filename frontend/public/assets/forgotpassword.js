@@ -207,5 +207,5 @@ form.addEventListener('submit', (e) => {
 // Client login button
 clientLoginBtn.addEventListener('click', (e) => {
   e.preventDefault();
-    window.location.href = '../login/login.html';
+    window.location.href = '/login.html';
 });

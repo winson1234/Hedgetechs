@@ -3,6 +3,7 @@ package main
 import (
 	"brokerageProject/internal/api"
 	"brokerageProject/internal/binance"
+	"brokerageProject/internal/coingecko"
 	"brokerageProject/internal/config"
 	"brokerageProject/internal/hub"
 	"brokerageProject/internal/services"
@@ -78,13 +79,13 @@ func main() {
 	isRenderEnv := os.Getenv("RENDER") == "true" || (os.Getenv("PORT") != "" && os.Getenv("PORT") != "8080")
 
 	if isRenderEnv {
-		// On Render: Use REST API polling fallback due to potential IP blocking
-		log.Println("Render environment detected - using REST API polling for market data")
+		// On Render: Use CoinGecko API (Binance blocks US cloud IPs with HTTP 451)
+		log.Println("Render environment detected - using CoinGecko API for market data")
 		symbols := []string{"BTCUSDT", "ETHUSDT", "SOLUSDT", "EURUSDT"}
-		go binance.PollMarketData(h, symbols)
+		go coingecko.PollCoinGeckoPrices(h, symbols)
 	} else {
-		// Local development: Use WebSocket streams
-		log.Println("Local environment - using WebSocket streams")
+		// Local development: Use Binance WebSocket streams
+		log.Println("Local environment - using Binance WebSocket streams")
 		// Start listening to the Binance stream and pass messages to the hub
 		go binance.StreamTrades(h)
 		// Start listening to the Binance depth stream for order book data

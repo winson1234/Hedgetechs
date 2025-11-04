@@ -49,7 +49,7 @@ export default function SecuritySettingsPage() {
 
   // Countdown timer for OTP
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setInterval>;
     if (showTFAModal && timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => {

@@ -2523,6 +2523,7 @@ body {
     color: var(--text-primary);
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -2530,6 +2531,7 @@ body {
 .news-item.featured .news-title {
     font-size: 28px;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
 }
 
 .news-excerpt {
@@ -2539,6 +2541,7 @@ body {
     margin-bottom: 16px;
     display: -webkit-box;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }

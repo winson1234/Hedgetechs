@@ -1,5 +1,4 @@
-import type { Page } from '../types';
-import { useUIStore } from '../stores/uiStore';
+import { Link, useLocation } from 'react-router-dom';
 
 // Icon component for navigation links
 const NavIcon = ({ iconName }: { iconName: string }) => {
@@ -39,38 +38,42 @@ const NavIcon = ({ iconName }: { iconName: string }) => {
 type NavLinkProps = {
   icon: string;
   label: string;
-  page: Page;
-  currentPage: Page;
+  to: string;
+  isActive: boolean;
   disabled?: boolean;
 };
 
-const NavLink = ({ icon, label, page, currentPage, disabled = false }: NavLinkProps) => {
-  const navigateTo = useUIStore(state => state.navigateTo);
-  const isActive = currentPage === page;
+const NavLink = ({ icon, label, to, isActive, disabled = false }: NavLinkProps) => {
+  if (disabled) {
+    return (
+      <div
+        title={`${label} (Coming soon)`}
+        className="flex flex-col items-center justify-center w-full h-20 transition-colors opacity-50 cursor-not-allowed text-slate-500 dark:text-slate-400"
+      >
+        <NavIcon iconName={icon} />
+        <span className="text-xs font-medium mt-1">{label}</span>
+      </div>
+    );
+  }
 
   return (
-    <button
-      onClick={() => !disabled && navigateTo(page)}
-      disabled={disabled}
-      title={disabled ? `${label} (Coming soon)` : label}
+    <Link
+      to={to}
       className={`flex flex-col items-center justify-center w-full h-20 transition-colors ${
         isActive
           ? 'text-indigo-600 dark:text-indigo-400'
           : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-      } ${
-        disabled
-          ? 'opacity-50 cursor-not-allowed'
-          : ''
       }`}
     >
       <NavIcon iconName={icon} />
       <span className="text-xs font-medium mt-1">{label}</span>
-    </button>
+    </Link>
   );
 };
 
 export default function MainSidebar() {
-  const currentPage = useUIStore(state => state.currentPage);
+  const location = useLocation();
+
   return (
     <nav className="fixed left-0 top-[60px] z-40 flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-sm w-24 h-[calc(100vh-60px)]">
       {/* Navigation Links */}
@@ -78,32 +81,32 @@ export default function MainSidebar() {
         <NavLink
           icon="dashboard"
           label="Dashboard"
-          page="dashboard"
-          currentPage={currentPage}
+          to="/dashboard"
+          isActive={location.pathname === '/' || location.pathname === '/dashboard'}
         />
         <NavLink
           icon="account"
           label="Account"
-          page="account"
-          currentPage={currentPage}
+          to="/account"
+          isActive={location.pathname === '/account'}
         />
         <NavLink
           icon="trading"
           label="Trading"
-          page="trading"
-          currentPage={currentPage}
+          to="/trading"
+          isActive={location.pathname === '/trading'}
         />
         <NavLink
           icon="wallet"
           label="Wallet"
-          page="wallet"
-          currentPage={currentPage}
+          to="/wallet"
+          isActive={location.pathname === '/wallet'}
         />
         <NavLink
           icon="history"
           label="History"
-          page="history"
-          currentPage={currentPage}
+          to="/history"
+          isActive={location.pathname === '/history'}
         />
       </div>
     </nav>

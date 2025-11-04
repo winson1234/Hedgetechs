@@ -101,9 +101,6 @@ function DepositTab() {
             if (processedPayments.current.has(paymentIntentId)) {
               console.log('Payment already processed, skipping:', paymentIntentId);
               setIsProcessing(false);
-              // Clean up URL and navigate to history
-              window.history.replaceState({}, document.title, '/wallet');
-              useUIStore.getState().setCurrentPage('wallet');
               return;
             }
 
@@ -143,9 +140,7 @@ function DepositTab() {
               if (result.success) {
                 showToast('FPX payment successful!', 'success');
 
-                // Navigate to History page to show the transaction
-                window.history.replaceState({}, document.title, '/wallet');
-                useUIStore.getState().setCurrentPage('wallet');
+                // Transaction processed successfully
               } else {
                 showToast(result.message, 'error');
                 // Clean up URL
@@ -345,8 +340,7 @@ function DepositTab() {
                 }
                 showToast('Deposit successful!', 'success');
 
-                // Navigate to Wallet/History page to show the transaction
-                useUIStore.getState().setCurrentPage('wallet');
+                // Transaction processed successfully
               } else {
                 showToast(result.message, 'error');
               }

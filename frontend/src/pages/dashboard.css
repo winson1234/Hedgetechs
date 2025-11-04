@@ -1,3 +1,16 @@
+/* Smooth Scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Force Section Title Size */
+.market-section .section-title,
+.news-section .section-title,
+.trust-section .section-title,
+.faq-section .section-title {
+  font-size: 64px !important;
+}
+
 /* Profile Dropdown */
 .profile-container {
   position: relative;
@@ -847,7 +860,7 @@ body.light-mode .hero-title {
 }
 
 .section-title {
-    font-size: 48px;
+    font-size: 48px !important;
     font-weight: 700;
     margin-bottom: 16px;
     line-height: 1.2;
@@ -1643,7 +1656,7 @@ body.light-mode .hero-title {
     }
     
     .section-title {
-        font-size: 40px;
+        font-size: 56px;
     }
 }
 
@@ -1744,12 +1757,12 @@ body.light-mode .hero-title {
     }
     
     .section-title {
-        font-size: 32px;
+        font-size: 48px;
     }
     
     .payout-title,
     .features-main-title {
-        font-size: 32px;
+        font-size: 48px;
     }
     
     .payout-desc,
@@ -1837,7 +1850,7 @@ body.light-mode .hero-title {
     }
     
     .section-title {
-        font-size: 28px;
+        font-size: 36px;
     }
     
     .feature-card,
@@ -1912,7 +1925,7 @@ body {
 }
 
 .section-title {
-    font-size: 48px;
+    font-size: 48px !important;
     font-weight: 700;
     margin-bottom: 16px;
     line-height: 1.2;
@@ -2109,7 +2122,7 @@ body {
     }
 
     .section-title {
-        font-size: 32px;
+        font-size: 40px;
     }
 
     .section-subtitle {
@@ -2156,7 +2169,7 @@ body {
 
 @media (max-width: 480px) {
     .section-title {
-        font-size: 28px;
+        font-size: 32px;
     }
 
     .faq-question {
@@ -2253,7 +2266,7 @@ body {
 }
 
 .section-title {
-    font-size: 48px;
+    font-size: 48px !important;
     font-weight: 700;
     margin-bottom: 8px;
     line-height: 1.2;

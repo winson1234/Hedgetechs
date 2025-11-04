@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ProfileDropdown from './ProfileDropdown';
 import { useUIStore } from '../stores/uiStore';
 import { useAccountStore } from '../stores/accountStore';
 
 export default function Header() {
+  const navigate = useNavigate();
+
   // Access stores
   const isDarkMode = useUIStore(state => state.isDarkMode);
   const setDarkMode = useUIStore(state => state.setDarkMode);
-  const navigateTo = useUIStore(state => state.navigateTo);
+  const setActiveWalletTab = useUIStore(state => state.setActiveWalletTab);
 
   const getActiveUsdBalance = useAccountStore(state => state.getActiveUsdBalance);
   const getActiveAccountCurrency = useAccountStore(state => state.getActiveAccountCurrency);
@@ -55,7 +58,10 @@ export default function Header() {
           
           {/* Updated "Deposit" to "Funds" and changed onClick */}
           <button
-            onClick={() => navigateTo('wallet', 'deposit')}
+            onClick={() => {
+              setActiveWalletTab('deposit');
+              navigate('/wallet');
+            }}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded text-sm font-medium transition"
           >
             Funds

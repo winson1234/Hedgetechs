@@ -1,4 +1,6 @@
+import { useNavigate } from 'react-router-dom';
 import { useAccountStore } from '../stores/accountStore';
+import { useAuthStore } from '../stores/authStore';
 
 type ProfileDropdownProps = {
   isOpen: boolean;
@@ -9,41 +11,44 @@ export default function ProfileDropdown({
   isOpen,
   closeDropdown,
 }: ProfileDropdownProps) {
+  const navigate = useNavigate();
+
   // Access stores
   const activeAccountId = useAccountStore(state => state.activeAccountId);
   const getActiveAccount = useAccountStore(state => state.getActiveAccount);
+  const logout = useAuthStore(state => state.logout);
 
   const activeAccount = getActiveAccount();
   const activeAccountType = activeAccount?.type;
   if (!isOpen) return null;
 
   const handleLogOut = () => {
-    // 1. Clear auth key
-    localStorage.removeItem('loggedInUser');
-
-    // 2. Clear all Zustand persisted stores
+    // 1. Clear all Zustand persisted stores
     localStorage.removeItem('account-store');
     localStorage.removeItem('order-store');
     localStorage.removeItem('transaction-storage');
     localStorage.removeItem('ui-store');
 
-    // 3. Clear FX rate cache
+    // 2. Clear FX rate cache
     localStorage.removeItem('fx_rates_cache');
     localStorage.removeItem('fx_rates_cache_time');
 
-    // 4. Close dropdown and redirect to dashboard
+    // 3. Logout and close dropdown
+    logout(); // This clears 'loggedInUser' from localStorage and updates auth state
     closeDropdown();
-    window.location.href = '/dashboard.html';
+
+    // 4. Navigate to login
+    navigate('/login');
   };
 
   const handleProfileClick = () => {
     closeDropdown();
-    window.location.href = '/profile.html';
+    navigate('/profile');
   };
 
   const handleSettingsClick = () => {
     closeDropdown();
-    window.location.href = '/securitySettings.html';
+    navigate('/settings/security');
   };
 
   const accountId = activeAccountId || 'No Account';

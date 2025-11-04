@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Account } from '../types';
 import { useAssetPrices } from '../hooks/useAssetPrices';
 import { useUIStore } from '../stores/uiStore';
@@ -17,6 +18,8 @@ const ArrowUpTrayIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fill="no
 type AccountTab = 'live' | 'demo';
 
 export default function AccountPage() {
+  const navigate = useNavigate();
+
   // Access stores
   const accounts = useAccountStore(state => state.accounts);
   const activeAccountId = useAccountStore(state => state.activeAccountId);
@@ -24,7 +27,7 @@ export default function AccountPage() {
   const openAccount = useAccountStore(state => state.openAccount);
   const editDemoBalance = useAccountStore(state => state.editDemoBalance);
   const toggleAccountStatus = useAccountStore(state => state.toggleAccountStatus);
-  const navigateTo = useUIStore(state => state.navigateTo);
+  const setActiveWalletTab = useUIStore(state => state.setActiveWalletTab);
   const showToast = useUIStore(state => state.showToast);
 
   // Get asset prices
@@ -378,7 +381,10 @@ export default function AccountPage() {
                             {/* Deposit Button - only for live accounts */}
                             {selectedAccount.type !== 'demo' && (
                                 <button
-                                    onClick={() => navigateTo('wallet', 'deposit')}
+                                    onClick={() => {
+                                      setActiveWalletTab('deposit');
+                                      navigate('/wallet');
+                                    }}
                                     className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                     disabled={selectedAccount.status !== 'active'}
                                     title={selectedAccount.status !== 'active' ? 'Account must be active' : 'Navigate to Deposit'}
@@ -390,7 +396,10 @@ export default function AccountPage() {
                             {/* Withdraw Button - only for live accounts */}
                             {selectedAccount.type !== 'demo' && (
                                 <button
-                                    onClick={() => navigateTo('wallet', 'withdraw')}
+                                    onClick={() => {
+                                      setActiveWalletTab('withdraw');
+                                      navigate('/wallet');
+                                    }}
                                     className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-md transition-colors border border-slate-200 dark:border-slate-600 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                     disabled={selectedAccount.status !== 'active'}
                                     title={selectedAccount.status !== 'active' ? 'Account must be active' : 'Navigate to Withdraw'}

@@ -1,10 +1,10 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { useUIStore } from '../stores/uiStore'
 
 export default function LeftToolbar() {
   const activeDrawingTool = useUIStore(state => state.activeDrawingTool)
   const setActiveDrawingTool = useUIStore(state => state.setActiveDrawingTool)
-  const navigateTo = useUIStore(state => state.navigateTo)
 
   const handleToolClick = (toolId: string) => {
     // Toggle tool - if already active, deactivate it
@@ -68,8 +68,8 @@ export default function LeftToolbar() {
   return (
     <div className="fixed left-0 top-[60px] z-40 flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-sm w-14 h-[calc(100vh-60px)]">
       {/* Dashboard/Home Button */}
-      <button
-        onClick={() => navigateTo('dashboard')}
+      <Link
+        to="/dashboard"
         className="w-full h-14 flex items-center justify-center border-b border-slate-200 dark:border-slate-800 transition-colors flex-shrink-0 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200"
         title="Dashboard"
         aria-label="Go to Dashboard"
@@ -77,7 +77,7 @@ export default function LeftToolbar() {
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
         </svg>
-      </button>
+      </Link>
       
       {/* Drawing Tools */}
       {drawingTools.map((tool) => (

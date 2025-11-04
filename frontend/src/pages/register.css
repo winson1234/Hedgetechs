@@ -1,0 +1,354 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.register-page {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+}
+
+.register-page .background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background: linear-gradient(180deg, #F9D387D9 20%, #C76D00 100%), url('/assets/images/home_login_page.jpg');
+    z-index: 1;
+}
+
+.register-page .header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #1a1a1a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  z-index: 100;
+}
+
+.register-page .logo {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.register-page .logo .fp {
+  color: #ffffff;
+  font-weight: 800;
+  font-style: oblique 10deg;
+}
+
+.register-page .logo .markets {
+  color: #FDDB92;
+  font-weight: 600;
+  font-style: oblique 10deg;
+}
+
+.register-page .name-group {
+  display: flex;
+  gap: 10px; /* space between first and last name */
+}
+
+.register-page .name-field {
+  flex: 1; /* each input takes equal width */
+  display: flex;
+  flex-direction: column;
+}
+
+.register-page .client-login-btn {
+  background: linear-gradient(90deg, #C76D00 50%, #FDDB92 90%, #E8C988 100%);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.register-page .client-login-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.register-page .container {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  padding: 80px 20px 40px;
+}
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.register-page .card {
+  background-color: #fff;
+  width: 100%;
+  max-width: 420px;
+  padding: 40px 35px;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  margin: auto;
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.register-page .card h1 {
+  font-size: 28px;
+  color: #000;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.register-page .card > p {
+  color: #666;
+  margin-bottom: 30px;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.register-page .form-group {
+  margin-bottom: 20px;
+  text-align: left;
+  position: relative;
+}
+
+.register-page .form-label {
+  color: #000000;
+  font-size: 13px;
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.register-page .form-label .required {
+  color: #e74c3c;
+  margin-left: 2px;
+}
+
+.register-page .card input,
+.register-page .card select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+  background: #fafafa;
+  color: #333;
+  transition: all 0.3s ease;
+  font-family: 'Lato', sans-serif;
+}
+
+.register-page .card select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 40px;
+}
+
+.register-page .password-wrapper {
+  position: relative;
+}
+
+.register-page .password-wrapper input {
+  padding-right: 45px;
+}
+
+.register-page .eye-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #666;
+  transition: color 0.3s ease;
+  width: 20px;
+  height: 20px;
+}
+
+.register-page .eye-icon:hover {
+  color: #C76D00;
+}
+
+.register-page .card input:focus,
+.register-page .card select:focus {
+  outline: none;
+  border-color: #C76D00;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(199, 109, 0, 0.1);
+}
+
+.register-page .card input::placeholder {
+  color: #aaa;
+}
+
+.register-page .password-strength {
+  margin-top: 8px;
+  font-size: 12px;
+  display: none;
+}
+
+.register-page .password-strength.show {
+  display: block;
+}
+
+.register-page .strength-bar {
+  height: 4px;
+  background: #e0e0e0;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 5px;
+}
+
+.register-page .strength-bar-fill {
+  height: 100%;
+  width: 0%;
+  transition: all 0.3s ease;
+  border-radius: 2px;
+}
+
+.register-page .strength-bar-fill.weak {
+  width: 33%;
+  background: #e74c3c;
+}
+
+.register-page .strength-bar-fill.medium {
+  width: 66%;
+  background: #f39c12;
+}
+
+.register-page .strength-bar-fill.strong {
+  width: 100%;
+  background: #27ae60;
+}
+
+.register-page .strength-text {
+  font-weight: 500;
+}
+
+.register-page .strength-text.weak {
+  color: #e74c3c;
+}
+
+.register-page .strength-text.medium {
+  color: #f39c12;
+}
+
+.register-page .strength-text.strong {
+  color: #27ae60;
+}
+
+.register-page .error-message {
+  color: #e74c3c;
+  font-size: 12px;
+  margin-top: 5px;
+  display: none;
+}
+
+.register-page .error-message.show {
+  display: block;
+}
+
+.register-page .card button {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 25px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  background: linear-gradient(90deg, #C76D00 50%, #FDDB92 90%, #E8C988 100%);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+  box-shadow: 0 4px 15px rgba(199, 109, 0, 0.3);
+}
+
+.register-page .card button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(199, 109, 0, 0.4);
+}
+
+.register-page .card button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.register-page .signin-link {
+  display: block;
+  margin-top: 20px;
+  color: #1e88e5;
+  font-size: 13px;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.register-page .signin-link:hover {
+  text-decoration: underline;
+}
+
+.register-page .terms-text {
+  font-size: 12px;
+  color: #666;
+  margin-top: 15px;
+  line-height: 1.5;
+}
+
+.register-page .terms-text a {
+  color: #C76D00;
+  text-decoration: none;
+}
+
+.register-page .terms-text a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .register-page .header {
+    padding: 0 20px;
+  }
+
+  .register-page .card {
+    width: 95%;
+    padding: 35px 25px;
+  }
+
+  .register-page .card h1 {
+    font-size: 24px;
+  }
+}

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Page, WalletTab, ToastState } from '../types'
+import type { WalletTab, ToastState } from '../types'
 
 interface UIStore {
   // Theme
@@ -26,11 +26,6 @@ interface UIStore {
   // Drawing Tools
   activeDrawingTool: string | null
   setActiveDrawingTool: (tool: string | null) => void
-
-  // Navigation
-  currentPage: Page
-  setCurrentPage: (page: Page) => void
-  navigateTo: (page: Page, walletTab?: WalletTab) => void
 
   // Wallet
   activeWalletTab: WalletTab
@@ -83,16 +78,6 @@ export const useUIStore = create<UIStore>()(
       activeDrawingTool: null,
       setActiveDrawingTool: (tool) => set({ activeDrawingTool: tool }),
 
-      // Navigation
-      currentPage: 'trading',
-      setCurrentPage: (page) => set({ currentPage: page }),
-      navigateTo: (page, walletTab) => {
-        set({ currentPage: page })
-        if (walletTab) {
-          set({ activeWalletTab: walletTab })
-        }
-      },
-
       // Wallet
       activeWalletTab: 'overview',
       setActiveWalletTab: (tab) => set({ activeWalletTab: tab }),
@@ -107,10 +92,9 @@ export const useUIStore = create<UIStore>()(
     }),
     {
       name: 'ui-store',
-      // Persist theme, page navigation, and wallet tab
+      // Persist theme and wallet tab
       partialize: (state) => ({
         isDarkMode: state.isDarkMode,
-        currentPage: state.currentPage,
         activeWalletTab: state.activeWalletTab
       }),
     }

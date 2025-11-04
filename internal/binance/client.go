@@ -6,6 +6,7 @@ import (
 	"brokerageProject/internal/models"
 	"encoding/json"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -18,8 +19,12 @@ func StreamTrades(h *hub.Hub) {
 	maxBackoff := 60 * time.Second
 
 	for {
-		// Attempt to connect
-		conn, _, err := websocket.DefaultDialer.Dial(config.BinanceWebSocketURL, nil)
+		// Attempt to connect with proper headers
+		headers := http.Header{}
+		headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+		headers.Add("Origin", "https://www.binance.com")
+
+		conn, _, err := websocket.DefaultDialer.Dial(config.BinanceWebSocketURL, headers)
 		if err != nil {
 			log.Printf("Binance dial error: %v. Reconnecting in %s", err, backoff)
 			time.Sleep(backoff)
@@ -118,8 +123,12 @@ func StreamDepth(h *hub.Hub) {
 	maxBackoff := 60 * time.Second
 
 	for {
-		// Attempt to connect
-		conn, _, err := websocket.DefaultDialer.Dial(config.BinanceDepthStreamURL, nil)
+		// Attempt to connect with proper headers
+		headers := http.Header{}
+		headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+		headers.Add("Origin", "https://www.binance.com")
+
+		conn, _, err := websocket.DefaultDialer.Dial(config.BinanceDepthStreamURL, headers)
 		if err != nil {
 			log.Printf("Binance depth dial error: %v. Reconnecting in %s", err, backoff)
 			time.Sleep(backoff)

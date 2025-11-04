@@ -14,7 +14,7 @@ export type Account = {
   server?: string
 }
 
-export type Page = 'trading' | 'account' | 'wallet' | 'history'
+export type Page = 'dashboard' | 'trading' | 'account' | 'wallet' | 'history'
 
 export type WalletTab = 'overview' | 'deposit' | 'withdraw' | 'transfer'
 

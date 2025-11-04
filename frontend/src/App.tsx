@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { getApiUrl } from './config/api';
 import LivePriceDisplay from './components/LivePriceDisplay';
 import ChartComponent from './components/ChartComponent';
@@ -16,6 +16,7 @@ import WalletPage from './pages/WalletPage';
 import HistoryPage from './pages/HistoryPage';
 import { usePriceStore } from './stores/priceStore';
 import { useUIStore } from './stores/uiStore';
+import type { Page } from './types';
 
 export default function App() {
   // Access stores
@@ -24,6 +25,62 @@ export default function App() {
   const activeInstrument = useUIStore(state => state.activeInstrument);
   const toast = useUIStore(state => state.toast);
   const hideToast = useUIStore(state => state.hideToast);
+  
+  // Track if we've already handled initial navigation
+  const hasInitialized = useRef(false);
+
+  // On initial load, check URL parameters and handle routing FIRST (before any redirects)
+  useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const pageParam = urlParams.get('page');
+    
+    if (pageParam) {
+      // If there's a page parameter, navigate to that page
+      const validPages: Page[] = ['dashboard', 'trading', 'account', 'wallet', 'history'];
+      if (validPages.includes(pageParam as Page)) {
+        useUIStore.getState().setCurrentPage(pageParam as Page);
+        // Clean up URL by removing the page parameter
+        window.history.replaceState({}, '', '/');
+        return; // Don't do any dashboard redirect
+      }
+    }
+    
+    // No page parameter - check if this is direct access to root
+    const isDirectAccess = window.location.pathname === '/' || window.location.pathname === '/index.html';
+    const referrer = document.referrer;
+    const fromHtmlPage = referrer && (
+      referrer.includes('/dashboard.html') ||
+      referrer.includes('/profile.html') || 
+      referrer.includes('/securitySettings.html') ||
+      referrer.includes('/login.html') ||
+      referrer.includes('/register.html')
+    );
+    
+    // Only redirect to dashboard if it's a direct access without referrer from HTML pages
+    if (isDirectAccess && !fromHtmlPage) {
+      window.location.href = '/dashboard.html';
+    }
+  }, []); // Run only once on mount
+
+  // Redirect to dashboard.html if currentPage is set to 'dashboard' (from MainSidebar/LeftToolbar)
+  useEffect(() => {
+    // Only redirect if initialization is done and user explicitly navigated to dashboard
+    if (hasInitialized.current && currentPage === 'dashboard') {
+      window.location.href = '/dashboard.html';
+    }
+  }, [currentPage]);
+
+  // Initialize dark mode from localStorage theme
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      const isDark = savedTheme === 'dark';
+      useUIStore.getState().setDarkMode(isDark);
+    }
+  }, []);
 
   // Hydrate price store with 24h ticker data on mount
   useEffect(() => {

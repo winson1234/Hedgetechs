@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trading Profile - FPMarkets</title>
     <link rel="stylesheet" href="/assets/profile.css">
+    <script>
+        // Initialize theme before page renders to prevent flash
+        (function() {
+            const theme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+            if (theme === 'light') {
+                document.body.classList.add('light-mode');
+            } else {
+                document.body.classList.add('dark-mode');
+            }
+        })();
+    </script>
 </head>
 <body>
     <!-- Fixed Header -->
@@ -18,12 +30,12 @@
                 </div>
                 
                 <nav class="nav-menu">
-                    <a href="#market" class="nav-link">Markets</a>
-                    <a href="#trade" class="nav-link">Trade</a>
-                    <a href="#news" class="nav-link">News</a>
-                    <a href="#features" class="nav-link">Features</a>
-                    <a href="#about" class="nav-link">About</a>
-                    <a href="#faq" class="nav-link">FAQ</a>
+                    <a href="/dashboard.html#market" class="nav-link">Markets</a>
+                    <a href="/?page=trading" class="nav-link">Trade</a>
+                    <a href="/dashboard.html#news" class="nav-link">News</a>
+                    <a href="/dashboard.html#features" class="nav-link">Features</a>
+                    <a href="/dashboard.html#about" class="nav-link">About</a>
+                    <a href="/dashboard.html#faq" class="nav-link">FAQ</a>
                 </nav>
 
                 <div class="nav-actions">
@@ -60,7 +72,7 @@
                                     </svg>
                                     My Profile
                                 </a>
-                                <a href="/" class="dropdown-item">
+                                <a href="/?page=account" class="dropdown-item">
                                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
                                     </svg>
@@ -74,7 +86,7 @@
                                     Settings
                                 </a>
                                 <div class="dropdown-divider"></div>
-                                <a href="#" class="dropdown-item" id="logoutBtn">
+                                <a href="/login.html" class="dropdown-item" id="logoutBtn">
                                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
                                     </svg>
@@ -174,7 +186,7 @@
             <div class="profile-card">
                 <div class="card-header">
                     <h2 class="card-title">Security Settings</h2>
-                    <button class="edit-link" onclick="window.location.href='../securitysettings/securitySettings.html'">Manage</button>
+                    <button class="edit-link" onclick="window.location.href='/securitySettings.html'">Manage</button>
                 </div>
                 
                 <div class="security-item">

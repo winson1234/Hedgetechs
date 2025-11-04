@@ -49,7 +49,19 @@ export const useUIStore = create<UIStore>()(
     (set) => ({
       // Theme
       isDarkMode: true,
-      setDarkMode: (isDark) => set({ isDarkMode: isDark }),
+      setDarkMode: (isDark) => {
+        set({ isDarkMode: isDark });
+        // Sync with HTML pages theme
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        // Apply theme to document
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+          document.body.classList.add('dark-mode');
+        } else {
+          document.documentElement.classList.remove('dark');
+          document.body.classList.remove('dark-mode');
+        }
+      },
 
       // Chart settings
       activeTimeframe: '1h',

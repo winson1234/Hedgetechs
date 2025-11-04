@@ -3,7 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FP Markets - Sign In</title>
+  <title>FP Markets - Sign In</title>
+  <script>
+    // Initialize theme before page renders to prevent flash
+    (function() {
+        const theme = localStorage.getItem('theme') || 'dark';
+        if (theme === 'light') {
+            document.documentElement.classList.add('light-mode');
+        } else {
+            document.documentElement.classList.add('dark-mode');
+        }
+    })();
+  </script>
   <script type="module" crossorigin src="/assets/login-mqjL20uB.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
   <link rel="stylesheet" crossorigin href="/assets/login-Kt7fwDMe.css">
@@ -30,7 +41,7 @@
           <label class="form-label">Password</label>
           <input type="password" class="form-input" required>
           <div class="forgot-password">
-            <a href="#" id="forgotPasswordLink">Forgot Password?</a>
+            <a href="/forgotPassword.html" id="forgotPasswordLink">Forgot Password?</a>
           </div>
         </div>
 
@@ -40,13 +51,14 @@
       <div class="signup-section">
         <p class="signup-text">Don't have an account?</p>
         <div class="signup-links">
-          <a href="#" id="registerDemoLink">Open a Demo Account</a>
+          <a href="/register.html" id="registerDemoLink">Open a Demo Account</a>
           <span>|</span>
-          <a href="#">Open a Real Account</a>
+          <a href="/register.html">Open a Real Account</a>
         </div>
       </div>
     </div>
   </div>
-
+
+
 </body>
 </html>

@@ -80,12 +80,12 @@ function setupProfileDropdown(profileData) {
   // Handle dropdown item clicks
   document.querySelectorAll(".dropdown-item").forEach(item => {
     item.addEventListener("click", (e) => {
-      e.preventDefault();
       const itemText = item.textContent.trim();
-      if (itemText === "My Profile") window.location.href = "/profile.html";
-      else if (itemText === "Accounts") window.location.href = "/";
-      else if (itemText === "Settings") window.location.href = "/securitySettings.html";
-      else if (itemText === "Logout") handleLogout();
+      if (itemText === "Logout") {
+        e.preventDefault();
+        handleLogout();
+      }
+      // For other items, let the default href behavior work
     });
   });
 }

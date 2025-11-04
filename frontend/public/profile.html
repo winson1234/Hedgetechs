@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Profile - FPMarkets</title>
+    <link rel="stylesheet" href="/assets/profile.css">
+</head>
+<body>
+    <!-- Fixed Header -->
+    <header class="header">
+        <div class="container">
+            <div class="nav-wrapper">
+                <div class="logo">
+                    <a href="/dashboard.html">
+                        <span class="logo-text">FP<span class="logo-accent">Markets</span></span>
+                    </a>
+                </div>
+                
+                <nav class="nav-menu">
+                    <a href="#market" class="nav-link">Markets</a>
+                    <a href="#trade" class="nav-link">Trade</a>
+                    <a href="#news" class="nav-link">News</a>
+                    <a href="#features" class="nav-link">Features</a>
+                    <a href="#about" class="nav-link">About</a>
+                    <a href="#faq" class="nav-link">FAQ</a>
+                </nav>
+
+                <div class="nav-actions">
+                    <!-- Theme Toggle -->
+                    <button class="icon-btn" id="themeToggle" title="Toggle Theme">
+                        <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+
+                    <!-- Profile -->
+                    <div class="profile-container">
+                        <div class="profile-icon" id="profileIcon">JD</div>
+                        <div class="profile-dropdown" id="profileDropdown">
+                            <div class="dropdown-header">
+                                <div class="dropdown-username">John Doe</div>
+                                <div class="dropdown-email">john.doe@fpmarkets.com</div>
+                            </div>
+                            <div class="dropdown-menu">
+                                <a href="/profile.html" class="dropdown-item">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                    </svg>
+                                    My Profile
+                                </a>
+                                <a href="/" class="dropdown-item">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                                    </svg>
+                                    Accounts
+                                </a>
+                                <a href="/securitySettings.html" class="dropdown-item">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                    Settings
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a href="#" class="dropdown-item" id="logoutBtn">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                    </svg>
+                                    Logout
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmationModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <h3>Confirm Changes</h3>
+            <p>Are you sure you want to save these changes?</p>
+            <div class="modal-actions">
+                <button id="confirmSaveBtn" class="confirm-btn">Confirm</button>
+                <button id="cancelSaveBtn" class="cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="main-content">
+        <div class="profile-header">
+            <div class="profile-top">
+                <div class="profile-left">
+                    <div class="profile-avatar-container">
+                        <div class="profile-avatar" id="profileAvatar">
+                            <img id="profileImage" style="display: none; width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                            <span id="profileInitials">JD</span>
+                        </div>
+                        <button class="change-photo-btn" id="changePhotoBtn">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
+                            </svg>
+                        </button>
+                        <input type="file" id="photoInput" accept="image/*" style="display: none;">
+                    </div>
+                    <div class="profile-info">
+                        <h1>John Doe</h1>
+                        <p>📧 john.doe@fpmarkets.com</p>
+                        <p>📱 +1 (555) 123-4567</p>
+                        <span class="verification-badge">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                            Verified Account
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="account-stats">
+                <div class="stat-item">
+                    <div class="stat-value">2 Yrs</div>
+                    <div class="stat-label">Member Since</div>
+                </div>
+                
+                <div class="stat-item">
+                    <div class="stat-value">✓ Verified</div>
+                    <div class="stat-label">Verification Status</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-grid">
+            <div class="profile-card">
+                <div class="card-header">
+                    <h2 class="card-title">Personal Information</h2>
+                    <button class="edit-link">Edit Profile</button>
+                </div>
+                
+                <div class="info-section">
+                    <h3 class="section-title">Contact Details</h3>
+                    <div class="info-row">
+                        <span class="info-label">Full Name</span>
+                        <span class="info-value">John Doe</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Email Address</span>
+                        <span class="info-value">john.doe@fpmarkets.com</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Phone Number</span>
+                        <span id="phoneDisplay" class="info-value"></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Country</span>
+                        <span class="info-value">United States</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-card">
+                <div class="card-header">
+                    <h2 class="card-title">Security Settings</h2>
+                    <button class="edit-link" onclick="window.location.href='../securitysettings/securitySettings.html'">Manage</button>
+                </div>
+                
+                <div class="security-item">
+                    <div class="security-info">
+                        <div class="security-icon">🔐</div>
+                        <div class="security-text">
+                            <h4>Two-Factor Authentication</h4>
+                            <p>Enabled via SMS</p>
+                        </div>
+                    </div>
+                    <button class="toggle-btn"></button>
+                </div>
+
+                <div class="security-item">
+                    <div class="security-info">
+                        <div class="security-icon">📧</div>
+                        <div class="security-text">
+                            <h4>Email Notifications</h4>
+                            <p>Trade alerts enabled</p>
+                        </div>
+                    </div>
+                    <button class="toggle-btn"></button>
+                </div>
+
+                <div class="security-item">
+                    <div class="security-info">
+                        <div class="security-icon">🔔</div>
+                        <div class="security-text">
+                            <h4>Login Alerts</h4>
+                            <p>New device notifications</p>
+                        </div>
+                    </div>
+                    <button class="toggle-btn"></button>
+                </div>
+
+                <button class="confirm-btn" onclick="openChangePasswordModal()">Change Password</button>
+            </div>
+
+            <div class="profile-card">
+                <div class="card-header">
+                    <h2 class="card-title">Language & Region</h2>
+                    <button class="edit-link">Edit</button>
+                </div>
+                
+                <div class="info-section">
+                    <div class="info-row">
+                        <span class="info-label">Language</span>
+                        <span class="info-value">English (US)</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Timezone</span>
+                        <span class="info-value">GMT+8 (Kuala Lumpur)</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Currency Display</span>
+                        <span class="info-value">USD ($)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Change Password Modal -->
+    <div id="changePasswordModal" class="modal-overlay" style="display:none;">
+        <div class="password-modal-box">
+            <h3>Change Password</h3>
+
+            <div class="form-group">
+                <label for="currentPassword">Current Password</label>
+                <input type="password" id="currentPassword" placeholder="Enter current password">
+            </div>
+
+            <div class="form-group">
+                <label for="newPassword">New Password</label>
+                <input type="password" id="newPassword" placeholder="Enter new password">
+            </div>
+            <div class="password-strength">
+                <div class="strength-bar">
+                    <div class="strength-bar-fill"></div>
+                </div>
+                <div class="strength-text"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="retypePassword">Retype Password</label>
+                <input type="password" id="retypePassword" placeholder="Re-enter new password">
+            </div>
+
+            <div class="modal-actions">
+                <button id="cancelPasswordBtn" class="cancel-btn">Cancel</button>
+                <button id="savePasswordBtn" class="confirm-btn">Reset</button>
+            </div>
+
+            <div id="passwordMessage" class="message"></div>
+        </div>
+    </div>
+
+    <script src="/assets/profile.js"></script>
+</body>
+</html>

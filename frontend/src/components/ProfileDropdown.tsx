@@ -1,4 +1,3 @@
-import { useUIStore } from '../stores/uiStore';
 import { useAccountStore } from '../stores/accountStore';
 
 type ProfileDropdownProps = {
@@ -11,7 +10,6 @@ export default function ProfileDropdown({
   closeDropdown,
 }: ProfileDropdownProps) {
   // Access stores
-  const navigateTo = useUIStore(state => state.navigateTo);
   const activeAccountId = useAccountStore(state => state.activeAccountId);
   const getActiveAccount = useAccountStore(state => state.getActiveAccount);
 
@@ -38,9 +36,9 @@ export default function ProfileDropdown({
     window.location.href = '/login.html';
   };
 
-  const handleAccountClick = () => {
-    navigateTo('account');
+  const handleProfileClick = () => {
     closeDropdown();
+    window.location.href = '/profile.html';
   };
 
   const accountId = activeAccountId || 'No Account';
@@ -93,15 +91,15 @@ export default function ProfileDropdown({
 
       {/* Menu Items */}
       <div className="py-2">
-        {/* Account Button */}
+        {/* Profile Button */}
         <button
-          onClick={handleAccountClick}
+          onClick={handleProfileClick}
           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
         >
           <svg className="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
-          <span>Account</span>
+          <span>Profile</span>
         </button>
 
         {/* Log Out Button */}

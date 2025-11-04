@@ -3,7 +3,6 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { getApiUrl } from '../config/api';
 import Header from './Header';
 import MainSidebar from './MainSidebar';
-import LeftToolbar from './LeftToolbar';
 import AnalyticsPanel from './AnalyticsPanel';
 import ToastNotification from './ToastNotification';
 import { usePriceStore } from '../stores/priceStore';
@@ -48,14 +47,14 @@ export default function AppLayout() {
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         <Header />
 
-        {/* Show LeftToolbar for trading page, MainSidebar for other pages */}
-        {isTradingPage ? <LeftToolbar /> : <MainSidebar />}
+        {/* Main Sidebar for all pages */}
+        <MainSidebar />
 
         {/* Show AnalyticsPanel only on trading page */}
         {isTradingPage && <AnalyticsPanel />}
 
         {/* Main Content Area */}
-        <div className={isTradingPage ? 'ml-14 pt-[60px]' : 'ml-24 pt-[60px]'}>
+        <div className="ml-24 pt-[60px]">
           <Outlet />
         </div>
 

@@ -4,6 +4,7 @@ import { WebSocketContext } from '../context/WebSocketContext'
 import type { PriceMessage } from '../hooks/useWebSocket'
 import { useUIStore } from '../stores/uiStore'
 import ChartHeader from './ChartHeader'
+import FloatingDrawingToolbar from './FloatingDrawingToolbar'
 import { getApiUrl } from '../config/api'
 
 type Kline = {
@@ -436,6 +437,9 @@ export default function ChartComponent() {
       </div>
       <div className="relative overflow-hidden w-full" style={{ height: '500px' }}>
         <div ref={ref} className="w-full h-full" />
+
+        {/* Floating Drawing Toolbar */}
+        <FloatingDrawingToolbar />
 
         {isLoading && (
           <div className="absolute inset-0 bg-slate-300/70 dark:bg-slate-700/70 flex items-center justify-center pointer-events-none z-10">

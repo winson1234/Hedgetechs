@@ -30,7 +30,7 @@ HTTP Handlers → CORS Middleware → Cache → External APIs
 - Starts Binance trade and depth streams
 - Initializes Frankfurter forex service
 - Registers HTTP/WebSocket handlers with CORS middleware
-- HEAD request support for UptimeRobot health checks
+- HEAD request support for health checks
 - Starts server on port from `PORT` env var (fallback: `8080`)
 
 ### hub/hub.go
@@ -151,27 +151,15 @@ go test -v ./internal/api         # Test handlers with verbose output
 go test -cover ./...              # Run with coverage report
 ```
 
----
-
-## Environment Variables
-
-Required for Stripe payment processing:
-```
-STRIPE_SECRET_KEY=sk_test_...
-```
-
-Place in `.env` file at project root.
-
----
-
 ## Deployment
 
-**Platform:** Render  
-**Service Type:** Web Service  
-**Build Command:** `go build -o server ./cmd/server`  
-**Start Command:** `./server`  
-**Live URL:** https://brokerageproject.onrender.com  
-**Health Monitoring:** UptimeRobot (HEAD requests to all endpoints)
+**Platform:** Fly.io
+**Region:** Frankfurt, Germany (fra)
+**Build:** Multi-stage Dockerfile (Go 1.23-alpine)
+**VM:** 256MB RAM, 1 shared CPU
+**Live URL:** https://brokerageproject.fly.dev
+**Health Check:** TCP probe on port 8080 every 15s
+**Auto-scaling:** Min 1 machine running, auto-start enabled
 
 ---
 

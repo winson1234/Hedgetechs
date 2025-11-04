@@ -1,13 +1,13 @@
 # Brokerage Platform
 
-Comprehensive cryptocurrency trading platform with real-time market data, multi-account management, wallet operations with Stripe payments, transaction history, and technical analysis.
+Comprehensive cryptocurrency trading platform with authentication, real-time market data, multi-account management, wallet operations with Stripe payments, transaction history, and technical analysis.
 
 ---
 
 ## Live Deployment
 
-**Frontend:** [https://brokerageproject.pages.dev](https://brokerageproject.pages.dev) (Cloudflare Pages)  
-**Backend:** [https://brokerageproject.onrender.com](https://brokerageproject.onrender.com) (Render)
+**Frontend:** [https://brokerageproject.pages.dev](https://brokerageproject.pages.dev) (Cloudflare Pages)
+**Backend:** [https://brokerageproject.fly.dev](https://brokerageproject.fly.dev) (Fly.io)
 
 ---
 
@@ -17,7 +17,7 @@ Comprehensive cryptocurrency trading platform with real-time market data, multi-
 ```bash
 go mod tidy                     # Install dependencies
 go build                        # Build binary
-cd cmd/server && go run main.go # Run server
+cd cmd/server; go run main.go # Run server
 go test ./...                   # Run tests
 ```
 
@@ -27,6 +27,7 @@ cd frontend
 pnpm install          # Install dependencies
 pnpm run dev          # Start dev server (http://localhost:5173)
 pnpm run typecheck    # TypeScript type checking
+pnpm run lint         # Lint codebase
 pnpm run build        # Production build
 ```
 
@@ -35,9 +36,9 @@ pnpm run build        # Production build
 ## Architecture
 
 ```
-Frontend (React + Zustand)
+Frontend (React + React Router + Zustand)
     ↓ WebSocket + REST (CORS-enabled)
-Backend (Go + Hub Pattern)
+Backend (Go + Hub Pattern) on Fly.io
     ↓
 ├─ Binance WebSocket (trades + depth)
 ├─ Binance REST API (klines, ticker)
@@ -73,14 +74,25 @@ frontend/src/
   │   ├── InstrumentsPanel.tsx            # Tradable assets
   │   ├── NewsPanel.tsx                   # Multi-source news
   │   ├── AnalyticsPanel.tsx              # Technical indicators
-  │   ├── AccountPage.tsx                 # Multi-account management
+  │   ├── AccountPage.tsx                 # Trading account management
   │   ├── MainSidebar.tsx                 # Navigation sidebar
+  │   ├── ProtectedRoute.tsx              # Route authentication guard
+  │   ├── PublicRoute.tsx                 # Public route handler
+  │   ├── AppLayout.tsx                   # Layout wrapper
   │   ├── wallet/                         # Deposit/Withdraw/Transfer
   │   └── market/                         # Trading history
   ├── pages/
+  │   ├── DashboardPage.tsx               # Public landing page
+  │   ├── LoginPage.tsx                   # User login
+  │   ├── RegisterPage.tsx                # User registration
+  │   ├── ForgotPasswordPage.tsx          # Password recovery
+  │   ├── ProfilePage.tsx                 # User profile
+  │   ├── SecuritySettingsPage.tsx        # Security settings
+  │   ├── TradingPage.tsx                 # Trading interface
   │   ├── WalletPage.tsx                  # Wallet operations
   │   └── HistoryPage.tsx                 # Transaction history
   ├── stores/                             # Zustand state management
+  │   ├── authStore.ts                    # Authentication state
   │   ├── accountStore.ts                 # Multi-account + balances
   │   ├── orderStore.ts                   # Pending orders + history
   │   ├── priceStore.ts                   # Real-time prices
@@ -88,16 +100,17 @@ frontend/src/
   │   └── uiStore.ts                      # UI state + navigation
   ├── context/WebSocketContext.tsx        # WebSocket manager
   ├── config/api.ts                       # API URL configuration
-  └── App.tsx                             # Multi-page layout
+  └── App.tsx                             # React Router configuration
 ```
 
 ---
 
 ## Tech Stack
 
-**Backend:** Go 1.25.3, gorilla/websocket, go-cache, Stripe Go SDK  
-**Frontend:** React 18, TypeScript 5, Vite 5, Tailwind CSS, lightweight-charts, Zustand, Stripe.js, Recharts  
+**Backend:** Go 1.23, gorilla/websocket, go-cache, Stripe Go SDK, godotenv
+**Frontend:** React 18, TypeScript 5, Vite 5, React Router 6, Tailwind CSS, lightweight-charts, Zustand, Stripe.js, Recharts
 **APIs:** Binance (WebSocket + REST), Frankfurter (forex), Stripe (payments), RSS Feeds
+**Deployment:** Fly.io (backend), Cloudflare Pages (frontend)
 
 ### External APIs
 - **Binance WebSocket**: Real-time trade data and order book depth (4 symbols)
@@ -112,9 +125,18 @@ frontend/src/
 
 ## Features
 
+### Authentication & User Management
+- **Public Landing Page**: Market overview, news, FAQ section
+- **User Registration**: Email-based signup with validation
+- **User Login**: Session-based authentication with localStorage
+- **Password Recovery**: Forgot password functionality
+- **Profile Management**: Edit user information and settings
+- **Security Settings**: Password change, 2FA toggle
+- **Protected Routes**: Authentication-guarded trading pages
+
 ### Multi-Page Application
 - **Trading Page**: Real-time charts, order execution, market data
-- **Account Page**: Multi-account management with portfolio visualization
+- **Account Page**: Trading account management with portfolio visualization
 - **Wallet Page**: Deposit (Stripe), withdraw, transfer operations
 - **History Page**: Transaction history with filtering and analytics
 
@@ -196,14 +218,9 @@ frontend/src/
 
 ## Environment Variables
 
-Create `.env` file at project root (see `env.example`):
+Create `.env` file at project root:
 
-**Backend:**
 ```
 STRIPE_SECRET_KEY=sk_test_...
-```
-
-**Frontend (.env.local):**
-```
 VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```

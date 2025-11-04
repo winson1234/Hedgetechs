@@ -74,10 +74,22 @@ func main() {
 	h := hub.NewHub()
 	go h.Run()
 
-	// Start listening to the Binance stream and pass messages to the hub
-	go binance.StreamTrades(h)
-	// Start listening to the Binance depth stream for order book data
-	go binance.StreamDepth(h)
+	// Check if running on Render (has PORT env var and no local indicators)
+	isRenderEnv := os.Getenv("RENDER") == "true" || (os.Getenv("PORT") != "" && os.Getenv("PORT") != "8080")
+
+	if isRenderEnv {
+		// On Render: Use REST API polling fallback due to potential IP blocking
+		log.Println("Render environment detected - using REST API polling for market data")
+		symbols := []string{"BTCUSDT", "ETHUSDT", "SOLUSDT", "EURUSDT"}
+		go binance.PollMarketData(h, symbols)
+	} else {
+		// Local development: Use WebSocket streams
+		log.Println("Local environment - using WebSocket streams")
+		// Start listening to the Binance stream and pass messages to the hub
+		go binance.StreamTrades(h)
+		// Start listening to the Binance depth stream for order book data
+		go binance.StreamDepth(h)
+	}
 
 	// Initialize forex service using Frankfurter API (free, no API key required)
 	log.Println("Initializing forex service with Frankfurter API (no API key required)")

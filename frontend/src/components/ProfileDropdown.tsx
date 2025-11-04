@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccountStore } from '../stores/accountStore';
 import { useAuthStore } from '../stores/authStore';
@@ -12,6 +13,7 @@ export default function ProfileDropdown({
   closeDropdown,
 }: ProfileDropdownProps) {
   const navigate = useNavigate();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Access stores
   const activeAccountId = useAccountStore(state => state.activeAccountId);
@@ -20,9 +22,13 @@ export default function ProfileDropdown({
 
   const activeAccount = getActiveAccount();
   const activeAccountType = activeAccount?.type;
-  if (!isOpen) return null;
 
   const handleLogOut = () => {
+    setShowLogoutModal(true);
+    closeDropdown();
+  };
+
+  const confirmLogout = () => {
     // 1. Clear all Zustand persisted stores
     localStorage.removeItem('account-store');
     localStorage.removeItem('order-store');
@@ -33,12 +39,16 @@ export default function ProfileDropdown({
     localStorage.removeItem('fx_rates_cache');
     localStorage.removeItem('fx_rates_cache_time');
 
-    // 3. Logout and close dropdown
+    // 3. Logout
     logout(); // This clears 'loggedInUser' from localStorage and updates auth state
-    closeDropdown();
+    setShowLogoutModal(false);
 
     // 4. Navigate to login
     navigate('/login');
+  };
+
+  const cancelLogout = () => {
+    setShowLogoutModal(false);
   };
 
   const handleProfileClick = () => {
@@ -76,6 +86,45 @@ export default function ProfileDropdown({
       </span>
     );
   };
+
+  // Show logout modal
+  if (showLogoutModal) {
+    return (
+      <div 
+        className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        onClick={cancelLogout}
+      >
+        <div 
+          className="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-md w-[90%] shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">
+            Confirm Logout
+          </h3>
+          <p className="text-base text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
+            Are you sure you want to logout?
+          </p>
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={cancelLogout}
+              className="px-6 py-3 rounded-lg font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmLogout}
+              className="px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-br from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 hover:-translate-y-0.5 transition shadow-lg hover:shadow-red-500/40"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't show dropdown if not open
+  if (!isOpen) return null;
 
   return (
     <div

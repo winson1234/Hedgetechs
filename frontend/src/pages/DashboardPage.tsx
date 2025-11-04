@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import './dashboard.css';
 
 export default function DashboardPage() {
   const { isLoggedIn, user, logout } = useAuthStore();
+  const navigate = useNavigate();
   const [activeMarketTab, setActiveMarketTab] = useState('popular');
   const [activeNewsTab, setActiveNewsTab] = useState('all');
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
@@ -13,6 +14,22 @@ export default function DashboardPage() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('EN');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const handleLogout = () => {
+    setShowLogoutModal(true);
+    setProfileDropdownOpen(false);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
+    logout();
+    navigate('/login');
+  };
+
+  const cancelLogout = () => {
+    setShowLogoutModal(false);
+  };
 
   useEffect(() => {
     document.body.className = theme === 'dark' ? 'dark-mode' : 'light-mode';
@@ -206,7 +223,7 @@ export default function DashboardPage() {
                           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                           </svg>
-                          My Profile
+                          Profile
                         </Link>
                         <Link to="/account" className="dropdown-item">
                           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -222,7 +239,7 @@ export default function DashboardPage() {
                           Settings
                         </Link>
                         <div className="dropdown-divider"></div>
-                        <button onClick={logout} className="dropdown-item">
+                        <button onClick={handleLogout} className="dropdown-item">
                           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
                           </svg>
@@ -796,6 +813,24 @@ export default function DashboardPage() {
           </div>
         </div>
       </footer>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="logout-confirmation-overlay" onClick={cancelLogout}>
+          <div className="logout-confirmation-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Confirm Logout</h3>
+            <p>Are you sure you want to logout?</p>
+            <div className="logout-confirmation-buttons">
+              <button onClick={cancelLogout} className="logout-cancel-btn">
+                Cancel
+              </button>
+              <button onClick={confirmLogout} className="logout-confirm-btn">
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

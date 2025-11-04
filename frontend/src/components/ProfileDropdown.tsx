@@ -94,7 +94,7 @@ export default function ProfileDropdown({
     }
 
     // Get users array (this is where passwords are stored)
-    let users;
+    let users: Array<{email: string; password: string}>;
     try {
       users = JSON.parse(localStorage.getItem('users') || '[]');
     } catch {
@@ -103,7 +103,7 @@ export default function ProfileDropdown({
     }
 
     // Find the current user
-    const currentUser = users.find((u: any) => u.email === loggedInUser.email);
+    const currentUser = users.find((u) => u.email === loggedInUser.email);
     
     if (!currentUser) {
       setPasswordMessage({ text: 'User not found in database.', type: 'error' });
@@ -137,7 +137,7 @@ export default function ProfileDropdown({
     }
 
     // Update password in users array
-    const userIndex = users.findIndex((u: any) => u.email === loggedInUser.email);
+    const userIndex = users.findIndex((u) => u.email === loggedInUser.email);
     if (userIndex !== -1) {
       users[userIndex].password = newPassword;
       try {

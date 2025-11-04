@@ -10,7 +10,6 @@ export default function ProfilePage() {
   const navigate = useNavigate();
 
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
-  const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
   const [editingPersonalInfo, setEditingPersonalInfo] = useState(false);
   const [editingLanguageRegion, setEditingLanguageRegion] = useState(false);
 
@@ -33,14 +32,6 @@ export default function ProfilePage() {
     country: '',
   });
 
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    retypePassword: '',
-  });
-  const [passwordMessage, setPasswordMessage] = useState({ text: '', type: '' });
-  const [passwordStrength, setPasswordStrength] = useState({ level: 0, text: '', className: '' });
-
   const [toggleStates, setToggleStates] = useState({
     twoFactor: false,
     emailNotifications: false,
@@ -58,39 +49,20 @@ export default function ProfilePage() {
     ES: "Spain", CA: "Canada", BR: "Brazil", MX: "Mexico"
   };
 
-  // Initialize theme
+  // Initialize theme - apply to html element for profile.css compatibility
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
-  }, [isDarkMode]);
-
-  // Password strength calculator
-  useEffect(() => {
-    if (!passwordData.newPassword) {
-      setPasswordStrength({ level: 0, text: '', className: '' });
-      return;
-    }
-
-    let strength = 0;
-    if (passwordData.newPassword.length >= 8) strength++;
-    if (passwordData.newPassword.length >= 12) strength++;
-    if (/[a-z]/.test(passwordData.newPassword) && /[A-Z]/.test(passwordData.newPassword)) strength++;
-    if (/\d/.test(passwordData.newPassword)) strength++;
-    if (/[^a-zA-Z0-9]/.test(passwordData.newPassword)) strength++;
-
-    let text = '', className = '';
-    if (strength <= 2) {
-      text = 'Weak';
-      className = 'weak';
-    } else if (strength <= 4) {
-      text = 'Medium';
-      className = 'medium';
+    const htmlElement = document.documentElement;
+    htmlElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    
+    // Also apply to body for consistency with other pages
+    if (isDarkMode) {
+      document.body.classList.add('dark-mode');
+      document.body.classList.remove('light-mode');
     } else {
-      text = 'Strong';
-      className = 'strong';
+      document.body.classList.add('light-mode');
+      document.body.classList.remove('dark-mode');
     }
-
-    setPasswordStrength({ level: strength, text, className });
-  }, [passwordData.newPassword]);
+  }, [isDarkMode]);
 
   const getInitials = (name: string) => {
     if (!name) return 'JD';
@@ -205,32 +177,6 @@ export default function ProfilePage() {
   const handleCancelLanguageEdit = () => {
     setEditingLanguageRegion(false);
     setFormData({ ...profileData });
-  };
-
-  const handleSavePassword = () => {
-    setPasswordMessage({ text: '', type: '' });
-
-    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.retypePassword) {
-      setPasswordMessage({ text: 'Please fill in all fields.', type: 'error' });
-      return;
-    }
-
-    if (passwordData.newPassword.length < 8) {
-      setPasswordMessage({ text: 'New password must be at least 8 characters.', type: 'error' });
-      return;
-    }
-
-    if (passwordData.newPassword !== passwordData.retypePassword) {
-      setPasswordMessage({ text: 'Passwords do not match.', type: 'error' });
-      return;
-    }
-
-    setPasswordMessage({ text: 'Password updated successfully!', type: 'success' });
-    setTimeout(() => {
-      setChangePasswordModalOpen(false);
-      setPasswordData({ currentPassword: '', newPassword: '', retypePassword: '' });
-      setPasswordMessage({ text: '', type: '' });
-    }, 1500);
   };
 
   const showSuccessMessage = (message: string) => {
@@ -449,8 +395,6 @@ export default function ProfilePage() {
                 onClick={() => setToggleStates({ ...toggleStates, loginAlerts: !toggleStates.loginAlerts })}
               ></button>
             </div>
-
-            <button className="confirm-btn" onClick={() => setChangePasswordModalOpen(true)}>Change Password</button>
           </div>
 
           {/* Language & Region Card */}
@@ -533,69 +477,6 @@ export default function ProfilePage() {
           </div>
         </div>
       </main>
-
-      {/* Change Password Modal */}
-      {changePasswordModalOpen && (
-        <div className="modal-overlay" onClick={() => setChangePasswordModalOpen(false)}>
-          <div className="password-modal-box" onClick={(e) => e.stopPropagation()}>
-            <h3>Change Password</h3>
-
-            <div className="form-group">
-              <label htmlFor="currentPassword">Current Password</label>
-              <input
-                type="password"
-                id="currentPassword"
-                placeholder="Enter current password"
-                value={passwordData.currentPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="newPassword">New Password</label>
-              <input
-                type="password"
-                id="newPassword"
-                placeholder="Enter new password"
-                value={passwordData.newPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-              />
-            </div>
-            {passwordData.newPassword && (
-              <div className="password-strength show">
-                <div className="strength-bar">
-                  <div className={`strength-bar-fill ${passwordStrength.className}`}></div>
-                </div>
-                <div className={`strength-text ${passwordStrength.className}`}>
-                  {passwordStrength.text}
-                </div>
-              </div>
-            )}
-
-            <div className="form-group">
-              <label htmlFor="retypePassword">Retype Password</label>
-              <input
-                type="password"
-                id="retypePassword"
-                placeholder="Re-enter new password"
-                value={passwordData.retypePassword}
-                onChange={(e) => setPasswordData({ ...passwordData, retypePassword: e.target.value })}
-              />
-            </div>
-
-            <div className="modal-actions">
-              <button onClick={() => setChangePasswordModalOpen(false)} className="cancel-btn">Cancel</button>
-              <button onClick={handleSavePassword} className="confirm-btn">Reset</button>
-            </div>
-
-            {passwordMessage.text && (
-              <div className={`message ${passwordMessage.type}`}>
-                {passwordMessage.text}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </>
   );
 }

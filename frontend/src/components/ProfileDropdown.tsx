@@ -85,42 +85,9 @@ export default function ProfileDropdown({
   };
 
   const handleSavePassword = () => {
-    // Get logged-in user
-    const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
-    
-    if (!loggedInUser.email) {
-      setPasswordMessage({ text: 'User not found. Please log in again.', type: 'error' });
-      return;
-    }
-
-    // Get users array (this is where passwords are stored)
-    let users: Array<{email: string; password: string}>;
-    try {
-      users = JSON.parse(localStorage.getItem('users') || '[]');
-    } catch {
-      setPasswordMessage({ text: 'Unable to read user data.', type: 'error' });
-      return;
-    }
-
-    // Find the current user
-    const currentUser = users.find((u) => u.email === loggedInUser.email);
-    
-    if (!currentUser) {
-      setPasswordMessage({ text: 'User not found in database.', type: 'error' });
-      return;
-    }
-
-    console.log('Current user password:', currentUser.password, 'Input:', currentPassword);
-
-    // Validate current password
-    if (currentPassword !== currentUser.password) {
-      setPasswordMessage({ text: 'Current password is incorrect.', type: 'error' });
-      return;
-    }
-
-    // Prevent same password
-    if (newPassword === currentUser.password) {
-      setPasswordMessage({ text: 'New password cannot be the same as the old one.', type: 'error' });
+    // Basic validation
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordMessage({ text: 'Please fill in all fields.', type: 'error' });
       return;
     }
 
@@ -136,20 +103,23 @@ export default function ProfileDropdown({
       return;
     }
 
-    // Update password in users array
-    const userIndex = users.findIndex((u) => u.email === loggedInUser.email);
-    if (userIndex !== -1) {
-      users[userIndex].password = newPassword;
-      try {
-        localStorage.setItem('users', JSON.stringify(users));
-      } catch {
-        setPasswordMessage({ text: 'Failed to save password. Try again.', type: 'error' });
-        return;
-      }
+    // Strength validation
+    if (passwordStrength && passwordStrength.class === 'weak') {
+      setPasswordMessage({ text: 'Password is too weak. Please choose a stronger password.', type: 'error' });
+      return;
     }
 
+    // TODO: When backend authentication is implemented, make API call here
+    // For now, show success message since there's no password storage
+    // Example:
+    // const response = await fetch('/api/auth/change-password', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ currentPassword, newPassword })
+    // });
+
     // Show success and close
-    setPasswordMessage({ text: 'Password updated successfully!', type: 'success' });
+    setPasswordMessage({ text: 'Password change validated! Backend integration pending.', type: 'success' });
     setTimeout(() => {
       handleCancelChangePassword();
     }, 1500);

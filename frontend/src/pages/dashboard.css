@@ -66,16 +66,16 @@ html {
   position: absolute;
   top: 60px;
   right: 0;
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   width: 250px;
-  z-index: 9999; /* higher value to always stay on top */
+  z-index: 9999;
   opacity: 0;
   visibility: hidden;
   transform: translateY(-10px);
   transition: all 0.3s ease;
-  pointer-events: none; /* Prevent accidental hover clicks when hidden */
+  pointer-events: none;
 }
 
 .profile-dropdown.show {
@@ -85,23 +85,29 @@ html {
   pointer-events: auto;
 }
 
-
 .dropdown-header {
   padding: 16px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+body.light-mode .dropdown-header {
   background: linear-gradient(135deg, #f8f9fa, #ffffff);
+}
+
+body.dark-mode .dropdown-header {
+  background: var(--bg-secondary);
 }
 
 .dropdown-username {
   font-weight: 600;
-  color: #000;
+  color: var(--text-primary);
   font-size: 15px;
   margin-bottom: 4px;
 }
 
 .dropdown-email {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .dropdown-menu {
@@ -113,16 +119,20 @@ html {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  color: #333;
+  color: var(--text-primary);
   text-decoration: none;
   transition: all 0.2s;
   font-size: 14px;
   cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
 }
 
 .dropdown-item:hover {
-  background: #f5f5f5;
-  color: #C76D00;
+  background: var(--bg-secondary);
+  color: var(--primary-color);
 }
 
 .dropdown-item svg {
@@ -223,6 +233,15 @@ body {
     height: 40px;
     cursor: pointer;
     transition: transform 0.3s ease;
+    background: transparent !important;
+}
+
+body.light-mode #languageToggle {
+    color: #1a1f3a !important;
+}
+
+body.dark-mode #languageToggle {
+    color: #ffffff !important;
 }
 
 .language-menu {
@@ -395,7 +414,6 @@ body.light-mode .header.scrolled {
 .icon-btn {
     background: transparent;
     border: none;
-    color: var(--text-secondary);
     cursor: pointer;
     padding: 8px;
     border-radius: 8px;
@@ -405,25 +423,85 @@ body.light-mode .header.scrolled {
     justify-content: center;
 }
 
+body.light-mode .icon-btn {
+    color: #1a1f3a !important;
+}
+
+body.dark-mode .icon-btn {
+    color: #ffffff !important;
+}
+
+.icon-btn svg {
+    color: inherit !important;
+    stroke: currentColor !important;
+}
+
+body.light-mode .icon-btn svg {
+    color: #1a1f3a !important;
+    stroke: #1a1f3a !important;
+}
+
+body.dark-mode .icon-btn svg {
+    color: #ffffff !important;
+    stroke: #ffffff !important;
+}
+
 .icon-btn:hover {
     background: var(--bg-card);
-    color: var(--text-primary);
+    color: var(--primary-color) !important;
 }
 
-.sun-icon {
+.icon-btn:hover svg {
+    color: var(--primary-color) !important;
+    stroke: var(--primary-color) !important;
+}
+
+/* Theme toggle button styling */
+#themeToggle {
+    background: transparent !important;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Hide both icons by default */
+#themeToggle .sun-icon {
     display: none;
 }
 
-body.light-mode .sun-icon {
-    display: block;
-}
-
-body.light-mode .moon-icon {
+#themeToggle .moon-icon {
     display: none;
 }
 
-.moon-icon {
-    display: block;
+/* Light mode - show sun icon (dark color) */
+body.light-mode #themeToggle .sun-icon {
+    display: block !important;
+}
+
+body.light-mode #themeToggle .sun-icon circle,
+body.light-mode #themeToggle .sun-icon line {
+    stroke: #1a1f3a !important;
+    fill: none !important;
+}
+
+body.light-mode #themeToggle .moon-icon {
+    display: none !important;
+}
+
+/* Dark mode - show moon icon (white color) */
+body.dark-mode #themeToggle .moon-icon {
+    display: block !important;
+}
+
+body.dark-mode #themeToggle .moon-icon path {
+    stroke: #ffffff !important;
+    fill: #ffffff !important;
+}
+
+body.dark-mode #themeToggle .sun-icon {
+    display: none !important;
 }
 
 .btn {
@@ -2397,7 +2475,7 @@ body {
 =========================== */
 .news-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 24px;
     margin-bottom: 48px;
 }
@@ -2682,9 +2760,9 @@ body {
 /* ===========================
    Responsive Design
 =========================== */
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
     .news-grid {
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        grid-template-columns: repeat(2, 1fr);
     }
     
     .news-item.featured {
@@ -2698,6 +2776,12 @@ body {
     
     .news-item.featured .news-title {
         font-size: 22px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .news-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 

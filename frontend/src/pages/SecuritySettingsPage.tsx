@@ -42,9 +42,19 @@ export default function SecuritySettingsPage() {
     useRef<HTMLInputElement>(null),
   ];
 
-  // Initialize theme
+  // Initialize theme - apply to html element for securitySettings.css compatibility
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    const htmlElement = document.documentElement;
+    htmlElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    
+    // Also apply to body for consistency with other pages
+    if (isDarkMode) {
+      document.body.classList.add('dark-mode');
+      document.body.classList.remove('light-mode');
+    } else {
+      document.body.classList.add('light-mode');
+      document.body.classList.remove('dark-mode');
+    }
   }, [isDarkMode]);
 
   // Countdown timer for OTP

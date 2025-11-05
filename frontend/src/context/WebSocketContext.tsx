@@ -2,6 +2,8 @@ import React, { createContext, useCallback, useEffect, useRef, useState } from '
 import type { PriceMessage } from '../hooks/useWebSocket'
 import { usePriceStore } from '../stores/priceStore'
 import { useOrderStore } from '../stores/orderStore'
+import { useAccountStore } from '../stores/accountStore'
+import { useUIStore } from '../stores/uiStore'
 
 type WSState = {
   connecting: boolean
@@ -43,22 +45,56 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 
     ws.onmessage = (ev) => {
       try {
-        const obj = JSON.parse(ev.data) as PriceMessage
+        const obj = JSON.parse(ev.data) as any
+
+        // Handle crypto deposit completion messages from Coinbase webhook
+        if (obj.type === 'DEPOSIT_COMPLETED') {
+          const payload = obj.payload
+          const accountId = payload.accountId
+          const amount = parseFloat(payload.amount)
+          const currency = payload.currency
+          const paymentIntentId = payload.paymentIntentId
+          const method = payload.method
+
+          // Call processDeposit in accountStore
+          useAccountStore.getState().processDeposit(
+            accountId,
+            amount,
+            currency,
+            paymentIntentId,
+            { method }
+          ).then((result) => {
+            if (result.success) {
+              useUIStore.getState().showToast(`Crypto deposit of ${amount} ${currency} completed!`, 'success')
+
+              // Clear pending deposit from localStorage
+              localStorage.removeItem('pending_crypto_deposit')
+            } else {
+              useUIStore.getState().showToast(result.message, 'error')
+            }
+          }).catch((error) => {
+            console.error('Failed to process crypto deposit:', error)
+            useUIStore.getState().showToast('Failed to process crypto deposit', 'error')
+          })
+
+          return // Don't process as price message
+        }
 
         // Update price store for price messages (real-time price updates)
-        if (obj.symbol && obj.price) {
-          const price = typeof obj.price === 'string' ? parseFloat(obj.price) : obj.price
+        const priceMsg = obj as PriceMessage
+        if (priceMsg.symbol && priceMsg.price) {
+          const price = typeof priceMsg.price === 'string' ? parseFloat(priceMsg.price) : priceMsg.price
           if (!isNaN(price)) {
-            usePriceStore.getState().updateCurrentPrice(obj.symbol, price)
+            usePriceStore.getState().updateCurrentPrice(priceMsg.symbol, price)
 
             // Real-time order matching: check pending orders immediately on every price tick
-            useOrderStore.getState().processPendingOrders(obj.symbol, price)
+            useOrderStore.getState().processPendingOrders(priceMsg.symbol, price)
           }
         }
 
         // Keep lastMessage for components that need raw WebSocket data
         // (ChartComponent for klines, OrderBookPanel for depth/trades)
-        setLastMessage(obj)
+        setLastMessage(priceMsg)
       } catch (err) {
         // ignore parse errors for now
       }

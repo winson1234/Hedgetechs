@@ -47,6 +47,8 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.6;
+    transform: scale(0.99);
+
   overflow-x: hidden;
   transition: background 0.3s ease, color 0.3s ease;
 }
@@ -177,6 +179,8 @@ body.light-mode .header.scrolled {
   justify-content: center;
   width: 40px;
   height: 40px;
+  min-width: 40px;  /* Add this */
+  min-height: 40px; /* Add this */
 }
 
 body.light-mode .icon-btn svg {
@@ -212,6 +216,11 @@ body.dark-mode .icon-btn svg {
   gap: 6px;
   font-weight: 600;
   font-size: 14px;
+  width: 40px;    
+  height: 40px;
+  min-width: 40px;  /* Add this */
+  min-height: 40px; /* Add this */
+
 }
 
 .language-menu {
@@ -453,7 +462,7 @@ body.dark-mode .dropdown-header {
    HERO SECTION
    =========================== */
 .hero {
-  margin-top: 0px;
+  margin-top: -50px;
   padding: 100px 0 80px;
   background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
   position: relative;
@@ -1502,13 +1511,32 @@ body.light-mode .hero-title {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   border: 1px solid var(--border-color);
 }
-
 /* ===========================
    TRUST SECTION
    =========================== */
 .trust-section {
   padding: 100px 0;
   background: var(--bg-primary);
+}
+
+.trust-section .section-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.trust-section .section-title {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.trust-section .section-subtitle {
+  font-size: 18px;
+  color: var(--text-secondary);
+  max-width: 700px;
+  margin: 0 auto;
 }
 
 .trust-grid {
@@ -1518,6 +1546,42 @@ body.light-mode .hero-title {
   margin-top: 48px;
 }
 
+/* Rest of trust-card styles remain the same */
+
+.faq-section {
+  padding: 100px 0;
+  background: var(--bg-secondary);
+}
+
+.faq-section .section-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.faq-section .section-title {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.faq-section .section-subtitle {
+  font-size: 18px;
+  color: var(--text-secondary);
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.faq-container {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Rest of FAQ styles remain the same */
 .trust-card {
   background: var(--bg-card);
   padding: 40px 32px;

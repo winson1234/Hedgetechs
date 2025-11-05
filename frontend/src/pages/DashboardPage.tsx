@@ -484,14 +484,7 @@ export default function DashboardPage() {
               <h2 className="section-title">Latest Market News</h2>
               <p className="section-subtitle">Stay updated with real-time crypto and financial headlines</p>
             </div>
-            <div className="header-right">
-              <a href="#" className="btn btn-secondary view-all-btn">
-                View All News
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </a>
-            </div>
+            
           </div>
 
           {/* News Filter Tabs */}
@@ -516,6 +509,14 @@ export default function DashboardPage() {
               <span className="tab-icon">⚖️</span>
               Regulation
             </button>
+            <div className="header-right">
+              <a href="#" className="btn btn-secondary view-all-btn">
+                View All News
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </a>
+            </div>
           </div>
 
           {/* News Grid */}

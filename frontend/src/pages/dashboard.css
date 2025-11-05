@@ -453,7 +453,7 @@ body.dark-mode .dropdown-header {
    HERO SECTION
    =========================== */
 .hero {
-  margin-top: 80px;
+  margin-top: 0px;
   padding: 100px 0 80px;
   background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
   position: relative;
@@ -948,12 +948,12 @@ body.light-mode .hero-title {
 
 .news-section .section-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 24px;
+  flex-direction: column; /* stack vertically */
+  align-items: center;     /* center horizontally */
+  text-align: center;      /* center text */
+  gap: 12px;
+  margin-bottom: 32px;     /* space below the title/desc before tabs */
 }
-
 .header-left {
   flex: 1;
   text-align: left;
@@ -981,7 +981,9 @@ body.light-mode .hero-title {
 /* News Tabs */
 .news-tabs {
   display: flex;
+  justify-content: center; /* ✅ center tabs */
   gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 32px;
   overflow-x: auto;
   padding-bottom: 8px;

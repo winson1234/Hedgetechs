@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { getApiUrl } from '../config/api';
 
 interface MiniSparklineChartProps {
   symbol: string;
@@ -32,14 +33,9 @@ const MiniSparklineChart: React.FC<MiniSparklineChartProps> = ({
         setLoading(true);
         setError(false);
 
-        // Use relative URL in production, localhost in dev
-        const baseUrl = import.meta.env.MODE === 'development'
-          ? 'http://localhost:8080'
-          : '';
-
         // Fetch 24h data with 15-minute intervals (96 data points)
         const response = await fetch(
-          `${baseUrl}/api/v1/klines?symbol=${symbol}&interval=15m&limit=96`
+          getApiUrl(`/api/v1/klines?symbol=${symbol}&interval=15m&limit=96`)
         );
 
         if (!response.ok) {

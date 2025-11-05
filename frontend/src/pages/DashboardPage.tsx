@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { WebSocketContext } from '../context/WebSocketContext';
 import MiniSparklineChart from '../components/MiniSparklineChart';
+import { getApiUrl } from '../config/api';
 import './dashboard.css';
 
 interface CryptoData {
@@ -104,13 +105,8 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        // Use relative URL in production, localhost in dev
-        const baseUrl = import.meta.env.MODE === 'development'
-          ? 'http://localhost:8080'
-          : '';
-
         const symbols = cryptoData.map(c => c.symbol).join(',');
-        const response = await fetch(`${baseUrl}/api/v1/ticker?symbols=${symbols}`);
+        const response = await fetch(getApiUrl(`/api/v1/ticker?symbols=${symbols}`));
 
         if (!response.ok) {
           console.error('Failed to fetch ticker data');
@@ -176,12 +172,7 @@ export default function DashboardPage() {
       try {
         setNewsLoading(true);
 
-        // Use relative URL in production, localhost in dev
-        const baseUrl = import.meta.env.MODE === 'development'
-          ? 'http://localhost:8080'
-          : '';
-
-        const response = await fetch(`${baseUrl}/api/v1/news`);
+        const response = await fetch(getApiUrl('/api/v1/news'));
 
         if (!response.ok) {
           console.error('Failed to fetch news');

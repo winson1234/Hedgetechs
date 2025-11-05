@@ -37,13 +37,13 @@ export default function WalletPage() {
       {/* Main Content */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm">
         {/* Tab Navigation */}
-        <div className="border-b border-slate-200 dark:border-slate-700 px-5 md:px-6 lg:px-8 pt-3">
-          <nav className="flex -mb-px space-x-8" aria-label="Tabs">
+        <div className="border-b border-slate-200 dark:border-slate-700 px-5 md:px-6 lg:px-8 pt-5">
+          <nav className="flex justify-center -mb-px space-x-12" aria-label="Tabs">
             {(['overview', 'deposit', 'withdraw', 'transfer'] as WalletTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveWalletTab(tab)}
-                className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors capitalize ${
+                className={`whitespace-nowrap pb-4 px-3 border-b-2 font-semibold text-base transition-colors capitalize ${
                   activeWalletTab === tab
                     ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
                     : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'

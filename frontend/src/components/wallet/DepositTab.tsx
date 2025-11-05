@@ -508,27 +508,201 @@ function DepositTab() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
-      {/* --- FORM COLUMN --- */}
-      <div className="lg:col-span-2">
-        <div className="max-w-xl">
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">
-            Deposit Funds
-          </h2>
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+      {/* --- INFO COLUMN (LEFT) --- */}
+      <div className="lg:col-span-5 lg:border-r lg:border-slate-300 dark:lg:border-slate-700 lg:pr-8">
+        <div className="lg:sticky lg:top-8">
+          <div className="p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <h3 className="text-xl font-bold mb-5 text-slate-900 dark:text-slate-100">
+              {selectedTab === 'card' && 'Card Payment'}
+              {selectedTab === 'banking' && 'Online Banking'}
+              {selectedTab === 'ewallet' && 'eWallet Payment'}
+              {selectedTab === 'crypto' && 'Cryptocurrency'}
+            </h3>
 
-          {/* Payment Method Tabs */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Payment Method
-            </label>
-            <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
+            {selectedTab === 'card' && (
+              <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                <li className="flex items-start gap-2">
+                  <span className="text-indigo-500 mt-0.5">✓</span>
+                  <span>Secured by Stripe - Industry-leading payment security</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-indigo-500 mt-0.5">✓</span>
+                  <span>Instant processing - Funds available immediately</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-indigo-500 mt-0.5">✓</span>
+                  <span>Your card details are never stored on our servers</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-indigo-500 mt-0.5">✓</span>
+                  <span>All major cards accepted: Visa, Mastercard, Amex</span>
+                </li>
+              </ul>
+            )}
+
+            {selectedTab === 'banking' && (
+              <>
+                <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 mt-0.5">✓</span>
+                    <span>Secure redirect to your bank&apos;s website</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 mt-0.5">✓</span>
+                    <span>Bank-level authentication and security</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 mt-0.5">✓</span>
+                    <span>Automatic currency conversion at live rates</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 mt-0.5">✓</span>
+                    <span>Supports FPX, iDEAL, Bancontact, and Giropay</span>
+                  </li>
+                </ul>
+
+                {/* Bank-specific info box */}
+                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                        {selectedBankMethod === 'fpx' && 'FPX Online Banking (Malaysia)'}
+                        {selectedBankMethod === 'ideal' && 'iDEAL Online Banking (Netherlands)'}
+                        {selectedBankMethod === 'bancontact' && 'Bancontact (Belgium)'}
+                        {selectedBankMethod === 'giropay' && 'Giropay (Germany)'}
+                      </h4>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                        You will be redirected to your bank&apos;s website to complete the payment securely. After completing the payment, you&apos;ll be redirected back to this page.
+                      </p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                        💱 Payment will be processed in {selectedBankMethod === 'fpx' ? 'MYR (Malaysian Ringgit)' : 'EUR (Euro)'} using live exchange rates.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {selectedTab === 'ewallet' && (
+              <>
+                <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 mt-0.5">✓</span>
+                    <span>Fast and convenient eWallet payments</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 mt-0.5">✓</span>
+                    <span>Secure redirect to your eWallet provider</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 mt-0.5">✓</span>
+                    <span>Popular trading payment methods worldwide</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 mt-0.5">✓</span>
+                    <span>Supports PayPal, Klarna, and Affirm</span>
+                  </li>
+                </ul>
+
+                {/* eWallet-specific info box */}
+                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                        {selectedEWallet === 'paypal' && 'PayPal Payment'}
+                        {selectedEWallet === 'klarna' && 'Klarna Payment'}
+                        {selectedEWallet === 'affirm' && 'Affirm Payment'}
+                      </h4>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                        You will be redirected to {selectedEWallet === 'paypal' ? 'PayPal' : selectedEWallet === 'klarna' ? 'Klarna' : 'Affirm'} to complete the payment securely. After completing the payment, you&apos;ll be redirected back to this page.
+                      </p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                        💱 Automatic currency conversion applied if needed
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {selectedTab === 'crypto' && (
+              <>
+                <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 mt-0.5">✓</span>
+                    <span>Pay with Bitcoin, Ethereum, USDT, and more</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 mt-0.5">✓</span>
+                    <span>Blockchain-verified and secure transactions</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 mt-0.5">✓</span>
+                    <span>Automatic credit after confirmation (typically 10-30 min)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 mt-0.5">✓</span>
+                    <span>Powered by Coinbase Commerce - trusted platform</span>
+                  </li>
+                </ul>
+
+                {/* Crypto-specific info box */}
+                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                        Cryptocurrency Payment
+                      </h4>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                        You will be redirected to Coinbase Commerce to complete your payment with Bitcoin, Ethereum, USDT, or other supported cryptocurrencies. Choose your preferred crypto on the payment page.
+                      </p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                        ⚡ Your account will be credited automatically after blockchain confirmation
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="mt-6 pt-6 border-t border-slate-300 dark:border-slate-600">
+              <p className="text-xs text-slate-500 dark:text-slate-500 leading-relaxed">
+                Your funds are held in segregated accounts and protected under financial regulations. All transactions are encrypted and monitored for fraud prevention.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* --- FORM COLUMN (RIGHT) --- */}
+      <div className="lg:col-span-7">
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-6">
+          Deposit Funds
+        </h2>
+
+        {/* Payment Method Tabs */}
+        <div className="mb-8">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+            Payment Method
+          </label>
+          <div className="grid grid-cols-4 gap-3">
               <button
                 type="button"
                 onClick={() => setSelectedTab('card')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                className={`px-4 py-3 text-sm font-semibold rounded-lg transition-all ${
                   selectedTab === 'card'
-                    ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                    : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
                 Card
@@ -536,21 +710,21 @@ function DepositTab() {
               <button
                 type="button"
                 onClick={() => setSelectedTab('banking')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                className={`px-4 py-3 text-sm font-semibold rounded-lg transition-all ${
                   selectedTab === 'banking'
-                    ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                    : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
-                Online Banking
+                Banking
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedTab('ewallet')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                className={`px-4 py-3 text-sm font-semibold rounded-lg transition-all ${
                   selectedTab === 'ewallet'
-                    ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                    : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
                 eWallet
@@ -558,10 +732,10 @@ function DepositTab() {
               <button
                 type="button"
                 onClick={() => setSelectedTab('crypto')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                className={`px-4 py-3 text-sm font-semibold rounded-lg transition-all ${
                   selectedTab === 'crypto'
-                    ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                    : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
                 Crypto
@@ -606,13 +780,13 @@ function DepositTab() {
 
           {/* Account Selection */}
           <div>
-            <label htmlFor="depositAccount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label htmlFor="depositAccount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
               Trading Account
             </label>
             <select
               id="depositAccount"
               {...register('accountId')}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-base font-medium"
             >
               {liveAccounts.map(acc => (
                 <option key={acc.id} value={acc.id}>
@@ -627,7 +801,7 @@ function DepositTab() {
 
           {/* Amount */}
           <div>
-            <label htmlFor="depositAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label htmlFor="depositAmount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
               Amount of Deposit (Minimum: $5.00)
             </label>
             <div className="relative">
@@ -638,9 +812,9 @@ function DepositTab() {
                 placeholder="0.00"
                 min="5"
                 step="0.01"
-                className="w-full px-3 py-2 pr-16 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full px-4 py-3.5 pr-20 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-lg font-semibold"
               />
-              <span className="absolute right-3 top-2.5 text-sm font-medium text-slate-500 dark:text-slate-400">
+              <span className="absolute right-4 top-4 text-base font-bold text-slate-500 dark:text-slate-400">
                 {accounts.find(a => a.id === selectedAccountId)?.currency || 'USD'}
               </span>
             </div>
@@ -650,24 +824,48 @@ function DepositTab() {
           </div>
 
           {/* Stripe Card Elements */}
-          <div className="space-y-3 border-t border-slate-200 dark:border-slate-700 pt-4">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          <div className="space-y-4 border-t-2 border-slate-200 dark:border-slate-700 pt-6">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               Card Information
-              {cardBrand && <span className="ml-2 text-xs text-slate-500">({cardBrand.toUpperCase()})</span>}
+              {cardBrand && <span className="ml-2 text-xs text-slate-500 uppercase">({cardBrand})</span>}
             </p>
 
             {/* Card Number */}
-            <div className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700">
-              <CardNumberElement options={CARD_ELEMENT_OPTIONS} />
+            <div className="px-4 py-4 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 transition-all focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
+              <CardNumberElement options={{
+                ...CARD_ELEMENT_OPTIONS,
+                style: {
+                  base: {
+                    ...CARD_ELEMENT_OPTIONS.style.base,
+                    fontSize: '16px',
+                  }
+                }
+              }} />
             </div>
 
             {/* Expiry and CVC */}
-            <div className="flex gap-2">
-              <div className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700">
-                <CardExpiryElement options={CARD_ELEMENT_OPTIONS} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="px-4 py-4 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 transition-all focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
+                <CardExpiryElement options={{
+                  ...CARD_ELEMENT_OPTIONS,
+                  style: {
+                    base: {
+                      ...CARD_ELEMENT_OPTIONS.style.base,
+                      fontSize: '16px',
+                    }
+                  }
+                }} />
               </div>
-              <div className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700">
-                <CardCvcElement options={CARD_ELEMENT_OPTIONS} />
+              <div className="px-4 py-4 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 transition-all focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
+                <CardCvcElement options={{
+                  ...CARD_ELEMENT_OPTIONS,
+                  style: {
+                    base: {
+                      ...CARD_ELEMENT_OPTIONS.style.base,
+                      fontSize: '16px',
+                    }
+                  }
+                }} />
               </div>
             </div>
 
@@ -680,7 +878,7 @@ function DepositTab() {
           <button
             type="submit"
             disabled={isProcessing || !stripe}
-            className="w-full px-4 py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
           >
             {isProcessing ? 'Processing...' : 'Confirm Deposit'}
           </button>
@@ -752,13 +950,13 @@ function DepositTab() {
 
           {/* Account Selection */}
           <div>
-            <label htmlFor="bankingDepositAccount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label htmlFor="bankingDepositAccount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
               Trading Account
             </label>
             <select
               id="bankingDepositAccount"
               {...register('accountId')}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-base font-medium"
             >
               {liveAccounts.map(acc => (
                 <option key={acc.id} value={acc.id}>
@@ -773,7 +971,7 @@ function DepositTab() {
 
           {/* Amount */}
           <div>
-            <label htmlFor="bankingDepositAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label htmlFor="bankingDepositAmount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
               Amount of Deposit (Minimum: $5.00)
             </label>
             <div className="relative">
@@ -784,9 +982,9 @@ function DepositTab() {
                 placeholder="0.00"
                 min="5"
                 step="0.01"
-                className="w-full px-3 py-2 pr-16 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full px-4 py-3.5 pr-20 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-lg font-semibold"
               />
-              <span className="absolute right-3 top-2.5 text-sm font-medium text-slate-500 dark:text-slate-400">
+              <span className="absolute right-4 top-4 text-base font-bold text-slate-500 dark:text-slate-400">
                 {accounts.find(a => a.id === selectedAccountId)?.currency || 'USD'}
               </span>
             </div>
@@ -795,42 +993,14 @@ function DepositTab() {
             )}
           </div>
 
-          {/* Bank Payment Method Info */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <div className="flex items-start gap-2">
-              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div className="flex-1">
-                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                  {selectedBankMethod === 'fpx' && 'FPX Online Banking (Malaysia)'}
-                  {selectedBankMethod === 'ideal' && 'iDEAL Online Banking (Netherlands)'}
-                  {selectedBankMethod === 'bancontact' && 'Bancontact (Belgium)'}
-                  {selectedBankMethod === 'giropay' && 'Giropay (Germany)'}
-                </h4>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-                  You will be redirected to your bank&apos;s website to complete the payment securely.
-                  After completing the payment, you&apos;ll be redirected back to this page.
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                  💱 Payment will be processed in {selectedBankMethod === 'fpx' ? 'MYR (Malaysian Ringgit)' : 'EUR (Euro)'} using live exchange rates.
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Submit Button */}
           <button
             type="submit"
             disabled={isProcessing || !stripe || !elements}
-            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
           >
             {isProcessing ? 'Processing...' : `Pay with ${selectedBankMethod.toUpperCase()}`}
           </button>
-
-          <p className="text-xs text-center text-slate-500 dark:text-slate-400">
-            Secure payment powered by Stripe. Your bank details are never stored on our servers.
-          </p>
         </form>
       )}
 
@@ -928,13 +1098,13 @@ function DepositTab() {
 
           {/* Account Selection */}
           <div>
-            <label htmlFor="ewalletDepositAccount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label htmlFor="ewalletDepositAccount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
               Trading Account
             </label>
             <select
               id="ewalletDepositAccount"
               {...register('accountId')}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-base font-medium"
             >
               {liveAccounts.map(acc => (
                 <option key={acc.id} value={acc.id}>
@@ -949,7 +1119,7 @@ function DepositTab() {
 
           {/* Amount */}
           <div>
-            <label htmlFor="ewalletDepositAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label htmlFor="ewalletDepositAmount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
               Amount of Deposit (Minimum: $5.00)
             </label>
             <div className="relative">
@@ -960,9 +1130,9 @@ function DepositTab() {
                 placeholder="0.00"
                 min="5"
                 step="0.01"
-                className="w-full px-3 py-2 pr-16 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full px-4 py-3.5 pr-20 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-lg font-semibold"
               />
-              <span className="absolute right-3 top-2.5 text-sm font-medium text-slate-500 dark:text-slate-400">
+              <span className="absolute right-4 top-4 text-base font-bold text-slate-500 dark:text-slate-400">
                 {accounts.find(a => a.id === selectedAccountId)?.currency || 'USD'}
               </span>
             </div>
@@ -971,41 +1141,14 @@ function DepositTab() {
             )}
           </div>
 
-          {/* eWallet Info */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <div className="flex items-start gap-2">
-              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div className="flex-1">
-                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                  {selectedEWallet === 'paypal' && 'PayPal Payment'}
-                  {selectedEWallet === 'klarna' && 'Klarna Payment'}
-                  {selectedEWallet === 'affirm' && 'Affirm Payment'}
-                </h4>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-                  You will be redirected to {selectedEWallet === 'paypal' ? 'PayPal' : selectedEWallet === 'klarna' ? 'Klarna' : 'Affirm'} to complete the payment securely.
-                  After completing the payment, you&apos;ll be redirected back to this page.
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                  💱 Automatic currency conversion applied if needed
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Submit Button */}
           <button
             type="submit"
             disabled={isProcessing || !stripe}
-            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
           >
             {isProcessing ? 'Processing...' : `Pay with ${selectedEWallet === 'paypal' ? 'PayPal' : selectedEWallet === 'klarna' ? 'Klarna' : 'Affirm'}`}
           </button>
-
-          <p className="text-xs text-center text-slate-500 dark:text-slate-400">
-            Secure payment powered by Stripe. Your payment details are never stored on our servers.
-          </p>
         </form>
       )}
 
@@ -1063,13 +1206,13 @@ function DepositTab() {
         }} className="space-y-4">
           {/* Account Selection */}
           <div>
-            <label htmlFor="cryptoDepositAccount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label htmlFor="cryptoDepositAccount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
               Trading Account
             </label>
             <select
               id="cryptoDepositAccount"
               {...register('accountId')}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-base font-medium"
             >
               {liveAccounts.map(acc => (
                 <option key={acc.id} value={acc.id}>
@@ -1084,7 +1227,7 @@ function DepositTab() {
 
           {/* Amount */}
           <div>
-            <label htmlFor="cryptoDepositAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label htmlFor="cryptoDepositAmount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
               Amount of Deposit (Minimum: $5.00)
             </label>
             <div className="relative">
@@ -1095,9 +1238,9 @@ function DepositTab() {
                 placeholder="0.00"
                 min="5"
                 step="0.01"
-                className="w-full px-3 py-2 pr-16 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full px-4 py-3.5 pr-20 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-lg font-semibold"
               />
-              <span className="absolute right-3 top-2.5 text-sm font-medium text-slate-500 dark:text-slate-400">
+              <span className="absolute right-4 top-4 text-base font-bold text-slate-500 dark:text-slate-400">
                 {accounts.find(a => a.id === selectedAccountId)?.currency || 'USD'}
               </span>
             </div>
@@ -1106,146 +1249,16 @@ function DepositTab() {
             )}
           </div>
 
-          {/* Crypto Info */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <div className="flex items-start gap-2">
-              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div className="flex-1">
-                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                  Cryptocurrency Payment
-                </h4>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-                  You will be redirected to Coinbase Commerce to complete your payment with Bitcoin, Ethereum, USDT, or other supported cryptocurrencies.
-                  Choose your preferred crypto on the payment page.
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                  ⚡ Your account will be credited automatically after blockchain confirmation
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Submit Button */}
           <button
             type="submit"
             disabled={isProcessing}
-            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
           >
             {isProcessing ? 'Redirecting...' : 'Pay with Cryptocurrency'}
           </button>
-
-          <p className="text-xs text-center text-slate-500 dark:text-slate-400">
-            Powered by Coinbase Commerce. Your crypto payment is secure and blockchain-verified.
-          </p>
         </form>
       )}
-        </div>
-      </div>
-
-      {/* --- INFO COLUMN --- */}
-      <div className="lg:col-span-1">
-        <div className="lg:sticky lg:top-8">
-          <div className="p-6 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-            <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-slate-100">
-              {selectedTab === 'card' && 'Card Payment'}
-              {selectedTab === 'banking' && 'Online Banking'}
-              {selectedTab === 'ewallet' && 'eWallet Payment'}
-              {selectedTab === 'crypto' && 'Cryptocurrency'}
-            </h3>
-
-            {selectedTab === 'card' && (
-              <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Secured by Stripe - Industry-leading payment security</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Instant processing - Funds available immediately</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Your card details are never stored on our servers</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>All major cards accepted: Visa, Mastercard, Amex</span>
-                </li>
-              </ul>
-            )}
-
-            {selectedTab === 'banking' && (
-              <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Secure redirect to your bank&apos;s website</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Bank-level authentication and security</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Automatic currency conversion at live rates</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Supports FPX, iDEAL, Bancontact, and Giropay</span>
-                </li>
-              </ul>
-            )}
-
-            {selectedTab === 'ewallet' && (
-              <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Fast and convenient eWallet payments</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Secure redirect to your eWallet provider</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Popular trading payment methods worldwide</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Supports PayPal, Klarna, and Affirm</span>
-                </li>
-              </ul>
-            )}
-
-            {selectedTab === 'crypto' && (
-              <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Pay with Bitcoin, Ethereum, USDT, and more</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Blockchain-verified and secure transactions</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Automatic credit after confirmation (typically 10-30 min)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-500 mt-0.5">✓</span>
-                  <span>Powered by Coinbase Commerce - trusted platform</span>
-                </li>
-              </ul>
-            )}
-
-            <div className="mt-6 pt-6 border-t border-slate-300 dark:border-slate-600">
-              <p className="text-xs text-slate-500 dark:text-slate-500 leading-relaxed">
-                Your funds are held in segregated accounts and protected under financial regulations. All transactions are encrypted and monitored for fraud prevention.
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

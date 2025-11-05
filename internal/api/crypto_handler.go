@@ -1,6 +1,7 @@
 package api
 
 import (
+	"brokerageProject/internal/hub"
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -151,7 +152,7 @@ func HandleCreateCryptoCharge(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleCryptoWebhook handles webhook events from Coinbase Commerce
-func HandleCryptoWebhook(hub interface{ Broadcast([]byte) }, w http.ResponseWriter, r *http.Request) {
+func HandleCryptoWebhook(hub *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -223,7 +224,7 @@ func HandleCryptoWebhook(hub interface{ Broadcast([]byte) }, w http.ResponseWrit
 
 		// Broadcast to all connected WebSocket clients
 		// The frontend will filter by accountId
-		hub.Broadcast(messageBytes)
+		hub.Broadcast <- messageBytes
 
 		// Log successful processing
 		fmt.Printf("Crypto deposit confirmed: Account=%s, Amount=%s %s, ChargeID=%s\n",

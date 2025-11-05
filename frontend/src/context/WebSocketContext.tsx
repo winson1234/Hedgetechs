@@ -45,16 +45,26 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 
     ws.onmessage = (ev) => {
       try {
-        const obj = JSON.parse(ev.data) as any
+        const obj = JSON.parse(ev.data) as {
+          type?: string;
+          payload?: {
+            accountId: string;
+            amount: string;
+            currency: string;
+            paymentIntentId: string;
+            method?: string;
+          };
+        }
 
         // Handle crypto deposit completion messages from Coinbase webhook
         if (obj.type === 'DEPOSIT_COMPLETED') {
           const payload = obj.payload
+          if (!payload) return;
+
           const accountId = payload.accountId
           const amount = parseFloat(payload.amount)
           const currency = payload.currency
           const paymentIntentId = payload.paymentIntentId
-          const method = payload.method
 
           // Call processDeposit in accountStore
           useAccountStore.getState().processDeposit(
@@ -62,7 +72,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
             amount,
             currency,
             paymentIntentId,
-            { method }
+            undefined // PaymentMethodMetadata doesn't have a method field
           ).then((result) => {
             if (result.success) {
               useUIStore.getState().showToast(`Crypto deposit of ${amount} ${currency} completed!`, 'success')

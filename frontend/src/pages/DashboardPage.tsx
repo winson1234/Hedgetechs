@@ -78,7 +78,7 @@ export default function DashboardPage() {
 
     // Handle trade updates from Binance
     if (data.type === 'trade') {
-      const price = parseFloat(data.price);
+      const price = typeof data.price === 'string' ? parseFloat(data.price) : data.price;
       const symbol = data.symbol;
 
       setCryptoData(prevData =>
@@ -117,12 +117,16 @@ export default function DashboardPage() {
           return;
         }
 
-        const tickerData = await response.json();
+        const tickerData = await response.json() as Array<{
+          symbol: string;
+          lastPrice: string;
+          priceChangePercent: string;
+        }>;
 
         // Update crypto data with 24h statistics
         setCryptoData(prevData =>
           prevData.map(crypto => {
-            const ticker = tickerData.find((t: any) => t.symbol === crypto.symbol);
+            const ticker = tickerData.find((t) => t.symbol === crypto.symbol);
             if (ticker) {
               const price = parseFloat(ticker.lastPrice);
               const change = parseFloat(ticker.priceChangePercent);
@@ -145,10 +149,23 @@ export default function DashboardPage() {
     };
 
     fetchInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
+  interface NewsItem {
+    id: number;
+    title: string;
+    excerpt: string;
+    source: string;
+    category: string;
+    timestamp: string;
+    featured: boolean;
+    image: string;
+    link: string;
+  }
+
   // Live news data from API
-  const [newsItems, setNewsItems] = useState<any[]>([]);
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [newsLoading, setNewsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
@@ -171,13 +188,22 @@ export default function DashboardPage() {
           return;
         }
 
-        const newsData = await response.json();
+        const newsData = await response.json() as {
+          articles: Array<{
+            title: string;
+            description: string;
+            source: string;
+            pubDate: string;
+            publishedAt?: string;
+            link: string;
+          }>;
+        };
 
         // Extract articles array from response
         const articles = newsData.articles || [];
 
         // Transform API response to match component structure
-        const transformedNews = articles.map((article: any, index: number) => {
+        const transformedNews = articles.map((article, index: number) => {
           const category = getCategoryFromArticle(article);
           return {
             id: index + 1,
@@ -185,7 +211,7 @@ export default function DashboardPage() {
             excerpt: article.description || article.title,
             source: article.source,
             category: category,
-            timestamp: formatTimestamp(article.pubDate || article.publishedAt),
+            timestamp: formatTimestamp(article.pubDate || article.publishedAt || ''),
             featured: index === 0, // Make first article featured
             image: getPlaceholderImage(category, index), // Use placeholder images
             link: article.link,
@@ -201,7 +227,7 @@ export default function DashboardPage() {
     };
 
     // Helper function to determine category from title and description
-    const getCategoryFromArticle = (article: any) => {
+    const getCategoryFromArticle = (article: { title: string; description: string; source: string }) => {
       const title = (article.title || '').toLowerCase();
       const description = (article.description || '').toLowerCase();
       const source = (article.source || '').toLowerCase();

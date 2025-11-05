@@ -2,6 +2,7 @@
 // Kept as a no-op shim for compatibility. Please migrate to WebSocketContext.
 
 export type PriceMessage = {
+  type?: string
   symbol: string
   price: string | number
   time: number

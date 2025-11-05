@@ -47,8 +47,6 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.6;
-    transform: scale(0.99);
-
   overflow-x: hidden;
   transition: background 0.3s ease, color 0.3s ease;
 }

@@ -1190,6 +1190,62 @@ body.light-mode .hero-title {
   gap: 8px;
 }
 
+/* Light Mode News Section Overrides */
+body.light-mode .news-badge {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: #1a1f3a !important;
+  border: 1px solid #e9ecef !important;
+}
+
+body.light-mode .featured-badge {
+  background: var(--gradient-gold) !important;
+  color: white !important;
+  border: none !important;
+}
+
+body.light-mode .news-overlay {
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.95) 0%, transparent 60%) !important;
+}
+
+body.light-mode .news-item {
+  background: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid #e9ecef !important;
+}
+
+body.light-mode .news-item:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+  border-color: #C76D00 !important;
+}
+
+body.light-mode .news-content {
+  background: #ffffff !important;
+}
+
+body.light-mode .news-title {
+  color: #1a1f3a !important;
+}
+
+body.light-mode .news-excerpt {
+  color: #6c757d !important;
+}
+
+body.light-mode .news-meta {
+  color: #6c757d !important;
+}
+
+body.light-mode .news-source {
+  color: #C76D00 !important;
+}
+
+body.light-mode .news-time {
+  color: #6c757d !important;
+}
+
+body.light-mode .news-link {
+  color: #C76D00 !important;
+}
+
 /* ===========================
    PAYOUT SECTION
    =========================== */

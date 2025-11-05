@@ -101,6 +101,19 @@ func main() {
 	http.HandleFunc(config.PaymentIntentAPIPath, api.CORSMiddleware(api.HandleCreatePaymentIntent))
 	// REST handler for Stripe payment status check (with CORS)
 	http.HandleFunc(config.PaymentStatusAPIPath, api.CORSMiddleware(api.HandlePaymentStatus))
+	// REST handler for Coinbase Commerce crypto charge creation (with CORS)
+	http.HandleFunc("/api/v1/deposit/create-crypto-charge", api.CORSMiddleware(api.HandleCreateCryptoCharge))
+	// Webhook handler for Coinbase Commerce (NO CORS - webhook only)
+	http.HandleFunc("/api/v1/crypto/webhook", func(w http.ResponseWriter, r *http.Request) {
+		api.HandleCryptoWebhook(h, w, r)
+	})
+
+	// Log Coinbase Commerce configuration status
+	if coinbaseKey := os.Getenv("COINBASE_COMMERCE_API_KEY"); coinbaseKey != "" {
+		log.Printf("COINBASE_COMMERCE_API_KEY loaded successfully (length: %d)", len(coinbaseKey))
+	} else {
+		log.Println("Note: COINBASE_COMMERCE_API_KEY is not set (crypto deposits disabled)")
+	}
 
 	// Start the HTTP server on the configured port
 	log.Fatal(http.ListenAndServe(serverAddress, nil))

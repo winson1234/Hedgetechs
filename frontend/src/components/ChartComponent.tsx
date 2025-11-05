@@ -87,6 +87,19 @@ export default function ChartComponent() {
   const ws = useContext(WebSocketContext)
   const lastMessage = ws?.lastMessage ?? null
 
+  // Helper function to convert LineStyle to lightweight-charts numeric format
+  const getNumericLineStyle = (style: string): 0 | 1 | 2 => {
+    switch (style) {
+      case 'dotted':
+        return 1
+      case 'dashed':
+        return 2
+      case 'solid':
+      default:
+        return 0
+    }
+  }
+
   useEffect(() => {
     if (!ref.current) return
     
@@ -346,7 +359,7 @@ export default function ChartComponent() {
               price: drawing.price,
               color: drawing.color,
               lineWidth: validLineWidth,
-              lineStyle: 0,
+              lineStyle: getNumericLineStyle(drawing.lineStyle),
               axisLabelVisible: true,
               title: '',
             })
@@ -390,7 +403,7 @@ export default function ChartComponent() {
           price: priceNum,
           color: activeDrawingColor,
           lineWidth: validLineWidth,
-          lineStyle: 0,
+          lineStyle: getNumericLineStyle(activeLineStyle),
           axisLabelVisible: true,
           title: '',
         })

@@ -35,7 +35,7 @@ export default function LoginPage() {
     const result = await login(email.trim().toLowerCase(), password);
 
     if (result.success) {
-      navigate('/dashboard');
+      navigate('/trading');
     } else {
       alert('❌ Incorrect email or password.');
     }

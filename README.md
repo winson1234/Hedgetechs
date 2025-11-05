@@ -1,5 +1,4 @@
 # Brokerage Platform
-hu abc
 Comprehensive cryptocurrency trading platform with authentication, real-time market data, multi-account management, wallet operations with Stripe payments, transaction history, and technical analysis.
 
 ---

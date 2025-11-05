@@ -24,7 +24,6 @@ export default function DashboardPage() {
   const confirmLogout = () => {
     setShowLogoutModal(false);
     logout();
-    navigate('/login');
   };
 
   const cancelLogout = () => {

@@ -860,6 +860,11 @@ body.light-mode .hero-title {
 .crypto-col {
   display: flex;
   align-items: center;
+  justify-content: center;
+}
+
+.crypto-col[style*="left"] {
+  justify-content: flex-start;
 }
 
 .crypto-info {

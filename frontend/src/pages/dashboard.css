@@ -150,7 +150,6 @@ body.light-mode .header.scrolled {
 .nav-link:hover::after {
   width: 100%;
 }
-
 /* Nav Actions */
 .nav-actions {
   display: flex;
@@ -164,23 +163,36 @@ body.light-mode .header.scrolled {
   gap: 12px;
 }
 
-/* Icon Buttons */
+/* ==========================
+   ICON BUTTONS (Shared)
+========================== */
+/* Icon Buttons (Theme + Language unified) */
 .icon-btn {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
+border-radius: 8px !important;   /* ✅ overrides any 50% radius */
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  min-width: 40px;  /* Add this */
-  min-height: 40px; /* Add this */
+  background: transparent;
+  border: 1px solid var(--border-color); /* visible outline */
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.05);
 }
 
+/* Hover effect — same for both */
+.icon-btn:hover {
+  background: var(--bg-card);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  box-shadow: 0 0 8px rgba(253, 219, 146, 0.3);
+}
+
+/* Light / dark mode SVG colors */
 body.light-mode .icon-btn svg {
   color: #1a1f3a !important;
   stroke: #1a1f3a !important;
@@ -191,34 +203,24 @@ body.dark-mode .icon-btn svg {
   stroke: #ffffff !important;
 }
 
-.icon-btn:hover {
-  background: var(--bg-card);
-  color: var(--primary-color) !important;
+/* Language Button Text */
+#languageToggle span {
+  line-height: 1;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--text-primary);
 }
-
-.icon-btn:hover svg {
-  color: var(--primary-color) !important;
-  stroke: var(--primary-color) !important;
-}
-
-/* Language Selector */
+/* ==========================
+   LANGUAGE DROPDOWN
+========================== */
 .language-selector {
   position: relative;
   display: inline-block;
 }
-
-#languageToggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-weight: 600;
-  font-size: 14px;
-  width: 40px;    
-  height: 40px;
-  min-width: 40px;  /* Add this */
-  min-height: 40px; /* Add this */
-
+.flag-label {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .language-menu {
@@ -241,6 +243,19 @@ body.dark-mode .icon-btn svg {
   display: block;
   animation: fadeIn 0.2s ease;
 }
+#languageToggle img {
+  width: 20px;
+  height: 15px;
+  border-radius: 3px;
+  object-fit: cover;
+}
+
+.language-menu li img {
+  width: 20px;
+  height: 15px;
+  border-radius: 3px;
+  object-fit: cover;
+}
 
 .language-menu li {
   padding: 8px 14px;
@@ -248,7 +263,7 @@ body.dark-mode .icon-btn svg {
   font-size: 14px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 8px;             /* spacing between flag and text */
   color: var(--text-primary);
   transition: background 0.2s ease;
 }
@@ -258,10 +273,12 @@ body.dark-mode .icon-btn svg {
   color: #fff;
 }
 
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-5px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
 
 /* Profile Dropdown */
 .profile-container {

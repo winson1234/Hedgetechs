@@ -429,21 +429,47 @@ export default function DashboardPage() {
                   </svg>
                 )}
               </button>
+{/* Language Selector */}
+<div className="language-selector">
+  <button
+    className="icon-btn"
+    id="languageToggle"
+    onClick={() => setLanguageMenuOpen(!languageMenuOpen)}
+    title="Select Language"
+  >
+    {selectedLanguage === 'EN' && (
+      <img src="https://flagcdn.com/w20/gb.png" alt="English" width="20" height="15" />
+    )}
+    {selectedLanguage === 'CN' && (
+      <img src="https://flagcdn.com/w20/cn.png" alt="Chinese" width="20" height="15" />
+    )}
+    {selectedLanguage === 'JP' && (
+      <img src="https://flagcdn.com/w20/jp.png" alt="Japanese" width="20" height="15" />
+    )}
+    {selectedLanguage === 'KR' && (
+      <img src="https://flagcdn.com/w20/kr.png" alt="Korean" width="20" height="15" />
+    )}
+  </button>
 
-              {/* Language Selector */}
-              <div className="language-selector">
-                <button className="icon-btn" id="languageToggle" onClick={() => setLanguageMenuOpen(!languageMenuOpen)} title="Select Language">
-                  <span id="languageLabel">{selectedLanguage}</span>
-                </button>
-                {languageMenuOpen && (
-                  <ul className="language-menu show">
-                    <li onClick={() => { setSelectedLanguage('EN'); setLanguageMenuOpen(false); }}>🇬🇧 English</li>
-                    <li onClick={() => { setSelectedLanguage('CN'); setLanguageMenuOpen(false); }}>🇨🇳 中文</li>
-                    <li onClick={() => { setSelectedLanguage('JP'); setLanguageMenuOpen(false); }}>🇯🇵 日本語</li>
-                    <li onClick={() => { setSelectedLanguage('KR'); setLanguageMenuOpen(false); }}>🇰🇷 한국어</li>
-                  </ul>
-                )}
-              </div>
+  {languageMenuOpen && (
+    <ul className="language-menu show">
+      <li onClick={() => { setSelectedLanguage('EN'); setLanguageMenuOpen(false); }}>
+        <img src="https://flagcdn.com/w20/gb.png" alt="English" /> English
+      </li>
+      <li onClick={() => { setSelectedLanguage('CN'); setLanguageMenuOpen(false); }}>
+        <img src="https://flagcdn.com/w20/cn.png" alt="Chinese" /> 中文
+      </li>
+      <li onClick={() => { setSelectedLanguage('JP'); setLanguageMenuOpen(false); }}>
+        <img src="https://flagcdn.com/w20/jp.png" alt="Japanese" /> 日本語
+      </li>
+      <li onClick={() => { setSelectedLanguage('KR'); setLanguageMenuOpen(false); }}>
+        <img src="https://flagcdn.com/w20/kr.png" alt="Korean" /> 한국어
+      </li>
+    </ul>
+  )}
+</div>
+
+
 
               {/* Auth Buttons / Profile */}
               {!isLoggedIn ? (

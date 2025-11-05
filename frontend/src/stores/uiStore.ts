@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { WalletTab, ToastState } from '../types'
+import type { WalletTab, ToastState, Drawing, DrawingState, LineStyle } from '../types'
 
 interface UIStore {
   // Theme
@@ -26,6 +26,18 @@ interface UIStore {
   // Drawing Tools
   activeDrawingTool: string | null
   setActiveDrawingTool: (tool: string | null) => void
+  drawings: Drawing[]
+  setDrawings: (drawings: Drawing[]) => void
+  addDrawing: (drawing: Drawing) => void
+  removeDrawing: (id: string) => void
+  drawingState: DrawingState
+  setDrawingState: (state: DrawingState) => void
+  activeDrawingColor: string
+  setActiveDrawingColor: (color: string) => void
+  activeLineWidth: number
+  setActiveLineWidth: (width: number) => void
+  activeLineStyle: LineStyle
+  setActiveLineStyle: (style: LineStyle) => void
 
   // Wallet
   activeWalletTab: WalletTab
@@ -77,6 +89,18 @@ export const useUIStore = create<UIStore>()(
       // Drawing Tools
       activeDrawingTool: null,
       setActiveDrawingTool: (tool) => set({ activeDrawingTool: tool }),
+      drawings: [],
+      setDrawings: (drawings) => set({ drawings }),
+      addDrawing: (drawing) => set((state) => ({ drawings: [...state.drawings, drawing] })),
+      removeDrawing: (id) => set((state) => ({ drawings: state.drawings.filter((d) => d.id !== id) })),
+      drawingState: null,
+      setDrawingState: (state) => set({ drawingState: state }),
+      activeDrawingColor: '#3b82f6',
+      setActiveDrawingColor: (color) => set({ activeDrawingColor: color }),
+      activeLineWidth: 2,
+      setActiveLineWidth: (width) => set({ activeLineWidth: width }),
+      activeLineStyle: 'solid',
+      setActiveLineStyle: (style) => set({ activeLineStyle: style }),
 
       // Wallet
       activeWalletTab: 'overview',

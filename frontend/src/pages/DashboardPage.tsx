@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import './dashboard.css';
 
 export default function DashboardPage() {
   const { isLoggedIn, user, logout } = useAuthStore();
-  const navigate = useNavigate();
   const [activeMarketTab, setActiveMarketTab] = useState('popular');
   const [activeNewsTab, setActiveNewsTab] = useState('all');
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);

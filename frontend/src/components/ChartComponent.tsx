@@ -1,11 +1,13 @@
-import React, { useEffect, useRef, useContext, useState } from 'react'
-import { createChart, IChartApi, ISeriesApi, UTCTimestamp, CandlestickData, IPriceLine, MouseEventParams } from 'lightweight-charts'
+import React, { useEffect, useRef, useContext, useState, useCallback } from 'react'
+import { createChart, IChartApi, ISeriesApi, UTCTimestamp, CandlestickData, IPriceLine, MouseEventParams, Time } from 'lightweight-charts'
 import { WebSocketContext } from '../context/WebSocketContext'
 import type { PriceMessage } from '../hooks/useWebSocket'
 import { useUIStore } from '../stores/uiStore'
 import ChartHeader from './ChartHeader'
 import FloatingDrawingToolbar from './FloatingDrawingToolbar'
+import TextInputModal from './TextInputModal'
 import { getApiUrl } from '../config/api'
+import type { Drawing } from '../types'
 
 type Kline = {
   openTime: number
@@ -30,9 +32,21 @@ export default function ChartComponent() {
   const symbol = useUIStore(state => state.activeInstrument)
   const setShowAnalyticsPanel = useUIStore(state => state.setShowAnalyticsPanel)
   const activeDrawingTool = useUIStore(state => state.activeDrawingTool)
+  const setActiveDrawingTool = useUIStore(state => state.setActiveDrawingTool)
+  const drawings = useUIStore(state => state.drawings)
+  const setDrawings = useUIStore(state => state.setDrawings)
+  const addDrawing = useUIStore(state => state.addDrawing)
+  const removeDrawing = useUIStore(state => state.removeDrawing)
+  const drawingState = useUIStore(state => state.drawingState)
+  const setDrawingState = useUIStore(state => state.setDrawingState)
+  const activeDrawingColor = useUIStore(state => state.activeDrawingColor)
+  const activeLineWidth = useUIStore(state => state.activeLineWidth)
+  const activeLineStyle = useUIStore(state => state.activeLineStyle)
+
   const ref = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const lastBarRef = useRef<{ time: UTCTimestamp; open: number; high: number; low: number; close: number } | null>(null)
   const priceLineRef = useRef<IPriceLine | null>(null)
   const [ohlcv, setOhlcv] = useState<OHLCVData | null>(null)
@@ -40,16 +54,12 @@ export default function ChartComponent() {
   const [isLoading, setIsLoading] = useState(false)
   const loadingTimeoutRef = useRef<number | null>(null)
 
-  // Drawing storage
-  type Drawing = {
-    id: string
-    type: 'horizontal-line' | 'vertical-line'
-    price?: number
-    time?: number
-    color: string
-    lineRef?: IPriceLine
-  }
-  const drawingsRef = useRef<Drawing[]>([]) // Keep ref in sync for cleanup
+  // Text annotation modal state
+  const [showTextModal, setShowTextModal] = useState(false)
+  const [textModalPosition, setTextModalPosition] = useState<{ time: number; price: number } | null>(null)
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; drawingId: string } | null>(null)
   
   // Map timeframe to seconds for candle grouping
   const getTimeframeSeconds = (tf: string): number => {
@@ -296,95 +306,161 @@ export default function ChartComponent() {
     }
   }, [lastMessage, timeframeSeconds, symbol])
 
+  // Helper function to save drawings to localStorage
+  const saveDrawingsToLocalStorage = useCallback((drawingsToSave: Drawing[]) => {
+    const serializable = drawingsToSave.map(d => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { lineRef, ...rest } = d as Drawing & { lineRef?: IPriceLine }
+      return rest
+    })
+    localStorage.setItem(`chart-drawings-${symbol}`, JSON.stringify(serializable))
+  }, [symbol])
+
   // Load drawings from localStorage when symbol changes
   useEffect(() => {
     if (!seriesRef.current) return
 
-    // First, clear any existing drawings to prevent duplicates
-    drawingsRef.current.forEach(drawing => {
-      if (drawing.lineRef && seriesRef.current) {
-        seriesRef.current.removePriceLine(drawing.lineRef)
+    // Clear existing horizontal line price lines
+    drawings.forEach(drawing => {
+      if (drawing.type === 'horizontal-line' && drawing.lineRef && seriesRef.current) {
+        try {
+          seriesRef.current.removePriceLine(drawing.lineRef as IPriceLine)
+        } catch (e) {
+          // ignore if already disposed
+        }
       }
     })
-    drawingsRef.current = []
 
-    // Then load drawings for the current symbol
+    // Load drawings for the current symbol
     const savedDrawings = localStorage.getItem(`chart-drawings-${symbol}`)
     if (savedDrawings) {
       try {
         const parsedDrawings: Drawing[] = JSON.parse(savedDrawings)
 
-        // Re-create price lines from saved data
-        parsedDrawings.forEach(drawing => {
-          if (drawing.type === 'horizontal-line' && drawing.price && seriesRef.current) {
+        // Re-create horizontal price lines from saved data
+        const drawingsWithRefs = parsedDrawings.map(drawing => {
+          if (drawing.type === 'horizontal-line' && seriesRef.current) {
+            // Clamp lineWidth to valid range for lightweight-charts (1-4)
+            const validLineWidth = Math.min(4, Math.max(1, drawing.lineWidth)) as 1 | 2 | 3 | 4
             const line = seriesRef.current.createPriceLine({
               price: drawing.price,
               color: drawing.color,
-              lineWidth: 2,
+              lineWidth: validLineWidth,
               lineStyle: 0,
               axisLabelVisible: true,
               title: '',
             })
-            drawing.lineRef = line
+            return { ...drawing, lineRef: line }
           }
+          return drawing
         })
 
-        drawingsRef.current = parsedDrawings
+        setDrawings(drawingsWithRefs)
       } catch (e) {
         console.error('Failed to load drawings:', e)
+        setDrawings([])
       }
+    } else {
+      setDrawings([])
     }
-  }, [symbol])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [symbol, setDrawings])
 
-  // Handle drawing tool clicks
+  // Handle drawing tool clicks - State Machine
   useEffect(() => {
-    if (!chartRef.current || !seriesRef.current) return
-    if (!activeDrawingTool || (activeDrawingTool !== 'horizontal-line' && activeDrawingTool !== 'vertical-line')) {
-      return
-    }
+    if (!chartRef.current || !seriesRef.current || !activeDrawingTool) return
 
     const handleChartClick = (param: MouseEventParams) => {
-      if (!param.point || !seriesRef.current) return
+      if (!param.point || !seriesRef.current || !chartRef.current) return
 
       const price = seriesRef.current.coordinateToPrice(param.point.y)
-      if (price === null) return
+      const time = chartRef.current.timeScale().coordinateToTime(param.point.x)
+
+      if (price === null || time === null) return
 
       const priceNum = Number(price)
+      const timeNum = typeof time === 'object' && 'timestamp' in time ? time.timestamp : Number(time)
 
-      // Only handle horizontal lines for now (vertical lines need more complex implementation)
+      // State machine for different drawing tools
       if (activeDrawingTool === 'horizontal-line') {
-        const newDrawing: Drawing = {
-          id: crypto.randomUUID(),
-          type: 'horizontal-line',
+        // 1-click tool
+        // Clamp lineWidth to valid range for lightweight-charts (1-4)
+        const validLineWidth = Math.min(4, Math.max(1, activeLineWidth)) as 1 | 2 | 3 | 4
+        const line = seriesRef.current.createPriceLine({
           price: priceNum,
-          color: '#3b82f6', // Blue color
-        }
-
-        const line = seriesRef.current!.createPriceLine({
-          price: priceNum,
-          color: newDrawing.color,
-          lineWidth: 2,
+          color: activeDrawingColor,
+          lineWidth: validLineWidth,
           lineStyle: 0,
           axisLabelVisible: true,
           title: '',
         })
 
-        newDrawing.lineRef = line
+        const newDrawing: Drawing = {
+          id: crypto.randomUUID(),
+          type: 'horizontal-line',
+          price: priceNum,
+          color: activeDrawingColor,
+          lineWidth: activeLineWidth,
+          lineStyle: activeLineStyle,
+          lineRef: line
+        }
 
-        const updatedDrawings = [...drawingsRef.current, newDrawing]
-        drawingsRef.current = updatedDrawings
+        addDrawing(newDrawing)
+        saveDrawingsToLocalStorage([...drawings, newDrawing])
+        setActiveDrawingTool(null)
+      } else if (activeDrawingTool === 'vertical-line') {
+        // 1-click tool
+        const newDrawing: Drawing = {
+          id: crypto.randomUUID(),
+          type: 'vertical-line',
+          time: Number(timeNum),
+          color: activeDrawingColor,
+          lineWidth: activeLineWidth,
+          lineStyle: activeLineStyle
+        }
 
-        // Save to localStorage (exclude lineRef as it can't be serialized)
-        const drawingsToSave = updatedDrawings.map((drawing) => ({
-          id: drawing.id,
-          type: drawing.type,
-          price: drawing.price,
-          time: drawing.time,
-          color: drawing.color,
-        }))
-        localStorage.setItem(`chart-drawings-${symbol}`, JSON.stringify(drawingsToSave))
+        addDrawing(newDrawing)
+        saveDrawingsToLocalStorage([...drawings, newDrawing])
+        setActiveDrawingTool(null)
+      } else if (activeDrawingTool === 'text') {
+        // 1-click tool with modal
+        setTextModalPosition({ time: Number(timeNum), price: priceNum })
+        setShowTextModal(true)
+      } else if (activeDrawingTool === 'trendline' || activeDrawingTool === 'rectangle') {
+        // 2-click tools
+        if (!drawingState) {
+          // First click
+          setDrawingState({
+            type: activeDrawingTool as 'trendline' | 'rectangle',
+            point1: { time: Number(timeNum), price: priceNum }
+          })
+        } else {
+          // Second click
+          const newDrawing: Drawing = activeDrawingTool === 'trendline'
+            ? {
+                id: crypto.randomUUID(),
+                type: 'trendline',
+                point1: drawingState.point1,
+                point2: { time: Number(timeNum), price: priceNum },
+                color: activeDrawingColor,
+                lineWidth: activeLineWidth,
+                lineStyle: activeLineStyle
+              }
+            : {
+                id: crypto.randomUUID(),
+                type: 'rectangle',
+                point1: drawingState.point1,
+                point2: { time: Number(timeNum), price: priceNum },
+                color: activeDrawingColor,
+                lineWidth: activeLineWidth,
+                lineStyle: activeLineStyle
+              }
 
-        console.log(`Horizontal line created at price: ${priceNum.toFixed(2)}`)
+          addDrawing(newDrawing)
+          saveDrawingsToLocalStorage([...drawings, newDrawing])
+          setDrawingState(null)
+          setActiveDrawingTool(null)
+        }
       }
     }
 
@@ -395,16 +471,261 @@ export default function ChartComponent() {
         chartRef.current.unsubscribeClick(handleChartClick)
       }
     }
-  }, [activeDrawingTool, symbol])
+  }, [activeDrawingTool, drawingState, activeDrawingColor, activeLineWidth, activeLineStyle, drawings, addDrawing, setActiveDrawingTool, setDrawingState, symbol, saveDrawingsToLocalStorage])
+
+  // Canvas rendering function
+  const renderDrawings = useCallback(() => {
+    if (!canvasRef.current || !chartRef.current || !seriesRef.current) return
+
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    // Render each drawing
+    drawings.forEach(drawing => {
+      if (drawing.type === 'horizontal-line') {
+        // Skip - handled by LWC price line
+        return
+      }
+
+      ctx.strokeStyle = drawing.color
+      ctx.fillStyle = drawing.color
+
+      // Set line width and style for non-text drawings
+      if (drawing.type !== 'text') {
+        ctx.lineWidth = drawing.lineWidth
+
+        // Set line style
+        if (drawing.lineStyle === 'dashed') {
+          ctx.setLineDash([drawing.lineWidth * 4, drawing.lineWidth * 2])
+        } else if (drawing.lineStyle === 'dotted') {
+          ctx.setLineDash([drawing.lineWidth, drawing.lineWidth * 2])
+        } else {
+          ctx.setLineDash([])
+        }
+      }
+
+      if (drawing.type === 'vertical-line') {
+        const x = chartRef.current!.timeScale().timeToCoordinate(drawing.time as Time)
+        if (x !== null) {
+          ctx.beginPath()
+          ctx.moveTo(x, 0)
+          ctx.lineTo(x, canvas.height)
+          ctx.stroke()
+        }
+      } else if (drawing.type === 'trendline') {
+        const x1 = chartRef.current!.timeScale().timeToCoordinate(drawing.point1.time as Time)
+        const y1 = seriesRef.current!.priceToCoordinate(drawing.point1.price)
+        const x2 = chartRef.current!.timeScale().timeToCoordinate(drawing.point2.time as Time)
+        const y2 = seriesRef.current!.priceToCoordinate(drawing.point2.price)
+
+        if (x1 !== null && y1 !== null && x2 !== null && y2 !== null) {
+          ctx.beginPath()
+          ctx.moveTo(x1, y1)
+          ctx.lineTo(x2, y2)
+          ctx.stroke()
+        }
+      } else if (drawing.type === 'rectangle') {
+        const x1 = chartRef.current!.timeScale().timeToCoordinate(drawing.point1.time as Time)
+        const y1 = seriesRef.current!.priceToCoordinate(drawing.point1.price)
+        const x2 = chartRef.current!.timeScale().timeToCoordinate(drawing.point2.time as Time)
+        const y2 = seriesRef.current!.priceToCoordinate(drawing.point2.price)
+
+        if (x1 !== null && y1 !== null && x2 !== null && y2 !== null) {
+          const width = x2 - x1
+          const height = y2 - y1
+          ctx.strokeRect(x1, y1, width, height)
+        }
+      } else if (drawing.type === 'text') {
+        const x = chartRef.current!.timeScale().timeToCoordinate(drawing.point.time as Time)
+        const y = seriesRef.current!.priceToCoordinate(drawing.point.price)
+
+        if (x !== null && y !== null) {
+          ctx.font = `${drawing.fontSize || 14}px sans-serif`
+          ctx.fillText(drawing.text, x + 5, y - 5)
+        }
+      }
+    })
+  }, [drawings])
+
+  // Canvas render loop - redraw when chart moves or drawings change
+  useEffect(() => {
+    if (!chartRef.current) return
+
+    const handleVisibleRangeChange = () => {
+      renderDrawings()
+    }
+
+    chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange)
+
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange)
+      }
+    }
+  }, [drawings, renderDrawings])
+
+  // Trigger render when drawings change
+  useEffect(() => {
+    renderDrawings()
+  }, [drawings, renderDrawings])
+
+  // Handle canvas and chart resize
+  useEffect(() => {
+    if (!ref.current || !canvasRef.current) return
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (ref.current && canvasRef.current && chartRef.current) {
+        const width = ref.current.clientWidth
+        const height = 500
+
+        canvasRef.current.width = width
+        canvasRef.current.height = height
+
+        chartRef.current.applyOptions({ width })
+        renderDrawings()
+      }
+    })
+
+    resizeObserver.observe(ref.current)
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [renderDrawings])
+
+  // Right-click context menu handler
+  useEffect(() => {
+    if (!ref.current) return
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault()
+
+      if (!chartRef.current || !seriesRef.current) return
+
+      const rect = (e.target as HTMLElement).getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+
+      // Hit detection - find if any drawing is near the click
+      const hitTolerance = 10 // pixels
+      let hitDrawing: Drawing | null = null
+
+      for (const drawing of drawings) {
+        if (drawing.type === 'horizontal-line') {
+          const lineY = seriesRef.current.priceToCoordinate(drawing.price)
+          if (lineY !== null && Math.abs(lineY - y) < hitTolerance) {
+            hitDrawing = drawing
+            break
+          }
+        } else if (drawing.type === 'vertical-line') {
+          const lineX = chartRef.current.timeScale().timeToCoordinate(drawing.time as Time)
+          if (lineX !== null && Math.abs(lineX - x) < hitTolerance) {
+            hitDrawing = drawing
+            break
+          }
+        } else if (drawing.type === 'trendline') {
+          const x1 = chartRef.current.timeScale().timeToCoordinate(drawing.point1.time as Time)
+          const y1 = seriesRef.current.priceToCoordinate(drawing.point1.price)
+          const x2 = chartRef.current.timeScale().timeToCoordinate(drawing.point2.time as Time)
+          const y2 = seriesRef.current.priceToCoordinate(drawing.point2.price)
+
+          if (x1 !== null && y1 !== null && x2 !== null && y2 !== null) {
+            // Simple distance to line calculation
+            const dist = Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / Math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2)
+            if (dist < hitTolerance) {
+              hitDrawing = drawing
+              break
+            }
+          }
+        } else if (drawing.type === 'rectangle') {
+          const x1 = chartRef.current.timeScale().timeToCoordinate(drawing.point1.time as Time)
+          const y1 = seriesRef.current.priceToCoordinate(drawing.point1.price)
+          const x2 = chartRef.current.timeScale().timeToCoordinate(drawing.point2.time as Time)
+          const y2 = seriesRef.current.priceToCoordinate(drawing.point2.price)
+
+          if (x1 !== null && y1 !== null && x2 !== null && y2 !== null) {
+            const minX = Math.min(x1, x2)
+            const maxX = Math.max(x1, x2)
+            const minY = Math.min(y1, y2)
+            const maxY = Math.max(y1, y2)
+
+            if (x >= minX - hitTolerance && x <= maxX + hitTolerance && y >= minY - hitTolerance && y <= maxY + hitTolerance) {
+              // Check if near border
+              if (Math.abs(x - minX) < hitTolerance || Math.abs(x - maxX) < hitTolerance || Math.abs(y - minY) < hitTolerance || Math.abs(y - maxY) < hitTolerance) {
+                hitDrawing = drawing
+                break
+              }
+            }
+          }
+        } else if (drawing.type === 'text') {
+          const textX = chartRef.current.timeScale().timeToCoordinate(drawing.point.time as Time)
+          const textY = seriesRef.current.priceToCoordinate(drawing.point.price)
+
+          if (textX !== null && textY !== null) {
+            // Rough hit detection for text
+            if (Math.abs(textX - x) < 50 && Math.abs(textY - y) < 20) {
+              hitDrawing = drawing
+              break
+            }
+          }
+        }
+      }
+
+      if (hitDrawing) {
+        setContextMenu({ x: e.clientX, y: e.clientY, drawingId: hitDrawing.id })
+      }
+    }
+
+    ref.current.addEventListener('contextmenu', handleContextMenu)
+    const refCurrent = ref.current
+
+    return () => {
+      refCurrent?.removeEventListener('contextmenu', handleContextMenu)
+    }
+  }, [drawings])
+
+  // Close context menu on click elsewhere
+  useEffect(() => {
+    if (!contextMenu) return
+
+    const handleClick = () => setContextMenu(null)
+    document.addEventListener('click', handleClick)
+
+    return () => {
+      document.removeEventListener('click', handleClick)
+    }
+  }, [contextMenu])
+
+  // Handle text modal submission
+  const handleTextSubmit = (text: string) => {
+    if (!textModalPosition) return
+
+    const newDrawing: Drawing = {
+      id: crypto.randomUUID(),
+      type: 'text',
+      point: textModalPosition,
+      text,
+      color: activeDrawingColor,
+      fontSize: 14
+    }
+
+    addDrawing(newDrawing)
+    saveDrawingsToLocalStorage([...drawings, newDrawing])
+    setActiveDrawingTool(null)
+  }
 
   // Format symbol for display (e.g., BTCUSDT -> BTC/USDT)
   const displaySymbol = symbol.replace(/USDT?$/, match => `/${match}`)
 
   // Format number with commas
   const formatNumber = (num: number, decimals: number = 2): string => {
-    return num.toLocaleString('en-US', { 
-      minimumFractionDigits: decimals, 
-      maximumFractionDigits: decimals 
+    return num.toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
     })
   }
 
@@ -413,20 +734,22 @@ export default function ChartComponent() {
   }
 
   const handleClearDrawings = () => {
-    // Remove all price lines from chart
-    drawingsRef.current.forEach(drawing => {
-      if (drawing.lineRef && seriesRef.current) {
-        seriesRef.current.removePriceLine(drawing.lineRef)
+    // Remove all horizontal line price lines from chart
+    drawings.forEach(drawing => {
+      if (drawing.type === 'horizontal-line' && drawing.lineRef && seriesRef.current) {
+        try {
+          seriesRef.current.removePriceLine(drawing.lineRef as IPriceLine)
+        } catch (e) {
+          // ignore if already disposed
+        }
       }
     })
 
-    // Clear from memory
-    drawingsRef.current = []
+    // Clear from state
+    setDrawings([])
 
     // Clear from localStorage
     localStorage.removeItem(`chart-drawings-${symbol}`)
-
-    console.log('All drawings cleared')
   }
 
   return (
@@ -435,8 +758,21 @@ export default function ChartComponent() {
       <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-2 truncate">
         {displaySymbol} - {timeframe} (last 200)
       </div>
-      <div className="relative overflow-hidden w-full" style={{ height: '500px' }}>
+      <div
+        className="relative overflow-hidden w-full"
+        style={{
+          height: '500px',
+          cursor: activeDrawingTool ? 'crosshair' : 'default'
+        }}
+      >
         <div ref={ref} className="w-full h-full" />
+
+        {/* Canvas overlay for drawings */}
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 pointer-events-none"
+          style={{ width: '100%', height: '500px' }}
+        />
 
         {/* Floating Drawing Toolbar */}
         <FloatingDrawingToolbar />
@@ -449,7 +785,38 @@ export default function ChartComponent() {
             </div>
           </div>
         )}
+
+        {/* Context menu for deleting drawings */}
+        {contextMenu && (
+          <div
+            className="fixed bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg py-1 z-50"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                removeDrawing(contextMenu.drawingId)
+                const updatedDrawings = drawings.filter(d => d.id !== contextMenu.drawingId)
+                saveDrawingsToLocalStorage(updatedDrawings)
+                setContextMenu(null)
+              }}
+              className="w-full px-4 py-2 text-sm text-left text-red-600 dark:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+            >
+              Delete Drawing
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Text Input Modal */}
+      <TextInputModal
+        isOpen={showTextModal}
+        onClose={() => {
+          setShowTextModal(false)
+          setTextModalPosition(null)
+        }}
+        onSubmit={handleTextSubmit}
+      />
 
       {ohlcv && (
         <div className="mt-3 grid grid-cols-5 gap-2 text-xs overflow-hidden">

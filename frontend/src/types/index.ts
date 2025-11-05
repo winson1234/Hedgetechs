@@ -59,3 +59,63 @@ export type Transaction = {
   // Error information
   errorMessage?: string
 }
+
+// Chart drawing types
+export type DrawingType = 'horizontal-line' | 'vertical-line' | 'trendline' | 'rectangle' | 'text'
+export type LineStyle = 'solid' | 'dashed' | 'dotted'
+
+export type DrawingPoint = {
+  time: number
+  price: number
+}
+
+// Tagged union for different drawing types
+export type Drawing =
+  | {
+      id: string
+      type: 'horizontal-line'
+      price: number
+      color: string
+      lineWidth: number
+      lineStyle: LineStyle
+      lineRef?: unknown // IPriceLine from lightweight-charts, stored at runtime only
+    }
+  | {
+      id: string
+      type: 'vertical-line'
+      time: number
+      color: string
+      lineWidth: number
+      lineStyle: LineStyle
+    }
+  | {
+      id: string
+      type: 'trendline'
+      point1: DrawingPoint
+      point2: DrawingPoint
+      color: string
+      lineWidth: number
+      lineStyle: LineStyle
+    }
+  | {
+      id: string
+      type: 'rectangle'
+      point1: DrawingPoint
+      point2: DrawingPoint
+      color: string
+      lineWidth: number
+      lineStyle: LineStyle
+    }
+  | {
+      id: string
+      type: 'text'
+      point: DrawingPoint
+      text: string
+      color: string
+      fontSize?: number
+    }
+
+export type DrawingState = {
+  type: DrawingType
+  point1: DrawingPoint
+} | null

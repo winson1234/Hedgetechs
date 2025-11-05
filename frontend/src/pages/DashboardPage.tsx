@@ -1,10 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { WebSocketContext } from '../context/WebSocketContext';
+import MiniSparklineChart from '../components/MiniSparklineChart';
 import './dashboard.css';
+
+interface CryptoData {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  filter: string;
+  icon: string;
+  gradient: string;
+}
 
 export default function DashboardPage() {
   const { isLoggedIn, user, logout } = useAuthStore();
+  const ws = useContext(WebSocketContext);
   const [activeMarketTab, setActiveMarketTab] = useState('popular');
   const [activeNewsTab, setActiveNewsTab] = useState('all');
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
@@ -14,6 +27,26 @@ export default function DashboardPage() {
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('EN');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // Real-time cryptocurrency data from WebSocket
+  const [cryptoData, setCryptoData] = useState<CryptoData[]>([
+    { symbol: 'BTCUSDT', name: 'Bitcoin', price: 0, change: 0, filter: 'popular', icon: '₿', gradient: 'linear-gradient(135deg, #f7931a, #ff9500)' },
+    { symbol: 'ETHUSDT', name: 'Ethereum', price: 0, change: 0, filter: 'popular', icon: 'Ξ', gradient: 'linear-gradient(135deg, #627eea, #8a9cff)' },
+    { symbol: 'BNBUSDT', name: 'Binance Coin', price: 0, change: 0, filter: 'popular', icon: 'B', gradient: 'linear-gradient(135deg, #f3ba2f, #ffd700)' },
+    { symbol: 'SOLUSDT', name: 'Solana', price: 0, change: 0, filter: 'popular', icon: '◎', gradient: 'linear-gradient(135deg, #9945ff, #14f195)' },
+    { symbol: 'ADAUSDT', name: 'Cardano', price: 0, change: 0, filter: 'popular', icon: '₳', gradient: 'linear-gradient(135deg, #0033ad, #3468d6)' },
+    { symbol: 'XRPUSDT', name: 'Ripple', price: 0, change: 0, filter: 'popular', icon: '✕', gradient: 'linear-gradient(135deg, #23292f, #3d4853)' },
+    { symbol: 'DOGEUSDT', name: 'Dogecoin', price: 0, change: 0, filter: 'popular', icon: 'Ð', gradient: 'linear-gradient(135deg, #c2a633, #f0d068)' },
+    { symbol: 'MATICUSDT', name: 'Polygon', price: 0, change: 0, filter: 'new', icon: '⬡', gradient: 'linear-gradient(135deg, #8247e5, #a77bf3)' },
+    { symbol: 'DOTUSDT', name: 'Polkadot', price: 0, change: 0, filter: 'new', icon: '●', gradient: 'linear-gradient(135deg, #e6007a, #ff4d9e)' },
+    { symbol: 'AVAXUSDT', name: 'Avalanche', price: 0, change: 0, filter: 'new', icon: '▲', gradient: 'linear-gradient(135deg, #e84142, #ff6b6b)' },
+    { symbol: 'LINKUSDT', name: 'Chainlink', price: 0, change: 0, filter: 'new', icon: '⬡', gradient: 'linear-gradient(135deg, #2a5ada, #5c8bf5)' },
+    { symbol: 'UNIUSDT', name: 'Uniswap', price: 0, change: 0, filter: 'new', icon: '🦄', gradient: 'linear-gradient(135deg, #ff007a, #ff6bae)' },
+    { symbol: 'LTCUSDT', name: 'Litecoin', price: 0, change: 0, filter: 'new', icon: 'Ł', gradient: 'linear-gradient(135deg, #345d9d, #5c8bd6)' },
+  ]);
+
+  // Store previous prices to calculate change
+  const [prevPrices, setPrevPrices] = useState<Record<string, number>>({});
 
   const handleLogout = () => {
     setShowLogoutModal(true);
@@ -37,73 +70,251 @@ export default function DashboardPage() {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  const cryptoData = [
-    { symbol: 'BTC', name: 'Bitcoin', price: 53380.20, change: 2.3, filter: 'popular', icon: '₿', gradient: 'linear-gradient(135deg, #f7931a, #ff9500)' },
-    { symbol: 'ETH', name: 'Ethereum', price: 1543.80, change: 1.1, filter: 'popular', icon: 'Ξ', gradient: 'linear-gradient(135deg, #627eea, #8a9cff)' },
-    { symbol: 'BNB', name: 'Binance Coin', price: 247.77, change: 2.4, filter: 'popular', icon: 'B', gradient: 'linear-gradient(135deg, #f3ba2f, #ffd700)' },
-    { symbol: 'SOL', name: 'Solana', price: 152.93, change: -1.2, filter: 'popular', icon: '◎', gradient: 'linear-gradient(135deg, #9945ff, #14f195)' },
-    { symbol: 'ADA', name: 'Cardano', price: 0.389, change: 3.5, filter: 'popular', icon: '₳', gradient: 'linear-gradient(135deg, #0033ad, #3468d6)' },
-    { symbol: 'XRP', name: 'Ripple', price: 0.5627, change: 3.9, filter: 'popular', icon: '✕', gradient: 'linear-gradient(135deg, #23292f, #3d4853)' },
-    { symbol: 'USDT', name: 'Tether', price: 0.9989, change: -0.01, filter: 'popular', icon: '₮', gradient: 'linear-gradient(135deg, #26a17b, #50af95)' },
-  ];
+  // WebSocket message handler for real-time price updates
+  useEffect(() => {
+    if (!ws?.lastMessage) return;
 
-  const newsItems = [
-    {
-      id: 1,
-      title: 'Bitcoin Surges Past $54K as Institutional Adoption Accelerates',
-      excerpt: 'Major financial institutions continue to embrace cryptocurrency as Bitcoin reaches new quarterly highs amid growing market confidence.',
-      source: 'CoinDesk',
-      category: 'crypto',
-      timestamp: '2 hours ago',
-      featured: true,
-      image: 'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=800&q=80'
-    },
-    {
-      id: 2,
-      title: 'Ethereum ETF Approval Expected to Drive Market Growth',
-      excerpt: 'Analysts predict significant market impact following anticipated regulatory approval for spot Ethereum ETFs.',
-      source: 'Bloomberg',
-      category: 'markets',
-      timestamp: '4 hours ago',
-      featured: false
-    },
-    {
-      id: 3,
-      title: 'DeFi Protocol Launches Revolutionary Yield Strategy',
-      excerpt: 'New decentralized finance platform introduces innovative approach to maximizing returns while minimizing risk.',
-      source: 'The Block',
-      category: 'crypto',
-      timestamp: '5 hours ago',
-      featured: false
-    },
-    {
-      id: 4,
-      title: 'SEC Announces New Framework for Digital Asset Regulation',
-      excerpt: 'Regulatory body unveils comprehensive guidelines aimed at providing clarity for cryptocurrency market participants.',
-      source: 'Reuters',
-      category: 'regulation',
-      timestamp: '6 hours ago',
-      featured: false
-    },
-    {
-      id: 5,
-      title: 'Layer 2 Solutions Show 300% Growth in Transaction Volume',
-      excerpt: 'Scaling solutions continue to gain traction as users seek lower fees and faster transaction speeds on blockchain networks.',
-      source: 'CryptoSlate',
-      category: 'technology',
-      timestamp: '8 hours ago',
-      featured: false
-    },
-    {
-      id: 6,
-      title: 'Major Exchange Launches Zero-Fee Trading for Select Pairs',
-      excerpt: 'Leading cryptocurrency platform introduces competitive pricing structure to attract new traders and increase market liquidity.',
-      source: 'Decrypt',
-      category: 'crypto',
-      timestamp: '10 hours ago',
-      featured: false
-    },
-  ];
+    const data = ws.lastMessage;
+
+    // Handle trade updates from Binance
+    if (data.type === 'trade') {
+      const price = parseFloat(data.price);
+      const symbol = data.symbol;
+
+      setCryptoData(prevData =>
+        prevData.map(crypto => {
+          if (crypto.symbol === symbol) {
+            // Calculate percentage change from previous price
+            const prevPrice = prevPrices[symbol] || price;
+            const changePercent = ((price - prevPrice) / prevPrice) * 100;
+
+            return {
+              ...crypto,
+              price,
+              change: changePercent,
+            };
+          }
+          return crypto;
+        })
+      );
+    }
+  }, [ws?.lastMessage, prevPrices]);
+
+  // Fetch initial 24h ticker data for baseline prices and changes
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        // Use relative URL in production, localhost in dev
+        const baseUrl = import.meta.env.MODE === 'development'
+          ? 'http://localhost:8080'
+          : '';
+
+        const symbols = cryptoData.map(c => c.symbol).join(',');
+        const response = await fetch(`${baseUrl}/api/v1/ticker?symbols=${symbols}`);
+
+        if (!response.ok) {
+          console.error('Failed to fetch ticker data');
+          return;
+        }
+
+        const tickerData = await response.json();
+
+        // Update crypto data with 24h statistics
+        setCryptoData(prevData =>
+          prevData.map(crypto => {
+            const ticker = tickerData.find((t: any) => t.symbol === crypto.symbol);
+            if (ticker) {
+              const price = parseFloat(ticker.lastPrice);
+              const change = parseFloat(ticker.priceChangePercent);
+
+              // Store initial price for change calculations
+              setPrevPrices(prev => ({ ...prev, [crypto.symbol]: price }));
+
+              return {
+                ...crypto,
+                price,
+                change,
+              };
+            }
+            return crypto;
+          })
+        );
+      } catch (err) {
+        console.error('Error fetching initial ticker data:', err);
+      }
+    };
+
+    fetchInitialData();
+  }, []); // Only run once on mount
+
+  // Live news data from API
+  const [newsItems, setNewsItems] = useState<any[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
+
+  // Fetch live news from backend API
+  useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        setNewsLoading(true);
+
+        // Use relative URL in production, localhost in dev
+        const baseUrl = import.meta.env.MODE === 'development'
+          ? 'http://localhost:8080'
+          : '';
+
+        const response = await fetch(`${baseUrl}/api/v1/news`);
+
+        if (!response.ok) {
+          console.error('Failed to fetch news');
+          return;
+        }
+
+        const newsData = await response.json();
+
+        // Extract articles array from response
+        const articles = newsData.articles || [];
+
+        // Transform API response to match component structure
+        const transformedNews = articles.map((article: any, index: number) => {
+          const category = getCategoryFromArticle(article);
+          return {
+            id: index + 1,
+            title: article.title,
+            excerpt: article.description || article.title,
+            source: article.source,
+            category: category,
+            timestamp: formatTimestamp(article.pubDate || article.publishedAt),
+            featured: index === 0, // Make first article featured
+            image: getPlaceholderImage(category, index), // Use placeholder images
+            link: article.link,
+          };
+        });
+
+        setNewsItems(transformedNews);
+      } catch (err) {
+        console.error('Error fetching news:', err);
+      } finally {
+        setNewsLoading(false);
+      }
+    };
+
+    // Helper function to determine category from title and description
+    const getCategoryFromArticle = (article: any) => {
+      const title = (article.title || '').toLowerCase();
+      const description = (article.description || '').toLowerCase();
+      const source = (article.source || '').toLowerCase();
+      const text = `${title} ${description}`;
+
+      // Check for regulation keywords
+      const regulationKeywords = ['regulation', 'regulatory', 'sec', 'compliance', 'law', 'legal', 'government', 'policy', 'ban', 'lawsuit'];
+      if (regulationKeywords.some(keyword => text.includes(keyword))) {
+        return 'regulation';
+      }
+
+      // Check for technology keywords
+      const techKeywords = ['blockchain', 'technology', 'protocol', 'layer 2', 'defi', 'nft', 'smart contract', 'upgrade', 'network', 'infrastructure'];
+      if (techKeywords.some(keyword => text.includes(keyword))) {
+        return 'technology';
+      }
+
+      // Check for crypto sources/keywords
+      if (source.includes('coindesk') || source.includes('cryptonews') || source.includes('cointelegraph') ||
+          text.includes('bitcoin') || text.includes('ethereum') || text.includes('crypto')) {
+        return 'crypto';
+      }
+
+      // Check for market sources
+      if (source.includes('fxstreet') || source.includes('investing') || source.includes('yahoo')) {
+        return 'markets';
+      }
+
+      return 'crypto'; // default
+    };
+
+    // Helper function to get placeholder image based on category with more variety
+    const getPlaceholderImage = (category: string, index: number) => {
+      const cryptoImages = [
+        'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1622630998477-20aa696ecb05?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1640826514546-7d2d259a2f6c?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1605792657660-596af9009e82?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1644088379091-d574269d422f?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1609554496796-c345a5335ceb?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1622707304787-b244e3d55c75?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1634704784915-aacf363b021f?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1563986768494-4dee2763ff3f?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1607799279861-4dd421887fb3?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1623497421753-44869a9fc23c?w=800&q=80&fit=crop',
+      ];
+
+      const marketImages = [
+        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1559526324-593bc073d938?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1560221328-12fe60f83ab8?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1579532537598-459ecdaf39cc?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1543286386-2e659306cd6c?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1553729459-efe14ef6055d?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&q=80&fit=crop',
+      ];
+
+      const techImages = [
+        'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80&fit=crop',
+      ];
+
+      const regulationImages = [
+        'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1561911341-7a293e0e5b92?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1453945619913-79ec89a82c51?w=800&q=80&fit=crop',
+      ];
+
+      let images = cryptoImages;
+      if (category === 'markets') images = marketImages;
+      else if (category === 'technology') images = techImages;
+      else if (category === 'regulation') images = regulationImages;
+
+      return images[index % images.length];
+    };
+
+    // Helper function to format timestamp
+    const formatTimestamp = (timestamp: string) => {
+      if (!timestamp) return 'Recently';
+
+      const publishedDate = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now.getTime() - publishedDate.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+      if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+      if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+      return publishedDate.toLocaleDateString();
+    };
+
+    fetchNews();
+
+    // Refresh news every 2 minutes (matching backend cache TTL)
+    const interval = setInterval(fetchNews, 2 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const faqItems = [
     {
@@ -139,6 +350,24 @@ export default function DashboardPage() {
   const filteredNews = activeNewsTab === 'all'
     ? newsItems
     : newsItems.filter(n => n.category === activeNewsTab);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredNews.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const displayedNews = filteredNews.slice(startIndex, endIndex);
+
+  // Reset to page 1 when tab changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeNewsTab]);
+
+  // Handler for page changes
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // Scroll to news section
+    document.getElementById('news')?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   return (
     <div className="dashboard-page">
@@ -412,15 +641,17 @@ export default function DashboardPage() {
       {/* Market Overview */}
       <section className="market-section" id="market">
         <div className="container">
-          <div className="section-header">
-            <h2 className="section-title">Today&apos;s Cryptocurrency Prices</h2>
-            <p className="section-subtitle">
+          <div className="section-header" style={{ textAlign: 'center' }}>
+            <h2 className="section-title" style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>
+              Today&apos;s Cryptocurrency Prices
+            </h2>
+            <p className="section-subtitle" style={{ fontSize: '1rem' }}>
               The global crypto market cap is <span className="market-cap-value">$2.89T</span> with 24h volume of <span className="market-volume-value">$120B</span>
             </p>
           </div>
 
           {/* Market Tabs */}
-          <div className="market-tabs">
+          <div className="market-tabs" style={{ justifyContent: 'center' }}>
             <button className={`market-tab ${activeMarketTab === 'popular' ? 'active' : ''}`} onClick={() => setActiveMarketTab('popular')}>
               <span className="tab-icon">🔥</span>
               Popular Coins
@@ -441,33 +672,42 @@ export default function DashboardPage() {
 
           <div className="crypto-table">
             <div className="crypto-row crypto-header">
-              <div className="crypto-col">Asset</div>
-              <div className="crypto-col">Last Price</div>
-              <div className="crypto-col">24h Change</div>
-              <div className="crypto-col">Chart</div>
-              <div className="crypto-col">Trade</div>
+              <div className="crypto-col" style={{ textAlign: 'left' }}>Asset</div>
+              <div className="crypto-col" style={{ textAlign: 'center' }}>Last Price</div>
+              <div className="crypto-col" style={{ textAlign: 'center' }}>24h Change</div>
+              <div className="crypto-col" style={{ textAlign: 'center' }}>Chart</div>
+              <div className="crypto-col" style={{ textAlign: 'center' }}>Trade</div>
             </div>
 
             {filteredCrypto.map(crypto => (
               <div key={crypto.symbol} className="crypto-row">
-                <div className="crypto-col">
+                <div className="crypto-col" style={{ textAlign: 'left' }}>
                   <div className="crypto-info">
                     <div className="crypto-icon" style={{ background: crypto.gradient }}>{crypto.icon}</div>
                     <div>
-                      <div className="crypto-symbol">{crypto.symbol}</div>
+                      <div className="crypto-symbol">{crypto.symbol.replace('USDT', '')}</div>
                       <div className="crypto-name">{crypto.name}</div>
                     </div>
                   </div>
                 </div>
-                <div className="crypto-col crypto-price">${crypto.price.toLocaleString()}</div>
-                <div className={`crypto-col crypto-change ${crypto.change > 0 ? 'positive' : 'negative'}`}>
-                  <span className="change-arrow">{crypto.change > 0 ? '▲' : '▼'}</span> {crypto.change > 0 ? '+' : ''}{crypto.change}%
+                <div className="crypto-col crypto-price" style={{ textAlign: 'center' }}>
+                  ${crypto.price > 0 ? crypto.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : '—'}
                 </div>
-                <div className="crypto-col">
-                  <div className={`mini-chart ${crypto.change > 0 ? 'positive' : 'negative'}`}></div>
+                <div className={`crypto-col crypto-change ${crypto.change > 0 ? 'positive' : 'negative'}`} style={{ textAlign: 'center' }}>
+                  <span className="change-arrow">{crypto.change > 0 ? '▲' : '▼'}</span> {crypto.change > 0 ? '+' : ''}{crypto.change.toFixed(2)}%
                 </div>
-                <div className="crypto-col">
-                  <button className="btn-trade">Buy</button>
+                <div className="crypto-col" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <MiniSparklineChart
+                    symbol={crypto.symbol}
+                    color={crypto.change > 0 ? '#10b981' : '#ef4444'}
+                    width={120}
+                    height={40}
+                  />
+                </div>
+                <div className="crypto-col" style={{ textAlign: 'center' }}>
+                  <Link to="/trading">
+                    <button className="btn-trade">Buy</button>
+                  </Link>
                 </div>
               </div>
             ))}
@@ -479,16 +719,17 @@ export default function DashboardPage() {
       <section className="news-section" id="news">
         <div className="container">
           {/* Section Header */}
-          <div className="section-header">
-            <div className="header-left">
-              <h2 className="section-title">Latest Market News</h2>
-              <p className="section-subtitle">Stay updated with real-time crypto and financial headlines</p>
-            </div>
-            
+          <div className="section-header" style={{ textAlign: 'center' }}>
+            <h2 className="section-title" style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>
+              Latest Market News
+            </h2>
+            <p className="section-subtitle" style={{ fontSize: '1rem' }}>
+              Stay updated with real-time crypto and financial headlines
+            </p>
           </div>
 
           {/* News Filter Tabs */}
-          <div className="news-tabs">
+          <div className="news-tabs" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
             <button className={`news-tab ${activeNewsTab === 'all' ? 'active' : ''}`} onClick={() => setActiveNewsTab('all')}>
               <span className="tab-icon">📰</span>
               All News
@@ -509,55 +750,296 @@ export default function DashboardPage() {
               <span className="tab-icon">⚖️</span>
               Regulation
             </button>
-            <div className="header-right">
-              <a href="#" className="btn btn-secondary view-all-btn">
-                View All News
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </a>
-            </div>
           </div>
 
           {/* News Grid */}
-          <div className="news-grid">
-            {filteredNews.map(news => (
-              <div key={news.id} className={`news-item ${news.featured ? 'featured' : ''}`}>
-                {news.featured && (
-                  <div className="news-badge featured-badge">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                    </svg>
-                    Featured
-                  </div>
-                )}
-                {!news.featured && (
-                  <div className="news-badge">{news.category.charAt(0).toUpperCase() + news.category.slice(1)}</div>
-                )}
-                {news.image && (
-                  <div className="news-image">
-                    <img src={news.image} alt={news.title} loading="lazy" />
-                    <div className="news-overlay"></div>
-                  </div>
-                )}
-                <div className="news-content">
-                  <div className="news-meta">
-                    <span className="news-source">{news.source}</span>
-                    <span className="news-time">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
+          {newsLoading ? (
+            <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '1.2rem' }}>Loading latest news...</div>
+            </div>
+          ) : displayedNews.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '1.2rem' }}>No news available for this category</div>
+            </div>
+          ) : (
+            <>
+              <div className="news-grid" style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+                gap: '2rem',
+                marginTop: '2rem'
+              }}>
+                {displayedNews.map(news => (
+                <div key={news.id} className="news-item" style={{
+                  background: 'var(--card-bg, #1a1f3a)',
+                  borderRadius: '16px',
+                  overflow: 'hidden',
+                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                  cursor: 'pointer',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '100%'
+                }} onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.3)';
+                }} onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}>
+                  <div className="news-badge" style={{
+                    position: 'absolute',
+                    top: '1rem',
+                    left: '1rem',
+                    zIndex: 10,
+                    background: news.featured ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(0, 0, 0, 0.7)',
+                    color: '#ffffff',
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    backdropFilter: 'blur(10px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}>
+                    {news.featured && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                       </svg>
-                      {news.timestamp}
-                    </span>
+                    )}
+                    {news.featured ? 'Featured' : news.category.charAt(0).toUpperCase() + news.category.slice(1)}
                   </div>
-                  <h3 className="news-title">{news.title}</h3>
-                  <p className="news-excerpt">{news.excerpt}</p>
-                  <a href="#" className="news-link">Read More →</a>
+                  <div style={{
+                    position: 'relative',
+                    height: '200px',
+                    overflow: 'hidden'
+                  }}>
+                    <img
+                      src={news.image}
+                      alt={news.title}
+                      loading="lazy"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                      onError={(e) => {
+                        // Fallback to a reliable default image if the original fails
+                        const target = e.target as HTMLImageElement;
+                        target.src = news.category === 'markets'
+                          ? 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&q=80&fit=crop'
+                          : 'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=800&q=80&fit=crop';
+                      }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: '50%',
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)'
+                    }}></div>
+                  </div>
+                  <div style={{
+                    padding: '1.5rem',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '1rem',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-secondary, #8892b0)'
+                    }}>
+                      <span style={{ fontWeight: '600', color: '#FDDB92' }}>{news.source}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        {news.timestamp}
+                      </span>
+                    </div>
+                    <h3 style={{
+                      fontSize: '1.1rem',
+                      fontWeight: '700',
+                      marginBottom: '0.75rem',
+                      color: 'var(--text-primary, #ffffff)',
+                      lineHeight: '1.4',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden'
+                    }}>{news.title}</h3>
+                    <p style={{
+                      fontSize: '0.9rem',
+                      color: 'var(--text-secondary, #8892b0)',
+                      lineHeight: '1.6',
+                      marginBottom: '1rem',
+                      flex: 1,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden'
+                    }}>{news.excerpt}</p>
+                    <a
+                      href={news.link || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: '#FDDB92',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        transition: 'gap 0.3s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.gap = '0.6rem';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.gap = '0.3rem';
+                      }}
+                    >
+                      Read More <span>→</span>
+                    </a>
+                  </div>
                 </div>
+              ))}
               </div>
-            ))}
-          </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginTop: '3rem',
+                  marginBottom: '2rem',
+                  flexWrap: 'wrap'
+                }}>
+                  {/* Previous Button */}
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    style={{
+                      padding: '0.75rem 1.25rem',
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      color: currentPage === 1 ? '#64748b' : '#ffffff',
+                      background: currentPage === 1 ? 'rgba(100, 116, 139, 0.2)' : 'rgba(102, 126, 234, 0.8)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.3s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                    Previous
+                  </button>
+
+                  {/* Page Numbers */}
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+                    // Show first page, last page, current page, and pages around current
+                    const showPage = page === 1 ||
+                                    page === totalPages ||
+                                    (page >= currentPage - 1 && page <= currentPage + 1);
+
+                    const showEllipsis = (page === currentPage - 2 && currentPage > 3) ||
+                                        (page === currentPage + 2 && currentPage < totalPages - 2);
+
+                    if (showEllipsis) {
+                      return (
+                        <span key={page} style={{ color: '#64748b', padding: '0 0.5rem' }}>...</span>
+                      );
+                    }
+
+                    if (!showPage) return null;
+
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        style={{
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.9rem',
+                          fontWeight: '600',
+                          color: '#ffffff',
+                          background: page === currentPage
+                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                            : 'rgba(255, 255, 255, 0.1)',
+                          border: page === currentPage ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          minWidth: '45px'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (page !== currentPage) {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (page !== currentPage) {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                          }
+                        }}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+
+                  {/* Next Button */}
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    style={{
+                      padding: '0.75rem 1.25rem',
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      color: currentPage === totalPages ? '#64748b' : '#ffffff',
+                      background: currentPage === totalPages ? 'rgba(100, 116, 139, 0.2)' : 'rgba(102, 126, 234, 0.8)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.3s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    Next
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </button>
+                </div>
+              )}
+
+              {/* Show current page info */}
+              <div style={{
+                textAlign: 'center',
+                color: 'var(--text-secondary)',
+                fontSize: '0.9rem',
+                marginBottom: '2rem'
+              }}>
+                Page {currentPage} of {totalPages} • Showing {displayedNews.length} of {filteredNews.length} articles
+              </div>
+            </>
+          )}
         </div>
       </section>
 

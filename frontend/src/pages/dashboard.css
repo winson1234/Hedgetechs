@@ -102,7 +102,10 @@ body.light-mode .header.scrolled {
   text-decoration: none;
   gap: 8px;
 }
-
+  .language-menu li.selected {
+    color: #FFD700; /* yellow/gold */
+    font-weight: bold; /* optional, make it stand out more */
+  }
 .logo-text {
   color: var(--text-primary);
   font-style: italic;

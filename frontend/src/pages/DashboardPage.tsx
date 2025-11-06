@@ -28,8 +28,25 @@ export default function DashboardPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState('EN');
+  const [selectedLanguage, setSelectedLanguage] = useState('EN-UK');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+const languages = [
+  { code: 'EN-US', name: 'English (US)', flag: 'https://flagcdn.com/w20/us.png' },
+  { code: 'EN-UK', name: 'English (UK)', flag: 'https://flagcdn.com/w20/gb.png' },
+  { code: 'ES', name: 'Spanish', flag: 'https://flagcdn.com/w20/es.png' },
+  { code: 'FR', name: 'French', flag: 'https://flagcdn.com/w20/fr.png' },
+  { code: 'DE', name: 'German', flag: 'https://flagcdn.com/w20/de.png' },
+  { code: 'CN', name: 'Chinese', flag: 'https://flagcdn.com/w20/cn.png' },
+  { code: 'JP', name: 'Japanese', flag: 'https://flagcdn.com/w20/jp.png' },
+  { code: 'KR', name: 'Korean', flag: 'https://flagcdn.com/w20/kr.png' },
+]
+
+// Reorder so selected language is first
+const sortedLanguages = [
+  ...languages.filter(lang => lang.code === selectedLanguage),
+  ...languages.filter(lang => lang.code !== selectedLanguage)
+]
 
   // Real-time cryptocurrency data from WebSocket
   const [cryptoData, setCryptoData] = useState<CryptoData[]>([
@@ -427,46 +444,37 @@ export default function DashboardPage() {
                   </svg>
                 )}
               </button>
-{/* Language Selector */}
+              
 <div className="language-selector">
   <button
     className="icon-btn"
-    id="languageToggle"
     onClick={() => setLanguageMenuOpen(!languageMenuOpen)}
     title="Select Language"
   >
-    {selectedLanguage === 'EN' && (
-      <img src="https://flagcdn.com/w20/gb.png" alt="English" width="20" height="15" />
-    )}
-    {selectedLanguage === 'CN' && (
-      <img src="https://flagcdn.com/w20/cn.png" alt="Chinese" width="20" height="15" />
-    )}
-    {selectedLanguage === 'JP' && (
-      <img src="https://flagcdn.com/w20/jp.png" alt="Japanese" width="20" height="15" />
-    )}
-    {selectedLanguage === 'KR' && (
-      <img src="https://flagcdn.com/w20/kr.png" alt="Korean" width="20" height="15" />
+    {languages.map(lang =>
+      selectedLanguage === lang.code ? (
+        <img key={lang.code} src={lang.flag} alt={lang.name} width="20" height="15" />
+      ) : null
     )}
   </button>
 
   {languageMenuOpen && (
     <ul className="language-menu show">
-      <li onClick={() => { setSelectedLanguage('EN'); setLanguageMenuOpen(false); }}>
-        <img src="https://flagcdn.com/w20/gb.png" alt="English" /> English
-      </li>
-      <li onClick={() => { setSelectedLanguage('CN'); setLanguageMenuOpen(false); }}>
-        <img src="https://flagcdn.com/w20/cn.png" alt="Chinese" /> 中文
-      </li>
-      <li onClick={() => { setSelectedLanguage('JP'); setLanguageMenuOpen(false); }}>
-        <img src="https://flagcdn.com/w20/jp.png" alt="Japanese" /> 日本語
-      </li>
-      <li onClick={() => { setSelectedLanguage('KR'); setLanguageMenuOpen(false); }}>
-        <img src="https://flagcdn.com/w20/kr.png" alt="Korean" /> 한국어
-      </li>
+      {sortedLanguages.map(lang => (
+        <li
+          key={lang.code}
+          className={selectedLanguage === lang.code ? 'selected' : ''}
+          onClick={() => {
+            setSelectedLanguage(lang.code)
+            setLanguageMenuOpen(false)
+          }}
+        >
+          <img src={lang.flag} alt={lang.name} width="20" height="15" /> {lang.name}
+        </li>
+      ))}
     </ul>
   )}
 </div>
-
 
 
               {/* Auth Buttons / Profile */}

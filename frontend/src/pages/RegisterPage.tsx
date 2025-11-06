@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import './register.css';
@@ -22,7 +22,15 @@ export default function RegisterPage() {
   const [retypeError, setRetypeError] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({ level: 0, text: '', color: '' });
 
-  // Password strength calculator
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const retypePasswordRef = useRef<HTMLInputElement>(null);
+
+  // Handle input changes
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }));
+  };
+
+  // Password strength checker
   useEffect(() => {
     if (!formData.password) {
       setPasswordStrength({ level: 0, text: '', color: '' });
@@ -48,7 +56,7 @@ export default function RegisterPage() {
     setPasswordStrength({ level: strength, ...levels[strength] });
   }, [formData.password]);
 
-  // Validate retype password
+  // Retype password validation
   useEffect(() => {
     if (formData.retypePassword && formData.password !== formData.retypePassword) {
       setRetypeError(true);
@@ -57,14 +65,21 @@ export default function RegisterPage() {
     }
   }, [formData.password, formData.retypePassword]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }));
+  // Focus restoration toggle
+  const togglePassword = () => {
+    setShowPassword(prev => !prev);
+    setTimeout(() => passwordRef.current?.focus(), 0);
   };
 
+  const toggleRetypePassword = () => {
+    setShowRetypePassword(prev => !prev);
+    setTimeout(() => retypePasswordRef.current?.focus(), 0);
+  };
+
+  // Submit handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
     if (!formData.email.includes('@')) {
       setEmailError(true);
       return;
@@ -117,6 +132,7 @@ export default function RegisterPage() {
           <p>Join FP Markets and start trading today</p>
 
           <form id="registerForm" onSubmit={handleSubmit}>
+            {/* Country */}
             <div className="form-group">
               <label className="form-label">Country <span className="required">*</span></label>
               <select id="country" value={formData.country} onChange={handleChange} required>
@@ -130,20 +146,10 @@ export default function RegisterPage() {
                 <option value="US">United States</option>
                 <option value="GB">United Kingdom</option>
                 <option value="AU">Australia</option>
-                <option value="CN">China</option>
-                <option value="JP">Japan</option>
-                <option value="KR">South Korea</option>
-                <option value="IN">India</option>
-                <option value="DE">Germany</option>
-                <option value="FR">France</option>
-                <option value="IT">Italy</option>
-                <option value="ES">Spain</option>
-                <option value="CA">Canada</option>
-                <option value="BR">Brazil</option>
-                <option value="MX">Mexico</option>
               </select>
             </div>
 
+            {/* Names */}
             <div className="form-group name-group">
               <div className="name-field">
                 <label className="form-label">First Name <span className="required">*</span></label>
@@ -155,26 +161,33 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* Email */}
             <div className="form-group">
               <label className="form-label">Email Address <span className="required">*</span></label>
               <input type="email" id="email" value={formData.email} onChange={handleChange} required />
               {emailError && <div className="error-message show">Please enter a valid email address</div>}
             </div>
 
+            {/* Password */}
             <div className="form-group">
               <label className="form-label">Password <span className="required">*</span></label>
               <div className="password-wrapper">
                 <input
+                  ref={passwordRef}
                   type={showPassword ? 'text' : 'password'}
                   id="password"
+<<<<<<< HEAD
                   placeholder="Enter your password"
+=======
+>>>>>>> e7427abedf3263e24b659f5b923224dbbbf0e312
                   value={formData.password}
                   onChange={handleChange}
+                  autoComplete="new-password"
                   required
                 />
                 <svg
                   className="eye-icon"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={togglePassword}
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 24 24"
                   fill="none"
@@ -183,10 +196,20 @@ export default function RegisterPage() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
+                  {showPassword ? (
+                    <>
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </>
+                  ) : (
+                    <>
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </>
+                  )}
                 </svg>
               </div>
+
               {formData.password && (
                 <div className="password-strength">
                   <div className="strength-bar">
@@ -205,20 +228,26 @@ export default function RegisterPage() {
               )}
             </div>
 
+            {/* Retype Password */}
             <div className="form-group">
               <label className="form-label">Retype Password <span className="required">*</span></label>
               <div className="password-wrapper">
                 <input
+                  ref={retypePasswordRef}
                   type={showRetypePassword ? 'text' : 'password'}
                   id="retypePassword"
+<<<<<<< HEAD
                   placeholder="Re-enter your password"
+=======
+>>>>>>> e7427abedf3263e24b659f5b923224dbbbf0e312
                   value={formData.retypePassword}
                   onChange={handleChange}
+                  autoComplete="new-password"
                   required
                 />
                 <svg
                   className="eye-icon"
-                  onClick={() => setShowRetypePassword(!showRetypePassword)}
+                  onClick={toggleRetypePassword}
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 24 24"
                   fill="none"
@@ -227,8 +256,17 @@ export default function RegisterPage() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
+                  {showRetypePassword ? (
+                    <>
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </>
+                  ) : (
+                    <>
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </>
+                  )}
                 </svg>
               </div>
               {retypeError && <div className="error-message show">Passwords do not match</div>}

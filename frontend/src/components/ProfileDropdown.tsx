@@ -148,10 +148,10 @@ export default function ProfileDropdown({
 
       // Update registered users database
       const registeredUsersData = localStorage.getItem('registeredUsers');
-      if (registeredUsersData) {
+      if (registeredUsersData && user?.email) {
         const registeredUsers = JSON.parse(registeredUsersData);
-        if (registeredUsers[user?.email!]) {
-          registeredUsers[user?.email!].passwordHash = newHash;
+        if (registeredUsers[user.email]) {
+          registeredUsers[user.email].passwordHash = newHash;
           localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
         }
       }

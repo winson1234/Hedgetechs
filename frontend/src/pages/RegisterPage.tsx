@@ -176,10 +176,7 @@ export default function RegisterPage() {
                   ref={passwordRef}
                   type={showPassword ? 'text' : 'password'}
                   id="password"
-<<<<<<< HEAD
                   placeholder="Enter your password"
-=======
->>>>>>> e7427abedf3263e24b659f5b923224dbbbf0e312
                   value={formData.password}
                   onChange={handleChange}
                   autoComplete="new-password"
@@ -236,10 +233,7 @@ export default function RegisterPage() {
                   ref={retypePasswordRef}
                   type={showRetypePassword ? 'text' : 'password'}
                   id="retypePassword"
-<<<<<<< HEAD
                   placeholder="Re-enter your password"
-=======
->>>>>>> e7427abedf3263e24b659f5b923224dbbbf0e312
                   value={formData.retypePassword}
                   onChange={handleChange}
                   autoComplete="new-password"

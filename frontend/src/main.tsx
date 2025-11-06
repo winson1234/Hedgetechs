@@ -45,7 +45,7 @@ function ThemeWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Apply theme on initial load based on persisted value
     setDarkMode(isDarkMode)
-  }, [])
+  }, [isDarkMode, setDarkMode])
 
   return <>{children}</>
 }

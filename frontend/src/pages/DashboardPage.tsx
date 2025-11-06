@@ -31,11 +31,9 @@ export default function DashboardPage() {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('EN-UK');
-const [isClosing, setIsClosing] = useState(false);
 const [showLogoutModal, setShowLogoutModal] = useState(false);
 const [isLoggingOut, setIsLoggingOut] = useState(false);
 const [fadeOut, setFadeOut] = useState(false);
-const [showLoggingOut, setShowLoggingOut] = useState(false);
 
 const languages = [
   { code: 'EN-US', name: 'English (US)', flag: 'https://flagcdn.com/w20/us.png' },

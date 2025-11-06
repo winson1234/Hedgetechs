@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import './register.css';
-import { motion, AnimatePresence } from 'framer-motion';
+//import { motion, AnimatePresence } from 'framer-motion';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -302,7 +302,7 @@ useEffect(() => {
             </p>
 
             <Link to="/login" className="signin-link">Already have an account? Sign in</Link>
-    <AnimatePresence>
+    {/*<AnimatePresence>
   {success && (
     <motion.div
       key="success-popup"
@@ -339,7 +339,7 @@ useEffect(() => {
       </motion.div>
     </motion.div>
   )}
-</AnimatePresence>
+</AnimatePresence> */}
 
           </form>
         </div>

@@ -33,36 +33,41 @@ body {
 }
 
 .register-page .header {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: 60px;
-  background: #1a1a1a;
+  background: rgba(10, 14, 39, 0.95);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-color);
+  z-index: 1000;
+  transition: all 0.3s ease;
+}
+
+/* Logo (Register Page) */
+.register-page .logo {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 40px;
-  z-index: 100;
+  text-decoration: none;
+  gap: 0; /* remove any spacing between spans */
 }
 
-.register-page .logo {
-  font-size: 20px;
-  font-weight: 700;
-  color: #fff;
+.register-page .fp {
+  color: #ffffff;
+  font-style: italic;
+  font-size: 24px;
+  font-weight: 400;
 }
 
-.register-page .logo .fp {
-  color: #1a1f3a;
-  font-weight: 800;
-  font-style: oblique 10deg;
-}
-
-.register-page .logo .markets {
+.register-page .markets {
   color: #FDDB92;
-  font-weight: 600;
-  font-style: oblique 10deg;
+  font-style: italic;
+  font-size: 24px;
+  font-weight: 900; /* heaviest available */
+  margin-left: 0;
 }
+
+
 
 .register-page .name-group {
   display: flex;

@@ -195,6 +195,7 @@ export const useAccountStore = create<AccountStore>()(
                   MYR: 0.22,
                 }
                 fxRates[currency] = fallbackRates[currency] || 1.0
+                console.warn(`Using fallback rate for ${currency}: ${fxRates[currency]}`)
               }
             })
           )

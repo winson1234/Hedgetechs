@@ -65,7 +65,7 @@ export default function ProfileDropdown({
     setShowLogoutModal(false);
 
     // 4. Navigate to login
-    navigate('/login');
+    navigate('/dashboard');
   };
 
   const cancelLogout = () => {

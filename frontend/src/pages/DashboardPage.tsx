@@ -975,29 +975,32 @@ const sortedLanguages = [
                   flexWrap: 'wrap'
                 }}>
                   {/* Previous Button */}
-                  <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    style={{
-                      padding: '0.75rem 1.25rem',
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
-                      color: currentPage === 1 ? '#64748b' : '#ffffff',
-                      background: currentPage === 1 ? 'rgba(100, 116, 139, 0.2)' : 'rgba(102, 126, 234, 0.8)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.3s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="15 18 9 12 15 6"></polyline>
-                    </svg>
-                    Previous
-                  </button>
+      
+                          <button
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            style={{
+                              padding: '0.75rem 1.25rem',
+                              fontSize: '0.9rem',
+                              fontWeight: '600',
+                              color: currentPage === 1 ? '#64748b' : '#ffffff',
+                              background: currentPage === 1 
+                                ? 'rgba(100, 116, 139, 0.2)' // disabled
+                                : 'linear-gradient(135deg, #C76D00, #FDDB92)', // enabled gradient
+                              border: 'none',
+                              borderRadius: '8px',
+                              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                              transition: 'all 0.3s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem'
+                            }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                            Previous
+                          </button>
 
                   {/* Page Numbers */}
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
@@ -1018,63 +1021,67 @@ const sortedLanguages = [
                     if (!showPage) return null;
 
                     return (
-                      <button
-                        key={page}
-                        onClick={() => handlePageChange(page)}
-                        style={{
-                          padding: '0.75rem 1rem',
-                          fontSize: '0.9rem',
-                          fontWeight: '600',
-                          color: '#ffffff',
-                          background: page === currentPage
-                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                            : 'rgba(255, 255, 255, 0.1)',
-                          border: page === currentPage ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease',
-                          minWidth: '45px'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (page !== currentPage) {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (page !== currentPage) {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                          }
-                        }}
-                      >
-                        {page}
-                      </button>
+                    <button
+                            key={page}
+                            onClick={() => handlePageChange(page)}
+                            style={{
+                              padding: '0.75rem 1rem',
+                              fontSize: '0.9rem',
+                              fontWeight: '600',
+                              color: '#ffffff',
+                              background: page === currentPage
+                                ? 'linear-gradient(135deg, #C76D00, #FDDB92)' // <- updated gradient
+                                : 'rgba(255, 255, 255, 0.1)',
+                              border: page === currentPage ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              transition: 'all 0.3s ease',
+                              minWidth: '45px'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (page !== currentPage) {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (page !== currentPage) {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              }
+                            }}
+                          >
+                            {page}
+                          </button>
+
                     );
                   })}
 
-                  {/* Next Button */}
-                  <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    style={{
-                      padding: '0.75rem 1.25rem',
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
-                      color: currentPage === totalPages ? '#64748b' : '#ffffff',
-                      background: currentPage === totalPages ? 'rgba(100, 116, 139, 0.2)' : 'rgba(102, 126, 234, 0.8)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.3s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}
-                  >
-                    Next
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                  </button>
+                                  {/* Next Button */}
+                        <button
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                          style={{
+                            padding: '0.75rem 1.25rem',
+                            fontSize: '0.9rem',
+                            fontWeight: '600',
+                            color: currentPage === totalPages ? '#64748b' : '#ffffff',
+                            background: currentPage === totalPages
+                              ? 'rgba(100, 116, 139, 0.2)' // disabled
+                              : 'linear-gradient(135deg, #C76D00, #FDDB92)', // enabled gradient
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.3s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}
+                        >
+                            Next
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                      </button>
+
                 </div>
               )}
 

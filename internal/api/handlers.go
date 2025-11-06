@@ -41,10 +41,10 @@ func HandleWebSocket(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Create a hub client with a per-client send channel
-	// Increased buffer size to handle high-frequency trading data from Binance
+	// Increased buffer size to match broadcast buffer for 24 concurrent instrument streams
 	client := &hub.Client{
 		Conn: conn,
-		Send: make(chan []byte, 256), // per-client buffer (increased from 64)
+		Send: make(chan []byte, 2048), // Match broadcast buffer size (24 instruments)
 	}
 
 	// Register the new client with the hub
@@ -366,7 +366,7 @@ func HandleTicker(w http.ResponseWriter, r *http.Request) {
 			PriceChangePercent: bt.PriceChangePercent,
 			HighPrice:          bt.HighPrice,
 			LowPrice:           bt.LowPrice,
-			Volume:             bt.Volume,
+			Volume:             bt.QuoteVolume, // Use quote volume (USDT value) to match Binance UI
 		})
 	}
 
@@ -522,9 +522,12 @@ func HandleNews(w http.ResponseWriter, r *http.Request) {
 			dateFormats := []string{
 				time.RFC1123Z,  // "Mon, 02 Jan 2006 15:04:05 -0700"
 				time.RFC1123,   // "Mon, 02 Jan 2006 15:04:05 MST"
+				"Mon, 02 Jan 2006 15:04:05 Z",       // RFC1123 with Z timezone and space
 				time.RFC3339,   // "2006-01-02T15:04:05Z07:00" (ISO8601)
 				"2006-01-02T15:04:05Z",     // ISO8601 with Z
+				"2006-01-02 15:04:05",      // Simple datetime format (YYYY-MM-DD HH:MM:SS)
 				"Mon, 2 Jan 2006 15:04:05 MST",      // RFC1123 with single-digit day
+				"Mon, 2 Jan 2006 15:04:05 Z",        // RFC1123 with single-digit day and Z timezone
 				"Mon, 2 Jan 2006 15:04:05 -0700",    // RFC1123Z with single-digit day
 				"2 Jan 2006 15:04:05 MST",           // Without weekday
 				"2 Jan 2006 15:04:05 -0700",         // Without weekday, with timezone offset

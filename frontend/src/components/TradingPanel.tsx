@@ -3,6 +3,7 @@ import { WebSocketContext } from '../context/WebSocketContext';
 import { useUIStore } from '../stores/uiStore';
 import { useAccountStore } from '../stores/accountStore';
 import { useOrderStore } from '../stores/orderStore';
+import { formatPrice } from '../utils/priceUtils';
 
 // Define the expected structure for a price update message from WebSocket
 type PriceUpdate = {
@@ -136,7 +137,7 @@ export default function TradingPanel() {
   useEffect(() => {
     // Set limit price only if it's currently empty AND we have a valid current price
     if (currentPrice > 0 && limitPrice === '') {
-      setLimitPrice(currentPrice.toFixed(2));
+      setLimitPrice(formatPrice(currentPrice));
     }
      // If current price becomes 0 (e.g., instrument change reset), clear limit price
      else if (currentPrice <= 0 && limitPrice !== '') {
@@ -461,7 +462,7 @@ export default function TradingPanel() {
     setAmount('');
     setPercentage(0);
     // Reset limit price to current price for convenience, keep stop price as is
-    setLimitPrice(currentPrice > 0 ? currentPrice.toFixed(2) : '');
+    setLimitPrice(currentPrice > 0 ? formatPrice(currentPrice) : '');
     // setStopPrice(''); // User might want to reuse stop price
   };
 
@@ -636,7 +637,7 @@ export default function TradingPanel() {
                 type="number"
                 value={stopPrice}
                 onChange={(e) => setStopPrice(e.target.value)}
-                placeholder={currentPrice > 0 ? currentPrice.toFixed(2) : '0.00'}
+                placeholder={currentPrice > 0 ? formatPrice(currentPrice) : '0.00'}
                 min="0" step="any"
                 className="w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-100"
               />
@@ -657,7 +658,7 @@ export default function TradingPanel() {
                 type="number"
                 value={limitPrice}
                 onChange={(e) => setLimitPrice(e.target.value)}
-                placeholder={currentPrice > 0 ? currentPrice.toFixed(2) : '0.00'}
+                placeholder={currentPrice > 0 ? formatPrice(currentPrice) : '0.00'}
                  min="0" step="any"
                 className="w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-100"
               />

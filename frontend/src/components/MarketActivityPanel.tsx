@@ -3,6 +3,7 @@ import { WebSocketContext } from '../context/WebSocketContext';
 import { useUIStore } from '../stores/uiStore';
 import PendingOrdersTab from './market/PendingOrdersTab';
 import TradeHistoryTab from './market/TradeHistoryTab';
+import { formatPrice, formatQuantity } from '../utils/priceUtils';
 
 type Trade = {
   price: string;
@@ -142,8 +143,8 @@ export default function MarketActivityPanel() {
                       key={`bid-${index}`}
                       className="grid grid-cols-3 gap-2 text-sm px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
                     >
-                      <div className="text-green-600 dark:text-green-500 font-medium">{parseFloat(bid[0]).toFixed(2)}</div>
-                      <div className="text-slate-700 dark:text-slate-300 text-right">{parseFloat(bid[1]).toFixed(4)}</div>
+                      <div className="text-green-600 dark:text-green-500 font-medium">{formatPrice(parseFloat(bid[0]))}</div>
+                      <div className="text-slate-700 dark:text-slate-300 text-right">{formatQuantity(parseFloat(bid[1]))}</div>
                       <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{calculateTotal(bids, index)}</div>
                     </div>
                   ))
@@ -170,8 +171,8 @@ export default function MarketActivityPanel() {
                       key={`ask-${index}`}
                       className="grid grid-cols-3 gap-2 text-sm px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
                     >
-                      <div className="text-red-600 dark:text-red-500 font-medium">{parseFloat(ask[0]).toFixed(2)}</div>
-                      <div className="text-slate-700 dark:text-slate-300 text-right">{parseFloat(ask[1]).toFixed(4)}</div>
+                      <div className="text-red-600 dark:text-red-500 font-medium">{formatPrice(parseFloat(ask[0]))}</div>
+                      <div className="text-slate-700 dark:text-slate-300 text-right">{formatQuantity(parseFloat(ask[1]))}</div>
                       <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{calculateTotal(asks, index)}</div>
                     </div>
                   ))
@@ -211,9 +212,9 @@ export default function MarketActivityPanel() {
                       className="grid grid-cols-3 gap-2 text-sm px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
                     >
                       <div className={`font-medium ${isBuy ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
-                        {parseFloat(trade.price).toFixed(2)}
+                        {formatPrice(parseFloat(trade.price))}
                       </div>
-                      <div className="text-slate-700 dark:text-slate-300 text-right">{parseFloat(trade.quantity).toFixed(4)}</div>
+                      <div className="text-slate-700 dark:text-slate-300 text-right">{formatQuantity(parseFloat(trade.quantity))}</div>
                       <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{timeStr}</div>
                     </div>
                   );

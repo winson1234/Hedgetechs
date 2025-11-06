@@ -25,5 +25,5 @@ type TickerResponse struct {
 	PriceChangePercent string `json:"priceChangePercent"`
 	HighPrice          string `json:"highPrice"`
 	LowPrice           string `json:"lowPrice"`
-	Volume             string `json:"volume"`
+	Volume             string `json:"volume"` // Quote volume in USDT (matches Binance UI display)
 }

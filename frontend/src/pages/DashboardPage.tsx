@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
 import { WebSocketContext } from '../context/WebSocketContext';
@@ -12,7 +12,7 @@ interface CryptoData {
   name: string;
   price: number;
   change: number;
-  filter: string;
+  volume24h: number;  // 24h trading volume for "Popular Coins" sorting
   icon: string;
   gradient: string;
 }
@@ -21,8 +21,10 @@ export default function DashboardPage() {
   const { isLoggedIn, user, logout } = useAuthStore();
   const isDarkMode = useUIStore(state => state.isDarkMode);
   const setDarkMode = useUIStore(state => state.setDarkMode);
+  const setActiveInstrument = useUIStore(state => state.setActiveInstrument);
+  const navigate = useNavigate();
   const ws = useContext(WebSocketContext);
-  const [activeMarketTab, setActiveMarketTab] = useState('popular');
+  const [activeMarketTab, setActiveMarketTab] = useState('all');
   const [activeNewsTab, setActiveNewsTab] = useState('all');
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -48,25 +50,38 @@ const sortedLanguages = [
   ...languages.filter(lang => lang.code !== selectedLanguage)
 ]
 
-  // Real-time cryptocurrency data from WebSocket
+  // Real-time cryptocurrency data from WebSocket (all 24 instruments)
   const [cryptoData, setCryptoData] = useState<CryptoData[]>([
-    { symbol: 'BTCUSDT', name: 'Bitcoin', price: 0, change: 0, filter: 'popular', icon: '₿', gradient: 'linear-gradient(135deg, #f7931a, #ff9500)' },
-    { symbol: 'ETHUSDT', name: 'Ethereum', price: 0, change: 0, filter: 'popular', icon: 'Ξ', gradient: 'linear-gradient(135deg, #627eea, #8a9cff)' },
-    { symbol: 'BNBUSDT', name: 'Binance Coin', price: 0, change: 0, filter: 'popular', icon: 'B', gradient: 'linear-gradient(135deg, #f3ba2f, #ffd700)' },
-    { symbol: 'SOLUSDT', name: 'Solana', price: 0, change: 0, filter: 'popular', icon: '◎', gradient: 'linear-gradient(135deg, #9945ff, #14f195)' },
-    { symbol: 'ADAUSDT', name: 'Cardano', price: 0, change: 0, filter: 'popular', icon: '₳', gradient: 'linear-gradient(135deg, #0033ad, #3468d6)' },
-    { symbol: 'XRPUSDT', name: 'Ripple', price: 0, change: 0, filter: 'popular', icon: '✕', gradient: 'linear-gradient(135deg, #23292f, #3d4853)' },
-    { symbol: 'DOGEUSDT', name: 'Dogecoin', price: 0, change: 0, filter: 'popular', icon: 'Ð', gradient: 'linear-gradient(135deg, #c2a633, #f0d068)' },
-    { symbol: 'MATICUSDT', name: 'Polygon', price: 0, change: 0, filter: 'new', icon: '⬡', gradient: 'linear-gradient(135deg, #8247e5, #a77bf3)' },
-    { symbol: 'DOTUSDT', name: 'Polkadot', price: 0, change: 0, filter: 'new', icon: '●', gradient: 'linear-gradient(135deg, #e6007a, #ff4d9e)' },
-    { symbol: 'AVAXUSDT', name: 'Avalanche', price: 0, change: 0, filter: 'new', icon: '▲', gradient: 'linear-gradient(135deg, #e84142, #ff6b6b)' },
-    { symbol: 'LINKUSDT', name: 'Chainlink', price: 0, change: 0, filter: 'new', icon: '⬡', gradient: 'linear-gradient(135deg, #2a5ada, #5c8bf5)' },
-    { symbol: 'UNIUSDT', name: 'Uniswap', price: 0, change: 0, filter: 'new', icon: '🦄', gradient: 'linear-gradient(135deg, #ff007a, #ff6bae)' },
-    { symbol: 'LTCUSDT', name: 'Litecoin', price: 0, change: 0, filter: 'new', icon: 'Ł', gradient: 'linear-gradient(135deg, #345d9d, #5c8bd6)' },
-  ]);
+    // Major (7)
+    { symbol: 'BTCUSDT', name: 'Bitcoin', price: 0, change: 0, volume24h: 0, icon: '₿', gradient: 'linear-gradient(135deg, #f7931a, #ff9500)' },
+    { symbol: 'ETHUSDT', name: 'Ethereum', price: 0, change: 0, volume24h: 0, icon: 'Ξ', gradient: 'linear-gradient(135deg, #627eea, #8a9cff)' },
+    { symbol: 'BNBUSDT', name: 'Binance Coin', price: 0, change: 0, volume24h: 0, icon: 'B', gradient: 'linear-gradient(135deg, #f3ba2f, #ffd700)' },
+    { symbol: 'SOLUSDT', name: 'Solana', price: 0, change: 0, volume24h: 0, icon: '◎', gradient: 'linear-gradient(135deg, #9945ff, #14f195)' },
+    { symbol: 'XRPUSDT', name: 'Ripple', price: 0, change: 0, volume24h: 0, icon: '✕', gradient: 'linear-gradient(135deg, #23292f, #3d4853)' },
+    { symbol: 'ADAUSDT', name: 'Cardano', price: 0, change: 0, volume24h: 0, icon: '₳', gradient: 'linear-gradient(135deg, #0033ad, #3468d6)' },
+    { symbol: 'AVAXUSDT', name: 'Avalanche', price: 0, change: 0, volume24h: 0, icon: '▲', gradient: 'linear-gradient(135deg, #e84142, #ff6b6b)' },
 
-  // Store previous prices to calculate change
-  const [prevPrices, setPrevPrices] = useState<Record<string, number>>({});
+    // DeFi/Layer2 (8)
+    { symbol: 'MATICUSDT', name: 'Polygon', price: 0, change: 0, volume24h: 0, icon: '⬡', gradient: 'linear-gradient(135deg, #8247e5, #a77bf3)' },
+    { symbol: 'LINKUSDT', name: 'Chainlink', price: 0, change: 0, volume24h: 0, icon: '⬡', gradient: 'linear-gradient(135deg, #2a5ada, #5c8bf5)' },
+    { symbol: 'UNIUSDT', name: 'Uniswap', price: 0, change: 0, volume24h: 0, icon: '🦄', gradient: 'linear-gradient(135deg, #ff007a, #ff6bae)' },
+    { symbol: 'ATOMUSDT', name: 'Cosmos', price: 0, change: 0, volume24h: 0, icon: '⚛', gradient: 'linear-gradient(135deg, #2e3148, #5064fb)' },
+    { symbol: 'DOTUSDT', name: 'Polkadot', price: 0, change: 0, volume24h: 0, icon: '●', gradient: 'linear-gradient(135deg, #e6007a, #ff4d9e)' },
+    { symbol: 'ARBUSDT', name: 'Arbitrum', price: 0, change: 0, volume24h: 0, icon: '◆', gradient: 'linear-gradient(135deg, #2d374b, #4a90e2)' },
+    { symbol: 'OPUSDT', name: 'Optimism', price: 0, change: 0, volume24h: 0, icon: '○', gradient: 'linear-gradient(135deg, #ff0420, #ff6b8a)' },
+    { symbol: 'APTUSDT', name: 'Aptos', price: 0, change: 0, volume24h: 0, icon: 'A', gradient: 'linear-gradient(135deg, #00d4aa, #40e5cc)' },
+
+    // Altcoin (9)
+    { symbol: 'DOGEUSDT', name: 'Dogecoin', price: 0, change: 0, volume24h: 0, icon: 'Ð', gradient: 'linear-gradient(135deg, #c2a633, #f0d068)' },
+    { symbol: 'LTCUSDT', name: 'Litecoin', price: 0, change: 0, volume24h: 0, icon: 'Ł', gradient: 'linear-gradient(135deg, #345d9d, #5c8bd6)' },
+    { symbol: 'SHIBUSDT', name: 'Shiba Inu', price: 0, change: 0, volume24h: 0, icon: '🐕', gradient: 'linear-gradient(135deg, #ffa409, #ffcd5d)' },
+    { symbol: 'NEARUSDT', name: 'Near Protocol', price: 0, change: 0, volume24h: 0, icon: 'N', gradient: 'linear-gradient(135deg, #00c08b, #00f395)' },
+    { symbol: 'ICPUSDT', name: 'Internet Computer', price: 0, change: 0, volume24h: 0, icon: '∞', gradient: 'linear-gradient(135deg, #29abe2, #6dd5f5)' },
+    { symbol: 'FILUSDT', name: 'Filecoin', price: 0, change: 0, volume24h: 0, icon: 'F', gradient: 'linear-gradient(135deg, #0090ff, #42b4ff)' },
+    { symbol: 'SUIUSDT', name: 'Sui', price: 0, change: 0, volume24h: 0, icon: 'S', gradient: 'linear-gradient(135deg, #4da2ff, #7ec8ff)' },
+    { symbol: 'STXUSDT', name: 'Stacks', price: 0, change: 0, volume24h: 0, icon: '⬢', gradient: 'linear-gradient(135deg, #5546ff, #7e72ff)' },
+    { symbol: 'TONUSDT', name: 'Toncoin', price: 0, change: 0, volume24h: 0, icon: '◇', gradient: 'linear-gradient(135deg, #0088cc, #229ed9)' },
+  ]);
 
   const handleLogout = () => {
     setShowLogoutModal(true);
@@ -100,62 +115,69 @@ const sortedLanguages = [
       setCryptoData(prevData =>
         prevData.map(crypto => {
           if (crypto.symbol === symbol) {
-            // Calculate percentage change from previous price
-            const prevPrice = prevPrices[symbol] || price;
-            const changePercent = ((price - prevPrice) / prevPrice) * 100;
-
+            // Only update price, preserve 24h change and volume from ticker API
+            // This ensures accurate 24h statistics instead of real-time fluctuations
             return {
               ...crypto,
-              price,
-              change: changePercent,
+              price,  // Real-time price update only
+              // change: preserved from ticker API
+              // volume24h: preserved from ticker API
             };
           }
           return crypto;
         })
       );
     }
-  }, [ws?.lastMessage, prevPrices]);
+  }, [ws?.lastMessage]);
 
-  // Fetch initial 24h ticker data for baseline prices and changes
+  // Fetch initial 24h ticker data with retry logic
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const fetchInitialData = async (retries = 3): Promise<void> => {
       try {
         const symbols = cryptoData.map(c => c.symbol).join(',');
         const response = await fetch(getApiUrl(`/api/v1/ticker?symbols=${symbols}`));
 
         if (!response.ok) {
-          console.error('Failed to fetch ticker data');
-          return;
+          throw new Error(`HTTP ${response.status}: Failed to fetch ticker data`);
         }
 
         const tickerData = await response.json() as Array<{
           symbol: string;
           lastPrice: string;
           priceChangePercent: string;
+          volume: string;  // 24h trading volume
         }>;
 
-        // Update crypto data with 24h statistics
+        // Update crypto data with 24h statistics including volume
         setCryptoData(prevData =>
           prevData.map(crypto => {
             const ticker = tickerData.find((t) => t.symbol === crypto.symbol);
             if (ticker) {
               const price = parseFloat(ticker.lastPrice);
               const change = parseFloat(ticker.priceChangePercent);
-
-              // Store initial price for change calculations
-              setPrevPrices(prev => ({ ...prev, [crypto.symbol]: price }));
+              const volume24h = parseFloat(ticker.volume);
 
               return {
                 ...crypto,
                 price,
                 change,
+                volume24h,
               };
             }
             return crypto;
           })
         );
       } catch (err) {
-        console.error('Error fetching initial ticker data:', err);
+        console.error(`Error fetching initial ticker data (${4 - retries}/3):`, err);
+
+        // Retry with exponential backoff
+        if (retries > 1) {
+          const delay = (4 - retries) * 2000; // 2s, 4s
+          console.log(`Retrying in ${delay / 1000}s...`);
+          setTimeout(() => fetchInitialData(retries - 1), delay);
+        } else {
+          console.error('All retries failed. Prices may not be displayed correctly.');
+        }
       }
     };
 
@@ -180,6 +202,10 @@ const sortedLanguages = [
   const [newsLoading, setNewsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
+
+  // Pagination for crypto table
+  const [cryptoCurrentPage, setCryptoCurrentPage] = useState(1);
+  const cryptoItemsPerPage = 6;
 
   // Fetch live news from backend API
   useEffect(() => {
@@ -363,7 +389,7 @@ const sortedLanguages = [
     },
     {
       question: 'Can I transfer funds between my trading accounts?',
-      answer: 'Yes. Go to Wallet → Transfer, choose the source and destination accounts (e.g., Main → Trading), specify the amount, and confirm. Transfers between internal wallets are instant and free of charge.'
+      answer: 'Yes. Go to Wallet → Transfer, choose the source and destination accounts, specify the amount, and confirm. Transfers between internal wallets are instant and free of charge.'
     },
     {
       question: 'How can I contact customer support?',
@@ -371,13 +397,20 @@ const sortedLanguages = [
     },
   ];
 
-  const filteredCrypto = activeMarketTab === 'popular'
-    ? cryptoData.filter(c => c.filter === 'popular')
+  // Dynamic filtering and sorting based on active tab
+  const filteredCrypto = activeMarketTab === 'all'
+    ? [...cryptoData].sort((a, b) => b.volume24h - a.volume24h) // All coins sorted by volume
+    : activeMarketTab === 'popular'
+    ? [...cryptoData].sort((a, b) => b.volume24h - a.volume24h).slice(0, 10) // Top 10 by volume
     : activeMarketTab === 'gainers'
-    ? cryptoData.filter(c => c.change > 0)
-    : activeMarketTab === 'losers'
-    ? cryptoData.filter(c => c.change < 0)
-    : cryptoData;
+    ? cryptoData.filter(c => c.change > 0).sort((a, b) => b.change - a.change) // Highest % first
+    : cryptoData.filter(c => c.change < 0).sort((a, b) => a.change - b.change); // Lowest % first
+
+  // Crypto pagination calculations
+  const cryptoTotalPages = Math.ceil(filteredCrypto.length / cryptoItemsPerPage);
+  const cryptoStartIndex = (cryptoCurrentPage - 1) * cryptoItemsPerPage;
+  const cryptoEndIndex = cryptoStartIndex + cryptoItemsPerPage;
+  const displayedCrypto = filteredCrypto.slice(cryptoStartIndex, cryptoEndIndex);
 
   const filteredNews = activeNewsTab === 'all'
     ? newsItems
@@ -389,16 +422,40 @@ const sortedLanguages = [
   const endIndex = startIndex + itemsPerPage;
   const displayedNews = filteredNews.slice(startIndex, endIndex);
 
-  // Reset to page 1 when tab changes
+  // Reset to page 1 when market tab changes
+  useEffect(() => {
+    setCryptoCurrentPage(1);
+  }, [activeMarketTab]);
+
+  // Reset to page 1 when news tab changes
   useEffect(() => {
     setCurrentPage(1);
   }, [activeNewsTab]);
 
-  // Handler for page changes
+  // Handler for crypto page changes
+  const handleCryptoPageChange = (page: number) => {
+    setCryptoCurrentPage(page);
+    // Scroll to market section
+    document.getElementById('market')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Handler for news page changes
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     // Scroll to news section
     document.getElementById('news')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Handler for Buy button click
+  const handleBuyClick = (symbol: string) => {
+    if (isLoggedIn) {
+      // Set active instrument and navigate to trading page
+      setActiveInstrument(symbol);
+      navigate('/trading');
+    } else {
+      // Redirect to login page if not logged in
+      navigate('/login');
+    }
   };
 
   return (
@@ -695,19 +752,19 @@ const sortedLanguages = [
               Today&apos;s Cryptocurrency Prices
             </h2>
             <p className="section-subtitle" style={{ fontSize: '1rem' }}>
-              The global crypto market cap is <span className="market-cap-value">$2.89T</span> with 24h volume of <span className="market-volume-value">$120B</span>
+              Track real-time prices and 24-hour trading volume across major cryptocurrencies
             </p>
           </div>
 
           {/* Market Tabs */}
           <div className="market-tabs" style={{ justifyContent: 'center' }}>
+            <button className={`market-tab ${activeMarketTab === 'all' ? 'active' : ''}`} onClick={() => setActiveMarketTab('all')}>
+              <span className="tab-icon">🪙</span>
+              All Coins
+            </button>
             <button className={`market-tab ${activeMarketTab === 'popular' ? 'active' : ''}`} onClick={() => setActiveMarketTab('popular')}>
               <span className="tab-icon">🔥</span>
               Popular Coins
-            </button>
-            <button className={`market-tab ${activeMarketTab === 'new' ? 'active' : ''}`} onClick={() => setActiveMarketTab('new')}>
-              <span className="tab-icon">✨</span>
-              New Listings
             </button>
             <button className={`market-tab ${activeMarketTab === 'gainers' ? 'active' : ''}`} onClick={() => setActiveMarketTab('gainers')}>
               <span className="tab-icon">📈</span>
@@ -724,11 +781,12 @@ const sortedLanguages = [
               <div className="crypto-col" style={{ textAlign: 'left' }}>Asset</div>
               <div className="crypto-col" style={{ textAlign: 'center' }}>Last Price</div>
               <div className="crypto-col" style={{ textAlign: 'center' }}>24h Change</div>
+              <div className="crypto-col" style={{ textAlign: 'center' }}>Volume</div>
               <div className="crypto-col" style={{ textAlign: 'center' }}>Chart</div>
               <div className="crypto-col" style={{ textAlign: 'center' }}>Trade</div>
             </div>
 
-            {filteredCrypto.map(crypto => (
+            {displayedCrypto.map(crypto => (
               <div key={crypto.symbol} className="crypto-row">
                 <div className="crypto-col" style={{ textAlign: 'left' }}>
                   <div className="crypto-info">
@@ -745,6 +803,9 @@ const sortedLanguages = [
                 <div className={`crypto-col crypto-change ${crypto.change > 0 ? 'positive' : 'negative'}`} style={{ textAlign: 'center' }}>
                   <span className="change-arrow">{crypto.change > 0 ? '▲' : '▼'}</span> {crypto.change > 0 ? '+' : ''}{crypto.change.toFixed(2)}%
                 </div>
+                <div className="crypto-col" style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  {crypto.volume24h > 0 ? `$${(crypto.volume24h / 1000000).toFixed(2)}M` : '—'}
+                </div>
                 <div className="crypto-col" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                   <MiniSparklineChart
                     symbol={crypto.symbol}
@@ -754,13 +815,129 @@ const sortedLanguages = [
                   />
                 </div>
                 <div className="crypto-col" style={{ textAlign: 'center' }}>
-                  <Link to="/trading">
-                    <button className="btn-trade">Buy</button>
-                  </Link>
+                  <button className="btn-trade" onClick={() => handleBuyClick(crypto.symbol)}>Buy</button>
                 </div>
               </div>
             ))}
           </div>
+
+          {/* Crypto Pagination Controls */}
+          {cryptoTotalPages > 1 && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '0.5rem',
+              marginTop: '3rem',
+              marginBottom: '2rem',
+              flexWrap: 'wrap'
+            }}>
+              {/* Previous Button */}
+              <button
+                onClick={() => handleCryptoPageChange(cryptoCurrentPage - 1)}
+                disabled={cryptoCurrentPage === 1}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  color: cryptoCurrentPage === 1 ? '#64748b' : '#ffffff',
+                  background: cryptoCurrentPage === 1
+                    ? 'rgba(100, 116, 139, 0.2)'
+                    : 'linear-gradient(135deg, #C76D00, #FDDB92)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: cryptoCurrentPage === 1 ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                Previous
+              </button>
+
+              {/* Page Numbers */}
+              {Array.from({ length: cryptoTotalPages }, (_, i) => i + 1).map(page => {
+                const showPage = page === 1 ||
+                                page === cryptoTotalPages ||
+                                (page >= cryptoCurrentPage - 1 && page <= cryptoCurrentPage + 1);
+
+                const showEllipsis = (page === cryptoCurrentPage - 2 && cryptoCurrentPage > 3) ||
+                                    (page === cryptoCurrentPage + 2 && cryptoCurrentPage < cryptoTotalPages - 2);
+
+                if (showEllipsis) {
+                  return (
+                    <span key={page} style={{ color: '#64748b', padding: '0 0.5rem' }}>...</span>
+                  );
+                }
+
+                if (!showPage) return null;
+
+                return (
+                  <button
+                    key={page}
+                    onClick={() => handleCryptoPageChange(page)}
+                    style={{
+                      padding: '0.75rem 1rem',
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      background: page === cryptoCurrentPage
+                        ? 'linear-gradient(135deg, #C76D00, #FDDB92)'
+                        : 'rgba(255, 255, 255, 0.1)',
+                      border: page === cryptoCurrentPage ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      minWidth: '45px'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (page !== cryptoCurrentPage) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (page !== cryptoCurrentPage) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                      }
+                    }}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+
+              {/* Next Button */}
+              <button
+                onClick={() => handleCryptoPageChange(cryptoCurrentPage + 1)}
+                disabled={cryptoCurrentPage === cryptoTotalPages}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  color: cryptoCurrentPage === cryptoTotalPages ? '#64748b' : '#ffffff',
+                  background: cryptoCurrentPage === cryptoTotalPages
+                    ? 'rgba(100, 116, 139, 0.2)'
+                    : 'linear-gradient(135deg, #C76D00, #FDDB92)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: cryptoCurrentPage === cryptoTotalPages ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                Next
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </section>
 

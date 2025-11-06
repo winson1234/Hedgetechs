@@ -26,11 +26,12 @@ export default function AppLayout() {
     }
   }, []);
 
-  // Hydrate price store with 24h ticker data on mount
+  // Hydrate price store with 24h ticker data on mount (all 24 instruments)
   useEffect(() => {
     const hydratePrices = async () => {
       try {
-        const response = await fetch(getApiUrl('/api/v1/ticker?symbols=BTCUSDT,ETHUSDT,SOLUSDT,EURUSDT'));
+        const symbols = 'BTCUSDT,ETHUSDT,BNBUSDT,SOLUSDT,XRPUSDT,ADAUSDT,AVAXUSDT,DOGEUSDT,MATICUSDT,LINKUSDT,UNIUSDT,ATOMUSDT,DOTUSDT,ARBUSDT,OPUSDT,APTUSDT,LTCUSDT,SHIBUSDT,NEARUSDT,ICPUSDT,FILUSDT,SUIUSDT,STXUSDT,TONUSDT';
+        const response = await fetch(getApiUrl(`/api/v1/ticker?symbols=${symbols}`));
         if (!response.ok) throw new Error('Failed to fetch 24h ticker data');
         const data = await response.json();
         usePriceStore.getState().hydrateFrom24hData(data);

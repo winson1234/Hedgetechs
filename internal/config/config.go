@@ -3,13 +3,15 @@ package config
 // --- Configuration ---
 
 // Binance settings
-// Binance combined streams WebSocket URL for multiple symbols
-// Includes: BTC, ETH, SOL, EUR (forex), BNB, ADA, XRP, DOGE, MATIC, DOT, AVAX, LINK, UNI, LTC
-const BinanceWebSocketURL = "wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@trade/solusdt@trade/eurusdt@trade/bnbusdt@trade/adausdt@trade/xrpusdt@trade/dogeusdt@trade/maticusdt@trade/dotusdt@trade/avaxusdt@trade/linkusdt@trade/uniusdt@trade/ltcusdt@trade"
+// Binance combined streams WebSocket URL for 24 cryptocurrency instruments
+// Major (7): BTC, ETH, BNB, SOL, XRP, ADA, AVAX
+// DeFi/Layer2 (8): MATIC, LINK, UNI, ATOM, DOT, ARB, OP, APT
+// Altcoin (9): DOGE, LTC, SHIB, NEAR, ICP, FIL, SUI, STX, TON
+const BinanceWebSocketURL = "wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@trade/bnbusdt@trade/solusdt@trade/xrpusdt@trade/adausdt@trade/avaxusdt@trade/dogeusdt@trade/maticusdt@trade/linkusdt@trade/uniusdt@trade/atomusdt@trade/dotusdt@trade/arbusdt@trade/opusdt@trade/aptusdt@trade/ltcusdt@trade/shibusdt@trade/nearusdt@trade/icpusdt@trade/filusdt@trade/suiusdt@trade/stxusdt@trade/tonusdt@trade"
 
-// Binance order book depth stream URL (use with symbol, e.g., btcusdt@depth20@100ms)
-// Includes depth data for primary trading pairs
-const BinanceDepthStreamURL = "wss://stream.binance.com:9443/stream?streams=btcusdt@depth20@100ms/ethusdt@depth20@100ms/solusdt@depth20@100ms/eurusdt@depth20@100ms/bnbusdt@depth20@100ms/adausdt@depth20@100ms/xrpusdt@depth20@100ms/dogeusdt@depth20@100ms"
+// Binance order book depth stream URL for all 24 instruments (20 levels, 100ms update)
+// Provides order book data for complete instrument coverage
+const BinanceDepthStreamURL = "wss://stream.binance.com:9443/stream?streams=btcusdt@depth20@100ms/ethusdt@depth20@100ms/bnbusdt@depth20@100ms/solusdt@depth20@100ms/xrpusdt@depth20@100ms/adausdt@depth20@100ms/avaxusdt@depth20@100ms/dogeusdt@depth20@100ms/maticusdt@depth20@100ms/linkusdt@depth20@100ms/uniusdt@depth20@100ms/atomusdt@depth20@100ms/dotusdt@depth20@100ms/arbusdt@depth20@100ms/opusdt@depth20@100ms/aptusdt@depth20@100ms/ltcusdt@depth20@100ms/shibusdt@depth20@100ms/nearusdt@depth20@100ms/icpusdt@depth20@100ms/filusdt@depth20@100ms/suiusdt@depth20@100ms/stxusdt@depth20@100ms/tonusdt@depth20@100ms"
 const BinanceRestURL = "https://api.binance.com/api/v3/klines"
 const BinanceTicker24hURL = "https://api.binance.com/api/v3/ticker/24hr"
 

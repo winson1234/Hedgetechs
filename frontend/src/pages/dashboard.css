@@ -862,20 +862,22 @@ body.light-mode .hero-title {
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid var(--border-color);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 .crypto-row {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 1fr 1.5fr 1fr;
-  gap: 16px;
-  padding: 20px 24px;
+  grid-template-columns: 2fr 1.2fr 1fr 1.2fr 1.5fr 0.8fr;
+  gap: 20px;
+  padding: 24px 28px;
   align-items: center;
   border-bottom: 1px solid var(--border-color);
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .crypto-row:hover {
-  background: rgba(253, 219, 146, 0.05);
+  background: rgba(253, 219, 146, 0.03);
+  transform: translateX(4px);
 }
 
 .crypto-row:last-child {
@@ -884,15 +886,17 @@ body.light-mode .hero-title {
 
 .crypto-header {
   background: var(--bg-secondary);
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 700;
+  font-size: 12px;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
+  padding: 18px 28px !important;
 }
 
 .crypto-header:hover {
   background: var(--bg-secondary);
+  transform: none;
 }
 
 .crypto-col {
@@ -912,32 +916,36 @@ body.light-mode .hero-title {
 }
 
 .crypto-icon {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: bold;
   color: white;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .crypto-symbol {
-  font-weight: 600;
-  font-size: 15px;
+  font-weight: 700;
+  font-size: 16px;
   color: var(--text-primary);
+  letter-spacing: 0.3px;
 }
 
 .crypto-name {
   font-size: 13px;
   color: var(--text-secondary);
+  margin-top: 2px;
 }
 
 .crypto-price {
   font-weight: 600;
-  font-size: 15px;
+  font-size: 16px;
+  color: var(--text-primary);
 }
 
 .crypto-change {
@@ -972,20 +980,22 @@ body.light-mode .hero-title {
 }
 
 .btn-trade {
-  padding: 8px 24px;
+  padding: 10px 28px;
   background: var(--gradient-gold);
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 8px rgba(253, 219, 146, 0.15);
 }
 
 .btn-trade:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(253, 219, 146, 0.4);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 20px rgba(253, 219, 146, 0.35);
 }
 
 /* ===========================

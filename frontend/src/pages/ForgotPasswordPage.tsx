@@ -23,6 +23,14 @@ export default function ForgotPasswordPage() {
   const [passwordError, setPasswordError] = useState('');
   const [confirmError, setConfirmError] = useState('');
   const [passwordStrength, setPasswordStrength] = useState({ level: 0, text: '', color: '' });
+const [showPassword, setShowPassword] = useState(false);
+const togglePassword = () => setShowPassword((prev) => !prev);
+const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+const [formData, setFormData] = useState({
+  password: '',
+  retypePassword: ''
+});
 
   const otpRefs = [
     useRef<HTMLInputElement>(null),
@@ -195,14 +203,15 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="forgotpassword-page">
-      <div className="header">
-        <div className="logo">
-          <span className="fp">FP</span><span className="markets">Markets</span>
-        </div>
-        <Link to="/login">
-          <button className="client-login-btn">Client Login</button>
-        </Link>
-      </div>
+    <div className="header">
+    <Link to="/dashboard" className="logo">
+      <span className="fp">FP</span><span className="markets">Markets</span>
+    </Link>
+    <Link to="/login">
+      <button className="client-login-btn">Client Login</button>
+    </Link>
+  </div>
+
 
       <div className="background"></div>
 
@@ -250,7 +259,7 @@ export default function ForgotPasswordPage() {
             {step === 'email' && (
               <div id="emailSection">
                 <div className="form-group">
-                  <label className="form-label">Email Address</label>
+                  <label className="form-label">Enter your email address</label>
                   <input
                     type="email"
                     id="email"
@@ -264,54 +273,115 @@ export default function ForgotPasswordPage() {
               </div>
             )}
 
-            {/* Password Section */}
-            {step === 'password' && (
-              <div id="passwordSection" className="password-section show">
-                <div className="form-group">
-                  <label className="form-label">New Password</label>
-                  <input
-                    type="password"
-                    id="newPassword"
-                    placeholder="Enter new password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                  {passwordError && <div className="error-message show">{passwordError}</div>}
-                  {newPassword && (
-                    <div className="password-strength">
-                      <div className="strength-bar">
-                        <div
-                          className="strength-bar-fill"
-                          style={{
-                            width: `${(passwordStrength.level / 5) * 100}%`,
-                            backgroundColor: passwordStrength.color
-                          }}
-                        ></div>
-                      </div>
-                      <div className="strength-text" style={{ color: passwordStrength.color }}>
-                        {passwordStrength.text}
-                      </div>
-                    </div>
-                  )}
-                </div>
+         {/* Password Section */}
+{step === 'password' && (
+  <div id="passwordSection" className="password-section show">
+    <div className="form-group">
+      <label className="form-label">New Password</label>
+      <div className="input-wrapper">
+        <input
+          type={showPassword ? 'text' : 'password'}
+          id="newPassword"
+          placeholder="Enter new password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          autoComplete="new-password"
+        />
 
-                <div className="form-group">
-                  <label className="form-label">Confirm Password</label>
-                  <input
-                    type="password"
-                    id="confirmPassword"
-                    placeholder="Confirm new password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                  {confirmError && <div className="error-message show">{confirmError}</div>}
-                </div>
+        {/* Eye Icon */}
+        <svg
+          className="eye-icon"
+          onClick={togglePassword}
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {showPassword ? (
+            <>
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </>
+          ) : (
+            <>
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+            </>
+          )}
+        </svg>
+      </div>
 
-                <button type="submit" id="submitBtn">Reset Password</button>
-              </div>
-            )}
+      {passwordError && <div className="error-message show">{passwordError}</div>}
+
+      {newPassword && (
+        <div className="password-strength show">
+          <div className="strength-bar">
+            <div
+              className="strength-bar-fill"
+              style={{
+                width: `${(passwordStrength.level / 5) * 100}%`,
+                backgroundColor: passwordStrength.color,
+              }}
+            ></div>
+          </div>
+          <div className="strength-text" style={{ color: passwordStrength.color }}>
+            {passwordStrength.text}
+          </div>
+        </div>
+      )}
+    </div>
+
+   <div className="form-group">
+  <label className="form-label">Confirm Password</label>
+  <div className="input-wrapper">
+    <input
+      type={showConfirmPassword ? 'text' : 'password'}
+      id="confirmPassword"
+      placeholder="Confirm new password"
+      value={confirmPassword}
+      onChange={(e) => setConfirmPassword(e.target.value)}
+      autoComplete="new-password"
+    />
+
+    {/* Eye Icon */}
+    <svg
+      className="eye-icon"
+      onClick={() => setShowConfirmPassword((prev) => !prev)}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {showConfirmPassword ? (
+        <>
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </>
+      ) : (
+        <>
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+        </>
+      )}
+    </svg>
+  </div>
+
+  {confirmError && <div className="error-message show">{confirmError}</div>}
+</div>
+
+
+    <button type="submit" id="submitBtn">Reset Password</button>
+  </div>
+)}
+
           </form>
 
           <Link to="/login" className="signin-link">Sign in now</Link>

@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import './register.css';
+import { motion, AnimatePresence } from 'framer-motion'; // 👈 make sure framer-motion is installed
+// npm install framer-motion
+
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -15,6 +18,7 @@ export default function RegisterPage() {
     password: '',
     retypePassword: ''
   });
+const [success, setSuccess] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showRetypePassword, setShowRetypePassword] = useState(false);
@@ -30,40 +34,56 @@ export default function RegisterPage() {
     setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }));
   };
 
-  // Password strength checker
-  useEffect(() => {
-    if (!formData.password) {
-      setPasswordStrength({ level: 0, text: '', color: '' });
-      return;
-    }
+useEffect(() => {
+  if (!formData.password) {
+    setPasswordStrength({ level: 0, text: '', color: '' });
+    return;
+  }
 
-    let strength = 0;
-    if (formData.password.length >= 8) strength++;
-    if (formData.password.length >= 12) strength++;
-    if (/[a-z]/.test(formData.password) && /[A-Z]/.test(formData.password)) strength++;
-    if (/\d/.test(formData.password)) strength++;
-    if (/[^a-zA-Z\d]/.test(formData.password)) strength++;
+  let strength = 0;
+  const password = formData.password;
 
-    const levels = [
-      { text: '', color: '' },
-      { text: 'Weak', color: '#e74c3c' },
-      { text: 'Fair', color: '#f39c12' },
-      { text: 'Good', color: '#27ae60' },
-      { text: 'Strong', color: '#27ae60' },
-      { text: 'Very Strong', color: '#27ae60' }
-    ];
+  if (password.length >= 8) strength++;
+  if (password.length >= 12) strength++;
+  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+  if (/\d/.test(password)) strength++;
+  if (/[@$!%*?&#^+=._-]/.test(password)) strength++;
 
-    setPasswordStrength({ level: strength, ...levels[strength] });
-  }, [formData.password]);
+  const levels = [
+    { text: '', color: '' },
+    { text: 'Weak', color: '#e74c3c' },
+    { text: 'Fair', color: '#f39c12' },
+    { text: 'Good', color: '#27ae60' },
+    { text: 'Strong', color: '#27ae60' },
+    { text: 'Very Strong', color: '#27ae60' }
+  ];
 
-  // Retype password validation
-  useEffect(() => {
-    if (formData.retypePassword && formData.password !== formData.retypePassword) {
-      setRetypeError(true);
-    } else {
-      setRetypeError(false);
-    }
-  }, [formData.password, formData.retypePassword]);
+  setPasswordStrength({ level: strength, ...levels[strength] });
+}, [formData.password]);
+// Retype password validation + password complexity check
+useEffect(() => {
+  // Check if passwords match
+  if (formData.retypePassword && formData.password !== formData.retypePassword) {
+    setRetypeError(true);
+  } else {
+    setRetypeError(false);
+  }
+
+  // Check for password complexity
+  const password = formData.password;
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSpecial = /[@!#\$%\^&\*]/.test(password);
+
+  if (password && (!hasUpper || !hasLower || !hasNumber || !hasSpecial)) {
+    setPasswordStrength({
+      level: 1,
+      text: 'Too Simple — include upper, lower, number & symbol (@!#)',
+      color: '#e74c3c'
+    });
+  }
+}, [formData.password, formData.retypePassword]);
 
   // Focus restoration toggle
   const togglePassword = () => {
@@ -77,38 +97,53 @@ export default function RegisterPage() {
   };
 
   // Submit handler
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    if (!formData.email.includes('@')) {
-      setEmailError(true);
-      return;
-    }
-    setEmailError(false);
+  if (!formData.email.includes('@')) {
+    setEmailError(true);
+    return;
+  }
+  setEmailError(false);
 
-    if (formData.password !== formData.retypePassword) {
-      setRetypeError(true);
-      return;
-    }
+  // Check password strength
+  const password = formData.password;
 
-    if (formData.password.length < 8) {
-      alert('Password must be at least 8 characters');
-      return;
-    }
+  // Must be at least 8 characters
+  if (password.length < 8) {
+    alert('Password must be at least 8 characters');
+    return;
+  }
 
-    const result = await register({
-      name: `${formData.firstName} ${formData.lastName}`,
-      email: formData.email,
-      country: formData.country,
-      password: formData.password
-    });
+  // Must contain at least one uppercase, one lowercase, one number, and one special character
+  const strongPasswordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^+=._-])[A-Za-z\d@$!%*?&#^+=._-]{8,}$/;
 
-    if (result.success) {
-      navigate('/dashboard');
-    } else {
-      alert(result.message || 'Registration failed');
-    }
-  };
+  if (!strongPasswordRegex.test(password)) {
+    alert('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g. @, #, $, !)');
+    return;
+  }
+
+  if (formData.password !== formData.retypePassword) {
+    setRetypeError(true);
+    return;
+  }
+
+  const result = await register({
+    name: `${formData.firstName} ${formData.lastName}`,
+    email: formData.email,
+    country: formData.country,
+    password: formData.password
+  });
+
+ if (result.success) {
+    setSuccess(true); // ✅ show animation
+    setTimeout(() => navigate('/dashboard'), 3000); // redirect after 2s
+  } else {
+    alert(result.message || 'Registration failed');
+  }
+};
+
 
   return (
     <div className="register-page">
@@ -268,6 +303,46 @@ export default function RegisterPage() {
             </p>
 
             <Link to="/login" className="signin-link">Already have an account? Sign in</Link>
+        <AnimatePresence>
+  {success && (
+    <motion.div
+      key="success-popup"
+      className="success-overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      <motion.div
+        className="success-box"
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+      >
+        <svg
+          className="checkmark"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 52 52"
+        >
+          <circle className="checkmark-circle" cx="26" cy="26" r="25" fill="none" />
+          <path
+            className="checkmark-check"
+            fill="none"
+            d="M14 27l7 7 16-16"
+          />
+        </svg>
+
+        <p>Registration Successful!</p>
+        <p style={{ fontSize: '14px', color: '#555', marginTop: '8px' }}>
+          Redirecting you to your dashboard...
+        </p>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
+
           </form>
         </div>
       </div>

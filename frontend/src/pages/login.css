@@ -53,6 +53,25 @@
             opacity: 0.4;
             z-index: 2;
         }
+        .input-wrapper {
+        position: relative;
+        }
+
+        .eye-icon {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        width: 20px;
+        height: 20px;
+        color: #aaa;
+        transition: color 0.2s;
+        }
+
+        .eye-icon:hover {
+        color: #fff;
+        }
 
         .login-page .candlestick-pattern {
             position: absolute;

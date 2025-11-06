@@ -31,7 +31,11 @@ export default function DashboardPage() {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('EN-UK');
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+const [isClosing, setIsClosing] = useState(false);
+const [showLogoutModal, setShowLogoutModal] = useState(false);
+const [isLoggingOut, setIsLoggingOut] = useState(false);
+const [fadeOut, setFadeOut] = useState(false);
+const [showLoggingOut, setShowLoggingOut] = useState(false);
 
 const languages = [
   { code: 'EN-US', name: 'English (US)', flag: 'https://flagcdn.com/w20/us.png' },
@@ -49,7 +53,32 @@ const sortedLanguages = [
   ...languages.filter(lang => lang.code === selectedLanguage),
   ...languages.filter(lang => lang.code !== selectedLanguage)
 ]
+const confirmLogout = async () => {
+  setIsLoggingOut(true); // Switch modal to "Logging out..." content
+  setFadeOut(false);
 
+  // Step 1: show "Logging out..." for 1.2s
+  await new Promise(resolve => setTimeout(resolve, 1200));
+
+  // Step 2: start fade-out animation
+  setFadeOut(true);
+
+  // Step 3: wait for fade animation (400ms) before proceeding
+  await new Promise(resolve => setTimeout(resolve, 400));
+
+  // Step 4: actually log out
+  logout();
+
+  // Step 5: hide modal and navigate
+  setShowLogoutModal(false);
+  navigate('/');
+};
+
+const cancelLogout = () => {
+  setShowLogoutModal(false);
+  setIsLoggingOut(false);
+  setFadeOut(false);
+};
   // Real-time cryptocurrency data from WebSocket (all 24 instruments)
   const [cryptoData, setCryptoData] = useState<CryptoData[]>([
     // Major (7)
@@ -86,15 +115,6 @@ const sortedLanguages = [
   const handleLogout = () => {
     setShowLogoutModal(true);
     setProfileDropdownOpen(false);
-  };
-
-  const confirmLogout = () => {
-    setShowLogoutModal(false);
-    logout();
-  };
-
-  const cancelLogout = () => {
-    setShowLogoutModal(false);
   };
 
   const toggleTheme = () => {
@@ -1528,23 +1548,40 @@ const sortedLanguages = [
         </div>
       </footer>
 
-      {/* Logout Confirmation Modal */}
-      {showLogoutModal && (
-        <div className="logout-confirmation-overlay" onClick={cancelLogout}>
-          <div className="logout-confirmation-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Confirm Logout</h3>
-            <p>Are you sure you want to logout? Your session data will be cleared.</p>
-            <div className="logout-confirmation-buttons">
-              <button onClick={cancelLogout} className="logout-cancel-btn">
-                Cancel
-              </button>
-              <button onClick={confirmLogout} className="logout-confirm-btn">
-                Logout
-              </button>
-            </div>
+{/* Logout Confirmation Modal */}
+{showLogoutModal && (
+  <div
+    className={`logout-confirmation-overlay ${fadeOut ? 'fade-out' : ''}`}
+    onClick={cancelLogout}
+  >
+    <div
+      className={`logout-confirmation-modal ${fadeOut ? 'fade-out' : ''}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {!isLoggingOut ? (
+        <>
+          <h3>Confirm Logout</h3>
+          <p>Are you sure you want to logout? Your session data will be cleared.</p>
+          <div className="logout-confirmation-buttons">
+            <button onClick={cancelLogout} className="logout-cancel-btn">
+              Cancel
+            </button>
+            <button onClick={confirmLogout} className="logout-confirm-btn">
+              Logout
+            </button>
           </div>
+        </>
+      ) : (
+        <div className="logging-out">
+          <div className="spinner"></div>
+          <p>Logging out...</p>
         </div>
       )}
+    </div>
+  </div>
+)}
+
+
     </div>
   );
 }

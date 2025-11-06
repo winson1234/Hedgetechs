@@ -575,6 +575,107 @@ body.dark-mode .dropdown-header {
   position: relative;
   z-index: 1;
 }
+/* Overlay animations */
+.logout-confirmation-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease forwards;
+}
+
+
+.logout-confirmation-overlay.fade-out {
+  animation: fadeOut 0.4s ease forwards;
+}
+
+/* Modal animations */
+.logout-confirmation-modal {
+  background: var(--bg-card);  /* ← FIXED: Now uses theme variable */
+  padding: 32px;
+  border-radius: 16px;
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s ease forwards;
+  border: 1px solid var(--border-color);
+}
+
+.logout-confirmation-modal.slide-down {
+  animation: slideDown 0.4s ease forwards;
+}
+
+/* Buttons */
+.logout-confirmation-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 25px;
+}
+
+.logout-confirm-btn,
+.logout-cancel-btn {
+  flex: 1;
+  margin: 0 5px;
+  padding: 10px 0;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.logout-confirm-btn {
+  background: #c0392b;
+  color: #fff;
+}
+
+.logout-cancel-btn {
+  background: #ddd;
+  color: #333;
+}
+
+.logout-confirm-btn:hover,
+.logout-cancel-btn:hover {
+  transform: scale(1.05);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+}
 
 
 

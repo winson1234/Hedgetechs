@@ -559,7 +559,7 @@ body.dark-mode .dropdown-header {
 }
 
 body.light-mode .hero-title {
-  background: linear-gradient(135deg, var(--text-primary), var(--primary-color));
+  background: linear-gradient(135deg, #1a1f3a 0%, #1a1f3a 60%, #8B5A00 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

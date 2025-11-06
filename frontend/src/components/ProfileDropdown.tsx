@@ -3,6 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useAccountStore } from '../stores/accountStore';
 import { useAuthStore } from '../stores/authStore';
 
+// Password hashing utility using Web Crypto API
+const hashPassword = async (password: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
 type ProfileDropdownProps = {
   isOpen: boolean;
   closeDropdown: () => void;
@@ -25,6 +34,7 @@ export default function ProfileDropdown({
   const activeAccountId = useAccountStore(state => state.activeAccountId);
   const getActiveAccount = useAccountStore(state => state.getActiveAccount);
   const logout = useAuthStore(state => state.logout);
+  const user = useAuthStore(state => state.user);
 
   const activeAccount = getActiveAccount();
   const activeAccountType = activeAccount?.type;
@@ -84,10 +94,32 @@ export default function ProfileDropdown({
     }
   };
 
-  const handleSavePassword = () => {
+  const handleSavePassword = async () => {
     // Basic validation
     if (!currentPassword || !newPassword || !confirmPassword) {
       setPasswordMessage({ text: 'Please fill in all fields.', type: 'error' });
+      return;
+    }
+
+    // Verify current password against stored hash
+    const storedHash = localStorage.getItem(`userPasswordHash_${user?.email}`);
+    if (!storedHash) {
+      setPasswordMessage({
+        text: 'Password validation unavailable. Please logout and login again to enable password changes.',
+        type: 'error'
+      });
+      return;
+    }
+
+    try {
+      const currentHash = await hashPassword(currentPassword);
+      if (currentHash !== storedHash) {
+        setPasswordMessage({ text: 'Current password is incorrect.', type: 'error' });
+        return;
+      }
+    } catch (error) {
+      console.error('Password hashing error:', error);
+      setPasswordMessage({ text: 'An error occurred while validating password.', type: 'error' });
       return;
     }
 
@@ -109,20 +141,30 @@ export default function ProfileDropdown({
       return;
     }
 
-    // TODO: When backend authentication is implemented, make API call here
-    // For now, show success message since there's no password storage
-    // Example:
-    // const response = await fetch('/api/auth/change-password', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ currentPassword, newPassword })
-    // });
+    // Hash and save new password
+    try {
+      const newHash = await hashPassword(newPassword);
+      localStorage.setItem(`userPasswordHash_${user?.email}`, newHash);
 
-    // Show success and close
-    setPasswordMessage({ text: 'Password change validated! Backend integration pending.', type: 'success' });
-    setTimeout(() => {
-      handleCancelChangePassword();
-    }, 1500);
+      // Update registered users database
+      const registeredUsersData = localStorage.getItem('registeredUsers');
+      if (registeredUsersData && user?.email) {
+        const registeredUsers = JSON.parse(registeredUsersData);
+        if (registeredUsers[user.email]) {
+          registeredUsers[user.email].passwordHash = newHash;
+          localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
+        }
+      }
+
+      // Show success and close
+      setPasswordMessage({ text: 'Password changed successfully!', type: 'success' });
+      setTimeout(() => {
+        handleCancelChangePassword();
+      }, 1500);
+    } catch (error) {
+      console.error('Password update error:', error);
+      setPasswordMessage({ text: 'An error occurred while updating password.', type: 'error' });
+    }
   };
 
   const handleCancelChangePassword = () => {
@@ -292,7 +334,7 @@ export default function ProfileDropdown({
             Confirm Logout
           </h3>
           <p className="text-base text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
-            Are you sure you want to logout?
+            Are you sure you want to logout? Your session data will be cleared.
           </p>
           <div className="flex gap-3 justify-end">
             <button

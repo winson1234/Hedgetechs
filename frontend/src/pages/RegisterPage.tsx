@@ -136,14 +136,12 @@ useEffect(() => {
     password: formData.password
   });
 
- if (result.success) {
-    setSuccess(true); // ✅ show animation
-    setTimeout(() => navigate('/dashboard'), 3000); // redirect after 2s
-  } else {
-    alert(result.message || 'Registration failed');
-  }
-};
-
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      alert(result.message || 'Registration failed');
+    }
+  };
 
   return (
     <div className="register-page">
@@ -208,6 +206,7 @@ useEffect(() => {
                   ref={passwordRef}
                   type={showPassword ? 'text' : 'password'}
                   id="password"
+                  placeholder="Enter your password"
                   value={formData.password}
                   onChange={handleChange}
                   autoComplete="new-password"
@@ -264,6 +263,7 @@ useEffect(() => {
                   ref={retypePasswordRef}
                   type={showRetypePassword ? 'text' : 'password'}
                   id="retypePassword"
+                  placeholder="Re-enter your password"
                   value={formData.retypePassword}
                   onChange={handleChange}
                   autoComplete="new-password"

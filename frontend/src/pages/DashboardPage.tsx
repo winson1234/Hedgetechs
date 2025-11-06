@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { useUIStore } from '../stores/uiStore';
 import { WebSocketContext } from '../context/WebSocketContext';
 import MiniSparklineChart from '../components/MiniSparklineChart';
 import { getApiUrl } from '../config/api';
@@ -18,13 +19,14 @@ interface CryptoData {
 
 export default function DashboardPage() {
   const { isLoggedIn, user, logout } = useAuthStore();
+  const isDarkMode = useUIStore(state => state.isDarkMode);
+  const setDarkMode = useUIStore(state => state.setDarkMode);
   const ws = useContext(WebSocketContext);
   const [activeMarketTab, setActiveMarketTab] = useState('popular');
   const [activeNewsTab, setActiveNewsTab] = useState('all');
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('EN');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -63,12 +65,8 @@ export default function DashboardPage() {
     setShowLogoutModal(false);
   };
 
-  useEffect(() => {
-    document.body.className = theme === 'dark' ? 'dark-mode' : 'light-mode';
-  }, [theme]);
-
   const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+    setDarkMode(!isDarkMode);
   };
 
   // WebSocket message handler for real-time price updates
@@ -411,8 +409,8 @@ export default function DashboardPage() {
             <div className="nav-actions">
               {/* Theme Toggle */}
               <button className="icon-btn" id="themeToggle" onClick={toggleTheme} title="Toggle Theme">
-                {theme === 'light' ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a1f3a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {isDarkMode ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="5"></circle>
                     <line x1="12" y1="1" x2="12" y2="3"></line>
                     <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -424,7 +422,7 @@ export default function DashboardPage() {
                     <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
                   </svg>
                 ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff" stroke="#ffffff" strokeWidth="2">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="#1a1f3a" stroke="#1a1f3a" strokeWidth="2">
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                   </svg>
                 )}
@@ -1343,7 +1341,7 @@ export default function DashboardPage() {
         <div className="logout-confirmation-overlay" onClick={cancelLogout}>
           <div className="logout-confirmation-modal" onClick={(e) => e.stopPropagation()}>
             <h3>Confirm Logout</h3>
-            <p>Are you sure you want to logout?</p>
+            <p>Are you sure you want to logout? Your session data will be cleared.</p>
             <div className="logout-confirmation-buttons">
               <button onClick={cancelLogout} className="logout-cancel-btn">
                 Cancel

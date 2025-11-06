@@ -1,11 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import './forgotpassword.css';
 
+// Password hashing utility using Web Crypto API
+const hashPassword = async (password: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
 export default function ForgotPasswordPage() {
+  const navigate = useNavigate();
   const [step, setStep] = useState<'email' | 'otp' | 'password' | 'success'>('email');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [generatedOtp, setGeneratedOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -53,8 +64,42 @@ export default function ForgotPasswordPage() {
       setEmailError('Please enter a valid email address');
       return;
     }
+
+    // Check if user exists
+    const registeredUsersData = localStorage.getItem('registeredUsers');
+    if (!registeredUsersData) {
+      setEmailError('No account found with this email address');
+      return;
+    }
+
+    const registeredUsers = JSON.parse(registeredUsersData);
+    if (!registeredUsers[email]) {
+      setEmailError('No account found with this email address');
+      return;
+    }
+
     setEmailError('');
-    // In real app, would send OTP to email
+
+    // Generate random 6-digit OTP
+    const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(randomOtp);
+
+    // Store OTP in localStorage for persistence
+    localStorage.setItem('reset_otp', randomOtp);
+    localStorage.setItem('reset_email', email);
+
+    // Log OTP to console for testing (in production, this would be sent via email)
+    console.log('='.repeat(50));
+    console.log('🔐 PASSWORD RESET OTP');
+    console.log('='.repeat(50));
+    console.log(`Email: ${email}`);
+    console.log(`OTP Code: ${randomOtp}`);
+    console.log('='.repeat(50));
+    console.log('⚠️ This OTP is valid for this session only');
+    console.log('='.repeat(50));
+
+    alert(`OTP has been generated! Check the console (F12) for the OTP code.\n\nOTP: ${randomOtp}`);
+
     setStep('otp');
   };
 
@@ -83,12 +128,19 @@ export default function ForgotPasswordPage() {
       setConfirmError('Please enter all 6 digits');
       return;
     }
-    // In real app, would verify OTP with backend
+
+    // Verify OTP matches generated OTP
+    const storedOtp = localStorage.getItem('reset_otp') || generatedOtp;
+    if (otpValue !== storedOtp) {
+      setConfirmError('Invalid OTP. Please check and try again.');
+      return;
+    }
+
     setConfirmError('');
     setStep('password');
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (newPassword.length < 8) {
@@ -103,8 +155,42 @@ export default function ForgotPasswordPage() {
     }
     setConfirmError('');
 
-    // In real app, would update password on backend
-    setStep('success');
+    try {
+      // Get the email from localStorage
+      const resetEmail = localStorage.getItem('reset_email') || email;
+
+      // Hash the new password
+      const newPasswordHash = await hashPassword(newPassword);
+
+      // Update registered users database
+      const registeredUsersData = localStorage.getItem('registeredUsers');
+      if (registeredUsersData) {
+        const registeredUsers = JSON.parse(registeredUsersData);
+        if (registeredUsers[resetEmail]) {
+          registeredUsers[resetEmail].passwordHash = newPasswordHash;
+          localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
+
+          // Also update the standalone password hash
+          localStorage.setItem(`userPasswordHash_${resetEmail}`, newPasswordHash);
+
+          console.log('✅ Password updated successfully for:', resetEmail);
+        }
+      }
+
+      // Clear reset data
+      localStorage.removeItem('reset_otp');
+      localStorage.removeItem('reset_email');
+
+      setStep('success');
+
+      // Redirect to login after 2 seconds
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
+    } catch (error) {
+      console.error('Error updating password:', error);
+      setPasswordError('An error occurred while updating password');
+    }
   };
 
   return (
@@ -125,7 +211,7 @@ export default function ForgotPasswordPage() {
           <h1>Reset Password</h1>
           <p id="cardDescription">
             {step === 'email' && 'Enter your email address to reset your password'}
-            {step === 'otp' && 'Enter the 6-digit OTP sent to your email'}
+            {step === 'otp' && 'Enter the 6-digit OTP (check console or alert message)'}
             {step === 'password' && 'Create a new password for your account'}
             {step === 'success' && ''}
           </p>
@@ -155,7 +241,7 @@ export default function ForgotPasswordPage() {
           {/* Success Banner */}
           {step === 'success' && (
             <div className="success-banner show">
-              ✅ Password updated successfully! You can now log in with your new password.
+              ✅ Password updated successfully! Redirecting to login page...
             </div>
           )}
 

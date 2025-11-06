@@ -389,7 +389,7 @@ const sortedLanguages = [
     },
     {
       question: 'Can I transfer funds between my trading accounts?',
-      answer: 'Yes. Go to Wallet → Transfer, choose the source and destination accounts (e.g., Main → Trading), specify the amount, and confirm. Transfers between internal wallets are instant and free of charge.'
+      answer: 'Yes. Go to Wallet → Transfer, choose the source and destination accounts, specify the amount, and confirm. Transfers between internal wallets are instant and free of charge.'
     },
     {
       question: 'How can I contact customer support?',

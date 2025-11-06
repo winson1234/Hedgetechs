@@ -1,3 +1,5 @@
+const countryNames = {} as { [key: string]: string };
+
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
@@ -13,16 +15,25 @@ export default function ProfilePage() {
   const [editingPersonalInfo, setEditingPersonalInfo] = useState(false);
   const [editingLanguageRegion, setEditingLanguageRegion] = useState(false);
 
-  const [profileData, setProfileData] = useState({
-    name: user?.name || 'John Doe',
-    email: user?.email || 'john.doe@fpmarkets.com',
-    phone: '',
-    country: 'United States',
-    language: 'English (US)',
-    timezone: 'GMT+8 (Kuala Lumpur)',
-    currency: 'USD ($)',
-    profilePicture: null as string | null,
-  });
+  const countryNames: Record<string, string> = {
+    MY: "Malaysia", SG: "Singapore", TH: "Thailand", ID: "Indonesia",
+    PH: "Philippines", VN: "Vietnam", US: "United States", GB: "United Kingdom",
+    AU: "Australia", CN: "China", JP: "Japan", KR: "South Korea",
+    IN: "India", DE: "Germany", FR: "France", IT: "Italy",
+    ES: "Spain", CA: "Canada", BR: "Brazil", MX: "Mexico"
+  };
+
+const [profileData, setProfileData] = useState({
+  name: user?.name || 'John Doe',
+  email: user?.email || 'john.doe@fpmarkets.com',
+  phone: '',
+  country: user?.country ? countryNames[user.country] || 'Unknown Country' : 'United States',
+  language: 'English (US)',
+  timezone: 'GMT+8 (Kuala Lumpur)',
+  currency: 'USD ($)',
+  profilePicture: null as string | null,
+});
+
 
   const [formData, setFormData] = useState({ ...profileData });
   const [formErrors, setFormErrors] = useState({
@@ -41,13 +52,6 @@ export default function ProfilePage() {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const pendingSaveAction = useRef<(() => void) | null>(null);
 
-  const countryNames: Record<string, string> = {
-    MY: "Malaysia", SG: "Singapore", TH: "Thailand", ID: "Indonesia",
-    PH: "Philippines", VN: "Vietnam", US: "United States", GB: "United Kingdom",
-    AU: "Australia", CN: "China", JP: "Japan", KR: "South Korea",
-    IN: "India", DE: "Germany", FR: "France", IT: "Italy",
-    ES: "Spain", CA: "Canada", BR: "Brazil", MX: "Mexico"
-  };
 
   // Initialize theme - apply to html element for profile.css compatibility
   useEffect(() => {

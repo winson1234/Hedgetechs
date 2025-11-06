@@ -48,25 +48,23 @@ export default function ProfileDropdown({
     setShowChangePasswordModal(true);
     closeDropdown();
   };
+const confirmLogout = async () => {
+  // 1. Clear persisted data
+  localStorage.removeItem('account-store');
+  localStorage.removeItem('order-store');
+  localStorage.removeItem('transaction-storage');
+  localStorage.removeItem('ui-store');
+  localStorage.removeItem('fx_rates_cache');
+  localStorage.removeItem('fx_rates_cache_time');
 
-  const confirmLogout = () => {
-    // 1. Clear all Zustand persisted stores
-    localStorage.removeItem('account-store');
-    localStorage.removeItem('order-store');
-    localStorage.removeItem('transaction-storage');
-    localStorage.removeItem('ui-store');
+  // 2. Wait for logout cleanup
+  await logout();
 
-    // 2. Clear FX rate cache
-    localStorage.removeItem('fx_rates_cache');
-    localStorage.removeItem('fx_rates_cache_time');
+  // 3. Close modal and redirect directly to dashboard
+  setShowLogoutModal(true);
+  navigate('/dashboard', { replace: true });
+};
 
-    // 3. Logout
-    logout(); // This clears 'loggedInUser' from localStorage and updates auth state
-    setShowLogoutModal(false);
-
-    // 4. Navigate to login
-    navigate('/dashboard');
-  };
 
   const cancelLogout = () => {
     setShowLogoutModal(false);

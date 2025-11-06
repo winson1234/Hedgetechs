@@ -179,8 +179,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  logout: () => {
-    localStorage.removeItem('loggedInUser');
-    set({ isLoggedIn: false, user: null });
-  },
+logout: async () => {
+  return new Promise<void>((resolve) => {
+    setTimeout(() => {
+      localStorage.removeItem('loggedInUser');
+      set({ isLoggedIn: false, user: null });
+      resolve();
+    }, 150); // tiny delay ensures React state syncs before navigation
+  });
+},
+
 }));

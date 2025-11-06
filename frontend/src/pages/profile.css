@@ -350,6 +350,7 @@ body {
 
 /* Profile Header */
 .profile-header {
+    margin-top:-80px;
     background: var(--bg-card);
     padding: 40px;
     border-radius: 16px;
@@ -471,9 +472,10 @@ body {
 /* Profile Grid */
 .profile-grid {
     display: grid;
-    grid-template-columns: 1.5fr 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 30px;
 }
+
 
 .profile-card {
     background: var(--bg-card);

@@ -1,5 +1,50 @@
 import { create } from 'zustand';
 
+// Password hashing utility using Web Crypto API
+const hashPassword = async (password: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// Registered users database in localStorage
+interface RegisteredUser {
+  email: string;
+  name: string;
+  country: string;
+  passwordHash: string;
+}
+
+// Get all registered users from localStorage
+const getRegisteredUsers = (): Record<string, RegisteredUser> => {
+  try {
+    const usersData = localStorage.getItem('registeredUsers');
+    return usersData ? JSON.parse(usersData) : {};
+  } catch (error) {
+    console.error('Error reading registered users:', error);
+    return {};
+  }
+};
+
+// Save registered user to localStorage
+const saveRegisteredUser = (user: RegisteredUser): void => {
+  try {
+    const users = getRegisteredUsers();
+    users[user.email] = user;
+    localStorage.setItem('registeredUsers', JSON.stringify(users));
+  } catch (error) {
+    console.error('Error saving registered user:', error);
+  }
+};
+
+// Get specific registered user
+const getRegisteredUser = (email: string): RegisteredUser | null => {
+  const users = getRegisteredUsers();
+  return users[email] || null;
+};
+
 interface User {
   email: string;
   name?: string;
@@ -51,10 +96,29 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
 
     try {
-      // TODO: Replace with actual API call when backend auth is implemented
-      // For now, using localStorage as per existing implementation
-      const user: User = { email, name: email.split('@')[0] };
+      // Check if user exists in registered users
+      const registeredUser = getRegisteredUser(email);
+      if (!registeredUser) {
+        return { success: false, message: 'Invalid email or password' };
+      }
+
+      // Verify password
+      const passwordHash = await hashPassword(password);
+      if (passwordHash !== registeredUser.passwordHash) {
+        return { success: false, message: 'Invalid email or password' };
+      }
+
+      // Login successful - create session
+      const user: User = {
+        email: registeredUser.email,
+        name: registeredUser.name,
+        country: registeredUser.country
+      };
       localStorage.setItem('loggedInUser', JSON.stringify(user));
+
+      // Keep password hash for password change validation
+      localStorage.setItem(`userPasswordHash_${email}`, passwordHash);
+
       set({ isLoggedIn: true, user });
       return { success: true };
     } catch (error) {
@@ -78,13 +142,35 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
 
     try {
-      // TODO: Replace with actual API call when backend auth is implemented
+      // Check if user already exists
+      const existingUser = getRegisteredUser(data.email);
+      if (existingUser) {
+        return { success: false, message: 'An account with this email already exists' };
+      }
+
+      // Hash password
+      const passwordHash = await hashPassword(data.password);
+
+      // Save to registered users database
+      const registeredUser: RegisteredUser = {
+        email: data.email,
+        name: data.name,
+        country: data.country,
+        passwordHash: passwordHash
+      };
+      saveRegisteredUser(registeredUser);
+
+      // Create user session
       const user: User = {
         email: data.email,
         name: data.name,
         country: data.country
       };
       localStorage.setItem('loggedInUser', JSON.stringify(user));
+
+      // Keep password hash for password change validation
+      localStorage.setItem(`userPasswordHash_${data.email}`, passwordHash);
+
       set({ isLoggedIn: true, user });
       return { success: true };
     } catch (error) {

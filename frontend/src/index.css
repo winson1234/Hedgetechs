@@ -39,3 +39,15 @@ body {
 .animate-fade-in-out {
   animation: fadeInOut 3s ease-in-out forwards;
 }
+
+/* Logo Styling */
+.logo-text {
+  font-style: italic;
+  font-size: 1.5rem;
+  font-weight: bold;
+  @apply text-slate-900 dark:text-white;
+}
+
+.logo-accent {
+  color: #FDDB92;
+}

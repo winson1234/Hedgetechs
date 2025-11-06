@@ -89,7 +89,10 @@ export default function RegisterPage() {
     });
 
     if (result.success) {
-      navigate('/dashboard');
+      // Logout after registration to require login with new credentials
+      useAuthStore.getState().logout();
+      alert('Registration successful! Please login with your credentials.');
+      navigate('/login');
     } else {
       alert(result.message || 'Registration failed');
     }
@@ -164,7 +167,7 @@ export default function RegisterPage() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   id="password"
-                  placeholder="••••••••••••"
+                  placeholder="Enter your password"
                   value={formData.password}
                   onChange={handleChange}
                   required
@@ -208,7 +211,7 @@ export default function RegisterPage() {
                 <input
                   type={showRetypePassword ? 'text' : 'password'}
                   id="retypePassword"
-                  placeholder="••••••••••••"
+                  placeholder="Re-enter your password"
                   value={formData.retypePassword}
                   onChange={handleChange}
                   required

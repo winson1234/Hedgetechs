@@ -42,11 +42,11 @@ export default function Header() {
       <div className="flex items-center justify-between">
         {/* Left Side: Title */}
         <div>
-          <button 
+          <button
             onClick={() => navigate('/dashboard')}
-            className="text-lg font-semibold text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+            className="hover:opacity-80 transition-opacity cursor-pointer bg-transparent border-none"
           >
-            FPMarkets
+            <span className="logo-text">FP<span className="logo-accent">Markets</span></span>
           </button>
         </div>
 

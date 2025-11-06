@@ -1,5 +1,3 @@
-const countryNames = {} as { [key: string]: string };
-
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';

@@ -18,7 +18,7 @@ export default function RegisterPage() {
     password: '',
     retypePassword: ''
   });
-const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showRetypePassword, setShowRetypePassword] = useState(false);
@@ -74,7 +74,7 @@ useEffect(() => {
   const hasUpper = /[A-Z]/.test(password);
   const hasLower = /[a-z]/.test(password);
   const hasNumber = /\d/.test(password);
-  const hasSpecial = /[@!#\$%\^&\*]/.test(password);
+  const hasSpecial = /[@!#$%^&*]/.test(password);
 
   if (password && (!hasUpper || !hasLower || !hasNumber || !hasSpecial)) {
     setPasswordStrength({
@@ -137,7 +137,8 @@ useEffect(() => {
   });
 
     if (result.success) {
-      navigate('/dashboard');
+      setSuccess(true);
+      setTimeout(() => navigate('/dashboard'), 2000);
     } else {
       alert(result.message || 'Registration failed');
     }

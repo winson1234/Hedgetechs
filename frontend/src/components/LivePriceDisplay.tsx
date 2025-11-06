@@ -76,12 +76,11 @@ export default function LivePriceDisplay({ symbol }: LivePriceDisplayProps) {
             <span className="text-base font-bold text-slate-600 dark:text-slate-400">{iconInfo.baseCurrency}</span>
           )}
         </div>
-        <div className="text-sm font-medium text-slate-600 dark:text-slate-400">{displaySymbol} (live)</div>
+        <div className="text-sm font-medium text-slate-600 dark:text-slate-400">{displaySymbol}</div>
       </div>
       <div className={`text-5xl font-mono font-bold ${color}`}>
         {price != null ? price.toFixed(2) : '—'}
       </div>
-      <div className="text-xs text-slate-500 dark:text-slate-400 mt-2">Real-time updates via WebSocket</div>
     </div>
   )
 }

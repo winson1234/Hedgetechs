@@ -16,7 +16,6 @@ export default function RegisterPage() {
     password: '',
     retypePassword: ''
   });
-  const [success, setSuccess] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showRetypePassword, setShowRetypePassword] = useState(false);
@@ -135,8 +134,7 @@ useEffect(() => {
   });
 
     if (result.success) {
-      setSuccess(true);
-      setTimeout(() => navigate('/dashboard'), 2000);
+      navigate('/dashboard');
     } else {
       alert(result.message || 'Registration failed');
     }

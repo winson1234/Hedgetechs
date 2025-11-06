@@ -2,9 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import './register.css';
-import { motion, AnimatePresence } from 'framer-motion'; // 👈 make sure framer-motion is installed
-// npm install framer-motion
-
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function RegisterPage() {
   const navigate = useNavigate();

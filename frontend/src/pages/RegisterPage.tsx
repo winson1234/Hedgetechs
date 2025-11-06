@@ -143,15 +143,15 @@ useEffect(() => {
   };
 
   return (
-    <div className="register-page">
-      <div className="header">
-        <div className="logo">
-          <span className="fp">FP</span><span className="markets">Markets</span>
-        </div>
-        <Link to="/login">
-          <button className="client-login-btn">Client Login</button>
-        </Link>
-      </div>
+<div className="register-page">
+  <div className="header">
+    <Link to="/dashboard" className="logo">
+      <span className="fp">FP</span><span className="markets">Markets</span>
+    </Link>
+    <Link to="/login">
+      <button className="client-login-btn">Client Login</button>
+    </Link>
+  </div>
 
       <div className="background"></div>
 
@@ -302,7 +302,7 @@ useEffect(() => {
             </p>
 
             <Link to="/login" className="signin-link">Already have an account? Sign in</Link>
-        <AnimatePresence>
+    <AnimatePresence>
   {success && (
     <motion.div
       key="success-popup"
@@ -340,7 +340,6 @@ useEffect(() => {
     </motion.div>
   )}
 </AnimatePresence>
-
 
           </form>
         </div>

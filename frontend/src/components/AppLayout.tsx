@@ -55,7 +55,7 @@ export default function AppLayout() {
         {isTradingPage && <AnalyticsPanel />}
 
         {/* Main Content Area */}
-        <div className="ml-24 pt-[60px]">
+        <div className="ml-24 pt-8">
           <Outlet />
         </div>
 

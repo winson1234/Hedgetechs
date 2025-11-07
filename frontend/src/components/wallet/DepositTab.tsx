@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getApiUrl } from '../../config/api';
 import { useAccountStore, formatBalance } from '../../stores/accountStore';
 import { useUIStore } from '../../stores/uiStore';
-import { CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements, PaymentRequestButtonElement } from '@stripe/react-stripe-js';
-import type { StripeCardNumberElement, PaymentRequest } from '@stripe/stripe-js';
+import { CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements, ExpressCheckoutElement } from '@stripe/react-stripe-js';
+import type { StripeCardNumberElement, StripeExpressCheckoutElementConfirmEvent } from '@stripe/stripe-js';
 
 // Validation schema
 const depositSchema = z.object({
@@ -57,7 +57,6 @@ function DepositTab() {
   const [selectedTab, setSelectedTab] = useState<PaymentTab>('card');
   const [isProcessing, setIsProcessing] = useState(false);
   const [cardBrand, setCardBrand] = useState<string>('');
-  const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
   const [selectedFpxBank, setSelectedFpxBank] = useState<string>('maybank2u');
 
   // Track processed payment intents to prevent duplicate deposits
@@ -92,6 +91,24 @@ function DepositTab() {
   });
 
   const selectedAccountId = watch('accountId');
+  const depositAmount = watch('amount');
+
+  // Express Checkout Element options (UI configuration only)
+  const expressCheckoutOptions = useMemo(() => {
+    const theme = isDarkMode ? 'white' : 'black';
+
+    return {
+      buttonType: {
+        applePay: 'buy' as const,
+        googlePay: 'buy' as const,
+      },
+      buttonTheme: {
+        applePay: theme as 'white' | 'black',
+        googlePay: theme as 'white' | 'black',
+      },
+      buttonHeight: 48,
+    };
+  }, [isDarkMode]);
 
   // Helper function to mark payment as processed (persists to localStorage)
   const markPaymentAsProcessed = (paymentIntentId: string) => {
@@ -213,146 +230,51 @@ function DepositTab() {
     });
   }, [elements]);
 
-  // Set up Apple Pay / Google Pay payment request
-  useEffect(() => {
-    if (!stripe) return;
+  // Express Checkout Element (Apple Pay / Google Pay / Link) confirmation handler
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleExpressCheckoutConfirm = async (_event: StripeExpressCheckoutElementConfirmEvent) => {
+    const amount = watch('amount');
+    const accountId = watch('accountId');
+    const account = accounts.find(a => a.id === accountId);
 
-    // Get selected account
-    const account = accounts.find(a => a.id === selectedAccountId) || activeAccount;
-    if (!account) return;
+    if (!account || amount < 5) {
+      showToast('Please enter a valid amount (minimum $5.00)', 'error');
+      return;
+    }
 
-    // Dynamic country mapping based on currency
-    const getCurrencyCountry = (currency: string): string => {
-      const countryMap: Record<string, string> = {
-        'USD': 'US',
-        'EUR': 'GB',  // Using GB for broader Apple/Google Pay support
-        'MYR': 'MY',
-        'JPY': 'JP',
-        'GBP': 'GB',
-        'CNY': 'CN',
-      };
-      return countryMap[currency.toUpperCase()] || 'US';
-    };
+    try {
+      // Create payment intent
+      const response = await fetch(getApiUrl('/api/v1/deposit/create-payment-intent'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Math.round(amount * 100),
+          currency: account.currency.toLowerCase(),
+          payment_method_types: ['card'],
+          metadata: {
+            account_id: accountId,
+            original_amount: amount.toString(),
+            original_currency: account.currency,
+          },
+        }),
+      });
 
-    const accountCurrency = account.currency.toLowerCase();
-    const country = getCurrencyCountry(account.currency);
-
-    const pr = stripe.paymentRequest({
-      country: country,
-      currency: accountCurrency,
-      total: {
-        label: 'Deposit to Trading Account',
-        amount: 500, // $5.00 in cents (minimum deposit) - will be updated when user enters amount
-      },
-      requestPayerName: true,
-      requestPayerEmail: true,
-    });
-
-    // Check if Apple Pay / Google Pay is available
-    pr.canMakePayment().then((result) => {
-      if (result) {
-        setPaymentRequest(pr);
-      }
-    });
-
-    // Handle payment method event
-    pr.on('paymentmethod', async (e) => {
-      const amount = watch('amount');
-      const accountId = watch('accountId');
-      const account = accounts.find(a => a.id === accountId);
-
-      if (!account || amount < 5) {
-        e.complete('fail');
-        showToast('Please enter a valid amount (minimum $5.00)', 'error');
+      if (!response.ok) {
+        showToast('Failed to create payment intent', 'error');
         return;
       }
 
-      try {
-        // Create payment intent
-        const response = await fetch(getApiUrl('/api/v1/deposit/create-payment-intent'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount: Math.round(amount * 100),
-            currency: account.currency.toLowerCase(),
-            payment_method_types: ['card'],
-            metadata: {
-              account_id: accountId,
-              original_amount: amount.toString(),
-              original_currency: account.currency,
-            },
-          }),
-        });
+      const { clientSecret } = await response.json();
 
-        if (!response.ok) {
-          e.complete('fail');
-          showToast('Failed to create payment intent', 'error');
-          return;
-        }
-
-        const { clientSecret } = await response.json();
-
-        // Confirm payment
-        const { error, paymentIntent } = await stripe.confirmCardPayment(
-          clientSecret,
-          { payment_method: e.paymentMethod.id },
-          { handleActions: false }
-        );
-
-        if (error) {
-          e.complete('fail');
-          showToast(error.message || 'Payment failed', 'error');
-          return;
-        }
-
-        e.complete('success');
-
-        // Check if already processed
-        if (paymentIntent && !processedPayments.current.has(paymentIntent.id)) {
-          markPaymentAsProcessed(paymentIntent.id);
-
-          // Process deposit
-          const result = await processDeposit(
-            accountId,
-            amount,
-            account.currency,
-            paymentIntent.id,
-            {
-              cardBrand: e.paymentMethod.card?.brand || 'digital_wallet',
-              last4: e.paymentMethod.card?.last4 || '****',
-            }
-          );
-
-          if (result.success) {
-            showToast('Digital wallet payment successful!', 'success');
-            reset();
-          } else {
-            showToast(result.message, 'error');
-          }
-        }
-      } catch (error) {
-        e.complete('fail');
-        console.error('Digital wallet payment error:', error);
-        showToast('Payment failed. Please try again.', 'error');
-      }
-    });
-  }, [stripe, watch, accounts, showToast, processDeposit, reset, selectedAccountId, activeAccount]);
-
-  // Update payment request when amount changes
-  useEffect(() => {
-    if (!paymentRequest) return;
-
-    const amount = watch('amount');
-    if (amount && amount >= 5) {
-      // Update the payment request total amount
-      paymentRequest.update({
-        total: {
-          label: 'Deposit to Trading Account',
-          amount: Math.round(amount * 100), // Convert to cents
-        },
-      });
+      // Return the client secret to Stripe Express Checkout Element
+      // The element will handle the payment confirmation automatically
+      return { clientSecret };
+    } catch (error) {
+      console.error('Express checkout payment error:', error);
+      showToast('Payment failed. Please try again.', 'error');
+      return;
     }
-  }, [watch, paymentRequest]);
+  };
 
   const onSubmit = async (data: DepositFormData) => {
     if (!stripe || !elements) {
@@ -744,38 +666,6 @@ function DepositTab() {
       {/* Card Payment Form */}
       {selectedTab === 'card' && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Apple Pay / Google Pay Button */}
-          {paymentRequest && (
-            <>
-              <div className="pb-4 border-b border-slate-200 dark:border-slate-700">
-                <PaymentRequestButtonElement
-                  options={{
-                    paymentRequest,
-                    style: {
-                      paymentRequestButton: {
-                        theme: isDarkMode ? 'light' : 'dark',
-                        height: '48px',
-                        type: 'default',
-                      }
-                    }
-                  }}
-                />
-              </div>
-
-              {/* OR Divider */}
-              <div className="relative py-4">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 font-medium">
-                    OR PAY WITH CARD
-                  </span>
-                </div>
-              </div>
-            </>
-          )}
-
           {/* Account Selection */}
           <div>
             <label htmlFor="depositAccount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
@@ -820,6 +710,16 @@ function DepositTab() {
               <p className="text-xs text-red-500 mt-1">{errors.amount.message}</p>
             )}
           </div>
+
+          {/* Express Checkout (Apple Pay / Google Pay / Link) */}
+          {depositAmount >= 5 && (
+            <div className="pb-4">
+              <ExpressCheckoutElement
+                onConfirm={handleExpressCheckoutConfirm}
+                options={expressCheckoutOptions}
+              />
+            </div>
+          )}
 
           {/* Stripe Card Elements */}
           <div className="space-y-4 border-t-2 border-slate-200 dark:border-slate-700 pt-6">

@@ -26,9 +26,9 @@ export default function WalletPage() {
   };
 
   return (
-    <div className="px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 bg-slate-50 dark:bg-slate-950 min-h-[calc(100vh-61px)]">
+    <div className="px-4 pb-4 md:px-6 md:pb-6 lg:px-8 lg:pb-8 bg-slate-50 dark:bg-slate-950 min-h-[calc(100vh-61px)]">
       {/* Page Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100">
           Wallet
         </h1>

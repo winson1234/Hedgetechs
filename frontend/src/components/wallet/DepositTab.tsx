@@ -264,11 +264,14 @@ function DepositTab() {
       return;
     }
 
+    setIsProcessing(true);
+
     try {
       // Step 1: Submit and validate payment details (modern pattern)
       const { error: submitError } = await elements.submit();
       if (submitError) {
         showToast(submitError.message || 'Payment validation failed', 'error');
+        setIsProcessing(false);
         return;
       }
 
@@ -290,18 +293,83 @@ function DepositTab() {
 
       if (!response.ok) {
         showToast('Failed to create payment intent', 'error');
+        setIsProcessing(false);
         return;
       }
 
       const { clientSecret } = await response.json();
 
       // Step 3: Confirm payment using the modern pattern
-      // For Express Checkout (Apple Pay/Google Pay), we still return clientSecret
-      // as the Express Checkout Element handles the confirmation internally
-      return { clientSecret };
+      // For Express Checkout, we use confirmPayment with redirect: 'if_required'
+      // so we can handle the completion and poll status ourselves
+      const { error: confirmError } = await stripe.confirmPayment({
+        elements,
+        clientSecret,
+        confirmParams: {
+          return_url: window.location.href, // For redirect-based methods (if needed)
+        },
+        redirect: 'if_required', // Don't redirect for Apple Pay/Google Pay/Link
+      });
+
+      if (confirmError) {
+        showToast(confirmError.message || 'Payment failed', 'error');
+        setIsProcessing(false);
+        return;
+      }
+
+      // Step 4: Poll payment status until succeeded or failed (max 60 seconds)
+      const paymentIntentId = clientSecret.split('_secret_')[0];
+      const maxAttempts = 20; // 20 attempts × 3 seconds = 60 seconds max
+      let attempts = 0;
+
+      const pollInterval = setInterval(async () => {
+        attempts++;
+
+        try {
+          const statusResponse = await fetch(getApiUrl(`/api/v1/payment/status?payment_intent_id=${paymentIntentId}`));
+          const statusData = await statusResponse.json();
+
+          if (statusData.status === 'succeeded') {
+            clearInterval(pollInterval);
+
+            // Check if already processed (de-duplication)
+            if (processedPayments.current.has(paymentIntentId)) {
+              console.log('Payment already processed:', paymentIntentId);
+              setIsProcessing(false);
+              return;
+            }
+
+            // Mark as processed
+            markPaymentAsProcessed(paymentIntentId);
+
+            // Process deposit
+            processDeposit(accountId, amount, account.currency);
+            showToast(`Successfully deposited ${formatBalance(amount, account.currency)} via Express Checkout`, 'success');
+            setIsProcessing(false);
+
+            // Reset form
+            setValue('amount', 5);
+          } else if (statusData.status === 'requires_payment_method' || statusData.status === 'canceled') {
+            clearInterval(pollInterval);
+            showToast(statusData.lastPaymentError || 'Payment failed', 'error');
+            setIsProcessing(false);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(pollInterval);
+            showToast('Payment processing timeout. Please check your account or contact support.', 'error');
+            setIsProcessing(false);
+          }
+        } catch (pollError) {
+          console.error('Error polling payment status:', pollError);
+          clearInterval(pollInterval);
+          showToast('Error checking payment status', 'error');
+          setIsProcessing(false);
+        }
+      }, 3000); // Poll every 3 seconds
+
     } catch (error) {
       console.error('Express checkout payment error:', error);
       showToast('Payment failed. Please try again.', 'error');
+      setIsProcessing(false);
       return;
     }
   };
@@ -585,7 +653,7 @@ function DepositTab() {
                         You will be redirected to your bank&apos;s website to complete the payment securely. After completing the payment, you&apos;ll be redirected back to this page.
                       </p>
                       <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                        💱 Payment will be processed in MYR (Malaysian Ringgit) using live exchange rates.
+                        Payment will be processed in MYR (Malaysian Ringgit) using live exchange rates.
                       </p>
                     </div>
                   </div>
@@ -628,7 +696,7 @@ function DepositTab() {
                         You will be redirected to NOWPayments to complete your payment with Bitcoin, Ethereum, USDT, or 300+ other supported cryptocurrencies. Choose your preferred crypto on the payment page.
                       </p>
                       <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                        ⚡ Your account will be credited automatically after blockchain confirmation
+                        Your account will be credited automatically after blockchain confirmation
                       </p>
                     </div>
                   </div>
@@ -743,16 +811,33 @@ function DepositTab() {
 
           {/* Express Checkout (Apple Pay / Google Pay / Link) */}
           {depositAmount >= 5 && (
-            <div className="pb-4">
-              <ExpressCheckoutElement
-                onConfirm={handleExpressCheckoutConfirm}
-                options={expressCheckoutOptions}
-              />
-            </div>
+            <>
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  Express Payment (One-Click)
+                </p>
+                <ExpressCheckoutElement
+                  onConfirm={handleExpressCheckoutConfirm}
+                  options={expressCheckoutOptions}
+                />
+              </div>
+
+              {/* OR Divider */}
+              <div className="relative py-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t-2 border-slate-200 dark:border-slate-700"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white dark:bg-slate-800 px-4 text-slate-500 dark:text-slate-400 font-semibold">
+                    Or pay with card
+                  </span>
+                </div>
+              </div>
+            </>
           )}
 
           {/* Stripe Card Elements */}
-          <div className="space-y-4 border-t-2 border-slate-200 dark:border-slate-700 pt-6">
+          <div className="space-y-4">
             <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               Card Information
               {cardBrand && <span className="ml-2 text-xs text-slate-500 uppercase">({cardBrand})</span>}
@@ -808,7 +893,7 @@ function DepositTab() {
             disabled={isProcessing || !stripe}
             className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
           >
-            {isProcessing ? 'Processing...' : 'Confirm Deposit'}
+            {isProcessing ? 'Processing Payment...' : 'Pay with Card'}
           </button>
         </form>
       )}

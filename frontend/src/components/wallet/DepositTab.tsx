@@ -132,6 +132,22 @@ function DepositTab() {
     }
   }, [activeAccountId, activeAccount, setValue]);
 
+  // Update Stripe Elements configuration dynamically when deposit amount changes
+  // This enables Express Checkout to display the correct amount
+  useEffect(() => {
+    if (elements && depositAmount >= 5) {
+      const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+      const currency = selectedAccount?.currency.toLowerCase() || 'usd';
+      const amountInCents = Math.round(depositAmount * 100);
+
+      // Update Elements with new amount and currency (modern pattern)
+      elements.update({
+        amount: amountInCents,
+        currency: currency,
+      });
+    }
+  }, [depositAmount, selectedAccountId, accounts, elements]);
+
   // Handle redirect-based payment return (FPX, eWallets)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -231,8 +247,14 @@ function DepositTab() {
   }, [elements]);
 
   // Express Checkout Element (Apple Pay / Google Pay / Link) confirmation handler
+  // Using modern 2025 "deferred intent" pattern with elements.submit() + stripe.confirmPayment()
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleExpressCheckoutConfirm = async (_event: StripeExpressCheckoutElementConfirmEvent) => {
+    if (!stripe || !elements) {
+      showToast('Stripe is not loaded. Please refresh the page.', 'error');
+      return;
+    }
+
     const amount = watch('amount');
     const accountId = watch('accountId');
     const account = accounts.find(a => a.id === accountId);
@@ -243,7 +265,14 @@ function DepositTab() {
     }
 
     try {
-      // Create payment intent
+      // Step 1: Submit and validate payment details (modern pattern)
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        showToast(submitError.message || 'Payment validation failed', 'error');
+        return;
+      }
+
+      // Step 2: Create payment intent on server
       const response = await fetch(getApiUrl('/api/v1/deposit/create-payment-intent'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -266,8 +295,9 @@ function DepositTab() {
 
       const { clientSecret } = await response.json();
 
-      // Return the client secret to Stripe Express Checkout Element
-      // The element will handle the payment confirmation automatically
+      // Step 3: Confirm payment using the modern pattern
+      // For Express Checkout (Apple Pay/Google Pay), we still return clientSecret
+      // as the Express Checkout Element handles the confirmation internally
       return { clientSecret };
     } catch (error) {
       console.error('Express checkout payment error:', error);

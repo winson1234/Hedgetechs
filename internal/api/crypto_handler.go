@@ -10,6 +10,15 @@ import (
 	"os"
 )
 
+// sendJSONError is a helper function to send consistent JSON error responses
+func sendJSONError(w http.ResponseWriter, message string, statusCode int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(map[string]string{
+		"error": message,
+	})
+}
+
 // NOWPaymentsChargeRequest represents the request to create a crypto charge
 type NOWPaymentsChargeRequest struct {
 	AccountID string  `json:"accountId"`
@@ -64,27 +73,27 @@ type NOWPaymentsWebhookEvent struct {
 // HandleCreateCryptoCharge creates a new NOWPayments payment
 func HandleCreateCryptoCharge(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Parse request body
 	var req NOWPaymentsChargeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		sendJSONError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	// Validate request
 	if req.AccountID == "" || req.Amount <= 0 || req.Currency == "" {
-		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		sendJSONError(w, "Missing required fields", http.StatusBadRequest)
 		return
 	}
 
 	// Get NOWPayments API key from environment
 	apiKey := os.Getenv("NOWPAYMENTS_API_KEY")
 	if apiKey == "" {
-		http.Error(w, "NOWPayments API key not configured", http.StatusInternalServerError)
+		sendJSONError(w, "NOWPayments API key not configured", http.StatusInternalServerError)
 		return
 	}
 
@@ -110,7 +119,7 @@ func HandleCreateCryptoCharge(w http.ResponseWriter, r *http.Request) {
 
 	payloadBytes, err := json.Marshal(invoicePayload)
 	if err != nil {
-		http.Error(w, "Failed to create payment payload", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to create payment payload", http.StatusInternalServerError)
 		return
 	}
 
@@ -120,7 +129,7 @@ func HandleCreateCryptoCharge(w http.ResponseWriter, r *http.Request) {
 	// Make API request to NOWPayments (using invoice endpoint)
 	nowPaymentsReq, err := http.NewRequest("POST", "https://api.nowpayments.io/v1/invoice", bytes.NewBuffer(payloadBytes))
 	if err != nil {
-		http.Error(w, "Failed to create NOWPayments request", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to create NOWPayments request", http.StatusInternalServerError)
 		return
 	}
 
@@ -130,14 +139,14 @@ func HandleCreateCryptoCharge(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{}
 	resp, err := client.Do(nowPaymentsReq)
 	if err != nil {
-		http.Error(w, "Failed to connect to NOWPayments", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to connect to NOWPayments", http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		http.Error(w, "Failed to read NOWPayments response", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to read NOWPayments response", http.StatusInternalServerError)
 		return
 	}
 
@@ -146,12 +155,7 @@ func HandleCreateCryptoCharge(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("NOWPayments API response body: %s\n", string(body))
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		// Return error as JSON instead of plain text
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadGateway)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": fmt.Sprintf("NOWPayments API error (status %d): %s", resp.StatusCode, string(body)),
-		})
+		sendJSONError(w, fmt.Sprintf("NOWPayments API error (status %d): %s", resp.StatusCode, string(body)), http.StatusBadGateway)
 		return
 	}
 
@@ -159,7 +163,7 @@ func HandleCreateCryptoCharge(w http.ResponseWriter, r *http.Request) {
 	var invoiceResp NOWPaymentsInvoiceResponse
 	if err := json.Unmarshal(body, &invoiceResp); err != nil {
 		fmt.Printf("Failed to parse NOWPayments response: %v\n", err)
-		http.Error(w, "Failed to parse NOWPayments response", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to parse NOWPayments response", http.StatusInternalServerError)
 		return
 	}
 
@@ -176,21 +180,21 @@ func HandleCreateCryptoCharge(w http.ResponseWriter, r *http.Request) {
 // HandleCryptoWebhook handles IPN webhook events from NOWPayments
 func HandleCryptoWebhook(hub *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Read the raw body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		sendJSONError(w, "Failed to read request body", http.StatusBadRequest)
 		return
 	}
 
 	// Parse webhook event
 	var event NOWPaymentsWebhookEvent
 	if err := json.Unmarshal(body, &event); err != nil {
-		http.Error(w, "Invalid webhook payload", http.StatusBadRequest)
+		sendJSONError(w, "Invalid webhook payload", http.StatusBadRequest)
 		return
 	}
 

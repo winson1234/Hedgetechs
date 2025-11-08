@@ -43,6 +43,10 @@ interface UIStore {
   activeWalletTab: WalletTab
   setActiveWalletTab: (tab: WalletTab) => void
 
+  // Sidebar
+  isSidebarExpanded: boolean
+  setSidebarExpanded: (expanded: boolean) => void
+
   // Toast notifications
   toast: ToastState
   showToast: (message: string, type: 'success' | 'error') => void
@@ -106,6 +110,10 @@ export const useUIStore = create<UIStore>()(
       activeWalletTab: 'overview',
       setActiveWalletTab: (tab) => set({ activeWalletTab: tab }),
 
+      // Sidebar
+      isSidebarExpanded: false,
+      setSidebarExpanded: (expanded) => set({ isSidebarExpanded: expanded }),
+
       // Toast notifications
       toast: null,
       showToast: (message, type) => {
@@ -116,10 +124,11 @@ export const useUIStore = create<UIStore>()(
     }),
     {
       name: 'ui-store',
-      // Persist theme and wallet tab
+      // Persist theme, wallet tab, and sidebar state
       partialize: (state) => ({
         isDarkMode: state.isDarkMode,
-        activeWalletTab: state.activeWalletTab
+        activeWalletTab: state.activeWalletTab,
+        isSidebarExpanded: state.isSidebarExpanded
       }),
     }
   )

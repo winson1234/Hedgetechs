@@ -16,7 +16,7 @@ Comprehensive cryptocurrency trading platform with authentication, real-time mar
 ```bash
 go mod tidy                     # Install dependencies
 go build                        # Build binary
-cd cmd/server; go run main.go # Run server
+cd cmd/server; go run main.go   # Run server
 go test ./...                   # Run tests
 ```
 
@@ -159,13 +159,17 @@ frontend/src/
 - Account status tracking
 
 ### Wallet & Payments
-- Stripe integration for card payments
+- Stripe integration with Express Checkout (Google Pay, Apple Pay, Link)
+- Card payments with Stripe Elements
 - FPX Banking support (Malaysia)
-- Real-time payment status tracking
+- Automatic payment methods (enables all activated payment methods in Stripe dashboard)
+- Real-time payment status tracking with polling
 - Payment de-duplication
 - Inter-account transfers
 - Withdrawal processing
 - Transaction history
+
+**Note:** Express Checkout requires HTTPS. See [SETUP.md](docs/SETUP.md) for local HTTPS configuration.
 
 ### Market Data
 - Historical klines with 5-minute caching
@@ -215,11 +219,6 @@ frontend/src/
 
 ---
 
-## Environment Variables
+## Setup
 
-Create `.env` file at project root:
-
-```
-STRIPE_SECRET_KEY=sk_test_...
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
-```
+For environment variables, HTTPS configuration, and deployment instructions, see [SETUP.md](docs/SETUP.md).

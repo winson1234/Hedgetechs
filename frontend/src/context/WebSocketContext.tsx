@@ -32,7 +32,10 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     const isDev = typeof import.meta !== 'undefined' && !!import.meta.env && import.meta.env.DEV
-    const url = isDev ? 'ws://localhost:8080/ws' : 'wss://brokerageproject.fly.dev/ws'
+    // Dynamically detect protocol based on current page (wss:// for HTTPS, ws:// for HTTP)
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const host = isDev ? 'localhost:8080' : 'brokerageproject.fly.dev'
+    const url = `${protocol}//${host}/ws`
     const ws = new WebSocket(url)
     wsRef.current = ws
 

@@ -230,21 +230,35 @@ React-based multi-page application providing comprehensive trading platform with
 - Balance editing modal
 - FX rate conversion for multi-currency accounts
 
-### WalletPage.tsx
+### WalletPage.tsx / DepositTab.tsx
 **Purpose:** Financial operations hub
 
 **Tabs:**
-- Deposit - Stripe card payments with FPX banking support
+- Deposit - Stripe Express Checkout and card payments with FPX banking support
 - Withdraw - Account-to-account withdrawals
 - Transfer - Inter-account transfers
 
-**Features:**
+**Deposit Features:**
+- **Express Checkout Element** (Google Pay, Apple Pay, Link) - one-click payments
 - Stripe Elements integration for card payments
-- Real-time payment status tracking
+- FPX Banking (Malaysia online banking)
+- Automatic payment methods (enables all activated Stripe payment methods)
+- Manual payment confirmation flow with `stripe.confirmPayment()`
+- Real-time payment status tracking with polling (60s timeout)
 - Payment intent de-duplication
 - Account balance updates
 - Currency conversion support
 - Transaction history integration
+
+**Payment Flow:**
+1. User enters amount ≥ $5 → Express Checkout buttons appear
+2. User clicks Google Pay/Apple Pay/Link or enters card details
+3. `handleExpressCheckoutConfirm()` or `onSubmit()` called
+4. `elements.submit()` validates payment details
+5. Backend creates payment intent with automatic payment methods
+6. Frontend calls `stripe.confirmPayment()` to complete payment
+7. Polling checks payment status every 3s (max 60s)
+8. On success: balance updated, transaction recorded
 
 ### HistoryPage.tsx
 **Purpose:** Transaction history and analytics
@@ -291,8 +305,10 @@ React-based multi-page application providing comprehensive trading platform with
 **Purpose:** Global WebSocket connection manager
 
 **Features:**
-- Connects to backend WebSocket (`ws://localhost:8080/ws` dev, `wss://brokerageproject.fly.dev/ws` prod)
+- Dynamic protocol detection (uses `wss://` for HTTPS, `ws://` for HTTP)
+- Automatic environment-based connection (localhost dev, production URL)
 - Price message broadcasting to priceStore
+- Deposit completion notifications from webhooks
 - Order execution triggering via orderStore
 - Auto-reconnect with exponential backoff (1s → 60s max) with jitter
 - Connection state management
@@ -398,11 +414,20 @@ Component → getApiUrl() → API Request → Backend Handler → Response → S
 ## Payment Integration
 
 ### Stripe Setup
-- **Elements:** CardNumberElement, CardExpiryElement, CardCvcElement
-- **Payment Methods:** Card, FPX Banking (Malaysia)
-- **Flow:** Create payment intent → Confirm → Poll status → Update balance
-- **Security:** Client-side tokenization, server-side processing
+- **Elements:** CardNumberElement, CardExpiryElement, CardCvcElement, ExpressCheckoutElement
+- **Payment Methods:**
+  - Express Checkout (Google Pay, Apple Pay, Link)
+  - Card (Visa, Mastercard, Amex)
+  - FPX Banking (Malaysia online banking)
+- **Automatic Payment Methods:** Backend uses `AutomaticPaymentMethods` when `payment_method_types` not specified
+- **Flow:**
+  1. Create payment intent (no payment_method_types → automatic methods enabled)
+  2. Manual confirmation with `stripe.confirmPayment({ elements, clientSecret, redirect: 'if_required' })`
+  3. Poll status every 3s for 60s
+  4. Update balance on success
+- **Security:** Client-side tokenization, server-side processing, HTTPS required for Express Checkout
 - **De-duplication:** Prevents duplicate deposits on page refresh
+- **Error Handling:** Structured error returns `{ error: { message } }` for Express Checkout compatibility
 
 ---
 
@@ -411,15 +436,10 @@ Component → getApiUrl() → API Request → Backend Handler → Response → S
 ```bash
 cd frontend
 pnpm install          # Install dependencies
-pnpm run dev          # Start dev server (http://localhost:5173)
+pnpm run dev          # Start dev server (https://localhost:5173 with HTTPS, http without)
 pnpm run typecheck    # TypeScript type checking
 pnpm run lint         # ESLint
 pnpm run build        # Production build for Cloudflare Pages
 ```
 
-## Deployment
-
-**Platform:** Cloudflare Pages  
-**Build Command:** `pnpm run build`  
-**Output Directory:** `dist`  
-**Live URL:** https://brokerageproject.pages.dev
+**HTTPS Setup:** See [../SETUP.md](SETUP.md) for local HTTPS configuration (required for Express Checkout)

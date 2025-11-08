@@ -1,6 +1,13 @@
 # Environment
 .env
 
+# SSL Certificates (mkcert-generated for local HTTPS development)
+*.pem
+*.key
+*.crt
+*.csr
+localhost+*
+
 # Go
 /bin/
 /vendor/
@@ -31,6 +38,4 @@ Thumbs.db
 
 # Build artifacts
 *.exe
-
-# Files or Folders from other collaborators
-authentication/
+server.exe

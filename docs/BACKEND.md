@@ -83,9 +83,12 @@ HTTP Handlers → CORS Middleware → Cache → External APIs
 **Returns:** Technical indicators or forex conversion rates
 
 #### HandleCreatePaymentIntent(w, r) - payment_handler.go
-**Method:** POST  
-**Body:** `amount`, `currency`, `accountId`, `paymentMethod`  
-**Source:** Stripe API  
+**Method:** POST
+**Body:** `amount`, `currency`, `payment_method_types` (optional), `metadata`
+**Source:** Stripe API
+**Logic:**
+- If `payment_method_types` provided → use specified types
+- If omitted → use automatic payment methods (enables all activated methods in Stripe dashboard)
 **Returns:** Payment intent with client secret for frontend confirmation
 
 #### HandlePaymentStatus(w, r) - payment_handler.go
@@ -143,23 +146,18 @@ HTTP Handlers → CORS Middleware → Cache → External APIs
 
 ---
 
-## Testing
+## Development
 
 ```bash
-go test ./...                     # Run all tests
-go test -v ./internal/api         # Test handlers with verbose output
-go test -cover ./...              # Run with coverage report
+go mod tidy                     # Install dependencies
+go build ./cmd/server           # Build binary
+cd cmd/server; go run main.go   # Run server (auto-detects HTTPS certificates)
+go test ./...                   # Run all tests
+go test -v ./internal/api       # Test handlers with verbose output
+go test -cover ./...            # Run with coverage report
 ```
 
-## Deployment
-
-**Platform:** Fly.io
-**Region:** Frankfurt, Germany (fra)
-**Build:** Multi-stage Dockerfile (Go 1.23-alpine)
-**VM:** 256MB RAM, 1 shared CPU
-**Live URL:** https://brokerageproject.fly.dev
-**Health Check:** TCP probe on port 8080 every 15s
-**Auto-scaling:** Min 1 machine running, auto-start enabled
+**HTTPS Setup:** Server automatically detects `localhost+2.pem` and `localhost+2-key.pem` in project root and starts HTTPS server. See [../SETUP.md](SETUP.md) for certificate generation.
 
 ---
 

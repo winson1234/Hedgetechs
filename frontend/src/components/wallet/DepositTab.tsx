@@ -59,6 +59,14 @@ function DepositTab() {
   const [cardBrand, setCardBrand] = useState<string>('');
   const [selectedFpxBank, setSelectedFpxBank] = useState<string>('maybank2u');
 
+  // Track pending Express Checkout payment for status polling
+  const [pendingExpressPayment, setPendingExpressPayment] = useState<{
+    paymentIntentId: string;
+    accountId: string;
+    amount: number;
+    currency: string;
+  } | null>(null);
+
   // Track processed payment intents to prevent duplicate deposits
   // Using localStorage to persist across page navigations (for redirect-based payments)
   const getInitialProcessedPayments = (): Set<string> => {
@@ -147,6 +155,66 @@ function DepositTab() {
       });
     }
   }, [depositAmount, selectedAccountId, accounts, elements]);
+
+  // Poll Express Checkout payment status (Google Pay / Apple Pay / Link)
+  useEffect(() => {
+    if (!pendingExpressPayment) return;
+
+    const { paymentIntentId, accountId, amount, currency } = pendingExpressPayment;
+    const maxAttempts = 20; // 20 attempts × 3 seconds = 60 seconds max
+    let attempts = 0;
+
+    const pollInterval = setInterval(async () => {
+      attempts++;
+
+      try {
+        const statusResponse = await fetch(getApiUrl(`/api/v1/payment/status?payment_intent_id=${paymentIntentId}`));
+        const statusData = await statusResponse.json();
+
+        if (statusData.status === 'succeeded') {
+          clearInterval(pollInterval);
+          setPendingExpressPayment(null);
+
+          // Check if already processed (de-duplication)
+          if (processedPayments.current.has(paymentIntentId)) {
+            console.log('Payment already processed:', paymentIntentId);
+            setIsProcessing(false);
+            return;
+          }
+
+          // Mark as processed
+          markPaymentAsProcessed(paymentIntentId);
+
+          // Process deposit
+          processDeposit(accountId, amount, currency);
+          showToast(`Successfully deposited ${formatBalance(amount, currency)} via Express Checkout`, 'success');
+          setIsProcessing(false);
+
+          // Reset form
+          setValue('amount', 5);
+        } else if (statusData.status === 'requires_payment_method' || statusData.status === 'canceled') {
+          clearInterval(pollInterval);
+          setPendingExpressPayment(null);
+          showToast(statusData.lastPaymentError || 'Payment failed', 'error');
+          setIsProcessing(false);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(pollInterval);
+          setPendingExpressPayment(null);
+          showToast('Payment processing timeout. Please check your account or contact support.', 'error');
+          setIsProcessing(false);
+        }
+      } catch (pollError) {
+        console.error('Error polling payment status:', pollError);
+        clearInterval(pollInterval);
+        setPendingExpressPayment(null);
+        showToast('Error checking payment status', 'error');
+        setIsProcessing(false);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    // Cleanup: clear interval when component unmounts or pendingExpressPayment changes
+    return () => clearInterval(pollInterval);
+  }, [pendingExpressPayment, processDeposit, showToast, setValue]);
 
   // Handle redirect-based payment return (FPX, eWallets)
   useEffect(() => {
@@ -247,12 +315,13 @@ function DepositTab() {
   }, [elements]);
 
   // Express Checkout Element (Apple Pay / Google Pay / Link) confirmation handler
-  // Using modern 2025 "deferred intent" pattern with elements.submit() + stripe.confirmPayment()
+  // Must manually call stripe.confirmPayment() - Express Checkout Element does NOT auto-confirm
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleExpressCheckoutConfirm = async (_event: StripeExpressCheckoutElementConfirmEvent) => {
     if (!stripe || !elements) {
-      showToast('Stripe is not loaded. Please refresh the page.', 'error');
-      return;
+      const errorMsg = 'Stripe is not loaded. Please refresh the page.';
+      showToast(errorMsg, 'error');
+      return { error: { message: errorMsg } };
     }
 
     const amount = watch('amount');
@@ -260,8 +329,9 @@ function DepositTab() {
     const account = accounts.find(a => a.id === accountId);
 
     if (!account || amount < 5) {
-      showToast('Please enter a valid amount (minimum $5.00)', 'error');
-      return;
+      const errorMsg = 'Please enter a valid amount (minimum $5.00)';
+      showToast(errorMsg, 'error');
+      return { error: { message: errorMsg } };
     }
 
     setIsProcessing(true);
@@ -270,9 +340,10 @@ function DepositTab() {
       // Step 1: Submit and validate payment details (modern pattern)
       const { error: submitError } = await elements.submit();
       if (submitError) {
-        showToast(submitError.message || 'Payment validation failed', 'error');
+        const errorMsg = submitError.message || 'Payment validation failed';
+        showToast(errorMsg, 'error');
         setIsProcessing(false);
-        return;
+        return { error: { message: errorMsg } };
       }
 
       // Step 2: Create payment intent on server
@@ -282,7 +353,7 @@ function DepositTab() {
         body: JSON.stringify({
           amount: Math.round(amount * 100),
           currency: account.currency.toLowerCase(),
-          payment_method_types: ['card'],
+          // Let backend use automatic payment methods (enables Link, Google Pay, Apple Pay, cards)
           metadata: {
             account_id: accountId,
             original_amount: amount.toString(),
@@ -292,85 +363,46 @@ function DepositTab() {
       });
 
       if (!response.ok) {
-        showToast('Failed to create payment intent', 'error');
+        const errorMsg = 'Failed to create payment intent';
+        showToast(errorMsg, 'error');
         setIsProcessing(false);
-        return;
+        return { error: { message: errorMsg } };
       }
 
       const { clientSecret } = await response.json();
+      const paymentIntentId = clientSecret.split('_secret_')[0];
 
-      // Step 3: Confirm payment using the modern pattern
-      // For Express Checkout, we use confirmPayment with redirect: 'if_required'
-      // so we can handle the completion and poll status ourselves
+      // Step 3: Manually confirm the payment using Stripe
+      // (Express Checkout Element does NOT auto-confirm - we must call confirmPayment)
       const { error: confirmError } = await stripe.confirmPayment({
         elements,
         clientSecret,
         confirmParams: {
-          return_url: window.location.href, // For redirect-based methods (if needed)
+          return_url: window.location.origin + '/wallet?payment=redirect',
         },
-        redirect: 'if_required', // Don't redirect for Apple Pay/Google Pay/Link
+        redirect: 'if_required', // Only redirect if 3D Secure or similar is needed
       });
 
       if (confirmError) {
-        showToast(confirmError.message || 'Payment failed', 'error');
+        console.error('Payment confirmation failed:', confirmError);
+        showToast(confirmError.message || 'Payment confirmation failed', 'error');
         setIsProcessing(false);
-        return;
+        return { error: { message: confirmError.message } };
       }
 
-      // Step 4: Poll payment status until succeeded or failed (max 60 seconds)
-      const paymentIntentId = clientSecret.split('_secret_')[0];
-      const maxAttempts = 20; // 20 attempts × 3 seconds = 60 seconds max
-      let attempts = 0;
-
-      const pollInterval = setInterval(async () => {
-        attempts++;
-
-        try {
-          const statusResponse = await fetch(getApiUrl(`/api/v1/payment/status?payment_intent_id=${paymentIntentId}`));
-          const statusData = await statusResponse.json();
-
-          if (statusData.status === 'succeeded') {
-            clearInterval(pollInterval);
-
-            // Check if already processed (de-duplication)
-            if (processedPayments.current.has(paymentIntentId)) {
-              console.log('Payment already processed:', paymentIntentId);
-              setIsProcessing(false);
-              return;
-            }
-
-            // Mark as processed
-            markPaymentAsProcessed(paymentIntentId);
-
-            // Process deposit
-            processDeposit(accountId, amount, account.currency);
-            showToast(`Successfully deposited ${formatBalance(amount, account.currency)} via Express Checkout`, 'success');
-            setIsProcessing(false);
-
-            // Reset form
-            setValue('amount', 5);
-          } else if (statusData.status === 'requires_payment_method' || statusData.status === 'canceled') {
-            clearInterval(pollInterval);
-            showToast(statusData.lastPaymentError || 'Payment failed', 'error');
-            setIsProcessing(false);
-          } else if (attempts >= maxAttempts) {
-            clearInterval(pollInterval);
-            showToast('Payment processing timeout. Please check your account or contact support.', 'error');
-            setIsProcessing(false);
-          }
-        } catch (pollError) {
-          console.error('Error polling payment status:', pollError);
-          clearInterval(pollInterval);
-          showToast('Error checking payment status', 'error');
-          setIsProcessing(false);
-        }
-      }, 3000); // Poll every 3 seconds
-
+      // Step 4: Store payment details for status polling (done in useEffect)
+      setPendingExpressPayment({
+        paymentIntentId,
+        accountId,
+        amount,
+        currency: account.currency,
+      });
     } catch (error) {
       console.error('Express checkout payment error:', error);
       showToast('Payment failed. Please try again.', 'error');
       setIsProcessing(false);
-      return;
+      // Return structured error for Google Pay/Apple Pay/Link to handle properly
+      return { error: { message: error instanceof Error ? error.message : 'Payment failed' } };
     }
   };
 

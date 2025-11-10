@@ -134,7 +134,7 @@ useEffect(() => {
   });
 
     if (result.success) {
-      navigate('/dashboard');
+      navigate('/profile');
     } else {
       alert(result.message || 'Registration failed');
     }

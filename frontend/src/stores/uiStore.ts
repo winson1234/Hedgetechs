@@ -59,7 +59,7 @@ export const useUIStore = create<UIStore>()(
   persist(
     (set) => ({
       // Theme
-      isDarkMode: true,
+      isDarkMode: false,
       setDarkMode: (isDark) => {
         set({ isDarkMode: isDark });
         // Sync with HTML pages theme

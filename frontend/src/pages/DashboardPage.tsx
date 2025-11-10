@@ -877,56 +877,55 @@ const cancelLogout = () => {
                 Previous
               </button>
 
-              {/* Page Numbers */}
-              {Array.from({ length: cryptoTotalPages }, (_, i) => i + 1).map(page => {
-                const showPage = page === 1 ||
-                                page === cryptoTotalPages ||
-                                (page >= cryptoCurrentPage - 1 && page <= cryptoCurrentPage + 1);
+            {Array.from({ length: cryptoTotalPages }, (_, i) => i + 1).map(page => {
+  const showPage = page === 1 ||
+                  page === cryptoTotalPages ||
+                  (page >= cryptoCurrentPage - 1 && page <= cryptoCurrentPage + 1);
 
-                const showEllipsis = (page === cryptoCurrentPage - 2 && cryptoCurrentPage > 3) ||
-                                    (page === cryptoCurrentPage + 2 && cryptoCurrentPage < cryptoTotalPages - 2);
+  const showEllipsis = (page === cryptoCurrentPage - 2 && cryptoCurrentPage > 3) ||
+                      (page === cryptoCurrentPage + 2 && cryptoCurrentPage < cryptoTotalPages - 2);
 
-                if (showEllipsis) {
-                  return (
-                    <span key={page} style={{ color: '#64748b', padding: '0 0.5rem' }}>...</span>
-                  );
-                }
+  if (showEllipsis) {
+    return (
+      <span key={page} style={{ color: '#64748b', padding: '0 0.5rem' }}>...</span>
+    );
+  }
 
-                if (!showPage) return null;
+  if (!showPage) return null;
 
-                return (
-                  <button
-                    key={page}
-                    onClick={() => handleCryptoPageChange(page)}
-                    style={{
-                      padding: '0.75rem 1rem',
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
-                      color: '#ffffff',
-                      background: page === cryptoCurrentPage
-                        ? 'linear-gradient(135deg, #C76D00, #FDDB92)'
-                        : 'rgba(255, 255, 255, 0.1)',
-                      border: page === cryptoCurrentPage ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      minWidth: '45px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (page !== cryptoCurrentPage) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (page !== cryptoCurrentPage) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                      }
-                    }}
-                  >
-                    {page}
-                  </button>
-                );
-              })}
+  return (
+    <button
+      key={page}
+      onClick={() => handleCryptoPageChange(page)}
+      style={{
+        padding: '0.75rem 1rem',
+        fontSize: '0.9rem',
+        fontWeight: '600',
+        color: page === cryptoCurrentPage ? '#ffffff' : '#1a1f3a', // dark text for other pages
+        background: page === cryptoCurrentPage
+          ? 'linear-gradient(135deg, #C76D00, #FDDB92)'
+          : 'rgba(255, 255, 255, 0.2)', // subtle background for other pages
+        border: page === cryptoCurrentPage ? 'none' : '1px solid rgba(0,0,0,0.1)',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        minWidth: '45px'
+      }}
+      onMouseEnter={(e) => {
+        if (page !== cryptoCurrentPage) {
+          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (page !== cryptoCurrentPage) {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+        }
+      }}
+    >
+      {page}
+    </button>
+  );
+})}
 
               {/* Next Button */}
               <button
@@ -1197,58 +1196,57 @@ const cancelLogout = () => {
                             Previous
                           </button>
 
-                  {/* Page Numbers */}
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
-                    // Show first page, last page, current page, and pages around current
-                    const showPage = page === 1 ||
-                                    page === totalPages ||
-                                    (page >= currentPage - 1 && page <= currentPage + 1);
+            {/* Page Numbers */}
+{Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+  const showPage = page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1);
 
-                    const showEllipsis = (page === currentPage - 2 && currentPage > 3) ||
-                                        (page === currentPage + 2 && currentPage < totalPages - 2);
+  const showEllipsis = (page === currentPage - 2 && currentPage > 3) ||
+                      (page === currentPage + 2 && currentPage < totalPages - 2);
 
-                    if (showEllipsis) {
-                      return (
-                        <span key={page} style={{ color: '#64748b', padding: '0 0.5rem' }}>...</span>
-                      );
-                    }
+  if (showEllipsis) {
+    return (
+      <span key={page} style={{ color: '#64748b', padding: '0 0.5rem' }}>...</span>
+    );
+  }
 
-                    if (!showPage) return null;
+  if (!showPage) return null;
 
-                    return (
-                    <button
-                            key={page}
-                            onClick={() => handlePageChange(page)}
-                            style={{
-                              padding: '0.75rem 1rem',
-                              fontSize: '0.9rem',
-                              fontWeight: '600',
-                              color: '#ffffff',
-                              background: page === currentPage
-                                ? 'linear-gradient(135deg, #C76D00, #FDDB92)' // <- updated gradient
-                                : 'rgba(255, 255, 255, 0.1)',
-                              border: page === currentPage ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              transition: 'all 0.3s ease',
-                              minWidth: '45px'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (page !== currentPage) {
-                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (page !== currentPage) {
-                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                              }
-                            }}
-                          >
-                            {page}
-                          </button>
+  return (
+    <button
+      key={page}
+      onClick={() => handlePageChange(page)}
+      style={{
+        padding: '0.75rem 1rem',
+        fontSize: '0.9rem',
+        fontWeight: '600',
+        color: page === currentPage ? '#ffffff' : '#1a1f3a', // dark text for other pages
+        background: page === currentPage
+          ? 'linear-gradient(135deg, #C76D00, #FDDB92)' // active page gradient
+          : 'rgba(255, 255, 255, 0.2)', // subtle light background for other pages
+        border: page === currentPage ? 'none' : '1px solid rgba(0,0,0,0.1)',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        minWidth: '45px'
+      }}
+      onMouseEnter={(e) => {
+        if (page !== currentPage) {
+          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'; // slightly darker on hover
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (page !== currentPage) {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; // revert background
+        }
+      }}
+    >
+      {page}
+    </button>
+  );
+})}
 
-                    );
-                  })}
 
                                   {/* Next Button */}
                         <button

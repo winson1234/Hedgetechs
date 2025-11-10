@@ -50,13 +50,23 @@ function ThemeWrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// Stripe Elements configuration using modern "deferred intent" pattern
+const stripeElementsOptions = {
+  mode: 'payment' as const,
+  amount: 500, // Default minimum: $5.00 (in cents)
+  currency: 'usd',
+  appearance: {
+    theme: 'stripe' as const, // Will be updated dynamically by DepositTab
+  },
+}
+
 // Always mount the React app
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <ThemeWrapper>
         <AuthWrapper>
-          <Elements stripe={stripePromise}>
+          <Elements stripe={stripePromise} options={stripeElementsOptions}>
             <WebSocketProvider>
               <App />
             </WebSocketProvider>

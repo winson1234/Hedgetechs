@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getApiUrl } from '../../config/api';
 import { useAccountStore, formatBalance } from '../../stores/accountStore';
 import { useUIStore } from '../../stores/uiStore';
-import { CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements, PaymentRequestButtonElement } from '@stripe/react-stripe-js';
-import type { StripeCardNumberElement, PaymentRequest } from '@stripe/stripe-js';
+import { CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements, ExpressCheckoutElement } from '@stripe/react-stripe-js';
+import type { StripeCardNumberElement, StripeExpressCheckoutElementConfirmEvent } from '@stripe/stripe-js';
 
 // Validation schema
 const depositSchema = z.object({
@@ -18,9 +18,7 @@ const depositSchema = z.object({
 
 type DepositFormData = z.infer<typeof depositSchema>;
 
-type PaymentTab = 'card' | 'banking' | 'ewallet' | 'crypto';
-type BankMethod = 'fpx' | 'ideal' | 'bancontact' | 'giropay';
-type EWalletMethod = 'paypal' | 'klarna' | 'affirm'; // Note: Stripe supports these, not Skrill/Neteller directly
+type PaymentTab = 'card' | 'banking' | 'crypto';
 
 function DepositTab() {
   const stripe = useStripe();
@@ -59,12 +57,37 @@ function DepositTab() {
   const [selectedTab, setSelectedTab] = useState<PaymentTab>('card');
   const [isProcessing, setIsProcessing] = useState(false);
   const [cardBrand, setCardBrand] = useState<string>('');
-  const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
-  const [selectedBankMethod, setSelectedBankMethod] = useState<BankMethod>('fpx');
-  const [selectedEWallet, setSelectedEWallet] = useState<EWalletMethod>('paypal');
+  const [selectedFpxBank, setSelectedFpxBank] = useState<string>('maybank2u');
+
+  // Track pending Express Checkout payment for status polling
+  const [pendingExpressPayment, setPendingExpressPayment] = useState<{
+    paymentIntentId: string;
+    accountId: string;
+    amount: number;
+    currency: string;
+  } | null>(null);
 
   // Track processed payment intents to prevent duplicate deposits
-  const processedPayments = useRef<Set<string>>(new Set());
+  // Using localStorage to persist across page navigations (for redirect-based payments)
+  const getInitialProcessedPayments = (): Set<string> => {
+    try {
+      const stored = localStorage.getItem('processed_payments');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Clean up old entries (older than 1 hour)
+        const oneHourAgo = Date.now() - 60 * 60 * 1000;
+        const filtered = Object.entries(parsed)
+          .filter(([, timestamp]) => (timestamp as number) > oneHourAgo)
+          .reduce((acc, [id]) => acc.add(id), new Set<string>());
+        return filtered;
+      }
+    } catch (error) {
+      console.error('Error loading processed payments:', error);
+    }
+    return new Set<string>();
+  };
+
+  const processedPayments = useRef<Set<string>>(getInitialProcessedPayments());
 
   // React Hook Form
   const { register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<DepositFormData>({
@@ -76,6 +99,39 @@ function DepositTab() {
   });
 
   const selectedAccountId = watch('accountId');
+  const depositAmount = watch('amount');
+
+  // Express Checkout Element options (UI configuration only)
+  const expressCheckoutOptions = useMemo(() => {
+    const theme = isDarkMode ? 'white' : 'black';
+
+    return {
+      buttonType: {
+        applePay: 'buy' as const,
+        googlePay: 'buy' as const,
+      },
+      buttonTheme: {
+        applePay: theme as 'white' | 'black',
+        googlePay: theme as 'white' | 'black',
+      },
+      buttonHeight: 48,
+    };
+  }, [isDarkMode]);
+
+  // Helper function to mark payment as processed (persists to localStorage)
+  const markPaymentAsProcessed = (paymentIntentId: string) => {
+    processedPayments.current.add(paymentIntentId);
+
+    try {
+      // Store in localStorage with timestamp for cleanup
+      const stored = localStorage.getItem('processed_payments');
+      const processed = stored ? JSON.parse(stored) : {};
+      processed[paymentIntentId] = Date.now();
+      localStorage.setItem('processed_payments', JSON.stringify(processed));
+    } catch (error) {
+      console.error('Error saving processed payment:', error);
+    }
+  };
 
   // Update selected account when active account changes
   useEffect(() => {
@@ -84,7 +140,83 @@ function DepositTab() {
     }
   }, [activeAccountId, activeAccount, setValue]);
 
-  // Handle redirect-based payment return (FPX, iDEAL, Bancontact, Giropay, eWallets)
+  // Update Stripe Elements configuration dynamically when deposit amount changes
+  // This enables Express Checkout to display the correct amount
+  useEffect(() => {
+    if (elements && depositAmount >= 5) {
+      const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+      const currency = selectedAccount?.currency.toLowerCase() || 'usd';
+      const amountInCents = Math.round(depositAmount * 100);
+
+      // Update Elements with new amount and currency (modern pattern)
+      elements.update({
+        amount: amountInCents,
+        currency: currency,
+      });
+    }
+  }, [depositAmount, selectedAccountId, accounts, elements]);
+
+  // Poll Express Checkout payment status (Google Pay / Apple Pay / Link)
+  useEffect(() => {
+    if (!pendingExpressPayment) return;
+
+    const { paymentIntentId, accountId, amount, currency } = pendingExpressPayment;
+    const maxAttempts = 20; // 20 attempts × 3 seconds = 60 seconds max
+    let attempts = 0;
+
+    const pollInterval = setInterval(async () => {
+      attempts++;
+
+      try {
+        const statusResponse = await fetch(getApiUrl(`/api/v1/payment/status?payment_intent_id=${paymentIntentId}`));
+        const statusData = await statusResponse.json();
+
+        if (statusData.status === 'succeeded') {
+          clearInterval(pollInterval);
+          setPendingExpressPayment(null);
+
+          // Check if already processed (de-duplication)
+          if (processedPayments.current.has(paymentIntentId)) {
+            console.log('Payment already processed:', paymentIntentId);
+            setIsProcessing(false);
+            return;
+          }
+
+          // Mark as processed
+          markPaymentAsProcessed(paymentIntentId);
+
+          // Process deposit
+          processDeposit(accountId, amount, currency);
+          showToast(`Successfully deposited ${formatBalance(amount, currency)} via Express Checkout`, 'success');
+          setIsProcessing(false);
+
+          // Reset form
+          setValue('amount', 5);
+        } else if (statusData.status === 'requires_payment_method' || statusData.status === 'canceled') {
+          clearInterval(pollInterval);
+          setPendingExpressPayment(null);
+          showToast(statusData.lastPaymentError || 'Payment failed', 'error');
+          setIsProcessing(false);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(pollInterval);
+          setPendingExpressPayment(null);
+          showToast('Payment processing timeout. Please check your account or contact support.', 'error');
+          setIsProcessing(false);
+        }
+      } catch (pollError) {
+        console.error('Error polling payment status:', pollError);
+        clearInterval(pollInterval);
+        setPendingExpressPayment(null);
+        showToast('Error checking payment status', 'error');
+        setIsProcessing(false);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    // Cleanup: clear interval when component unmounts or pendingExpressPayment changes
+    return () => clearInterval(pollInterval);
+  }, [pendingExpressPayment, processDeposit, showToast, setValue]);
+
+  // Handle redirect-based payment return (FPX, eWallets)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const paymentIntentClientSecret = urlParams.get('payment_intent_client_secret');
@@ -107,11 +239,12 @@ function DepositTab() {
             if (processedPayments.current.has(paymentIntentId)) {
               console.log('Payment already processed, skipping:', paymentIntentId);
               setIsProcessing(false);
+              window.history.replaceState({}, document.title, window.location.pathname);
               return;
             }
 
             // Mark as processed IMMEDIATELY to prevent duplicates
-            processedPayments.current.add(paymentIntentId);
+            markPaymentAsProcessed(paymentIntentId);
 
             // Payment succeeded, process deposit
             // Get the ORIGINAL account ID from payment intent metadata (from backend)
@@ -181,110 +314,97 @@ function DepositTab() {
     });
   }, [elements]);
 
-  // Set up Apple Pay / Google Pay payment request
-  useEffect(() => {
-    if (!stripe) return;
+  // Express Checkout Element (Apple Pay / Google Pay / Link) confirmation handler
+  // Must manually call stripe.confirmPayment() - Express Checkout Element does NOT auto-confirm
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleExpressCheckoutConfirm = async (_event: StripeExpressCheckoutElementConfirmEvent) => {
+    if (!stripe || !elements) {
+      const errorMsg = 'Stripe is not loaded. Please refresh the page.';
+      showToast(errorMsg, 'error');
+      return { error: { message: errorMsg } };
+    }
 
-    const pr = stripe.paymentRequest({
-      country: 'US',
-      currency: 'usd',
-      total: {
-        label: 'Deposit to Trading Account',
-        amount: 1000, // $10.00 in cents (minimum deposit)
-      },
-      requestPayerName: true,
-      requestPayerEmail: true,
-    });
+    const amount = watch('amount');
+    const accountId = watch('accountId');
+    const account = accounts.find(a => a.id === accountId);
 
-    // Check if Apple Pay / Google Pay is available
-    pr.canMakePayment().then((result) => {
-      if (result) {
-        setPaymentRequest(pr);
-      }
-    });
+    if (!account || amount < 5) {
+      const errorMsg = 'Please enter a valid amount (minimum $5.00)';
+      showToast(errorMsg, 'error');
+      return { error: { message: errorMsg } };
+    }
 
-    // Handle payment method event
-    pr.on('paymentmethod', async (e) => {
-      const amount = watch('amount');
-      const accountId = watch('accountId');
-      const account = accounts.find(a => a.id === accountId);
+    setIsProcessing(true);
 
-      if (!account || amount < 5) {
-        e.complete('fail');
-        showToast('Please enter a valid amount (minimum $5.00)', 'error');
-        return;
+    try {
+      // Step 1: Submit and validate payment details (modern pattern)
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        const errorMsg = submitError.message || 'Payment validation failed';
+        showToast(errorMsg, 'error');
+        setIsProcessing(false);
+        return { error: { message: errorMsg } };
       }
 
-      try {
-        // Create payment intent
-        const response = await fetch(getApiUrl('/api/v1/deposit/create-payment-intent'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount: Math.round(amount * 100),
-            currency: account.currency.toLowerCase(),
-            payment_method_types: ['card'],
-            metadata: {
-              account_id: accountId,
-              original_amount: amount.toString(),
-              original_currency: account.currency,
-            },
-          }),
-        });
+      // Step 2: Create payment intent on server
+      const response = await fetch(getApiUrl('/api/v1/deposit/create-payment-intent'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Math.round(amount * 100),
+          currency: account.currency.toLowerCase(),
+          // Let backend use automatic payment methods (enables Link, Google Pay, Apple Pay, cards)
+          metadata: {
+            account_id: accountId,
+            original_amount: amount.toString(),
+            original_currency: account.currency,
+          },
+        }),
+      });
 
-        if (!response.ok) {
-          e.complete('fail');
-          showToast('Failed to create payment intent', 'error');
-          return;
-        }
-
-        const { clientSecret } = await response.json();
-
-        // Confirm payment
-        const { error, paymentIntent } = await stripe.confirmCardPayment(
-          clientSecret,
-          { payment_method: e.paymentMethod.id },
-          { handleActions: false }
-        );
-
-        if (error) {
-          e.complete('fail');
-          showToast(error.message || 'Payment failed', 'error');
-          return;
-        }
-
-        e.complete('success');
-
-        // Check if already processed
-        if (paymentIntent && !processedPayments.current.has(paymentIntent.id)) {
-          processedPayments.current.add(paymentIntent.id);
-
-          // Process deposit
-          const result = await processDeposit(
-            accountId,
-            amount,
-            account.currency,
-            paymentIntent.id,
-            {
-              cardBrand: e.paymentMethod.card?.brand || 'digital_wallet',
-              last4: e.paymentMethod.card?.last4 || '****',
-            }
-          );
-
-          if (result.success) {
-            showToast('Digital wallet payment successful!', 'success');
-            reset();
-          } else {
-            showToast(result.message, 'error');
-          }
-        }
-      } catch (error) {
-        e.complete('fail');
-        console.error('Digital wallet payment error:', error);
-        showToast('Payment failed. Please try again.', 'error');
+      if (!response.ok) {
+        const errorMsg = 'Failed to create payment intent';
+        showToast(errorMsg, 'error');
+        setIsProcessing(false);
+        return { error: { message: errorMsg } };
       }
-    });
-  }, [stripe, watch, accounts, showToast, processDeposit, reset]);
+
+      const { clientSecret } = await response.json();
+      const paymentIntentId = clientSecret.split('_secret_')[0];
+
+      // Step 3: Manually confirm the payment using Stripe
+      // (Express Checkout Element does NOT auto-confirm - we must call confirmPayment)
+      const { error: confirmError } = await stripe.confirmPayment({
+        elements,
+        clientSecret,
+        confirmParams: {
+          return_url: window.location.origin + '/wallet?payment=redirect',
+        },
+        redirect: 'if_required', // Only redirect if 3D Secure or similar is needed
+      });
+
+      if (confirmError) {
+        console.error('Payment confirmation failed:', confirmError);
+        showToast(confirmError.message || 'Payment confirmation failed', 'error');
+        setIsProcessing(false);
+        return { error: { message: confirmError.message } };
+      }
+
+      // Step 4: Store payment details for status polling (done in useEffect)
+      setPendingExpressPayment({
+        paymentIntentId,
+        accountId,
+        amount,
+        currency: account.currency,
+      });
+    } catch (error) {
+      console.error('Express checkout payment error:', error);
+      showToast('Payment failed. Please try again.', 'error');
+      setIsProcessing(false);
+      // Return structured error for Google Pay/Apple Pay/Link to handle properly
+      return { error: { message: error instanceof Error ? error.message : 'Payment failed' } };
+    }
+  };
 
   const onSubmit = async (data: DepositFormData) => {
     if (!stripe || !elements) {
@@ -292,8 +412,8 @@ function DepositTab() {
       return;
     }
 
-    if (selectedTab !== 'card' && selectedTab !== 'banking' && selectedTab !== 'ewallet') {
-      showToast('Only card, banking, and eWallet payments are currently supported.', 'error');
+    if (selectedTab !== 'card' && selectedTab !== 'banking' && selectedTab !== 'crypto') {
+      showToast('Only card and banking payments are currently supported.', 'error');
       return;
     }
 
@@ -314,33 +434,22 @@ function DepositTab() {
       // Fetch live FX rates if currency conversion needed
       const rates = await getFXRates();
 
+      // Validate rates object exists
+      if (!rates || Object.keys(rates).length === 0) {
+        showToast('Unable to fetch exchange rates. Please try again.', 'error');
+        setIsProcessing(false);
+        return;
+      }
+
       if (selectedTab === 'banking') {
-        paymentMethodTypes = [selectedBankMethod];
+        // FPX requires MYR
+        paymentMethodTypes = ['fpx'];
+        paymentCurrency = 'myr';
 
-        // Currency requirements for each bank method
-        if (selectedBankMethod === 'fpx') {
-          // FPX requires MYR
-          paymentCurrency = 'myr';
-          const usdAmount = data.amount * (rates[account.currency] || 1.0);
-          const myrRate = rates['MYR'] || 0.22;
-          paymentAmount = Math.round((usdAmount / myrRate) * 100);
-        } else if (['ideal', 'bancontact', 'giropay'].includes(selectedBankMethod)) {
-          // European banks require EUR
-          paymentCurrency = 'eur';
-          const usdAmount = data.amount * (rates[account.currency] || 1.0);
-          const eurRate = rates['EUR'] || 1.08;
-          paymentAmount = Math.round((usdAmount / eurRate) * 100);
-        }
-      } else if (selectedTab === 'ewallet') {
-        paymentMethodTypes = [selectedEWallet];
-
-        // eWallets typically support USD, EUR
-        // Convert MYR/JPY to USD if needed
-        if (account.currency === 'MYR' || account.currency === 'JPY') {
-          paymentCurrency = 'usd';
-          const usdAmount = data.amount * (rates[account.currency] || 1.0);
-          paymentAmount = Math.round(usdAmount * 100);
-        }
+        // Proper currency triangulation: account currency → USD → MYR
+        const accountRate = rates[account.currency] || 1.0;
+        const myrRate = rates['MYR'] || 0.22;
+        paymentAmount = Math.round((data.amount * accountRate / myrRate) * 100);
       }
 
       const response = await fetch(getApiUrl('/api/v1/deposit/create-payment-intent'), {
@@ -379,14 +488,15 @@ function DepositTab() {
         });
         stripeError = result.error;
         paymentIntent = result.paymentIntent;
-      } else if (selectedTab === 'banking' || selectedTab === 'ewallet') {
-        // Redirect-based payments (banking and eWallets)
-        const result = await stripe.confirmPayment({
-          clientSecret,
-          confirmParams: {
-            return_url: window.location.origin + '/wallet?payment=redirect',
+      } else if (selectedTab === 'banking') {
+        // FPX banking payment
+        const result = await stripe.confirmFpxPayment(clientSecret, {
+          payment_method: {
+            fpx: {
+              bank: selectedFpxBank,
+            },
           },
-          redirect: 'if_required',
+          return_url: window.location.origin + '/wallet?payment=redirect',
         });
 
         stripeError = result.error;
@@ -395,7 +505,7 @@ function DepositTab() {
         // If payment requires redirect, user will be redirected automatically
         // If we get here without error and no paymentIntent, redirect is happening
         if (!stripeError && !paymentIntent) {
-          showToast('Redirecting to payment provider...', 'success');
+          showToast('Redirecting to your bank...', 'success');
           // User will be redirected, processing will continue after return
           return;
         }
@@ -439,7 +549,7 @@ function DepositTab() {
             if (statusData.status === 'succeeded') {
               // Mark as processed IMMEDIATELY before any async operations
               depositProcessed = true;
-              processedPayments.current.add(paymentIntent.id);
+              markPaymentAsProcessed(paymentIntent.id);
               clearInterval(pollInterval);
 
               // Process deposit in account store
@@ -516,7 +626,6 @@ function DepositTab() {
             <h3 className="text-xl font-bold mb-5 text-slate-900 dark:text-slate-100">
               {selectedTab === 'card' && 'Card Payment'}
               {selectedTab === 'banking' && 'Online Banking'}
-              {selectedTab === 'ewallet' && 'eWallet Payment'}
               {selectedTab === 'crypto' && 'Cryptocurrency'}
             </h3>
 
@@ -554,15 +663,15 @@ function DepositTab() {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-indigo-500 mt-0.5">✓</span>
-                    <span>Automatic currency conversion at live rates</span>
+                    <span>Automatic currency conversion to MYR at live rates</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-indigo-500 mt-0.5">✓</span>
-                    <span>Supports FPX, iDEAL, Bancontact, and Giropay</span>
+                    <span>FPX Online Banking - Malaysia&apos;s trusted payment method</span>
                   </li>
                 </ul>
 
-                {/* Bank-specific info box */}
+                {/* FPX-specific info box */}
                 <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <div className="flex items-start gap-2">
                     <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -570,61 +679,13 @@ function DepositTab() {
                     </svg>
                     <div className="flex-1">
                       <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                        {selectedBankMethod === 'fpx' && 'FPX Online Banking (Malaysia)'}
-                        {selectedBankMethod === 'ideal' && 'iDEAL Online Banking (Netherlands)'}
-                        {selectedBankMethod === 'bancontact' && 'Bancontact (Belgium)'}
-                        {selectedBankMethod === 'giropay' && 'Giropay (Germany)'}
+                        FPX Online Banking (Malaysia)
                       </h4>
                       <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
                         You will be redirected to your bank&apos;s website to complete the payment securely. After completing the payment, you&apos;ll be redirected back to this page.
                       </p>
                       <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                        💱 Payment will be processed in {selectedBankMethod === 'fpx' ? 'MYR (Malaysian Ringgit)' : 'EUR (Euro)'} using live exchange rates.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {selectedTab === 'ewallet' && (
-              <>
-                <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
-                  <li className="flex items-start gap-2">
-                    <span className="text-indigo-500 mt-0.5">✓</span>
-                    <span>Fast and convenient eWallet payments</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-indigo-500 mt-0.5">✓</span>
-                    <span>Secure redirect to your eWallet provider</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-indigo-500 mt-0.5">✓</span>
-                    <span>Popular trading payment methods worldwide</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-indigo-500 mt-0.5">✓</span>
-                    <span>Supports PayPal, Klarna, and Affirm</span>
-                  </li>
-                </ul>
-
-                {/* eWallet-specific info box */}
-                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                        {selectedEWallet === 'paypal' && 'PayPal Payment'}
-                        {selectedEWallet === 'klarna' && 'Klarna Payment'}
-                        {selectedEWallet === 'affirm' && 'Affirm Payment'}
-                      </h4>
-                      <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-                        You will be redirected to {selectedEWallet === 'paypal' ? 'PayPal' : selectedEWallet === 'klarna' ? 'Klarna' : 'Affirm'} to complete the payment securely. After completing the payment, you&apos;ll be redirected back to this page.
-                      </p>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                        💱 Automatic currency conversion applied if needed
+                        Payment will be processed in MYR (Malaysian Ringgit) using live exchange rates.
                       </p>
                     </div>
                   </div>
@@ -649,7 +710,7 @@ function DepositTab() {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-indigo-500 mt-0.5">✓</span>
-                    <span>Powered by Coinbase Commerce - trusted platform</span>
+                    <span>Powered by NOWPayments - supports 300+ cryptocurrencies</span>
                   </li>
                 </ul>
 
@@ -664,10 +725,10 @@ function DepositTab() {
                         Cryptocurrency Payment
                       </h4>
                       <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-                        You will be redirected to Coinbase Commerce to complete your payment with Bitcoin, Ethereum, USDT, or other supported cryptocurrencies. Choose your preferred crypto on the payment page.
+                        You will be redirected to NOWPayments to complete your payment with Bitcoin, Ethereum, USDT, or 300+ other supported cryptocurrencies. Choose your preferred crypto on the payment page.
                       </p>
                       <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                        ⚡ Your account will be credited automatically after blockchain confirmation
+                        Your account will be credited automatically after blockchain confirmation
                       </p>
                     </div>
                   </div>
@@ -695,7 +756,7 @@ function DepositTab() {
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
             Payment Method
           </label>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={() => setSelectedTab('card')}
@@ -720,17 +781,6 @@ function DepositTab() {
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedTab('ewallet')}
-                className={`px-4 py-3 text-sm font-semibold rounded-lg transition-all ${
-                  selectedTab === 'ewallet'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                eWallet
-              </button>
-              <button
-                type="button"
                 onClick={() => setSelectedTab('crypto')}
                 className={`px-4 py-3 text-sm font-semibold rounded-lg transition-all ${
                   selectedTab === 'crypto'
@@ -746,38 +796,6 @@ function DepositTab() {
       {/* Card Payment Form */}
       {selectedTab === 'card' && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Apple Pay / Google Pay Button */}
-          {paymentRequest && (
-            <>
-              <div className="pb-4 border-b border-slate-200 dark:border-slate-700">
-                <PaymentRequestButtonElement
-                  options={{
-                    paymentRequest,
-                    style: {
-                      paymentRequestButton: {
-                        theme: isDarkMode ? 'light' : 'dark',
-                        height: '48px',
-                        type: 'default',
-                      }
-                    }
-                  }}
-                />
-              </div>
-
-              {/* OR Divider */}
-              <div className="relative py-4">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 font-medium">
-                    OR PAY WITH CARD
-                  </span>
-                </div>
-              </div>
-            </>
-          )}
-
           {/* Account Selection */}
           <div>
             <label htmlFor="depositAccount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
@@ -823,8 +841,35 @@ function DepositTab() {
             )}
           </div>
 
+          {/* Express Checkout (Apple Pay / Google Pay / Link) */}
+          {depositAmount >= 5 && (
+            <>
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  Express Payment (One-Click)
+                </p>
+                <ExpressCheckoutElement
+                  onConfirm={handleExpressCheckoutConfirm}
+                  options={expressCheckoutOptions}
+                />
+              </div>
+
+              {/* OR Divider */}
+              <div className="relative py-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t-2 border-slate-200 dark:border-slate-700"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white dark:bg-slate-800 px-4 text-slate-500 dark:text-slate-400 font-semibold">
+                    Or pay with card
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+
           {/* Stripe Card Elements */}
-          <div className="space-y-4 border-t-2 border-slate-200 dark:border-slate-700 pt-6">
+          <div className="space-y-4">
             <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               Card Information
               {cardBrand && <span className="ml-2 text-xs text-slate-500 uppercase">({cardBrand})</span>}
@@ -880,74 +925,14 @@ function DepositTab() {
             disabled={isProcessing || !stripe}
             className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
           >
-            {isProcessing ? 'Processing...' : 'Confirm Deposit'}
+            {isProcessing ? 'Processing Payment...' : 'Pay with Card'}
           </button>
         </form>
       )}
 
-      {/* Online Banking */}
+      {/* Online Banking - FPX */}
       {selectedTab === 'banking' && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Bank Method Selection */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-              Select Bank Method
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setSelectedBankMethod('fpx')}
-                className={`px-4 py-3 border-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedBankMethod === 'fpx'
-                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-                }`}
-              >
-                <div className="font-semibold">FPX</div>
-                <div className="text-xs opacity-75">Malaysia</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedBankMethod('ideal')}
-                className={`px-4 py-3 border-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedBankMethod === 'ideal'
-                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-                }`}
-              >
-                <div className="font-semibold">iDEAL</div>
-                <div className="text-xs opacity-75">Netherlands</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedBankMethod('bancontact')}
-                className={`px-4 py-3 border-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedBankMethod === 'bancontact'
-                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-                }`}
-              >
-                <div className="font-semibold">Bancontact</div>
-                <div className="text-xs opacity-75">Belgium</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedBankMethod('giropay')}
-                className={`px-4 py-3 border-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedBankMethod === 'giropay'
-                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-                }`}
-              >
-                <div className="font-semibold">Giropay</div>
-                <div className="text-xs opacity-75">Germany</div>
-              </button>
-            </div>
-          </div>
-
           {/* Account Selection */}
           <div>
             <label htmlFor="bankingDepositAccount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
@@ -993,161 +978,48 @@ function DepositTab() {
             )}
           </div>
 
+          {/* FPX Bank Selection */}
+          <div>
+            <label htmlFor="fpxBankSelect" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+              Select Your Bank
+            </label>
+            <select
+              id="fpxBankSelect"
+              value={selectedFpxBank}
+              onChange={(e) => setSelectedFpxBank(e.target.value)}
+              className="w-full px-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-base font-medium"
+            >
+              <option value="maybank2u">Maybank2u</option>
+              <option value="cimb">CIMB Clicks</option>
+              <option value="public_bank">Public Bank</option>
+              <option value="rhb">RHB Bank</option>
+              <option value="hong_leong_bank">Hong Leong Bank</option>
+              <option value="ambank">AmBank</option>
+              <option value="affin_bank">Affin Bank</option>
+              <option value="alliance_bank">Alliance Bank</option>
+              <option value="bank_islam">Bank Islam</option>
+              <option value="bank_muamalat">Bank Muamalat</option>
+              <option value="bank_rakyat">Bank Rakyat</option>
+              <option value="bsn">BSN</option>
+              <option value="hsbc">HSBC Bank</option>
+              <option value="kfh">Kuwait Finance House</option>
+              <option value="maybank2e">Maybank2E</option>
+              <option value="ocbc">OCBC Bank</option>
+              <option value="standard_chartered">Standard Chartered</option>
+              <option value="uob">UOB Bank</option>
+            </select>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+              Please select your bank to proceed with FPX payment
+            </p>
+          </div>
+
           {/* Submit Button */}
           <button
             type="submit"
             disabled={isProcessing || !stripe || !elements}
             className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
           >
-            {isProcessing ? 'Processing...' : `Pay with ${selectedBankMethod.toUpperCase()}`}
-          </button>
-        </form>
-      )}
-
-      {/* eWallet Options */}
-      {selectedTab === 'ewallet' && (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* eWallet Method Selection */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-              Select eWallet Method
-            </label>
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => setSelectedEWallet('paypal')}
-                className={`w-full py-4 px-6 border-2 rounded-lg flex items-center justify-between transition-colors ${
-                  selectedEWallet === 'paypal'
-                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                    P
-                  </div>
-                  <div className="text-left">
-                    <div className="font-semibold text-slate-900 dark:text-slate-100">PayPal</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">Fast and secure payments</div>
-                  </div>
-                </div>
-                {selectedEWallet === 'paypal' && (
-                  <div className="w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 12 12">
-                      <path d="M4.5 8.5L2 6l.7-.7L4.5 7.1 9.3 2.3l.7.7z" />
-                    </svg>
-                  </div>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedEWallet('klarna')}
-                className={`w-full py-4 px-6 border-2 rounded-lg flex items-center justify-between transition-colors ${
-                  selectedEWallet === 'klarna'
-                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                    K
-                  </div>
-                  <div className="text-left">
-                    <div className="font-semibold text-slate-900 dark:text-slate-100">Klarna</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">Buy now, pay later</div>
-                  </div>
-                </div>
-                {selectedEWallet === 'klarna' && (
-                  <div className="w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 12 12">
-                      <path d="M4.5 8.5L2 6l.7-.7L4.5 7.1 9.3 2.3l.7.7z" />
-                    </svg>
-                  </div>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedEWallet('affirm')}
-                className={`w-full py-4 px-6 border-2 rounded-lg flex items-center justify-between transition-colors ${
-                  selectedEWallet === 'affirm'
-                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                    A
-                  </div>
-                  <div className="text-left">
-                    <div className="font-semibold text-slate-900 dark:text-slate-100">Affirm</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">Flexible financing</div>
-                  </div>
-                </div>
-                {selectedEWallet === 'affirm' && (
-                  <div className="w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 12 12">
-                      <path d="M4.5 8.5L2 6l.7-.7L4.5 7.1 9.3 2.3l.7.7z" />
-                    </svg>
-                  </div>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Account Selection */}
-          <div>
-            <label htmlFor="ewalletDepositAccount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-              Trading Account
-            </label>
-            <select
-              id="ewalletDepositAccount"
-              {...register('accountId')}
-              className="w-full px-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-base font-medium"
-            >
-              {liveAccounts.map(acc => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.id} - {formatBalance(acc.balances[acc.currency], acc.currency)}
-                </option>
-              ))}
-            </select>
-            {errors.accountId && (
-              <p className="text-xs text-red-500 mt-1">{errors.accountId.message}</p>
-            )}
-          </div>
-
-          {/* Amount */}
-          <div>
-            <label htmlFor="ewalletDepositAmount" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-              Amount of Deposit (Minimum: $5.00)
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                id="ewalletDepositAmount"
-                {...register('amount', { valueAsNumber: true })}
-                placeholder="0.00"
-                min="5"
-                step="0.01"
-                className="w-full px-4 py-3.5 pr-20 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-lg font-semibold"
-              />
-              <span className="absolute right-4 top-4 text-base font-bold text-slate-500 dark:text-slate-400">
-                {accounts.find(a => a.id === selectedAccountId)?.currency || 'USD'}
-              </span>
-            </div>
-            {errors.amount && (
-              <p className="text-xs text-red-500 mt-1">{errors.amount.message}</p>
-            )}
-          </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isProcessing || !stripe}
-            className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
-          >
-            {isProcessing ? 'Processing...' : `Pay with ${selectedEWallet === 'paypal' ? 'PayPal' : selectedEWallet === 'klarna' ? 'Klarna' : 'Affirm'}`}
+            {isProcessing ? 'Processing...' : 'Pay with FPX'}
           </button>
         </form>
       )}
@@ -1168,7 +1040,7 @@ function DepositTab() {
           setIsProcessing(true);
 
           try {
-            // Call backend to create Coinbase Commerce charge
+            // Call backend to create NOWPayments charge
             const response = await fetch(getApiUrl('/api/v1/deposit/create-crypto-charge'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -1195,7 +1067,7 @@ function DepositTab() {
               timestamp: Date.now(),
             }));
 
-            // Redirect to Coinbase Commerce hosted page
+            // Redirect to NOWPayments hosted payment page
             window.location.href = data.hosted_url;
 
           } catch (error) {

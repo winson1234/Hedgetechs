@@ -27,11 +27,6 @@ const [showPassword, setShowPassword] = useState(false);
 const togglePassword = () => setShowPassword((prev) => !prev);
 const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-const [formData, setFormData] = useState({
-  password: '',
-  retypePassword: ''
-});
-
   const otpRefs = [
     useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),

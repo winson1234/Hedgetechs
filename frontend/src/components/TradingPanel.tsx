@@ -572,17 +572,18 @@ export default function TradingPanel() {
 
       {/* Available Balance Breakdown */}
        <div className="mb-5 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-bold text-slate-700 dark:text-slate-300">Available Balance</div>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="text-sm font-bold text-slate-700 dark:text-slate-300 flex-shrink-0">Available Balance</div>
           {/* Account Switcher */}
           <select
             value={activeAccountId || ''}
             onChange={(e) => setActiveAccount(e.target.value)}
-            className="px-2.5 py-1 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-700 dark:text-slate-300 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="max-w-[140px] min-w-0 px-1.5 py-1 text-[11px] bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-700 dark:text-slate-300 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+            title={accounts.find(acc => acc.id === activeAccountId)?.id}
           >
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
-                {account.id.substring(0, 12)}... ({account.type === 'live' ? 'Live' : 'Demo'})
+                {account.id.substring(0, 10)}... ({account.type === 'live' ? 'L' : 'D'})
               </option>
             ))}
           </select>
@@ -677,7 +678,7 @@ export default function TradingPanel() {
               type="number"
               value={amount}
               onChange={(e) => handleAmountChange(e.target.value)}
-              placeholder="0.000000"
+              placeholder="0.0000"
               min="0" // Ensure non-negative input
               step="any" // Allow decimals
               className="w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-100"

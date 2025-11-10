@@ -350,7 +350,7 @@ body {
 
 /* Profile Header */
 .profile-header {
-    margin-top:-80px;
+    margin-top:-40px;
     background: var(--bg-card);
     padding: 40px;
     border-radius: 16px;

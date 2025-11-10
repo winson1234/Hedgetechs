@@ -77,9 +77,9 @@ function AccountHoldingsChart({
       </div>
 
       {/* Chart and Legend */}
-      <div className="grid grid-cols-2 gap-6 items-center">
+      <div className="flex items-center justify-center gap-12">
         {/* Left: Chart */}
-        <div className="flex justify-center">
+        <div className="flex-shrink-0">
           <Suspense
             fallback={
               <div className="h-[220px] flex items-center justify-center">
@@ -98,19 +98,19 @@ function AccountHoldingsChart({
         </div>
 
         {/* Right: Legend */}
-        <div className="space-y-2.5">
+        <div className="flex-1 space-y-2.5 min-w-0">
           {chartSnapshot.map((asset) => (
-            <div key={asset.currency} className="flex items-start gap-2">
+            <div key={asset.currency} className="flex items-start gap-3">
               <div
                 className="w-3 h-3 rounded-full flex-shrink-0 mt-0.5"
                 style={{ backgroundColor: getAssetColor(asset.currency) }}
               />
               <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2 text-xs">
+                <div className="flex items-baseline gap-3 text-xs">
                   <span className="font-medium text-slate-700 dark:text-slate-300 truncate">
                     {asset.currency}
                   </span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                  <span className="font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">
                     {asset.percentage.toFixed(1)}%
                   </span>
                 </div>

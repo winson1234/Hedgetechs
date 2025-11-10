@@ -138,8 +138,8 @@ export default function NewsPanel() {
 
   const unreadCount = filteredArticles.filter(isUnread).length
 
-  // Pagination: always show exactly 3 items per page
-  const itemsPerPage = 3
+  // Pagination: always show exactly 4 items per page
+  const itemsPerPage = 4
   const totalPages = Math.ceil(filteredArticles.length / itemsPerPage)
   const startIndex = currentPage * itemsPerPage
   const endIndex = startIndex + itemsPerPage
@@ -239,10 +239,10 @@ export default function NewsPanel() {
       </div>
         
       {/* Filter Toggle */}
-      <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1 mb-3">
+      <div className="flex gap-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 mb-3">
         <button
           onClick={() => setFilter('all')}
-          className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+          className={`flex-1 px-1 py-1 text-[10px] font-medium rounded transition-colors ${
             filter === 'all'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -252,7 +252,7 @@ export default function NewsPanel() {
         </button>
         <button
           onClick={() => setFilter('crypto')}
-          className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+          className={`flex-1 px-1 py-1 text-[10px] font-medium rounded transition-colors ${
             filter === 'crypto'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -262,7 +262,7 @@ export default function NewsPanel() {
         </button>
         <button
           onClick={() => setFilter('forex')}
-          className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+          className={`flex-1 px-1 py-1 text-[10px] font-medium rounded transition-colors ${
             filter === 'forex'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -272,7 +272,7 @@ export default function NewsPanel() {
         </button>
         <button
           onClick={() => setFilter('market')}
-          className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+          className={`flex-1 px-1 py-1 text-[10px] font-medium rounded transition-colors ${
             filter === 'market'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -282,7 +282,7 @@ export default function NewsPanel() {
         </button>
         <button
           onClick={() => setFilter('system')}
-          className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+          className={`flex-1 px-1 py-1 text-[10px] font-medium rounded transition-colors ${
             filter === 'system'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -322,8 +322,9 @@ export default function NewsPanel() {
           <div className="space-y-2 flex-1">
             {displayedArticles.map((article, index) => {
               const unread = isUnread(article)
-              // Use combination of guid, link, and index to ensure unique keys
-              const uniqueKey = article.guid || article.link || `article-${index}-${article.title.slice(0, 20)}`
+              // Use global index to ensure unique keys across pagination
+              const globalIndex = startIndex + index
+              const uniqueKey = `article-${globalIndex}-${article.link || article.title}`
               return (
                 <div
                   key={uniqueKey}

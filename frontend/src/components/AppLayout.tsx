@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { getApiUrl } from '../config/api';
 import Header from './Header';
 import MainSidebar from './MainSidebar';
+import MobileBottomNav from './MobileBottomNav';
 import AnalyticsPanel from './AnalyticsPanel';
 import ToastNotification from './ToastNotification';
 import { usePriceStore } from '../stores/priceStore';
@@ -11,6 +12,7 @@ import { useUIStore } from '../stores/uiStore';
 export default function AppLayout() {
   const location = useLocation();
   const isDarkMode = useUIStore(state => state.isDarkMode);
+  const isSidebarExpanded = useUIStore(state => state.isSidebarExpanded);
   const toast = useUIStore(state => state.toast);
   const hideToast = useUIStore(state => state.hideToast);
 
@@ -48,14 +50,19 @@ export default function AppLayout() {
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         <Header />
 
-        {/* Main Sidebar for all pages */}
+        {/* Main Sidebar for desktop */}
         <MainSidebar />
+
+        {/* Mobile Bottom Navigation */}
+        <MobileBottomNav />
 
         {/* Show AnalyticsPanel only on trading page */}
         {isTradingPage && <AnalyticsPanel />}
 
         {/* Main Content Area */}
-        <div className="ml-24 pt-[60px]">
+        <div className={`pt-8 pb-16 md:pb-8 transition-all duration-150 ${
+          isSidebarExpanded ? 'md:ml-44' : 'md:ml-14'
+        }`}>
           <Outlet />
         </div>
 

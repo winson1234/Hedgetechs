@@ -101,20 +101,37 @@ func main() {
 	http.HandleFunc(config.PaymentIntentAPIPath, api.CORSMiddleware(api.HandleCreatePaymentIntent))
 	// REST handler for Stripe payment status check (with CORS)
 	http.HandleFunc(config.PaymentStatusAPIPath, api.CORSMiddleware(api.HandlePaymentStatus))
-	// REST handler for Coinbase Commerce crypto charge creation (with CORS)
+	// REST handler for NOWPayments crypto charge creation (with CORS)
 	http.HandleFunc("/api/v1/deposit/create-crypto-charge", api.CORSMiddleware(api.HandleCreateCryptoCharge))
-	// Webhook handler for Coinbase Commerce (NO CORS - webhook only)
+	// Webhook handler for NOWPayments IPN (NO CORS - webhook only)
 	http.HandleFunc("/api/v1/crypto/webhook", func(w http.ResponseWriter, r *http.Request) {
 		api.HandleCryptoWebhook(h, w, r)
 	})
 
-	// Log Coinbase Commerce configuration status
-	if coinbaseKey := os.Getenv("COINBASE_COMMERCE_API_KEY"); coinbaseKey != "" {
-		log.Printf("COINBASE_COMMERCE_API_KEY loaded successfully (length: %d)", len(coinbaseKey))
+	// Log NOWPayments configuration status
+	if nowPaymentsKey := os.Getenv("NOWPAYMENTS_API_KEY"); nowPaymentsKey != "" {
+		log.Printf("NOWPAYMENTS_API_KEY loaded successfully (length: %d)", len(nowPaymentsKey))
 	} else {
-		log.Println("Note: COINBASE_COMMERCE_API_KEY is not set (crypto deposits disabled)")
+		log.Println("Note: NOWPAYMENTS_API_KEY is not set (crypto deposits disabled)")
 	}
 
-	// Start the HTTP server on the configured port
+	// Start the HTTP/HTTPS server on the configured port
+	// Check for mkcert-generated SSL certificates for local HTTPS development
+	certFile := filepath.Join("..", "..", "localhost+2.pem")     // From cmd/server, look at project root
+	keyFile := filepath.Join("..", "..", "localhost+2-key.pem")  // From cmd/server, look at project root
+
+	// Check if certificate files exist
+	if _, certErr := os.Stat(certFile); certErr == nil {
+		if _, keyErr := os.Stat(keyFile); keyErr == nil {
+			// Certificates found - start HTTPS server
+			log.Printf("SSL certificates found - starting HTTPS server on https://localhost%s", serverAddress)
+			log.Println("Note: These are mkcert-generated certificates for local development")
+			log.Fatal(http.ListenAndServeTLS(serverAddress, certFile, keyFile, nil))
+		}
+	}
+
+	// No certificates found - start HTTP server (backward compatible)
+	log.Printf("No SSL certificates found - starting HTTP server on http://localhost%s", serverAddress)
+	log.Println("Tip: For HTTPS in development, generate certificates with mkcert (see HTTPS_SETUP.md)")
 	log.Fatal(http.ListenAndServe(serverAddress, nil))
 }

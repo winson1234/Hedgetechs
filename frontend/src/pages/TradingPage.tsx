@@ -34,10 +34,10 @@ export default function TradingPage() {
 
         {/* Instruments + News - Full width on mobile, spans both on tablet, 3 cols on xl */}
         <div className="md:col-span-1 xl:col-span-3 space-y-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 lg:p-5 h-[500px] md:h-[600px] lg:h-[735px] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 lg:p-5 h-[500px] md:h-[600px] lg:h-[600px] overflow-y-auto">
             <InstrumentsPanel />
           </div>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 lg:p-5 h-[400px] md:h-[450px] lg:h-[555px]">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 lg:p-5 h-[400px] md:h-[450px] lg:h-[700px]">
             <NewsPanel />
           </div>
         </div>

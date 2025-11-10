@@ -134,7 +134,7 @@ useEffect(() => {
   });
 
     if (result.success) {
-      navigate('/profile');
+      navigate('/trading');
     } else {
       alert(result.message || 'Registration failed');
     }

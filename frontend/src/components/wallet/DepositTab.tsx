@@ -3,8 +3,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getApiUrl } from '../../config/api';
-import { useAccountStore, formatBalance } from '../../stores/accountStore';
-import { useUIStore } from '../../stores/uiStore';
+import { formatBalance } from '../../utils/format';
+import { useAppSelector, useAppDispatch } from '../../store';
+import { addToast, selectIsDarkMode } from '../../store/slices/uiSlice';
+import { createDeposit } from '../../store/slices/transactionSlice';
 import { CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements, ExpressCheckoutElement } from '@stripe/react-stripe-js';
 import type { StripeCardNumberElement, StripeExpressCheckoutElementConfirmEvent } from '@stripe/stripe-js';
 
@@ -23,9 +25,10 @@ type PaymentTab = 'card' | 'banking' | 'crypto';
 function DepositTab() {
   const stripe = useStripe();
   const elements = useElements();
+  const dispatch = useAppDispatch();
   
   // Get dark mode state
-  const isDarkMode = useUIStore(state => state.isDarkMode);
+  const isDarkMode = useAppSelector(selectIsDarkMode);
   
   // Stripe Elements custom styles (dynamic based on dark mode)
   const CARD_ELEMENT_OPTIONS = {
@@ -43,15 +46,51 @@ function DepositTab() {
     },
   };
 
-  // Access stores
-  const accounts = useAccountStore(state => state.accounts);
-  const activeAccountId = useAccountStore(state => state.activeAccountId);
-  const getActiveAccount = useAccountStore(state => state.getActiveAccount);
-  const processDeposit = useAccountStore(state => state.processDeposit);
-  const getFXRates = useAccountStore(state => state.getFXRates);
-  const showToast = useUIStore(state => state.showToast);
+  // Access Redux state
+  const accounts = useAppSelector(state => state.account.accounts);
+  const activeAccountId = useAppSelector(state => state.account.activeAccountId);
+  
+  // Get active account
+  const activeAccount = useMemo(() => 
+    accounts.find(a => a.id === activeAccountId) || null,
+    [accounts, activeAccountId]
+  );
 
-  const activeAccount = getActiveAccount();
+  // Helper function to show toast
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+    dispatch(addToast({ message, type }));
+  };
+
+  // Helper function to process deposit (calls backend API and dispatches Redux action)
+  const processDeposit = async (accountId: string, amount: number, currency: string, paymentIntentId?: string, metadata?: any) => {
+    try {
+      // Dispatch Redux action to create deposit transaction
+      const result = await dispatch(createDeposit({
+        accountId,
+        amount,
+        currency,
+        paymentIntentId,
+        metadata
+      })).unwrap();
+      
+      return result;
+    } catch (error) {
+      console.error('Deposit failed:', error);
+      throw error;
+    }
+  };
+
+  // Helper function to get FX rates
+  const getFXRates = async () => {
+    try {
+      const response = await fetch(getApiUrl('/api/v1/fx-rates'));
+      if (!response.ok) throw new Error('Failed to fetch FX rates');
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to fetch FX rates:', error);
+      return {};
+    }
+  };
 
   // State
   const [selectedTab, setSelectedTab] = useState<PaymentTab>('card');
@@ -806,11 +845,14 @@ function DepositTab() {
               {...register('accountId')}
               className="w-full px-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-base font-medium"
             >
-              {liveAccounts.map(acc => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.id} - {formatBalance(acc.balances[acc.currency], acc.currency)}
-                </option>
-              ))}
+              {liveAccounts.map(acc => {
+                const balance = acc.balances.find(b => b.currency === acc.currency);
+                return (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.id} - {formatBalance(balance?.amount || 0, acc.currency)}
+                  </option>
+                );
+              })}
             </select>
             {errors.accountId && (
               <p className="text-xs text-red-500 mt-1">{errors.accountId.message}</p>
@@ -943,11 +985,14 @@ function DepositTab() {
               {...register('accountId')}
               className="w-full px-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-base font-medium"
             >
-              {liveAccounts.map(acc => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.id} - {formatBalance(acc.balances[acc.currency], acc.currency)}
-                </option>
-              ))}
+              {liveAccounts.map(acc => {
+                const balance = acc.balances.find(b => b.currency === acc.currency);
+                return (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.id} - {formatBalance(balance?.amount || 0, acc.currency)}
+                  </option>
+                );
+              })}
             </select>
             {errors.accountId && (
               <p className="text-xs text-red-500 mt-1">{errors.accountId.message}</p>
@@ -1086,11 +1131,14 @@ function DepositTab() {
               {...register('accountId')}
               className="w-full px-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-base font-medium"
             >
-              {liveAccounts.map(acc => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.id} - {formatBalance(acc.balances[acc.currency], acc.currency)}
-                </option>
-              ))}
+              {liveAccounts.map(acc => {
+                const balance = acc.balances.find(b => b.currency === acc.currency);
+                return (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.id} - {formatBalance(balance?.amount || 0, acc.currency)}
+                  </option>
+                );
+              })}
             </select>
             {errors.accountId && (
               <p className="text-xs text-red-500 mt-1">{errors.accountId.message}</p>

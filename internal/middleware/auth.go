@@ -21,6 +21,10 @@ const (
 	UserIDKey ContextKey = "user_id"
 	// UserEmailKey is the context key for storing the authenticated user email
 	UserEmailKey ContextKey = "user_email"
+	// IPAddressKey is the context key for storing the client IP address
+	IPAddressKey ContextKey = "ip_address"
+	// UserAgentKey is the context key for storing the client user agent
+	UserAgentKey ContextKey = "user_agent"
 )
 
 // SupabaseJWTClaims represents the claims in a Supabase JWT token
@@ -64,9 +68,15 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Inject user information into the request context
+		// Extract IP address and user agent from request
+		ipAddress := getClientIP(r)
+		userAgent := r.UserAgent()
+
+		// Inject user information and request metadata into the request context
 		ctx := context.WithValue(r.Context(), UserIDKey, userID)
 		ctx = context.WithValue(ctx, UserEmailKey, email)
+		ctx = context.WithValue(ctx, IPAddressKey, ipAddress)
+		ctx = context.WithValue(ctx, UserAgentKey, userAgent)
 
 		// Call the next handler with the updated context
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -130,6 +140,43 @@ func GetUserEmailFromContext(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("user email not found in context")
 	}
 	return email, nil
+}
+
+// GetIPAddressFromContext extracts the IP address from the request context
+func GetIPAddressFromContext(ctx context.Context) (string, error) {
+	ipAddress, ok := ctx.Value(IPAddressKey).(string)
+	if !ok {
+		return "", fmt.Errorf("IP address not found in context")
+	}
+	return ipAddress, nil
+}
+
+// GetUserAgentFromContext extracts the user agent from the request context
+func GetUserAgentFromContext(ctx context.Context) (string, error) {
+	userAgent, ok := ctx.Value(UserAgentKey).(string)
+	if !ok {
+		return "", fmt.Errorf("user agent not found in context")
+	}
+	return userAgent, nil
+}
+
+// getClientIP extracts the client's IP address from the request
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header (for proxies/load balancers)
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff != "" {
+		// X-Forwarded-For can contain multiple IPs, take the first one
+		return strings.Split(xff, ",")[0]
+	}
+
+	// Check X-Real-IP header
+	xri := r.Header.Get("X-Real-IP")
+	if xri != "" {
+		return xri
+	}
+
+	// Fall back to RemoteAddr
+	return r.RemoteAddr
 }
 
 // respondWithError sends a JSON error response

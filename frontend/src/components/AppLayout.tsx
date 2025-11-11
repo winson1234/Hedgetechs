@@ -6,15 +6,16 @@ import MainSidebar from './MainSidebar';
 import MobileBottomNav from './MobileBottomNav';
 import AnalyticsPanel from './AnalyticsPanel';
 import ToastNotification from './ToastNotification';
-import { usePriceStore } from '../stores/priceStore';
-import { useUIStore } from '../stores/uiStore';
+import { useAppDispatch, useAppSelector } from '../store';
+import { hydrateFrom24hData, setLoading } from '../store/slices/priceSlice';
+import { setTheme, removeToast, selectIsDarkMode } from '../store/slices/uiSlice';
 
 export default function AppLayout() {
   const location = useLocation();
-  const isDarkMode = useUIStore(state => state.isDarkMode);
-  const isSidebarExpanded = useUIStore(state => state.isSidebarExpanded);
-  const toast = useUIStore(state => state.toast);
-  const hideToast = useUIStore(state => state.hideToast);
+  const dispatch = useAppDispatch();
+  const isDarkMode = useAppSelector(selectIsDarkMode);
+  const isSidebarExpanded = useAppSelector(state => state.ui.isSidebarExpanded);
+  const toasts = useAppSelector(state => state.ui.toasts);
 
   // Determine if we're on the trading page
   const isTradingPage = location.pathname === '/trading';
@@ -23,10 +24,9 @@ export default function AppLayout() {
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme) {
-      const isDark = savedTheme === 'dark';
-      useUIStore.getState().setDarkMode(isDark);
+      dispatch(setTheme(savedTheme as 'light' | 'dark'));
     }
-  }, []);
+  }, [dispatch]);
 
   // Hydrate price store with 24h ticker data on mount (all 24 instruments)
   useEffect(() => {
@@ -36,14 +36,14 @@ export default function AppLayout() {
         const response = await fetch(getApiUrl(`/api/v1/ticker?symbols=${symbols}`));
         if (!response.ok) throw new Error('Failed to fetch 24h ticker data');
         const data = await response.json();
-        usePriceStore.getState().hydrateFrom24hData(data);
+        dispatch(hydrateFrom24hData(data));
       } catch (err) {
         console.error('Failed to hydrate price store:', err);
-        usePriceStore.setState({ loading: false });
+        dispatch(setLoading(false));
       }
     };
     hydratePrices();
-  }, []);
+  }, [dispatch]);
 
   return (
     <div className={isDarkMode ? 'dark' : ''}>
@@ -66,14 +66,15 @@ export default function AppLayout() {
           <Outlet />
         </div>
 
-        {/* Toast Notification */}
-        {toast && (
+        {/* Toast Notifications */}
+        {toasts.map((toast) => (
           <ToastNotification
+            key={toast.id}
             message={toast.message}
             type={toast.type}
-            onClose={hideToast}
+            onClose={() => dispatch(removeToast(toast.id))}
           />
-        )}
+        ))}
       </div>
     </div>
   );

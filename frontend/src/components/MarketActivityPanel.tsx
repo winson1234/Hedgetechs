@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { WebSocketContext } from '../context/WebSocketContext';
-import { useUIStore } from '../stores/uiStore';
+import { useAppSelector } from '../store';
 import PendingOrdersTab from './market/PendingOrdersTab';
 import TradeHistoryTab from './market/TradeHistoryTab';
 import { formatPrice, formatQuantity } from '../utils/priceUtils';
@@ -15,7 +15,7 @@ type Trade = {
 type TabType = 'orderbook' | 'trades' | 'pending' | 'history';
 
 export default function MarketActivityPanel() {
-  const activeInstrument = useUIStore(state => state.activeInstrument);
+  const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
   const ws = useContext(WebSocketContext);
   const lastMessage = ws?.lastMessage ?? null;
   const [activeTab, setActiveTab] = useState<TabType>('orderbook');

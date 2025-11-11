@@ -2,8 +2,10 @@ import { useState, useEffect, useMemo, memo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useAccountStore, formatBalance } from '../../stores/accountStore';
-import { useUIStore } from '../../stores/uiStore';
+import { formatBalance } from '../../utils/format';
+import { useAppSelector, useAppDispatch } from '../../store';
+import { addToast } from '../../store/slices/uiSlice';
+import { createWithdrawal } from '../../store/slices/transactionSlice';
 
 // Validation schema (will add .refine for balance check)
 const withdrawSchemaBase = z.object({
@@ -18,14 +20,37 @@ const withdrawSchemaBase = z.object({
 type WithdrawFormData = z.infer<typeof withdrawSchemaBase>;
 
 function WithdrawTab() {
-  // Access stores
-  const accounts = useAccountStore(state => state.accounts);
-  const activeAccountId = useAccountStore(state => state.activeAccountId);
-  const getActiveAccount = useAccountStore(state => state.getActiveAccount);
-  const processWithdrawal = useAccountStore(state => state.processWithdrawal);
-  const showToast = useUIStore(state => state.showToast);
+  const dispatch = useAppDispatch();
+  
+  // Access Redux state
+  const accounts = useAppSelector(state => state.account.accounts);
+  const activeAccountId = useAppSelector(state => state.account.activeAccountId);
+  
+  // Get active account
+  const activeAccount = useMemo(() => 
+    accounts.find(a => a.id === activeAccountId) || null,
+    [accounts, activeAccountId]
+  );
 
-  const activeAccount = getActiveAccount();
+  // Helper function to show toast
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+    dispatch(addToast({ message, type }));
+  };
+
+  // Helper function to process withdrawal
+  const processWithdrawal = async (accountId: string, amount: number, currency: string, bankDetails: any) => {
+    try {
+      await dispatch(createWithdrawal({
+        accountId,
+        amount,
+        currency,
+        metadata: bankDetails
+      })).unwrap();
+    } catch (error) {
+      console.error('Withdrawal failed:', error);
+      throw error;
+    }
+  };
 
   // State
   const [isProcessing, setIsProcessing] = useState(false);
@@ -51,17 +76,18 @@ function WithdrawTab() {
     [accounts, selectedAccountId]
   );
 
-  const availableBalance = useMemo(() =>
-    selectedAccount ? (selectedAccount.balances[selectedAccount.currency] || 0) : 0,
-    [selectedAccount]
-  );
+  const availableBalance = useMemo(() => {
+    if (!selectedAccount) return 0;
+    const balance = selectedAccount.balances.find(b => b.currency === selectedAccount.currency);
+    return balance?.amount || 0;
+  }, [selectedAccount]);
 
   // Create dynamic schema with balance validation
   const withdrawSchema = useMemo(() =>
     withdrawSchemaBase.refine(
       (data) => data.amount <= availableBalance,
       {
-        message: `Insufficient funds. Available: ${formatBalance(availableBalance, selectedAccount?.currency)}`,
+        message: `Insufficient funds. Available: ${formatBalance(availableBalance, selectedAccount?.currency || 'USD')}`,
         path: ['amount'],
       }
     ),
@@ -94,7 +120,7 @@ function WithdrawTab() {
 
     try {
       // Process withdrawal with bank details
-      const result = await processWithdrawal(
+      await processWithdrawal(
         data.accountId,
         data.amount,
         account.currency,
@@ -105,13 +131,9 @@ function WithdrawTab() {
         }
       );
 
-      if (result.success) {
-        // Clear form
-        reset();
-        showToast('Withdrawal initiated successfully!', 'success');
-      } else {
-        showToast(result.message, 'error');
-      }
+      // Clear form
+      reset();
+      showToast('Withdrawal initiated successfully!', 'success');
     } catch (error) {
       console.error('Withdrawal error:', error);
       showToast(error instanceof Error ? error.message : 'Withdrawal failed', 'error');
@@ -149,11 +171,14 @@ function WithdrawTab() {
             {...register('accountId')}
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
-            {liveAccounts.map(acc => (
-              <option key={acc.id} value={acc.id}>
-                {acc.id} - {formatBalance(acc.balances[acc.currency], acc.currency)}
-              </option>
-            ))}
+            {liveAccounts.map(acc => {
+              const balance = acc.balances.find(b => b.currency === acc.currency);
+              return (
+                <option key={acc.id} value={acc.id}>
+                  {acc.id} - {formatBalance(balance?.amount || 0, acc.currency)}
+                </option>
+              );
+            })}
           </select>
           {errors.accountId && (
             <p className="text-xs text-red-500 mt-1">{errors.accountId.message}</p>
@@ -167,7 +192,7 @@ function WithdrawTab() {
               Amount to Withdraw
             </label>
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              Available: {formatBalance(availableBalance, selectedAccount?.currency)}
+              Available: {formatBalance(availableBalance, selectedAccount?.currency || 'USD')}
             </span>
           </div>
           <div className="relative">

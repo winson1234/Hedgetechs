@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { useAssetPrices } from '../hooks/useAssetPrices'
-import { useUIStore } from '../stores/uiStore'
-import { usePriceStore } from '../stores/priceStore'
+import { useAppDispatch, useAppSelector } from '../store'
+import { setActiveInstrument } from '../store/slices/uiSlice'
 import { formatPrice, formatPercentChange } from '../utils/priceUtils'
 
 type InstrumentCategory = 'major' | 'defi' | 'altcoin'
@@ -49,13 +49,13 @@ const instrumentSymbols: InstrumentSymbol[] = [
 type CategoryFilter = 'all' | InstrumentCategory
 
 export default function InstrumentsPanel() {
-  // Access stores
-  const activeInstrument = useUIStore(state => state.activeInstrument)
-  const setActiveInstrument = useUIStore(state => state.setActiveInstrument)
+  const dispatch = useAppDispatch();
+  // Access Redux state
+  const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
+  const priceData = useAppSelector(state => state.price.currentPrices);
 
   // Get asset prices
-  const { prices: assetPrices, loading: pricesLoading } = useAssetPrices()
-  const priceData = usePriceStore(state => state.prices)
+  const { prices: assetPrices, loading: pricesLoading } = useAssetPrices();
   const [searchQuery, setSearchQuery] = useState('')
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
@@ -112,7 +112,7 @@ export default function InstrumentsPanel() {
     return instrumentSymbols.map(inst => {
       const price = assetPrices[inst.symbol] || 0
       const priceInfo = priceData[inst.symbol]
-      const changePercent = priceInfo?.change24h || 0
+      const changePercent = 0 // Will be updated by WebSocket in future
 
       // Check if instrument has received data (within last 10 seconds)
       const lastUpdate = priceInfo?.timestamp || 0
@@ -302,7 +302,7 @@ export default function InstrumentsPanel() {
                     : 'hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
                 }`}
               >
-                <div className="flex items-center gap-3" onClick={() => setActiveInstrument(item.symbol)}>
+                <div className="flex items-center gap-3" onClick={() => dispatch(setActiveInstrument(item.symbol))}>
                   {/* Icon */}
                   <div className="relative flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                     {item.isLoading ? (

@@ -72,6 +72,13 @@ type Account struct {
 	CreatedAt     time.Time     `json:"created_at"`
 	UpdatedAt     time.Time     `json:"updated_at"`
 
+	// UX personalization fields (production features)
+	Nickname       *string    `json:"nickname,omitempty"`        // User-defined nickname (e.g., "My Trading Account")
+	Color          *string    `json:"color,omitempty"`           // Hex color code for visual identification
+	Icon           *string    `json:"icon,omitempty"`            // Icon identifier (e.g., "wallet", "chart")
+	LastAccessedAt *time.Time `json:"last_accessed_at,omitempty"` // Last time account was accessed
+	AccessCount    int        `json:"access_count"`              // Total number of accesses
+
 	// Balances will be populated when fetching account details
 	Balances []Balance `json:"balances,omitempty"`
 }
@@ -119,6 +126,19 @@ type CreateAccountResponse struct {
 // GetAccountsResponse represents the response when fetching all user accounts
 type GetAccountsResponse struct {
 	Accounts []Account `json:"accounts"`
+}
+
+// UpdateAccountMetadataRequest represents the request to update account personalization
+type UpdateAccountMetadataRequest struct {
+	Nickname *string `json:"nickname,omitempty"` // User-defined nickname
+	Color    *string `json:"color,omitempty"`    // Hex color code (e.g., "#6366f1")
+	Icon     *string `json:"icon,omitempty"`     // Icon identifier (e.g., "wallet", "chart")
+}
+
+// UpdateAccountMetadataResponse represents the response after updating account metadata
+type UpdateAccountMetadataResponse struct {
+	Account Account `json:"account"`
+	Message string  `json:"message"`
 }
 
 // ErrorResponse represents a standard error response

@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
-import { useTransactionStore } from '../stores/transactionStore';
-import { useOrderStore, type ExecutedOrder, type PendingOrder } from '../stores/orderStore';
-import { useAccountStore, formatBalance } from '../stores/accountStore';
+import { useAppSelector, useAppDispatch } from '../store';
+import { fetchTransactions } from '../store/slices/transactionSlice';
+import { formatBalance } from '../utils/format';
 import type { Transaction, TransactionStatus, TransactionType } from '../types';
 import TransactionDetailModal from '../components/TransactionDetailModal';
 import HistorySummaryCards from '../components/HistorySummaryCards';
@@ -115,12 +115,12 @@ export default function HistoryPage() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Get data from stores
-  const transactions = useTransactionStore(state => state.transactions);
-  const fetchAllTransactionsForLiveAccounts = useTransactionStore(state => state.fetchAllTransactionsForLiveAccounts);
-  const executedOrders = useOrderStore(state => state.orderHistory);
-  const pendingOrders = useOrderStore(state => state.pendingOrders);
-  const accounts = useAccountStore(state => state.accounts);
+  // Get data from Redux stores
+  const dispatch = useAppDispatch();
+  const transactions = useAppSelector(state => state.transaction.transactions);
+  const executedOrders = useAppSelector(state => state.order.orders);
+  const pendingOrders = useAppSelector(state => state.order.pendingOrders);
+  const accounts = useAppSelector(state => state.account.accounts);
 
   // Get all live accounts
   const liveAccounts = useMemo(() => {
@@ -130,10 +130,12 @@ export default function HistoryPage() {
   // Fetch transactions from ALL live accounts (demo accounts are excluded)
   useEffect(() => {
     if (liveAccounts.length > 0) {
-      const liveAccountIds = liveAccounts.map(acc => acc.id);
-      fetchAllTransactionsForLiveAccounts(liveAccountIds);
+      // Fetch transactions for each live account
+      liveAccounts.forEach(acc => {
+        dispatch(fetchTransactions(acc.id));
+      });
     }
-  }, [liveAccounts, fetchAllTransactionsForLiveAccounts]);
+  }, [liveAccounts, dispatch]);
 
   // Combined and sorted history
   const allHistory = useMemo<HistoryItem[]>(() => {

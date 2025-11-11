@@ -1,20 +1,29 @@
-import { useUIStore } from '../../stores/uiStore';
-import { useOrderStore } from '../../stores/orderStore';
-import { formatBalance } from '../../stores/accountStore';
+import { useAppSelector, useAppDispatch } from '../../store';
+import { cancelPendingOrder } from '../../store/slices/orderSlice';
+
+// Utility function to format balance (replace with actual implementation if needed)
+const formatBalance = (value: number, currency: string) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency === 'USD' ? 'USD' : 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  }).format(value);
+};
 
 export default function PendingOrdersTab() {
-  const activeInstrument = useUIStore(state => state.activeInstrument);
-  const getPendingOrdersBySymbol = useOrderStore(state => state.getPendingOrdersBySymbol);
-  const cancelPendingOrder = useOrderStore(state => state.cancelPendingOrder);
-
-  const pendingOrders = getPendingOrdersBySymbol(activeInstrument);
+  const dispatch = useAppDispatch();
+  const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
+  const pendingOrders = useAppSelector(state => 
+    state.order.pendingOrders.filter(order => order.symbol === activeInstrument)
+  );
 
   const handleCancel = (orderId: string) => {
-    cancelPendingOrder(orderId);
+    dispatch(cancelPendingOrder(orderId));
   };
 
   // Format timestamp to readable date
-  const formatTimestamp = (timestamp: number) => {
+  const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleString('en-US', {
       month: 'short',
@@ -94,7 +103,7 @@ export default function PendingOrdersTab() {
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-600 dark:text-slate-400">Amount:</span>
                   <span className="font-medium text-slate-900 dark:text-slate-100">
-                    {order.amount.toLocaleString(undefined, {
+                    {order.quantity.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 6,
                     })}{' '}
@@ -107,15 +116,15 @@ export default function PendingOrdersTab() {
                     {order.type === 'limit' ? 'Limit Price:' : 'Limit Price:'}
                   </span>
                   <span className="font-medium text-slate-900 dark:text-slate-100">
-                    {formatBalance(order.price, 'USD')}
+                    {formatBalance(order.trigger_price, 'USD')}
                   </span>
                 </div>
 
-                {order.type === 'stop-limit' && order.stopPrice && (
+                {order.type === 'stop_limit' && order.limit_price && (
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-600 dark:text-slate-400">Stop Price:</span>
                     <span className="font-medium text-slate-900 dark:text-slate-100">
-                      {formatBalance(order.stopPrice, 'USD')}
+                      {formatBalance(order.limit_price, 'USD')}
                     </span>
                   </div>
                 )}
@@ -123,7 +132,7 @@ export default function PendingOrdersTab() {
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-600 dark:text-slate-400">Total:</span>
                   <span className="font-semibold text-slate-900 dark:text-slate-100">
-                    {formatBalance(order.amount * order.price, 'USD')}
+                    {formatBalance(order.quantity * order.trigger_price, 'USD')}
                   </span>
                 </div>
 
@@ -131,7 +140,7 @@ export default function PendingOrdersTab() {
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-500 dark:text-slate-500">Placed:</span>
                     <span className="text-slate-500 dark:text-slate-500">
-                      {formatTimestamp(order.timestamp)}
+                      {formatTimestamp(order.created_at)}
                     </span>
                   </div>
                 </div>
@@ -143,11 +152,11 @@ export default function PendingOrdersTab() {
                 <span className="text-xs text-slate-500 dark:text-slate-400">
                   {order.type === 'limit'
                     ? order.side === 'buy'
-                      ? `Executes when price ≤ ${formatBalance(order.price, 'USD')}`
-                      : `Executes when price ≥ ${formatBalance(order.price, 'USD')}`
+                      ? `Executes when price ≤ ${formatBalance(order.trigger_price, 'USD')}`
+                      : `Executes when price ≥ ${formatBalance(order.trigger_price, 'USD')}`
                     : order.side === 'buy'
-                    ? `Stops at ${formatBalance(order.stopPrice, 'USD')}`
-                    : `Stops at ${formatBalance(order.stopPrice, 'USD')}`}
+                    ? `Stops at ${formatBalance(order.limit_price || 0, 'USD')}`
+                    : `Stops at ${formatBalance(order.limit_price || 0, 'USD')}`}
                 </span>
               </div>
             </div>

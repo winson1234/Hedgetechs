@@ -157,7 +157,8 @@ func GetAccounts(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch all accounts for the user
 	rows, err := pool.Query(ctx,
-		`SELECT id, user_id, account_number, type, product_type, currency, status, created_at, updated_at
+		`SELECT id, user_id, account_number, type, product_type, currency, status, created_at, updated_at,
+		        nickname, color, icon, last_accessed_at, access_count
 		 FROM accounts
 		 WHERE user_id = $1
 		 ORDER BY created_at DESC`,
@@ -178,6 +179,7 @@ func GetAccounts(w http.ResponseWriter, r *http.Request) {
 			&account.ID, &account.UserID, &account.AccountNumber,
 			&account.Type, &account.ProductType, &account.Currency,
 			&account.Status, &account.CreatedAt, &account.UpdatedAt,
+			&account.Nickname, &account.Color, &account.Icon, &account.LastAccessedAt, &account.AccessCount,
 		)
 		if err != nil {
 			log.Printf("Failed to scan account: %v", err)
@@ -227,7 +229,8 @@ type DBQuerier interface {
 func getAccountByID(ctx context.Context, pool DBQuerier, accountID, userID uuid.UUID) (models.Account, error) {
 	var account models.Account
 	err := pool.QueryRow(ctx,
-		`SELECT id, user_id, account_number, type, product_type, currency, status, created_at, updated_at
+		`SELECT id, user_id, account_number, type, product_type, currency, status, created_at, updated_at,
+		        nickname, color, icon, last_accessed_at, access_count
 		 FROM accounts
 		 WHERE id = $1 AND user_id = $2`,
 		accountID, userID,
@@ -235,6 +238,7 @@ func getAccountByID(ctx context.Context, pool DBQuerier, accountID, userID uuid.
 		&account.ID, &account.UserID, &account.AccountNumber,
 		&account.Type, &account.ProductType, &account.Currency,
 		&account.Status, &account.CreatedAt, &account.UpdatedAt,
+		&account.Nickname, &account.Color, &account.Icon, &account.LastAccessedAt, &account.AccessCount,
 	)
 	if err != nil {
 		return account, fmt.Errorf("failed to fetch account: %w", err)
@@ -298,5 +302,104 @@ func respondWithJSONError(w http.ResponseWriter, statusCode int, errorType, mess
 		"error":   errorType,
 		"message": message,
 		"code":    statusCode,
+	})
+}
+
+// UpdateAccountMetadata handles PATCH /api/v1/accounts/:id
+// Protected endpoint that updates account personalization (nickname, color, icon)
+func UpdateAccountMetadata(w http.ResponseWriter, r *http.Request) {
+	// Extract user ID from context (injected by AuthMiddleware)
+	userID, err := middleware.GetUserIDFromContext(r.Context())
+	if err != nil {
+		respondWithJSONError(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
+		return
+	}
+
+	// Extract account ID from URL query parameter
+	accountIDStr := r.URL.Query().Get("id")
+	if accountIDStr == "" {
+		respondWithJSONError(w, http.StatusBadRequest, "invalid_request", "account ID is required")
+		return
+	}
+
+	accountID, err := uuid.Parse(accountIDStr)
+	if err != nil {
+		respondWithJSONError(w, http.StatusBadRequest, "invalid_request", "invalid account ID format")
+		return
+	}
+
+	// Parse request body
+	var req models.UpdateAccountMetadataRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithJSONError(w, http.StatusBadRequest, "invalid_request", "invalid request body: "+err.Error())
+		return
+	}
+
+	// Validate that at least one field is provided
+	if req.Nickname == nil && req.Color == nil && req.Icon == nil {
+		respondWithJSONError(w, http.StatusBadRequest, "validation_error", "at least one field (nickname, color, icon) must be provided")
+		return
+	}
+
+	// Get database pool
+	pool, err := database.GetPool()
+	if err != nil {
+		log.Printf("Database pool error: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "database connection error")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Verify account belongs to user
+	var accountUserID uuid.UUID
+	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", accountID).Scan(&accountUserID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			respondWithJSONError(w, http.StatusNotFound, "not_found", "account not found")
+			return
+		}
+		log.Printf("Failed to verify account ownership: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to verify account")
+		return
+	}
+
+	if accountUserID != userID {
+		respondWithJSONError(w, http.StatusForbidden, "forbidden", "account does not belong to user")
+		return
+	}
+
+	// Update account metadata
+	_, err = pool.Exec(ctx,
+		`UPDATE accounts
+		 SET nickname = COALESCE($1, nickname),
+		     color = COALESCE($2, color),
+		     icon = COALESCE($3, icon),
+		     updated_at = NOW()
+		 WHERE id = $4`,
+		req.Nickname, req.Color, req.Icon, accountID,
+	)
+	if err != nil {
+		log.Printf("Failed to update account metadata: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to update account metadata")
+		return
+	}
+
+	// Fetch updated account
+	updatedAccount, err := getAccountByID(ctx, pool, accountID, userID)
+	if err != nil {
+		log.Printf("Failed to fetch updated account: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "account updated but failed to fetch details")
+		return
+	}
+
+	// Return updated account
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "account metadata updated successfully",
+		"account": updatedAccount,
 	})
 }

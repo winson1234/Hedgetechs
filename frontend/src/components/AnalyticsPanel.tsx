@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useUIStore } from '../stores/uiStore';
+import { useAppDispatch, useAppSelector } from '../store';
+import { setShowAnalyticsPanel } from '../store/slices/uiSlice';
 import { getApiUrl } from '../config/api';
 
 // Forex rate data type
@@ -21,13 +22,13 @@ type IndicatorData = {
 type TabType = 'forex' | 'rsi' | 'sma' | 'ema' | 'macd';
 
 const AnalyticsPanel: React.FC = () => {
-  // Access stores
-  const isOpen = useUIStore(state => state.showAnalyticsPanel);
-  const setShowAnalyticsPanel = useUIStore(state => state.setShowAnalyticsPanel);
-  const activeInstrument = useUIStore(state => state.activeInstrument);
+  const dispatch = useAppDispatch();
+  // Access Redux state
+  const isOpen = useAppSelector(state => state.ui.showAnalyticsPanel);
+  const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
 
   const onClose = () => {
-    setShowAnalyticsPanel(false);
+    dispatch(setShowAnalyticsPanel(false));
   };
 
   const [activeTab, setActiveTab] = useState<TabType>('forex');

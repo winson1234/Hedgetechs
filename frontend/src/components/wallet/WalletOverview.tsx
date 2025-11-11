@@ -1,12 +1,13 @@
 import { useMemo, useEffect, useState } from 'react';
-import { useAccountStore, formatBalance } from '../../stores/accountStore';
+import { formatBalance } from '../../utils/format';
+import { useAppSelector } from '../../store';
 import { useAssetPrices } from '../../hooks/useAssetPrices';
+import { getApiUrl } from '../../config/api';
 import PortfolioAllocation from './PortfolioAllocation';
 
 export default function WalletOverview() {
-  // Access stores
-  const accounts = useAccountStore(state => state.accounts);
-  const getFXRates = useAccountStore(state => state.getFXRates);
+  // Access Redux state
+  const accounts = useAppSelector(state => state.account.accounts);
   const { prices: assetPrices, loading: pricesLoading } = useAssetPrices();
 
   // FX rates for converting non-USD fiat currencies
@@ -14,8 +15,18 @@ export default function WalletOverview() {
 
   // Fetch FX rates on mount
   useEffect(() => {
-    getFXRates().then(rates => setFxRates(rates));
-  }, [getFXRates]);
+    const fetchFXRates = async () => {
+      try {
+        const response = await fetch(getApiUrl('/api/v1/fx-rates'));
+        if (!response.ok) throw new Error('Failed to fetch FX rates');
+        const rates = await response.json();
+        setFxRates(rates);
+      } catch (error) {
+        console.error('Failed to fetch FX rates:', error);
+      }
+    };
+    fetchFXRates();
+  }, []);
 
   // Calculate total portfolio value in USD
   const totalPortfolioValue = useMemo(() => {
@@ -23,16 +34,17 @@ export default function WalletOverview() {
       let accountValue = 0;
 
       // Add base currency converted to USD using FX rates
-      const baseCurrencyAmount = acc.balances[acc.currency] ?? 0;
+      const baseBalance = acc.balances.find(b => b.currency === acc.currency);
+      const baseCurrencyAmount = baseBalance?.amount ?? 0;
       const fxRate = fxRates[acc.currency] || 1.0; // rates are X-to-USD
       accountValue += baseCurrencyAmount * fxRate;
 
       // Add crypto holdings converted to USD
-      Object.entries(acc.balances).forEach(([currency, amount]) => {
-        if (currency !== acc.currency && amount > 0) {
-          const symbol = `${currency}USDT`;
+      acc.balances.forEach((balance) => {
+        if (balance.currency !== acc.currency && balance.amount > 0) {
+          const symbol = `${balance.currency}USDT`;
           const price = assetPrices[symbol] || 0;
-          accountValue += amount * price;
+          accountValue += balance.amount * price;
         }
       });
 
@@ -45,16 +57,17 @@ export default function WalletOverview() {
       let accountValue = 0;
 
       // Convert base currency to USD using FX rates
-      const baseCurrencyAmount = acc.balances[acc.currency] ?? 0;
+      const baseBalance = acc.balances.find(b => b.currency === acc.currency);
+      const baseCurrencyAmount = baseBalance?.amount ?? 0;
       const fxRate = fxRates[acc.currency] || 1.0; // rates are X-to-USD
       accountValue += baseCurrencyAmount * fxRate;
 
       // Add crypto holdings converted to USD
-      Object.entries(acc.balances).forEach(([currency, amount]) => {
-        if (currency !== acc.currency && amount > 0) {
-          const symbol = `${currency}USDT`;
+      acc.balances.forEach((balance) => {
+        if (balance.currency !== acc.currency && balance.amount > 0) {
+          const symbol = `${balance.currency}USDT`;
           const price = assetPrices[symbol] || 0;
-          accountValue += amount * price;
+          accountValue += balance.amount * price;
         }
       });
       return total + accountValue;
@@ -66,16 +79,17 @@ export default function WalletOverview() {
       let accountValue = 0;
 
       // Convert base currency to USD using FX rates
-      const baseCurrencyAmount = acc.balances[acc.currency] ?? 0;
+      const baseBalance = acc.balances.find(b => b.currency === acc.currency);
+      const baseCurrencyAmount = baseBalance?.amount ?? 0;
       const fxRate = fxRates[acc.currency] || 1.0; // rates are X-to-USD
       accountValue += baseCurrencyAmount * fxRate;
 
       // Add crypto holdings converted to USD
-      Object.entries(acc.balances).forEach(([currency, amount]) => {
-        if (currency !== acc.currency && amount > 0) {
-          const symbol = `${currency}USDT`;
+      acc.balances.forEach((balance) => {
+        if (balance.currency !== acc.currency && balance.amount > 0) {
+          const symbol = `${balance.currency}USDT`;
           const price = assetPrices[symbol] || 0;
-          accountValue += amount * price;
+          accountValue += balance.amount * price;
         }
       });
       return total + accountValue;

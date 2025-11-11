@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAccountStore } from '../stores/accountStore';
-import { useAuthStore } from '../stores/authStore';
+import { useAppDispatch, useAppSelector } from '../store';
+import { signOut } from '../store/slices/authSlice';
 
 // Password hashing utility using Web Crypto API
 const hashPassword = async (password: string): Promise<string> => {
@@ -30,13 +30,12 @@ export default function ProfileDropdown({
   const [passwordMessage, setPasswordMessage] = useState<{text: string; type: 'success' | 'error'} | null>(null);
   const [passwordStrength, setPasswordStrength] = useState<{strength: string; class: string} | null>(null);
 
-  // Access stores
-  const activeAccountId = useAccountStore(state => state.activeAccountId);
-  const getActiveAccount = useAccountStore(state => state.getActiveAccount);
-  const logout = useAuthStore(state => state.logout);
-  const user = useAuthStore(state => state.user);
+  // Access Redux store
+  const dispatch = useAppDispatch();
+  const user = useAppSelector(state => state.auth.user);
+  const { accounts, activeAccountId } = useAppSelector(state => state.account);
 
-  const activeAccount = getActiveAccount();
+  const activeAccount = accounts.find(acc => acc.id === activeAccountId);
   const activeAccountType = activeAccount?.type;
 
   const handleLogOut = () => {
@@ -49,7 +48,7 @@ export default function ProfileDropdown({
     closeDropdown();
   };
 const confirmLogout = async () => {
-  // 1. Clear persisted data
+  // 1. Clear persisted data (old Zustand stores)
   localStorage.removeItem('account-store');
   localStorage.removeItem('order-store');
   localStorage.removeItem('transaction-storage');
@@ -57,11 +56,11 @@ const confirmLogout = async () => {
   localStorage.removeItem('fx_rates_cache');
   localStorage.removeItem('fx_rates_cache_time');
 
-  // 2. Wait for logout cleanup
-  await logout();
+  // 2. Dispatch Redux logout
+  await dispatch(signOut());
 
   // 3. Close modal and redirect directly to dashboard
-  setShowLogoutModal(true);
+  setShowLogoutModal(false);
   navigate('/dashboard', { replace: true });
 };
 

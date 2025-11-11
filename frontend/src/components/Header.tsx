@@ -1,22 +1,34 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProfileDropdown from './ProfileDropdown';
-import { useUIStore } from '../stores/uiStore';
-import { useAccountStore } from '../stores/accountStore';
+import { useAppDispatch, useAppSelector } from '../store';
+import { setActiveWalletTab, toggleTheme } from '../store/slices/uiSlice';
 
 export default function Header() {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
 
-  // Access stores
-  const isDarkMode = useUIStore(state => state.isDarkMode);
-  const setDarkMode = useUIStore(state => state.setDarkMode);
-  const setActiveWalletTab = useUIStore(state => state.setActiveWalletTab);
+  // Access Redux state
+  const theme = useAppSelector(state => state.ui.theme);
+  const { accounts, activeAccountId } = useAppSelector(state => state.account);
 
-  const getActiveUsdBalance = useAccountStore(state => state.getActiveUsdBalance);
-  const getActiveAccountCurrency = useAccountStore(state => state.getActiveAccountCurrency);
+  // Derived state
+  const isDarkMode = theme === 'dark';
+  
+  // Get active account and calculate USD balance
+  const activeAccount = useMemo(() => 
+    accounts.find(acc => acc.id === activeAccountId),
+    [accounts, activeAccountId]
+  );
 
-  const usdBalance = getActiveUsdBalance();
-  const accountCurrency = getActiveAccountCurrency();
+  const usdBalance = useMemo(() => {
+    if (!activeAccount) return 0;
+    const usdBal = activeAccount.balances.find(b => b.currency === 'USD');
+    return usdBal?.amount || 0;
+  }, [activeAccount]);
+
+  const accountCurrency = activeAccount?.currency || 'USD';
+
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -64,7 +76,7 @@ export default function Header() {
           {/* Updated "Deposit" to "Funds" and changed onClick */}
           <button
             onClick={() => {
-              setActiveWalletTab('deposit');
+              dispatch(setActiveWalletTab('deposit'));
               navigate('/wallet');
             }}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded text-sm font-medium transition"
@@ -75,7 +87,7 @@ export default function Header() {
           {/* Theme Toggle Button */}
           <button
             className="p-2 border border-slate-300 dark:border-slate-700 rounded text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-            onClick={() => setDarkMode(!isDarkMode)}
+            onClick={() => dispatch(toggleTheme())}
             title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
             {isDarkMode ? (

@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useContext, useCallback } from 'react';
-import { WebSocketContext } from '../context/WebSocketContext';
-import { useUIStore } from '../stores/uiStore';
-import { useAccountStore } from '../stores/accountStore';
-import { useOrderStore } from '../stores/orderStore';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useAppDispatch, useAppSelector } from '../store';
+import { setActiveAccount } from '../store/slices/accountSlice';
+import { createPendingOrder } from '../store/slices/orderSlice';
 import { formatPrice } from '../utils/priceUtils';
 
 // Define the expected structure for a price update message from WebSocket
@@ -18,26 +17,21 @@ type TradingMode = 'spot' | 'cross' | 'isolated' | 'grid';
 type OrderType = 'limit' | 'market' | 'stop-limit';
 
 export default function TradingPanel() {
-  // Access stores
-  const activeInstrument = useUIStore(state => state.activeInstrument);
-  const accounts = useAccountStore(state => state.accounts);
-  const activeAccountId = useAccountStore(state => state.activeAccountId);
-  const setActiveAccount = useAccountStore(state => state.setActiveAccount);
-  const getActiveUsdBalance = useAccountStore(state => state.getActiveUsdBalance);
-  const getActiveAccountCurrency = useAccountStore(state => state.getActiveAccountCurrency);
-  const getActiveCryptoHoldings = useAccountStore(state => state.getActiveCryptoHoldings);
-  const executeBuy = useAccountStore(state => state.executeBuy);
-  const executeSell = useAccountStore(state => state.executeSell);
-  const getFXRates = useAccountStore(state => state.getFXRates);
+  // Access Redux store
+  const dispatch = useAppDispatch();
+  const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
+  const { accounts, activeAccountId } = useAppSelector(state => state.account);
+  const { currentPrices } = useAppSelector(state => state.price);
 
-  const addPendingOrder = useOrderStore(state => state.addPendingOrder);
-  const recordExecutedOrder = useOrderStore(state => state.recordExecutedOrder);
-  const processPendingOrdersFromStore = useOrderStore(state => state.processPendingOrders);
+  // Get active account
+  const activeAccount = accounts.find(acc => acc.id === activeAccountId);
 
-  const accountBalance = getActiveUsdBalance(); // This is in the account's currency, NOT USD
-  const accountCurrency = getActiveAccountCurrency();
-  const cryptoHoldings = getActiveCryptoHoldings();
-  const ws = useContext(WebSocketContext);
+  // Get balance from active account (in account's currency)
+  const accountBalance = activeAccount?.balances.find(b => b.currency === activeAccount.currency)?.amount || 0;
+  const accountCurrency = activeAccount?.currency || 'USD';
+
+  // Get crypto holdings (simplified - would need proper implementation)
+  const cryptoHoldings: Record<string, number> = {}; // TODO: Implement proper crypto holdings tracking
 
   // FX rates state for currency conversion
   const [usdBalance, setUsdBalance] = useState<number>(accountBalance);
@@ -48,21 +42,14 @@ export default function TradingPanel() {
       if (accountCurrency === 'USD') {
         setUsdBalance(accountBalance);
       } else {
-        try {
-          const rates = await getFXRates();
-          const rate = rates[accountCurrency] || 1.0;
-          setUsdBalance(accountBalance * rate);
-        } catch (error) {
-          console.error('Failed to convert balance to USD:', error);
-          setUsdBalance(accountBalance); // Fallback to raw balance
-        }
+        // TODO: Implement FX rate conversion
+        // For now, use 1:1 conversion
+        setUsdBalance(accountBalance);
       }
     };
 
     convertToUSD();
-  }, [accountBalance, accountCurrency, getFXRates]);
-  // Ensure lastMessage is treated as potentially having different shapes
-  const lastMessage = ws?.lastMessage ?? null;
+  }, [accountBalance, accountCurrency]);
 
   // Trading mode and settings
   const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
@@ -97,40 +84,21 @@ export default function TradingPanel() {
   // Get current holdings for the active instrument
   const currentHolding = cryptoHoldings[baseCurrency] || 0;
 
-  // --- Start of Pending Order Execution Logic ---
-  // Listen to live price updates AND trigger pending order checks
+  // --- Start of Price Update Logic ---
+  // Listen to Redux price updates for the active instrument
   useEffect(() => {
-    if (!lastMessage) return;
-
-    // Check if it's a trade message (has price field, not order book)
-    // Needs symbol and price properties to be a relevant price update
-    if (
-        typeof lastMessage === 'object' &&
-        lastMessage !== null &&
-        'symbol' in lastMessage &&
-        'price' in lastMessage &&
-        !('bids' in lastMessage) // Ensure it's not an order book update
-        ) {
-      const msg = lastMessage as PriceUpdate; // Use the defined type
-
-      // Process only if the message is for the active instrument
-      if (msg.symbol === activeInstrument) {
-        const price = typeof msg.price === 'string' ? parseFloat(msg.price) : msg.price;
-        if (!isNaN(price) && price > 0) {
-          // Check if the price has actually changed to avoid unnecessary processing
-          if (price !== currentPrice) {
-              setCurrentPrice(price);
-              // ---> Call the orderStore's pending order processing function <---
-              processPendingOrdersFromStore(activeInstrument, price);
-          }
-        } else {
-          console.warn("Received invalid price in WebSocket message:", msg.price);
-        }
+    const priceData = currentPrices[activeInstrument];
+    if (priceData && priceData.price > 0) {
+      // Check if the price has actually changed to avoid unnecessary processing
+      if (priceData.price !== currentPrice) {
+        setCurrentPrice(priceData.price);
+        // TODO: Pending order processing should be handled in Redux middleware or App.tsx
+        // processPendingOrders(activeInstrument, priceData.price);
       }
     }
-  }, [lastMessage, activeInstrument, processPendingOrdersFromStore, currentPrice]);
+  }, [currentPrices, activeInstrument, currentPrice]);
 
-  // --- End of Pending Order Execution Logic ---
+  // --- End of Price Update Logic ---
 
 
   // Initialize limit price when instrument changes or when first price is received

@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useContext, useState, useCallback } from 'rea
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp, CandlestickData, IPriceLine, MouseEventParams, Time } from 'lightweight-charts'
 import { WebSocketContext } from '../context/WebSocketContext'
 import type { PriceMessage } from '../hooks/useWebSocket'
-import { useUIStore } from '../stores/uiStore'
+import { useAppDispatch, useAppSelector } from '../store'
+import { setShowAnalyticsPanel } from '../store/slices/uiSlice'
 import ChartHeader from './ChartHeader'
 import FloatingDrawingToolbar from './FloatingDrawingToolbar'
 import TextInputModal from './TextInputModal'
@@ -27,21 +28,27 @@ type OHLCVData = {
 }
 
 export default function ChartComponent() {
-  // Access stores
-  const timeframe = useUIStore(state => state.activeTimeframe)
-  const symbol = useUIStore(state => state.activeInstrument)
-  const setShowAnalyticsPanel = useUIStore(state => state.setShowAnalyticsPanel)
-  const activeDrawingTool = useUIStore(state => state.activeDrawingTool)
-  const setActiveDrawingTool = useUIStore(state => state.setActiveDrawingTool)
-  const drawings = useUIStore(state => state.drawings)
-  const setDrawings = useUIStore(state => state.setDrawings)
-  const addDrawing = useUIStore(state => state.addDrawing)
-  const removeDrawing = useUIStore(state => state.removeDrawing)
-  const drawingState = useUIStore(state => state.drawingState)
-  const setDrawingState = useUIStore(state => state.setDrawingState)
-  const activeDrawingColor = useUIStore(state => state.activeDrawingColor)
-  const activeLineWidth = useUIStore(state => state.activeLineWidth)
-  const activeLineStyle = useUIStore(state => state.activeLineStyle)
+  const dispatch = useAppDispatch();
+  // Access Redux state
+  const symbol = useAppSelector(state => state.ui.activeInstrument);
+  
+  // Local state for chart-specific features
+  const [timeframe, setTimeframe] = useState('1h');
+  const [activeDrawingTool, setActiveDrawingTool] = useState<Drawing['type'] | null>(null);
+  const [drawings, setDrawings] = useState<Drawing[]>([]);
+  const [drawingState, setDrawingState] = useState<any>(null);
+  const [activeDrawingColor, setActiveDrawingColor] = useState('#3b82f6');
+  const [activeLineWidth, setActiveLineWidth] = useState(2);
+  const [activeLineStyle, setActiveLineStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid');
+  
+  // Helper functions for drawing management
+  const addDrawing = useCallback((drawing: Drawing) => {
+    setDrawings(prev => [...prev, drawing]);
+  }, []);
+  
+  const removeDrawing = useCallback((id: string) => {
+    setDrawings(prev => prev.filter(d => d.id !== id));
+  }, []);
 
   const ref = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -743,7 +750,7 @@ export default function ChartComponent() {
   }
 
   const handleAnalyticsClick = () => {
-    setShowAnalyticsPanel(true)
+    dispatch(setShowAnalyticsPanel(true));
   }
 
   const handleClearDrawings = () => {
@@ -767,7 +774,12 @@ export default function ChartComponent() {
 
   return (
     <div className="w-full">
-      <ChartHeader onAnalyticsClick={handleAnalyticsClick} onClearDrawings={handleClearDrawings} />
+      <ChartHeader 
+        activeTimeframe={timeframe}
+        onTimeframeChange={setTimeframe}
+        onAnalyticsClick={handleAnalyticsClick} 
+        onClearDrawings={handleClearDrawings} 
+      />
       <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-2 truncate">
         {displaySymbol} - {timeframe} (last 200)
       </div>
@@ -788,7 +800,16 @@ export default function ChartComponent() {
         />
 
         {/* Floating Drawing Toolbar */}
-        <FloatingDrawingToolbar />
+        <FloatingDrawingToolbar 
+          activeDrawingTool={activeDrawingTool}
+          onToolChange={setActiveDrawingTool}
+          activeDrawingColor={activeDrawingColor}
+          onColorChange={setActiveDrawingColor}
+          activeLineWidth={activeLineWidth}
+          onLineWidthChange={setActiveLineWidth}
+          activeLineStyle={activeLineStyle}
+          onLineStyleChange={setActiveLineStyle}
+        />
 
         {isLoading && (
           <div className="absolute inset-0 bg-slate-300/70 dark:bg-slate-700/70 flex items-center justify-center pointer-events-none z-10">

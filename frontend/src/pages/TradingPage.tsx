@@ -4,10 +4,10 @@ import TradingPanel from '../components/TradingPanel';
 import InstrumentsPanel from '../components/InstrumentsPanel';
 import NewsPanel from '../components/NewsPanel';
 import MarketActivityPanel from '../components/MarketActivityPanel';
-import { useUIStore } from '../stores/uiStore';
+import { useAppSelector } from '../store';
 
 export default function TradingPage() {
-  const activeInstrument = useUIStore(state => state.activeInstrument);
+  const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
 
   return (
     <div className="px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8">

@@ -1,8 +1,10 @@
 import { Navigate, Outlet } from 'react-router-dom';
-import { useAuthStore } from '../stores/authStore';
+import { useAppSelector } from '../store';
 
 export default function ProtectedRoute() {
-  const { isLoggedIn, isLoading } = useAuthStore();
+  const { user, loading } = useAppSelector((state) => state.auth);
+  const isLoggedIn = !!user;
+  const isLoading = loading;
 
   // Show loading state while checking authentication
   if (isLoading) {

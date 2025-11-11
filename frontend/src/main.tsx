@@ -1,13 +1,16 @@
 import React, { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { Provider } from 'react-redux'
+import { PersistGate } from 'redux-persist/integration/react'
+import { store, persistor, useAppDispatch, useAppSelector } from './store'
+import { refreshSession, setSession } from './store/slices/authSlice'
+import { setTheme } from './store/slices/uiSlice'
 import App from './App'
 import './index.css'
-import { WebSocketProvider } from './context/WebSocketContext'
 import { Elements } from '@stripe/react-stripe-js'
 import { loadStripe } from '@stripe/stripe-js'
-import { useAuthStore } from './stores/authStore'
-import { useUIStore } from './stores/uiStore'
+import { supabase } from './lib/supabase'
 
 // Suppress Stripe telemetry errors (blocked by ad blockers)
 const originalError = console.error
@@ -26,26 +29,44 @@ console.error = (...args) => {
 // Load Stripe publishable key from environment
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '')
 
-// Auth wrapper component to initialize auth state
+// Auth wrapper component to initialize auth state and listen to Supabase auth changes
 function AuthWrapper({ children }: { children: React.ReactNode }) {
-  const checkAuthStatus = useAuthStore((state) => state.checkAuthStatus)
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
-    checkAuthStatus()
-  }, [checkAuthStatus])
+    // Check initial session
+    dispatch(refreshSession())
+
+    // Listen to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      dispatch(setSession({
+        user: session?.user || null,
+        session: session,
+      }))
+    })
+
+    // Cleanup subscription
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [dispatch])
 
   return <>{children}</>
 }
 
-// Theme wrapper component to initialize theme on load
+// Theme wrapper component to apply theme on load
 function ThemeWrapper({ children }: { children: React.ReactNode }) {
-  const isDarkMode = useUIStore((state) => state.isDarkMode)
-  const setDarkMode = useUIStore((state) => state.setDarkMode)
+  const theme = useAppSelector((state) => state.ui.theme)
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
-    // Apply theme on initial load based on persisted value
-    setDarkMode(isDarkMode)
-  }, [isDarkMode, setDarkMode])
+    // Apply theme to document
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [theme])
 
   return <>{children}</>
 }
@@ -63,16 +84,18 @@ const stripeElementsOptions = {
 // Always mount the React app
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <ThemeWrapper>
-        <AuthWrapper>
-          <Elements stripe={stripePromise} options={stripeElementsOptions}>
-            <WebSocketProvider>
-              <App />
-            </WebSocketProvider>
-          </Elements>
-        </AuthWrapper>
-      </ThemeWrapper>
-    </BrowserRouter>
+    <Provider store={store}>
+      <PersistGate loading={<div>Loading...</div>} persistor={persistor}>
+        <BrowserRouter>
+          <ThemeWrapper>
+            <AuthWrapper>
+              <Elements stripe={stripePromise} options={stripeElementsOptions}>
+                <App />
+              </Elements>
+            </AuthWrapper>
+          </ThemeWrapper>
+        </BrowserRouter>
+      </PersistGate>
+    </Provider>
   </React.StrictMode>
 )

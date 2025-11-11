@@ -1,26 +1,36 @@
 import { useState } from 'react';
-import { useUIStore } from '../stores/uiStore';
-import type { LineStyle } from '../types';
+import type { LineStyle, DrawingType } from '../types';
 
-export default function FloatingDrawingToolbar() {
+interface FloatingDrawingToolbarProps {
+  activeDrawingTool: DrawingType | null;
+  onToolChange: (tool: DrawingType | null) => void;
+  activeDrawingColor: string;
+  onColorChange: (color: string) => void;
+  activeLineWidth: number;
+  onLineWidthChange: (width: number) => void;
+  activeLineStyle: LineStyle;
+  onLineStyleChange: (style: LineStyle) => void;
+}
+
+export default function FloatingDrawingToolbar({
+  activeDrawingTool,
+  onToolChange,
+  activeDrawingColor,
+  onColorChange,
+  activeLineWidth,
+  onLineWidthChange,
+  activeLineStyle,
+  onLineStyleChange
+}: FloatingDrawingToolbarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showLineWidth, setShowLineWidth] = useState(false);
   const [showLineStyle, setShowLineStyle] = useState(false);
 
-  const activeDrawingTool = useUIStore(state => state.activeDrawingTool);
-  const setActiveDrawingTool = useUIStore(state => state.setActiveDrawingTool);
-  const activeDrawingColor = useUIStore(state => state.activeDrawingColor);
-  const setActiveDrawingColor = useUIStore(state => state.setActiveDrawingColor);
-  const activeLineWidth = useUIStore(state => state.activeLineWidth);
-  const setActiveLineWidth = useUIStore(state => state.setActiveLineWidth);
-  const activeLineStyle = useUIStore(state => state.activeLineStyle);
-  const setActiveLineStyle = useUIStore(state => state.setActiveLineStyle);
-
-  const handleToolClick = (toolId: string) => {
+  const handleToolClick = (toolId: DrawingType) => {
     // Toggle tool - if already active, deactivate it
     const newActiveTool = activeDrawingTool === toolId ? null : toolId;
-    setActiveDrawingTool(newActiveTool);
+    onToolChange(newActiveTool);
   };
 
   const colors = [
@@ -41,7 +51,7 @@ export default function FloatingDrawingToolbar() {
     { name: 'Dotted', value: 'dotted' }
   ];
 
-  const drawingTools = [
+  const drawingTools: { id: DrawingType; name: string; disabled: boolean; icon: JSX.Element }[] = [
     {
       id: 'trendline',
       name: 'Trendline',
@@ -168,7 +178,7 @@ export default function FloatingDrawingToolbar() {
                     <button
                       key={color.value}
                       onClick={() => {
-                        setActiveDrawingColor(color.value);
+                        onColorChange(color.value);
                         setShowColorPicker(false);
                       }}
                       className={`w-7 h-7 rounded border-2 transition ${
@@ -203,7 +213,7 @@ export default function FloatingDrawingToolbar() {
                     <button
                       key={width}
                       onClick={() => {
-                        setActiveLineWidth(width);
+                        onLineWidthChange(width);
                         setShowLineWidth(false);
                       }}
                       className={`w-full px-3 py-1.5 text-xs rounded flex items-center justify-between transition ${
@@ -239,7 +249,7 @@ export default function FloatingDrawingToolbar() {
                     <button
                       key={style.value}
                       onClick={() => {
-                        setActiveLineStyle(style.value);
+                        onLineStyleChange(style.value);
                         setShowLineStyle(false);
                       }}
                       className={`w-full px-3 py-2 text-xs rounded flex items-center justify-between transition ${

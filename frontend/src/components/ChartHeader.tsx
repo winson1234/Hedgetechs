@@ -1,17 +1,20 @@
-import { useUIStore } from '../stores/uiStore'
+import { useState } from 'react'
 
 interface ChartHeaderProps {
+  activeTimeframe: string
+  onTimeframeChange: (timeframe: string) => void
   onAnalyticsClick?: () => void
   onClearDrawings?: () => void
 }
 
-export default function ChartHeader({ onAnalyticsClick, onClearDrawings }: ChartHeaderProps) {
-  const activeTimeframe = useUIStore((state) => state.activeTimeframe)
-  const setActiveTimeframe = useUIStore((state) => state.setActiveTimeframe)
-  const showCustomInterval = useUIStore((state) => state.showCustomInterval)
-  const setShowCustomInterval = useUIStore((state) => state.setShowCustomInterval)
-  const customInterval = useUIStore((state) => state.customInterval)
-  const setCustomInterval = useUIStore((state) => state.setCustomInterval)
+export default function ChartHeader({ 
+  activeTimeframe, 
+  onTimeframeChange, 
+  onAnalyticsClick, 
+  onClearDrawings 
+}: ChartHeaderProps) {
+  const [showCustomInterval, setShowCustomInterval] = useState(false)
+  const [customInterval, setCustomInterval] = useState('')
 
   const timeframes = ['1m', '5m', '15m', '1h', '4h', '1d', '1w']
 
@@ -19,17 +22,17 @@ export default function ChartHeader({ onAnalyticsClick, onClearDrawings }: Chart
     if (timeframe === 'Custom') {
       setShowCustomInterval(!showCustomInterval)
       if (!showCustomInterval) {
-        setActiveTimeframe('Custom')
+        onTimeframeChange('Custom')
       }
     } else {
-      setActiveTimeframe(timeframe)
+      onTimeframeChange(timeframe)
       setShowCustomInterval(false)
     }
   }
 
   const handleCustomIntervalSubmit = () => {
     if (customInterval.trim()) {
-      setActiveTimeframe(customInterval.trim())
+      onTimeframeChange(customInterval.trim())
     }
   }
 

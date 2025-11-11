@@ -1,9 +1,36 @@
 import { useMemo, memo, lazy, Suspense, useState, useEffect } from 'react';
-import type { Account } from '../../types';
 import type { AssetPriceMap } from '../../hooks/useAssetPrices';
 import { getAssetColor } from '../../utils/colors';
 import PortfolioLegend from './PortfolioLegend';
-import { useAccountStore } from '../../stores/accountStore';
+import { getApiUrl } from '../../config/api';
+
+// Account type from Redux store
+interface Balance {
+  id: string;
+  account_id: string;
+  currency: string;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Account {
+  id: string;
+  user_id: string;
+  account_number: string;
+  type: 'live' | 'demo';
+  product_type: 'spot' | 'cfd' | 'futures';
+  currency: string;
+  status: 'active' | 'deactivated' | 'suspended';
+  created_at: string;
+  updated_at: string;
+  nickname?: string | null;
+  color?: string | null;
+  icon?: string | null;
+  last_accessed_at?: string | null;
+  access_count: number;
+  balances: Balance[];
+}
 
 // Lazy load the chart component to improve initial load time
 const DonutChartRenderer = lazy(() => import('./DonutChartRenderer'));
@@ -42,27 +69,32 @@ function PortfolioAllocation({
   const [chartSnapshot, setChartSnapshot] = useState<AssetAllocation[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [fxRates, setFxRates] = useState<Record<string, number>>({ USD: 1.0 });
-  const getFXRates = useAccountStore((state) => state.getFXRates);
 
   // Fetch FX rates on mount
   useEffect(() => {
-    getFXRates().then(rates => {
-      setFxRates(rates);
-    }).catch(error => {
-      console.error('Failed to load FX rates:', error);
-    });
-  }, [getFXRates]);
+    const fetchFXRates = async () => {
+      try {
+        const response = await fetch(getApiUrl('/api/v1/fx-rates'));
+        if (!response.ok) throw new Error('Failed to fetch FX rates');
+        const rates = await response.json();
+        setFxRates(rates);
+      } catch (error) {
+        console.error('Failed to load FX rates:', error);
+      }
+    };
+    fetchFXRates();
+  }, []);
 
   const assetAllocations = useMemo((): AssetAllocation[] => {
     const assetTotals: Record<string, number> = {};
 
     // Aggregate all assets across accounts
     accounts.forEach(acc => {
-      Object.entries(acc.balances).forEach(([currency, amount]) => {
-        if (assetTotals[currency]) {
-          assetTotals[currency] += amount;
+      acc.balances.forEach((balance) => {
+        if (assetTotals[balance.currency]) {
+          assetTotals[balance.currency] += balance.amount;
         } else {
-          assetTotals[currency] = amount;
+          assetTotals[balance.currency] = balance.amount;
         }
       });
     });

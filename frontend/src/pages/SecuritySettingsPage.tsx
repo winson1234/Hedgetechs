@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { useUIStore } from '../stores/uiStore';
+import { useAppSelector } from '../store';
+import { selectIsDarkMode } from '../store/slices/uiSlice';
 import './securitySettings.css';
 
 interface Device {
@@ -13,7 +14,7 @@ interface Device {
 }
 
 export default function SecuritySettingsPage() {
-  const { isDarkMode } = useUIStore();
+  const isDarkMode = useAppSelector(selectIsDarkMode);
 
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [showTFAModal, setShowTFAModal] = useState(false);

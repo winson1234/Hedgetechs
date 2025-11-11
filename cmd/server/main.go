@@ -8,6 +8,8 @@ import (
 	"brokerageProject/internal/hub"
 	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/services"
+	"brokerageProject/internal/utils"
+	"brokerageProject/internal/worker"
 	"log"
 	"net/http"
 	"os"
@@ -59,7 +61,17 @@ func main() {
 		log.Println("Database connection initialized successfully")
 		// Ensure database connection is closed on shutdown
 		defer database.Close()
+
+		// Initialize audit logger (requires database)
+		dbPool, err := database.GetPool()
+		if err == nil {
+			utils.InitGlobalAuditLogger(dbPool)
+		}
 	}
+
+	// Initialize rate limiter (100 requests per minute per user, burst of 20)
+	middleware.InitRateLimiter(100, 20)
+	log.Println("✅ Rate limiter initialized (100 req/min per user)")
 
 	// Get port from environment (required for Render deployment)
 	// Falls back to 8080 for local development
@@ -87,10 +99,51 @@ func main() {
 	h := hub.NewHub()
 	go h.Run()
 
+	// Initialize event-driven order processor (requires database)
+	var orderProcessor *worker.OrderProcessor
+	if dbPool, err := database.GetPool(); err == nil {
+		orderProcessor = worker.NewOrderProcessor(dbPool)
+		go orderProcessor.Run()
+		log.Println("✅ Event-driven order processor started")
+	} else {
+		log.Println("⚠️  Order processor disabled (database not available)")
+	}
+
+	// Create message broadcaster that fans out to both hub and order processor
+	// This allows both WebSocket clients and the order processor to receive real-time price updates
+	messageBroadcaster := make(chan []byte, 4096) // Large buffer for high-frequency data
+	go func() {
+		for msg := range messageBroadcaster {
+			// Forward to hub for WebSocket clients (non-blocking)
+			select {
+			case h.Broadcast <- msg:
+			default:
+				log.Println("⚠️  Hub broadcast channel full, dropping message")
+			}
+
+			// Forward to order processor for pending order execution (non-blocking)
+			if orderProcessor != nil {
+				select {
+				case orderProcessor.MessageChannel <- msg:
+				default:
+					// Order processor busy, skip this update (OK for frequent price updates)
+				}
+			}
+		}
+	}()
+
 	// Start Binance WebSocket streams for real-time market data
+	// Messages are sent to messageBroadcaster which fans out to hub and order processor
 	log.Println("Starting Binance WebSocket streams")
-	go binance.StreamTrades(h)
-	go binance.StreamDepth(h)
+	go binance.StreamTrades(h)  // TODO: Modify to send to messageBroadcaster
+	go binance.StreamDepth(h)   // TODO: Modify to send to messageBroadcaster
+
+	// NOTE: Currently binance streams send directly to hub.Broadcast
+	// For event-driven order processing to work, we need to either:
+	// 1. Modify binance client to accept multiple broadcast channels, OR
+	// 2. Create a hub wrapper that also forwards to order processor, OR
+	// 3. Have order processor subscribe as a hub client (requires refactoring)
+	// For now, order processor will work once binance integration is updated
 
 	// Initialize forex service using Frankfurter API (free, no API key required)
 	log.Println("Initializing forex service with Frankfurter API (no API key required)")
@@ -123,6 +176,7 @@ func main() {
 
 	// Account management endpoints (protected with JWT authentication)
 	// POST /api/v1/accounts - Create a new trading account
+	// GET /api/v1/accounts - List all user's accounts
 	http.HandleFunc("/api/v1/accounts", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			// Apply CORS and Auth middleware for POST requests
@@ -137,6 +191,50 @@ func main() {
 			})(w, r)
 		} else {
 			// Method not allowed
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// PATCH /api/v1/accounts/metadata?id={uuid} - Update account metadata (nickname, color, icon)
+	http.HandleFunc("/api/v1/accounts/metadata", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch || r.Method == http.MethodPost {
+			// Apply CORS, Auth, and Rate Limit middleware
+			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.UpdateAccountMetadata)))(w, r)
+		} else if r.Method == http.MethodOptions {
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Pending Orders endpoints (protected with JWT authentication + rate limiting)
+	// POST /api/v1/pending-orders - Create a new pending limit/stop-limit order
+	// GET /api/v1/pending-orders?account_id={uuid} - List pending orders for account
+	http.HandleFunc("/api/v1/pending-orders", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.CreatePendingOrder)))(w, r)
+		} else if r.Method == http.MethodGet {
+			api.CORSMiddleware(middleware.AuthMiddleware(api.GetPendingOrders))(w, r)
+		} else if r.Method == http.MethodOptions {
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// DELETE /api/v1/pending-orders/cancel?id={uuid} - Cancel a pending order
+	http.HandleFunc("/api/v1/pending-orders/cancel", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete || r.Method == http.MethodPost {
+			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.CancelPendingOrder)))(w, r)
+		} else if r.Method == http.MethodOptions {
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		} else {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	})

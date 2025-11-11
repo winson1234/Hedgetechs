@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../stores/authStore';
+import { useAppDispatch } from '../store';
+import { signIn } from '../store/slices/authSlice';
 import './login.css';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const login = useAuthStore(state => state.login);
+  const dispatch = useAppDispatch();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const candlesticksRef = useRef<HTMLDivElement>(null);
-const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Generate candlesticks on mount (matching original main.js)
   useEffect(() => {
@@ -33,11 +34,10 @@ const [showPassword, setShowPassword] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const result = await login(email.trim().toLowerCase(), password);
-
-    if (result.success) {
+    try {
+      await dispatch(signIn({ email: email.trim().toLowerCase(), password })).unwrap();
       navigate('/trading');
-    } else {
+    } catch (error) {
       alert('❌ Incorrect email or password.');
     }
   };

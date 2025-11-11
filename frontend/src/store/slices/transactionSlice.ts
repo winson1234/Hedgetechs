@@ -1,0 +1,329 @@
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import type { RootState } from '../index';
+
+// Types
+export type TransactionStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type TransactionType = 'deposit' | 'withdraw' | 'transfer';
+
+export interface PaymentMethodMetadata {
+  // For card payments
+  cardBrand?: string;
+  last4?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
+  // For bank transfers
+  bankName?: string;
+  accountLast4?: string;
+  routingNumber?: string;
+  // For FPX payments (Malaysia online banking)
+  fpxBank?: string;
+}
+
+export interface Transaction {
+  id: string;
+  type: TransactionType;
+  status: TransactionStatus;
+  accountId: string;
+  amount: number;
+  currency: string;
+  timestamp: number;
+  // Payment processor info
+  paymentIntentId?: string;
+  metadata?: PaymentMethodMetadata;
+  // For transfers
+  fromAccountId?: string;
+  toAccountId?: string;
+  targetAccountId?: string;
+  // Description from backend
+  description?: string;
+  // Error information
+  errorMessage?: string;
+}
+
+interface TransactionState {
+  transactions: Transaction[];
+  loading: boolean;
+  error: string | null;
+}
+
+// Initial state
+const initialState: TransactionState = {
+  transactions: [],
+  loading: false,
+  error: null,
+};
+
+// Helper to get auth token
+const getAuthToken = (getState: () => RootState) => {
+  const state = getState();
+  return state.auth.session?.access_token || null;
+};
+
+// Async thunks
+
+// Fetch transactions
+export const fetchTransactions = createAsyncThunk(
+  'transaction/fetchTransactions',
+  async (accountId: string, { getState, rejectWithValue }) => {
+    try {
+      const token = getAuthToken(getState as () => RootState);
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch(`/api/v1/transactions?account_id=${accountId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      const data = await response.json();
+      return data.transactions || [];
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch transactions');
+    }
+  }
+);
+
+// Create deposit transaction
+export const createDeposit = createAsyncThunk(
+  'transaction/createDeposit',
+  async (
+    {
+      accountId,
+      amount,
+      currency,
+      paymentIntentId,
+      metadata,
+    }: {
+      accountId: string;
+      amount: number;
+      currency: string;
+      paymentIntentId?: string;
+      metadata?: PaymentMethodMetadata;
+    },
+    { getState, rejectWithValue }
+  ) => {
+    try {
+      const token = getAuthToken(getState as () => RootState);
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch('/api/v1/transactions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          account_id: accountId,
+          type: 'deposit',
+          amount,
+          currency,
+          payment_intent_id: paymentIntentId,
+          metadata,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to create deposit');
+      const data = await response.json();
+      return data.transaction;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to create deposit');
+    }
+  }
+);
+
+// Create withdrawal transaction
+export const createWithdrawal = createAsyncThunk(
+  'transaction/createWithdrawal',
+  async (
+    {
+      accountId,
+      amount,
+      currency,
+      metadata,
+    }: {
+      accountId: string;
+      amount: number;
+      currency: string;
+      metadata?: PaymentMethodMetadata;
+    },
+    { getState, rejectWithValue }
+  ) => {
+    try {
+      const token = getAuthToken(getState as () => RootState);
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch('/api/v1/transactions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          account_id: accountId,
+          type: 'withdraw',
+          amount,
+          currency,
+          metadata,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to create withdrawal');
+      const data = await response.json();
+      return data.transaction;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to create withdrawal');
+    }
+  }
+);
+
+// Create transfer transaction
+export const createTransfer = createAsyncThunk(
+  'transaction/createTransfer',
+  async (
+    {
+      fromAccountId,
+      toAccountId,
+      amount,
+      currency,
+    }: {
+      fromAccountId: string;
+      toAccountId: string;
+      amount: number;
+      currency: string;
+    },
+    { getState, rejectWithValue }
+  ) => {
+    try {
+      const token = getAuthToken(getState as () => RootState);
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch('/api/v1/transactions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          account_id: fromAccountId,
+          type: 'transfer',
+          amount,
+          currency,
+          target_account_id: toAccountId,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to create transfer');
+      const data = await response.json();
+      return data.transaction;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to create transfer');
+    }
+  }
+);
+
+// Transaction slice
+const transactionSlice = createSlice({
+  name: 'transaction',
+  initialState,
+  reducers: {
+    // Add transaction (for real-time updates)
+    addTransaction: (state, action: PayloadAction<Transaction>) => {
+      state.transactions.unshift(action.payload);
+    },
+
+    // Update transaction status
+    updateTransactionStatus: (
+      state,
+      action: PayloadAction<{ id: string; status: TransactionStatus; errorMessage?: string }>
+    ) => {
+      const transaction = state.transactions.find((t) => t.id === action.payload.id);
+      if (transaction) {
+        transaction.status = action.payload.status;
+        if (action.payload.errorMessage) {
+          transaction.errorMessage = action.payload.errorMessage;
+        }
+      }
+    },
+
+    // Clear transactions
+    clearTransactions: (state) => {
+      state.transactions = [];
+    },
+
+    // Clear error
+    clearError: (state) => {
+      state.error = null;
+    },
+  },
+  extraReducers: (builder) => {
+    // Fetch transactions
+    builder
+      .addCase(fetchTransactions.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchTransactions.fulfilled, (state, action) => {
+        state.loading = false;
+        state.transactions = action.payload;
+      })
+      .addCase(fetchTransactions.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Create deposit
+    builder
+      .addCase(createDeposit.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(createDeposit.fulfilled, (state, action) => {
+        state.loading = false;
+        state.transactions.unshift(action.payload);
+      })
+      .addCase(createDeposit.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Create withdrawal
+    builder
+      .addCase(createWithdrawal.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(createWithdrawal.fulfilled, (state, action) => {
+        state.loading = false;
+        state.transactions.unshift(action.payload);
+      })
+      .addCase(createWithdrawal.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Create transfer
+    builder
+      .addCase(createTransfer.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(createTransfer.fulfilled, (state, action) => {
+        state.loading = false;
+        state.transactions.unshift(action.payload);
+      })
+      .addCase(createTransfer.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+  },
+});
+
+export const {
+  addTransaction,
+  updateTransactionStatus,
+  clearTransactions,
+  clearError,
+} = transactionSlice.actions;
+
+export default transactionSlice.reducer;

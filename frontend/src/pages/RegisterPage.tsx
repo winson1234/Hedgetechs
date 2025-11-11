@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../stores/authStore';
+import { useAppDispatch } from '../store';
+import { signUp } from '../store/slices/authSlice';
 import './register.css';
 //import { motion, AnimatePresence } from 'framer-motion';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const register = useAuthStore(state => state.register);
+  const dispatch = useAppDispatch();
 
   const [formData, setFormData] = useState({
     country: '',
@@ -126,18 +127,17 @@ useEffect(() => {
     return;
   }
 
-  const result = await register({
-    name: `${formData.firstName} ${formData.lastName}`,
-    email: formData.email,
-    country: formData.country,
-    password: formData.password
-  });
-
-    if (result.success) {
-      navigate('/trading');
-    } else {
-      alert(result.message || 'Registration failed');
-    }
+  try {
+    await dispatch(signUp({
+      name: `${formData.firstName} ${formData.lastName}`,
+      email: formData.email,
+      country: formData.country,
+      password: formData.password
+    })).unwrap();
+    navigate('/profile');
+  } catch (error: any) {
+    alert(error?.message || 'Registration failed');
+  }
   };
 
   return (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useUIStore } from '../stores/uiStore';
+import { useAppDispatch, useAppSelector } from '../store';
+import { setSidebarExpanded } from '../store/slices/uiSlice';
 
 // Icon component for navigation links
 const NavIcon = ({ iconName }: { iconName: string }) => {
@@ -95,7 +96,8 @@ const NavLink = ({ icon, label, to, isActive, isExpanded, disabled = false }: Na
 
 export default function MainSidebar() {
   const location = useLocation();
-  const { isSidebarExpanded, setSidebarExpanded } = useUIStore();
+  const dispatch = useAppDispatch();
+  const isSidebarExpanded = useAppSelector(state => state.ui.isSidebarExpanded);
   const [isHovered, setIsHovered] = useState(false);
 
   // Determine if sidebar should be shown as expanded
@@ -103,7 +105,7 @@ export default function MainSidebar() {
 
   // Handle toggle
   const handleToggle = () => {
-    setSidebarExpanded(!isSidebarExpanded);
+    dispatch(setSidebarExpanded(!isSidebarExpanded));
   };
 
   // Keyboard shortcut: Ctrl+B or Cmd+B to toggle sidebar
@@ -112,13 +114,13 @@ export default function MainSidebar() {
       // Check for Ctrl+B (Windows/Linux) or Cmd+B (Mac)
       if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
         e.preventDefault();
-        setSidebarExpanded(!isSidebarExpanded);
+        dispatch(setSidebarExpanded(!isSidebarExpanded));
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSidebarExpanded, setSidebarExpanded]);
+  }, [isSidebarExpanded, dispatch]);
 
   return (
     <nav

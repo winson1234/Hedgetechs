@@ -2,8 +2,10 @@ import { useState, useEffect, useMemo, memo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useAccountStore, formatBalance } from '../../stores/accountStore';
-import { useUIStore } from '../../stores/uiStore';
+import { formatBalance } from '../../utils/format';
+import { useAppSelector, useAppDispatch } from '../../store';
+import { addToast } from '../../store/slices/uiSlice';
+import { createTransfer } from '../../store/slices/transactionSlice';
 
 // Base validation schema
 const transferSchemaBase = z.object({
@@ -15,14 +17,37 @@ const transferSchemaBase = z.object({
 type TransferFormData = z.infer<typeof transferSchemaBase>;
 
 function TransferTab() {
-  // Access stores
-  const accounts = useAccountStore(state => state.accounts);
-  const activeAccountId = useAccountStore(state => state.activeAccountId);
-  const getActiveAccount = useAccountStore(state => state.getActiveAccount);
-  const processTransfer = useAccountStore(state => state.processTransfer);
-  const showToast = useUIStore(state => state.showToast);
+  const dispatch = useAppDispatch();
+  
+  // Access Redux state
+  const accounts = useAppSelector(state => state.account.accounts);
+  const activeAccountId = useAppSelector(state => state.account.activeAccountId);
+  
+  // Get active account
+  const activeAccount = useMemo(() => 
+    accounts.find(a => a.id === activeAccountId) || null,
+    [accounts, activeAccountId]
+  );
 
-  const activeAccount = getActiveAccount();
+  // Helper function to show toast
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+    dispatch(addToast({ message, type }));
+  };
+
+  // Helper function to process transfer
+  const processTransfer = async (fromAccountId: string, toAccountId: string, amount: number, currency: string) => {
+    try {
+      await dispatch(createTransfer({
+        fromAccountId,
+        toAccountId,
+        amount,
+        currency
+      })).unwrap();
+    } catch (error) {
+      console.error('Transfer failed:', error);
+      throw error;
+    }
+  };
 
   // State
   const [isProcessing, setIsProcessing] = useState(false);
@@ -52,10 +77,11 @@ function TransferTab() {
     [accounts, toAccountId]
   );
 
-  const availableBalance = useMemo(() =>
-    fromAccount ? (fromAccount.balances[fromAccount.currency] || 0) : 0,
-    [fromAccount]
-  );
+  const availableBalance = useMemo(() => {
+    if (!fromAccount) return 0;
+    const balance = fromAccount.balances.find(b => b.currency === fromAccount.currency);
+    return balance?.amount || 0;
+  }, [fromAccount]);
 
   const transferCurrency = fromAccount?.currency || 'USD';
 
@@ -88,7 +114,7 @@ function TransferTab() {
       .refine(
         (data) => data.amount <= availableBalance,
         {
-          message: `Insufficient funds. Available: ${formatBalance(availableBalance, fromAccount?.currency)}`,
+          message: `Insufficient funds. Available: ${formatBalance(availableBalance, fromAccount?.currency || 'USD')}`,
           path: ['amount'],
         }
       ),
@@ -144,24 +170,20 @@ function TransferTab() {
 
     try {
       // Process transfer
-      const result = await processTransfer(
+      await processTransfer(
         data.fromAccountId,
         data.toAccountId,
         data.amount,
         fromAcc.currency
       );
 
-      if (result.success) {
-        // Clear form
-        reset({
-          fromAccountId: data.fromAccountId,
-          toAccountId: '',
-          amount: 0,
-        });
-        showToast('Transfer completed successfully!', 'success');
-      } else {
-        showToast(result.message, 'error');
-      }
+      // Clear form
+      reset({
+        fromAccountId: data.fromAccountId,
+        toAccountId: '',
+        amount: 0,
+      });
+      showToast('Transfer completed successfully!', 'success');
     } catch (error) {
       console.error('Transfer error:', error);
       showToast(error instanceof Error ? error.message : 'Transfer failed', 'error');
@@ -231,11 +253,14 @@ function TransferTab() {
             {...register('fromAccountId')}
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
-            {fromAccounts.map(acc => (
-              <option key={acc.id} value={acc.id}>
-                {acc.id} ({acc.type}) - {formatBalance(acc.balances[acc.currency], acc.currency)}
-              </option>
-            ))}
+            {fromAccounts.map(acc => {
+              const balance = acc.balances.find(b => b.currency === acc.currency);
+              return (
+                <option key={acc.id} value={acc.id}>
+                  {acc.id} ({acc.type}) - {formatBalance(balance?.amount || 0, acc.currency)}
+                </option>
+              );
+            })}
           </select>
           {errors.fromAccountId && (
             <p className="text-xs text-red-500 mt-1">{errors.fromAccountId.message}</p>
@@ -260,11 +285,14 @@ function TransferTab() {
                   : 'No matching accounts available'
                 : 'Select source account first'}
             </option>
-            {toAccounts.map(acc => (
-              <option key={acc.id} value={acc.id}>
-                {acc.id} ({acc.type}) - {formatBalance(acc.balances[acc.currency], acc.currency)}
-              </option>
-            ))}
+            {toAccounts.map(acc => {
+              const balance = acc.balances.find(b => b.currency === acc.currency);
+              return (
+                <option key={acc.id} value={acc.id}>
+                  {acc.id} ({acc.type}) - {formatBalance(balance?.amount || 0, acc.currency)}
+                </option>
+              );
+            })}
           </select>
           {errors.toAccountId && (
             <p className="text-xs text-red-500 mt-1">{errors.toAccountId.message}</p>
@@ -283,7 +311,7 @@ function TransferTab() {
               Amount to Transfer
             </label>
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              Available: {formatBalance(availableBalance, fromAccount?.currency)}
+              Available: {formatBalance(availableBalance, fromAccount?.currency || 'USD')}
             </span>
           </div>
           <div className="relative">

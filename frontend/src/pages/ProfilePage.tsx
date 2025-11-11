@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../stores/authStore';
-import { useUIStore } from '../stores/uiStore';
+import { useAppSelector } from '../store';
+import { selectIsDarkMode } from '../store/slices/uiSlice';
 import './profile.css';
 
 export default function ProfilePage() {
-  const { user } = useAuthStore();
-  const { isDarkMode } = useUIStore();
+  const user = useAppSelector(state => state.auth.user);
+  const isDarkMode = useAppSelector(selectIsDarkMode);
   const navigate = useNavigate();
 
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
@@ -22,10 +22,10 @@ export default function ProfilePage() {
   };
 
 const [profileData, setProfileData] = useState({
-  name: user?.name || 'John Doe',
-  email: user?.email || 'john.doe@fpmarkets.com',
+  name: user?.email?.split('@')[0] || 'User',
+  email: user?.email || 'user@example.com',
   phone: '',
-  country: user?.country ? countryNames[user.country] || 'Unknown Country' : 'United States',
+  country: 'United States',
   language: 'English (US)',
   timezone: 'GMT+8 (Kuala Lumpur)',
   currency: 'USD ($)',

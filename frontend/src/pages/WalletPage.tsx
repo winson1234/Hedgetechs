@@ -1,14 +1,15 @@
 import type { WalletTab } from '../types';
-import { useUIStore } from '../stores/uiStore';
+import { useAppDispatch, useAppSelector } from '../store';
+import { setActiveWalletTab } from '../store/slices/uiSlice';
 import WalletOverview from '../components/wallet/WalletOverview';
 import DepositTab from '../components/wallet/DepositTab';
 import WithdrawTab from '../components/wallet/WithdrawTab';
 import TransferTab from '../components/wallet/TransferTab';
 
 export default function WalletPage() {
-  // Access stores
-  const activeWalletTab = useUIStore(state => state.activeWalletTab);
-  const setActiveWalletTab = useUIStore(state => state.setActiveWalletTab);
+  const dispatch = useAppDispatch();
+  // Access Redux state
+  const activeWalletTab = useAppSelector(state => state.ui.activeWalletTab);
 
   const renderTabContent = () => {
     switch (activeWalletTab) {
@@ -42,7 +43,7 @@ export default function WalletPage() {
             {(['overview', 'deposit', 'withdraw', 'transfer'] as WalletTab[]).map((tab) => (
               <button
                 key={tab}
-                onClick={() => setActiveWalletTab(tab)}
+                onClick={() => dispatch(setActiveWalletTab(tab))}
                 className={`whitespace-nowrap pb-4 px-3 border-b-2 font-semibold text-base transition-colors capitalize ${
                   activeWalletTab === tab
                     ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'

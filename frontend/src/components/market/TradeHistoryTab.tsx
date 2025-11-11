@@ -1,15 +1,26 @@
-import { useUIStore } from '../../stores/uiStore';
-import { useOrderStore } from '../../stores/orderStore';
-import { formatBalance } from '../../stores/accountStore';
+import { useAppSelector } from '../../store';
+
+// Utility function to format balance
+const formatBalance = (value: number, currency: string) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency === 'USD' ? 'USD' : 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  }).format(value);
+};
 
 export default function TradeHistoryTab() {
-  const activeInstrument = useUIStore(state => state.activeInstrument);
-  const getOrderHistoryBySymbol = useOrderStore(state => state.getOrderHistoryBySymbol);
-
-  const orderHistory = getOrderHistoryBySymbol(activeInstrument);
+  const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
+  const orderHistory = useAppSelector(state => 
+    state.order.orders.filter(order => 
+      order.symbol === activeInstrument && 
+      (order.status === 'filled' || order.status === 'partially_filled')
+    )
+  );
 
   // Format timestamp to readable date
-  const formatTimestamp = (timestamp: number) => {
+  const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleString('en-US', {
       month: 'short',
@@ -80,14 +91,9 @@ export default function TradeHistoryTab() {
                     <span className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">
                       {order.type}
                     </span>
-                    {order.wasFromPending && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
-                        Auto
-                      </span>
-                    )}
                   </div>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
-                    {formatTimestamp(order.timestamp)}
+                    {formatTimestamp(order.created_at)}
                   </span>
                 </div>
 
@@ -96,7 +102,7 @@ export default function TradeHistoryTab() {
                   <div className="flex justify-between">
                     <span className="text-slate-600 dark:text-slate-400">Amount:</span>
                     <span className="font-medium text-slate-900 dark:text-slate-100">
-                      {order.amount.toLocaleString(undefined, {
+                      {order.amount_base.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 6,
                       })}
@@ -104,23 +110,26 @@ export default function TradeHistoryTab() {
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400">Price:</span>
+                    <span className="text-slate-600 dark:text-slate-400">Avg Price:</span>
                     <span className="font-medium text-slate-900 dark:text-slate-100">
-                      {formatBalance(order.executionPrice, 'USD')}
+                      {formatBalance(order.average_fill_price || 0, 'USD')}
                     </span>
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400">Fee:</span>
+                    <span className="text-slate-600 dark:text-slate-400">Filled:</span>
                     <span className="font-medium text-slate-900 dark:text-slate-100">
-                      {formatBalance(order.fee, 'USD')}
+                      {order.filled_amount.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 6,
+                      })}
                     </span>
                   </div>
 
                   <div className="flex justify-between">
                     <span className="text-slate-600 dark:text-slate-400">Total:</span>
                     <span className="font-semibold text-slate-900 dark:text-slate-100">
-                      {formatBalance(order.total, 'USD')}
+                      {formatBalance((order.average_fill_price || 0) * order.filled_amount, 'USD')}
                     </span>
                   </div>
                 </div>

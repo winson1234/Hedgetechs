@@ -1,7 +1,8 @@
 import { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../stores/authStore';
-import { useUIStore } from '../stores/uiStore';
+import { useAppSelector, useAppDispatch } from '../store';
+import { signOut } from '../store/slices/authSlice';
+import { setTheme, setActiveInstrument, selectIsDarkMode } from '../store/slices/uiSlice';
 import { WebSocketContext } from '../context/WebSocketContext';
 import MiniSparklineChart from '../components/MiniSparklineChart';
 import { getApiUrl } from '../config/api';
@@ -18,10 +19,10 @@ interface CryptoData {
 }
 
 export default function DashboardPage() {
-  const { isLoggedIn, user, logout } = useAuthStore();
-  const isDarkMode = useUIStore(state => state.isDarkMode);
-  const setDarkMode = useUIStore(state => state.setDarkMode);
-  const setActiveInstrument = useUIStore(state => state.setActiveInstrument);
+  const dispatch = useAppDispatch();
+  const isLoggedIn = useAppSelector(state => !!state.auth.session);
+  const user = useAppSelector(state => state.auth.user);
+  const isDarkMode = useAppSelector(selectIsDarkMode);
   const navigate = useNavigate();
   const ws = useContext(WebSocketContext);
   const [activeMarketTab, setActiveMarketTab] = useState('all');
@@ -65,7 +66,7 @@ const confirmLogout = async () => {
   await new Promise(resolve => setTimeout(resolve, 400));
 
   // Step 4: actually log out
-  logout();
+  dispatch(signOut());
 
   // Step 5: hide modal and navigate
   setShowLogoutModal(false);
@@ -115,8 +116,8 @@ const cancelLogout = () => {
     setProfileDropdownOpen(false);
   };
 
-  const toggleTheme = () => {
-    setDarkMode(!isDarkMode);
+  const toggleThemeMode = () => {
+    dispatch(setTheme(isDarkMode ? 'light' : 'dark'));
   };
 
   // WebSocket message handler for real-time price updates
@@ -500,7 +501,7 @@ const cancelLogout = () => {
             {/* Right Side Actions */}
             <div className="nav-actions">
               {/* Theme Toggle */}
-              <button className="icon-btn" id="themeToggle" onClick={toggleTheme} title="Toggle Theme">
+              <button className="icon-btn" id="themeToggle" onClick={toggleThemeMode} title="Toggle Theme">
                 {isDarkMode ? (
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="5"></circle>
@@ -561,12 +562,12 @@ const cancelLogout = () => {
               ) : (
                 <div className="profile-container">
                   <div className="profile-icon" onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}>
-                    {user?.name?.charAt(0) || 'U'}
+                    {user?.email?.charAt(0).toUpperCase() || 'U'}
                   </div>
                   {profileDropdownOpen && (
                     <div className="profile-dropdown show">
                       <div className="dropdown-header">
-                        <div className="dropdown-username">{user?.name || 'User'}</div>
+                        <div className="dropdown-username">{user?.email?.split('@')[0] || 'User'}</div>
                         <div className="dropdown-email">{user?.email || 'user@example.com'}</div>
                       </div>
                       <div className="dropdown-menu">

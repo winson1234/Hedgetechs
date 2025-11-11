@@ -1,25 +1,44 @@
-import { Routes, Route } from 'react-router-dom';
-import ProtectedRoute from './components/ProtectedRoute';
-import PublicRoute from './components/PublicRoute';
-import AppLayout from './components/AppLayout';
+import { useEffect } from 'react'
+import { Routes, Route } from 'react-router-dom'
+import ProtectedRoute from './components/ProtectedRoute'
+import PublicRoute from './components/PublicRoute'
+import AppLayout from './components/AppLayout'
+import { useAuthStore } from './stores/authStore'
+import { useAccountStore } from './stores/accountStore'
 
 // Auth Pages
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
 
 // Public Pages
-import DashboardPage from './pages/DashboardPage';
+import DashboardPage from './pages/DashboardPage'
 
 // Protected Pages
-import TradingPage from './pages/TradingPage';
-import AccountPage from './components/AccountPage';
-import WalletPage from './pages/WalletPage';
-import HistoryPage from './pages/HistoryPage';
-import ProfilePage from './pages/ProfilePage';
-import SecuritySettingsPage from './pages/SecuritySettingsPage';
+import TradingPage from './pages/TradingPage'
+import AccountPage from './components/AccountPage'
+import WalletPage from './pages/WalletPage'
+import HistoryPage from './pages/HistoryPage'
+import ProfilePage from './pages/ProfilePage'
+import SecuritySettingsPage from './pages/SecuritySettingsPage'
 
 export default function App() {
+  const { checkAuthStatus, isLoggedIn, isLoading: authLoading } = useAuthStore()
+  const { fetchAccounts } = useAccountStore()
+
+  // Initialize app: Check auth status and load accounts if logged in
+  useEffect(() => {
+    // Check authentication status on mount
+    checkAuthStatus()
+  }, [checkAuthStatus])
+
+  // Fetch accounts when user is logged in
+  useEffect(() => {
+    if (isLoggedIn && !authLoading) {
+      fetchAccounts()
+    }
+  }, [isLoggedIn, authLoading, fetchAccounts])
+
   return (
     <Routes>
       {/* Public Routes - Redirect to dashboard if logged in */}

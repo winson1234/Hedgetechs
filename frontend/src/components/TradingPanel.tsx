@@ -298,7 +298,7 @@ export default function TradingPanel() {
   };
 
   // Handle order submission
-  const handleOrder = (side: 'buy' | 'sell') => {
+  const handleOrder = async (side: 'buy' | 'sell') => {
     // Use currentPrice for market orders, limitPrice for limit/stop-limit
     const price = orderType === 'market' ? currentPrice : parseFloat(limitPrice);
     const qty = parseFloat(amount);
@@ -368,8 +368,8 @@ export default function TradingPanel() {
 
       const result =
         side === 'buy'
-          ? executeBuy(activeInstrument, qty, currentPrice)
-          : executeSell(activeInstrument, qty, currentPrice);
+          ? await executeBuy(activeInstrument, qty, currentPrice)
+          : await executeSell(activeInstrument, qty, currentPrice);
 
       if (!result.success) {
         console.error("Market order execution failed:", result.message);

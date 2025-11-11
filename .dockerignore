@@ -1,35 +1,60 @@
 # Git
-.git
+.git/
 .gitignore
+.gitattributes
 
 # Documentation
 *.md
 docs/
 
-# Frontend
-frontend/
-*.html
-*.css
-*.js
-*.ts
-*.tsx
-*.json
-
-# Environment
+# Environment files (will be mounted or passed as build args)
 .env
 .env.*
+!env.example
 
-# IDE
+# IDE and Editor
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# Build artifacts
+# Build artifacts and temporary files
+tmp/
 *.exe
 *.test
 *.out
+*.log
+build-errors.log
 
-# Dependencies
+# Dependencies (will be installed in container)
 node_modules/
+vendor/
+
+# Frontend build output
+frontend/dist/
+frontend/build/
+
+# Docker files (don't copy into images)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Testing
+coverage/
+*.coverage
+.nyc_output/
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # Cloudflare
 .wrangler/
+
+# Fly.io
+fly.toml

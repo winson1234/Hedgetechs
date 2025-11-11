@@ -1,192 +1,321 @@
-import { create } from 'zustand';
+/**
+ * Authentication Store (Supabase-based)
+ *
+ * This store manages user authentication using Supabase Auth.
+ * All authentication logic is handled server-side by Supabase.
+ */
 
-// Password hashing utility using Web Crypto API
-const hashPassword = async (password: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-};
+import { create } from 'zustand'
+import { supabase } from '../lib/supabase'
+import type { Session } from '@supabase/supabase-js'
 
-// Registered users database in localStorage
-interface RegisteredUser {
-  email: string;
-  name: string;
-  country: string;
-  passwordHash: string;
-}
-
-// Get all registered users from localStorage
-const getRegisteredUsers = (): Record<string, RegisteredUser> => {
-  try {
-    const usersData = localStorage.getItem('registeredUsers');
-    return usersData ? JSON.parse(usersData) : {};
-  } catch (error) {
-    console.error('Error reading registered users:', error);
-    return {};
-  }
-};
-
-// Save registered user to localStorage
-const saveRegisteredUser = (user: RegisteredUser): void => {
-  try {
-    const users = getRegisteredUsers();
-    users[user.email] = user;
-    localStorage.setItem('registeredUsers', JSON.stringify(users));
-  } catch (error) {
-    console.error('Error saving registered user:', error);
-  }
-};
-
-// Get specific registered user
-const getRegisteredUser = (email: string): RegisteredUser | null => {
-  const users = getRegisteredUsers();
-  return users[email] || null;
-};
-
-interface User {
-  email: string;
-  name?: string;
-  country?: string;
+interface AuthUser {
+  id: string
+  email: string
+  name?: string
+  country?: string
 }
 
 interface AuthState {
-  isLoggedIn: boolean;
-  user: User | null;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
-  register: (data: { email: string; password: string; name: string; country: string }) => Promise<{ success: boolean; message?: string }>;
-  logout: () => void;
-  checkAuthStatus: () => void;
+  // State
+  isLoggedIn: boolean
+  user: AuthUser | null
+  session: Session | null
+  isLoading: boolean
+
+  // Actions
+  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>
+  register: (data: {
+    email: string
+    password: string
+    name: string
+    country: string
+  }) => Promise<{ success: boolean; message?: string }>
+  logout: () => Promise<void>
+  checkAuthStatus: () => Promise<void>
+  getAccessToken: () => Promise<string | null>
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
+  // Initial state
   isLoggedIn: false,
   user: null,
+  session: null,
   isLoading: true,
 
-  checkAuthStatus: () => {
+  /**
+   * Check authentication status
+   * Called on app initialization to restore session
+   */
+  checkAuthStatus: async () => {
     try {
-      const loggedInUser = localStorage.getItem('loggedInUser');
-      if (loggedInUser) {
-        const user = JSON.parse(loggedInUser);
-        set({ isLoggedIn: true, user, isLoading: false });
+      // Get current session from Supabase
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (session) {
+        // Session exists - user is logged in
+        const user: AuthUser = {
+          id: session.user.id,
+          email: session.user.email!,
+          name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
+          country: session.user.user_metadata?.country,
+        }
+
+        set({
+          isLoggedIn: true,
+          user,
+          session,
+          isLoading: false,
+        })
       } else {
-        set({ isLoggedIn: false, user: null, isLoading: false });
+        // No session - user is not logged in
+        set({
+          isLoggedIn: false,
+          user: null,
+          session: null,
+          isLoading: false,
+        })
       }
     } catch (error) {
-      console.error('Error checking auth status:', error);
-      set({ isLoggedIn: false, user: null, isLoading: false });
+      console.error('Error checking auth status:', error)
+      set({
+        isLoggedIn: false,
+        user: null,
+        session: null,
+        isLoading: false,
+      })
     }
   },
 
-  login: async (email: string, password: string) => {
-    // Simple validation
-    if (!email || !password) {
-      return { success: false, message: 'Email and password are required' };
-    }
-
-    if (!email.includes('@')) {
-      return { success: false, message: 'Please enter a valid email address' };
-    }
-
-    if (password.length < 6) {
-      return { success: false, message: 'Password must be at least 6 characters' };
-    }
-
-    try {
-      // Check if user exists in registered users
-      const registeredUser = getRegisteredUser(email);
-      if (!registeredUser) {
-        return { success: false, message: 'Invalid email or password' };
-      }
-
-      // Verify password
-      const passwordHash = await hashPassword(password);
-      if (passwordHash !== registeredUser.passwordHash) {
-        return { success: false, message: 'Invalid email or password' };
-      }
-
-      // Login successful - create session
-      const user: User = {
-        email: registeredUser.email,
-        name: registeredUser.name,
-        country: registeredUser.country
-      };
-      localStorage.setItem('loggedInUser', JSON.stringify(user));
-
-      // Keep password hash for password change validation
-      localStorage.setItem(`userPasswordHash_${email}`, passwordHash);
-
-      set({ isLoggedIn: true, user });
-      return { success: true };
-    } catch (error) {
-      console.error('Login error:', error);
-      return { success: false, message: 'An error occurred during login' };
-    }
-  },
-
+  /**
+   * Register a new user
+   */
   register: async (data) => {
-    // Simple validation
+    // Validation
     if (!data.email || !data.password || !data.name || !data.country) {
-      return { success: false, message: 'All fields are required' };
+      return { success: false, message: 'All fields are required' }
     }
 
     if (!data.email.includes('@')) {
-      return { success: false, message: 'Please enter a valid email address' };
+      return { success: false, message: 'Please enter a valid email address' }
     }
 
     if (data.password.length < 8) {
-      return { success: false, message: 'Password must be at least 8 characters' };
+      return { success: false, message: 'Password must be at least 8 characters' }
     }
 
     try {
-      // Check if user already exists
-      const existingUser = getRegisteredUser(data.email);
-      if (existingUser) {
-        return { success: false, message: 'An account with this email already exists' };
+      // Register with Supabase Auth
+      const { data: authData, error } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            full_name: data.name,
+            country: data.country,
+          },
+        },
+      })
+
+      if (error) {
+        // Handle specific Supabase errors
+        if (error.message.includes('already registered')) {
+          return { success: false, message: 'An account with this email already exists' }
+        }
+        return { success: false, message: error.message }
       }
 
-      // Hash password
-      const passwordHash = await hashPassword(data.password);
+      if (!authData.user) {
+        return { success: false, message: 'Registration failed - no user data returned' }
+      }
 
-      // Save to registered users database
-      const registeredUser: RegisteredUser = {
-        email: data.email,
-        name: data.name,
-        country: data.country,
-        passwordHash: passwordHash
-      };
-      saveRegisteredUser(registeredUser);
+      // Check if email confirmation is required
+      if (authData.session) {
+        // Auto-login successful (email confirmation disabled)
+        const user: AuthUser = {
+          id: authData.user.id,
+          email: authData.user.email!,
+          name: data.name,
+          country: data.country,
+        }
 
-      // Create user session
-      const user: User = {
-        email: data.email,
-        name: data.name,
-        country: data.country
-      };
-      localStorage.setItem('loggedInUser', JSON.stringify(user));
+        set({
+          isLoggedIn: true,
+          user,
+          session: authData.session,
+        })
 
-      // Keep password hash for password change validation
-      localStorage.setItem(`userPasswordHash_${data.email}`, passwordHash);
-
-      set({ isLoggedIn: true, user });
-      return { success: true };
+        return { success: true }
+      } else {
+        // Email confirmation required
+        return {
+          success: true,
+          message: 'Registration successful! Please check your email to verify your account.',
+        }
+      }
     } catch (error) {
-      console.error('Registration error:', error);
-      return { success: false, message: 'An error occurred during registration' };
+      console.error('Registration error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred during registration'
+      return {
+        success: false,
+        message: errorMessage,
+      }
     }
   },
 
-logout: async () => {
-  return new Promise<void>((resolve) => {
-    setTimeout(() => {
-      localStorage.removeItem('loggedInUser');
-      set({ isLoggedIn: false, user: null });
-      resolve();
-    }, 150); // tiny delay ensures React state syncs before navigation
-  });
-},
+  /**
+   * Login with email and password
+   */
+  login: async (email: string, password: string) => {
+    // Validation
+    if (!email || !password) {
+      return { success: false, message: 'Email and password are required' }
+    }
 
-}));
+    if (!email.includes('@')) {
+      return { success: false, message: 'Please enter a valid email address' }
+    }
+
+    if (password.length < 6) {
+      return { success: false, message: 'Password must be at least 6 characters' }
+    }
+
+    try {
+      // Sign in with Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        // Handle specific errors
+        if (error.message.includes('Invalid login credentials')) {
+          return { success: false, message: 'Invalid email or password' }
+        }
+        return { success: false, message: error.message }
+      }
+
+      if (!data.session) {
+        return { success: false, message: 'Login failed - no session created' }
+      }
+
+      // Login successful
+      const user: AuthUser = {
+        id: data.user.id,
+        email: data.user.email!,
+        name: data.user.user_metadata?.name || data.user.user_metadata?.full_name,
+        country: data.user.user_metadata?.country,
+      }
+
+      set({
+        isLoggedIn: true,
+        user,
+        session: data.session,
+      })
+
+      return { success: true }
+    } catch (error) {
+      console.error('Login error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred during login'
+      return {
+        success: false,
+        message: errorMessage,
+      }
+    }
+  },
+
+  /**
+   * Logout the current user
+   */
+  logout: async () => {
+    try {
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut()
+
+      if (error) {
+        console.error('Logout error:', error)
+      }
+
+      // Clear state
+      set({
+        isLoggedIn: false,
+        user: null,
+        session: null,
+      })
+
+      // Small delay to ensure state syncs before navigation
+      await new Promise((resolve) => setTimeout(resolve, 150))
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Clear state anyway
+      set({
+        isLoggedIn: false,
+        user: null,
+        session: null,
+      })
+    }
+  },
+
+  /**
+   * Get the current access token (JWT)
+   * Used for authenticated API requests to the Go backend
+   */
+  getAccessToken: async () => {
+    const { session } = get()
+    if (!session) {
+      return null
+    }
+
+    // Check if token is still valid
+    const now = Math.floor(Date.now() / 1000)
+    if (session.expires_at && session.expires_at < now) {
+      // Token expired, try to refresh
+      const {
+        data: { session: newSession },
+      } = await supabase.auth.refreshSession()
+      if (newSession) {
+        set({ session: newSession })
+        return newSession.access_token
+      }
+      return null
+    }
+
+    return session.access_token
+  },
+}))
+
+// Set up auth state change listener
+// This will automatically update the store when auth state changes
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Auth state changed:', event)
+
+  if (event === 'SIGNED_IN' && session) {
+    // User signed in
+    const user: AuthUser = {
+      id: session.user.id,
+      email: session.user.email!,
+      name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
+      country: session.user.user_metadata?.country,
+    }
+
+    useAuthStore.setState({
+      isLoggedIn: true,
+      user,
+      session,
+    })
+  } else if (event === 'SIGNED_OUT') {
+    // User signed out
+    useAuthStore.setState({
+      isLoggedIn: false,
+      user: null,
+      session: null,
+    })
+  } else if (event === 'TOKEN_REFRESHED' && session) {
+    // Token was refreshed
+    useAuthStore.setState({
+      session,
+    })
+  }
+})

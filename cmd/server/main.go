@@ -4,7 +4,9 @@ import (
 	"brokerageProject/internal/api"
 	"brokerageProject/internal/binance"
 	"brokerageProject/internal/config"
+	"brokerageProject/internal/database"
 	"brokerageProject/internal/hub"
+	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/services"
 	"log"
 	"net/http"
@@ -47,6 +49,17 @@ func main() {
 
 	// Initialize Stripe after loading environment variables
 	api.InitializeStripe()
+
+	// Initialize database connection pool
+	log.Println("Initializing database connection...")
+	if err := database.InitDB(); err != nil {
+		log.Printf("WARNING: Failed to initialize database: %v", err)
+		log.Println("Account management features will not be available")
+	} else {
+		log.Println("Database connection initialized successfully")
+		// Ensure database connection is closed on shutdown
+		defer database.Close()
+	}
 
 	// Get port from environment (required for Render deployment)
 	// Falls back to 8080 for local development
@@ -106,6 +119,122 @@ func main() {
 	// Webhook handler for NOWPayments IPN (NO CORS - webhook only)
 	http.HandleFunc("/api/v1/crypto/webhook", func(w http.ResponseWriter, r *http.Request) {
 		api.HandleCryptoWebhook(h, w, r)
+	})
+
+	// Account management endpoints (protected with JWT authentication)
+	// POST /api/v1/accounts - Create a new trading account
+	http.HandleFunc("/api/v1/accounts", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			// Apply CORS and Auth middleware for POST requests
+			api.CORSMiddleware(middleware.AuthMiddleware(api.CreateAccount))(w, r)
+		} else if r.Method == http.MethodGet {
+			// Apply CORS and Auth middleware for GET requests
+			api.CORSMiddleware(middleware.AuthMiddleware(api.GetAccounts))(w, r)
+		} else if r.Method == http.MethodOptions {
+			// Handle preflight CORS requests
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		} else {
+			// Method not allowed
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Instruments endpoints (public - no auth required)
+	// GET /api/v1/instruments - List all tradeable instruments
+	http.HandleFunc("/api/v1/instruments", api.CORSMiddleware(allowHEAD(api.GetInstruments)))
+	// GET /api/v1/instruments/symbol?symbol=BTCUSDT - Get instrument by symbol
+	http.HandleFunc("/api/v1/instruments/symbol", api.CORSMiddleware(allowHEAD(api.GetInstrumentBySymbol)))
+
+	// Transactions endpoints (protected with JWT authentication)
+	// POST /api/v1/transactions - Create transaction (deposit/withdrawal/transfer)
+	// GET /api/v1/transactions?account_id={uuid} - List transactions for account
+	http.HandleFunc("/api/v1/transactions", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			api.CORSMiddleware(middleware.AuthMiddleware(api.CreateTransaction))(w, r)
+		} else if r.Method == http.MethodGet {
+			api.CORSMiddleware(middleware.AuthMiddleware(api.GetTransactions))(w, r)
+		} else if r.Method == http.MethodOptions {
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Orders endpoints (protected with JWT authentication)
+	// POST /api/v1/orders - Create a new order
+	// GET /api/v1/orders?account_id={uuid} - List orders for account
+	http.HandleFunc("/api/v1/orders", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			api.CORSMiddleware(middleware.AuthMiddleware(api.CreateOrder))(w, r)
+		} else if r.Method == http.MethodGet {
+			api.CORSMiddleware(middleware.AuthMiddleware(api.GetOrders))(w, r)
+		} else if r.Method == http.MethodOptions {
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/orders/cancel?order_id={uuid} - Cancel an order
+	http.HandleFunc("/api/v1/orders/cancel", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			api.CORSMiddleware(middleware.AuthMiddleware(api.CancelOrder))(w, r)
+		} else if r.Method == http.MethodOptions {
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Contracts endpoints (protected with JWT authentication)
+	// POST /api/v1/contracts - Open a new position
+	// GET /api/v1/contracts?account_id={uuid}&status=open - List contracts
+	http.HandleFunc("/api/v1/contracts", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			api.CORSMiddleware(middleware.AuthMiddleware(api.CreateContract))(w, r)
+		} else if r.Method == http.MethodGet {
+			api.CORSMiddleware(middleware.AuthMiddleware(api.GetContracts))(w, r)
+		} else if r.Method == http.MethodOptions {
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/contracts/close?contract_id={uuid} - Close a position
+	http.HandleFunc("/api/v1/contracts/close", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			api.CORSMiddleware(middleware.AuthMiddleware(api.CloseContract))(w, r)
+		} else if r.Method == http.MethodOptions {
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// PATCH /api/v1/contracts/tpsl?contract_id={uuid} - Update TP/SL
+	http.HandleFunc("/api/v1/contracts/tpsl", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch || r.Method == http.MethodPost {
+			api.CORSMiddleware(middleware.AuthMiddleware(api.UpdateContractTPSL))(w, r)
+		} else if r.Method == http.MethodOptions {
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
 	})
 
 	// Log NOWPayments configuration status

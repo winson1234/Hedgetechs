@@ -117,9 +117,23 @@ export default function HistoryPage() {
 
   // Get data from stores
   const transactions = useTransactionStore(state => state.transactions);
+  const fetchAllTransactionsForLiveAccounts = useTransactionStore(state => state.fetchAllTransactionsForLiveAccounts);
   const executedOrders = useOrderStore(state => state.orderHistory);
   const pendingOrders = useOrderStore(state => state.pendingOrders);
   const accounts = useAccountStore(state => state.accounts);
+
+  // Get all live accounts
+  const liveAccounts = useMemo(() => {
+    return accounts.filter(acc => acc.type === 'live');
+  }, [accounts]);
+
+  // Fetch transactions from ALL live accounts (demo accounts are excluded)
+  useEffect(() => {
+    if (liveAccounts.length > 0) {
+      const liveAccountIds = liveAccounts.map(acc => acc.id);
+      fetchAllTransactionsForLiveAccounts(liveAccountIds);
+    }
+  }, [liveAccounts, fetchAllTransactionsForLiveAccounts]);
 
   // Combined and sorted history
   const allHistory = useMemo<HistoryItem[]>(() => {
@@ -300,6 +314,18 @@ export default function HistoryPage() {
   const renderIcon = (item: HistoryItem) => {
     if (item.itemType === 'transaction') {
       const txn = item as Transaction;
+
+      // Special icon for demo adjustments
+      if (txn.description?.includes('Demo Balance Adjustment')) {
+        return (
+          <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+            <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+          </div>
+        );
+      }
+
       switch (txn.type) {
         case 'deposit':
           return (
@@ -353,12 +379,14 @@ export default function HistoryPage() {
         case 'deposit':
           return (
             <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">Deposit</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">
+                {txn.description?.includes('Demo Balance Adjustment') ? 'Demo Adjustment' : 'Deposit'}
+              </p>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                {txn.metadata?.cardBrand && txn.metadata?.last4
+                {txn.description || (txn.metadata?.cardBrand && txn.metadata?.last4
                   ? `${txn.metadata.cardBrand.toUpperCase()} •••• ${txn.metadata.last4}`
-                  : 'Card payment'}
-                {account && ` → ${account.id}`}
+                  : 'Card payment')}
+                {!txn.description && account && ` → Account ${account.accountNumber}`}
               </p>
             </div>
           );
@@ -367,9 +395,9 @@ export default function HistoryPage() {
             <div>
               <p className="font-medium text-slate-900 dark:text-slate-100">Withdrawal</p>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                {txn.metadata?.bankName || 'Bank'}
-                {txn.metadata?.accountLast4 && ` •••• ${txn.metadata.accountLast4}`}
-                {account && ` ← ${account.id}`}
+                {txn.description || (txn.metadata?.bankName || 'Bank')}
+                {!txn.description && txn.metadata?.accountLast4 && ` •••• ${txn.metadata.accountLast4}`}
+                {!txn.description && account && ` ← Account ${account.accountNumber}`}
               </p>
             </div>
           );
@@ -378,7 +406,7 @@ export default function HistoryPage() {
             <div>
               <p className="font-medium text-slate-900 dark:text-slate-100">Transfer</p>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                {txn.fromAccountId} → {txn.toAccountId}
+                {txn.description || `${txn.fromAccountId} → ${txn.toAccountId}`}
               </p>
             </div>
           );
@@ -725,7 +753,22 @@ export default function HistoryPage() {
 
         {/* History List */}
         <div className="p-5 md:p-6 lg:p-8">
-          {paginatedHistory.length === 0 ? (
+          {liveAccounts.length === 0 ? (
+            <div className="text-center py-16">
+              <svg className="mx-auto h-16 w-16 text-purple-400 dark:text-purple-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+                No Live Accounts
+              </h3>
+              <p className="text-slate-500 dark:text-slate-400 mb-2">
+                Transaction history shows only <span className="font-semibold">Live Account</span> transactions.
+              </p>
+              <p className="text-slate-500 dark:text-slate-400">
+                Demo account transactions are not tracked. Create a Live Account to see real transaction history.
+              </p>
+            </div>
+          ) : paginatedHistory.length === 0 ? (
             <div className="text-center py-16">
               <svg className="mx-auto h-16 w-16 text-slate-400 dark:text-slate-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

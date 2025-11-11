@@ -1,0 +1,52 @@
+services:
+  # Backend service (Go with Air hot-reloading)
+  backend:
+    build:
+      context: .
+      dockerfile: ./cmd/server/Dockerfile.dev
+    container_name: brokerage-backend-dev
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount entire project for hot-reloading
+      - ./:/app
+      # Mount SSL certificates (if they exist)
+      - ./localhost+2.pem:/app/localhost+2.pem:ro
+      - ./localhost+2-key.pem:/app/localhost+2-key.pem:ro
+      # Exclude tmp directory to avoid conflicts
+      - /app/tmp
+    env_file:
+      - .env
+    environment:
+      - DOCKER_ENV=development
+    networks:
+      - brokerage-network
+    restart: unless-stopped
+
+  # Frontend service (React + Vite with hot-reloading)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: brokerage-frontend-dev
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount frontend directory for hot-reloading
+      - ./frontend:/app
+      # Anonymous volume to protect node_modules
+      - /app/node_modules
+    env_file:
+      - .env
+    environment:
+      - DOCKER_ENV=development
+      - VITE_DOCKER_BACKEND_URL=http://backend:8080
+    networks:
+      - brokerage-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  brokerage-network:
+    driver: bridge

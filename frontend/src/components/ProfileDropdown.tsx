@@ -184,8 +184,8 @@ const confirmLogout = async () => {
     navigate('/settings/security');
   };
 
-  const accountId = activeAccountId || 'No Account';
-  const avatarLetter = activeAccountType ? activeAccountType.charAt(0).toUpperCase() : '?';
+  const displayName = user?.name || user?.email?.split('@')[0] || 'User';
+  const avatarLetter = displayName.charAt(0).toUpperCase();
 
   // Create a renderable element for the account type badge
   const accountTypeDisplay = () => {
@@ -369,7 +369,7 @@ const confirmLogout = async () => {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
-              {accountId}
+              {displayName}
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               {accountTypeDisplay()}

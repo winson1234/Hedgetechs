@@ -1,51 +1,19 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import type { Account, AccountStatus, PaymentMethodMetadata } from '../types'
+import type {
+  Account,
+  AccountStatus,
+  PaymentMethodMetadata,
+  BackendAccount,
+  BackendBalance,
+} from '../types'
 import { useUIStore } from './uiStore'
 import { useTransactionStore } from './transactionStore'
+import { useAuthStore } from './authStore'
 import { getApiUrl } from '../config/api'
 
-// Helper Functions
-const generateAccountId = (type: 'live' | 'demo'): string => {
-  const prefix = type === 'live' ? 'L' : 'D'
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
-}
-
-const getDefaultAccounts = (): Account[] => [
-  {
-    id: generateAccountId('live'),
-    type: 'live',
-    currency: 'USD',
-    balances: { USD: 10000, BTC: 1, ETH: 5, SOL: 100 },
-    createdAt: Date.now() - 200000,
-    status: 'active',
-    platformType: 'integrated',
-    platform: 'Brokerage Web',
-    server: 'Primary Server',
-  },
-  {
-    id: generateAccountId('demo'),
-    type: 'demo',
-    currency: 'USD',
-    balances: { USD: 50000 },
-    createdAt: Date.now(),
-    status: 'active',
-    platformType: 'integrated',
-    platform: 'Brokerage Web',
-    server: 'Primary Server',
-  },
-  {
-    id: 'M-8032415',
-    type: 'live',
-    currency: 'USD',
-    balances: { USD: 2500 },
-    createdAt: Date.now() - 500000,
-    status: 'active',
-    platformType: 'external',
-    platform: 'MetaTrader 5',
-    server: 'Exness-MT5Real21',
-  },
-]
+// ============================================================
+// API INTEGRATION - Server-authoritative account management
+// ============================================================
 
 export const formatBalance = (balance: number | undefined, currency: string | undefined): string => {
   const numBalance = balance ?? 0
@@ -80,6 +48,7 @@ interface AccountStore {
   // State
   accounts: Account[]
   activeAccountId: string | null
+  isLoading: boolean
 
   // Selectors (computed properties)
   getActiveAccount: () => Account | undefined
@@ -90,17 +59,16 @@ interface AccountStore {
   // FX Rates Helper
   getFXRates: () => Promise<Record<string, number>>
 
-  // Account Management Actions
+  // Account Management Actions (Server-authoritative)
+  fetchAccounts: () => Promise<void>
   setActiveAccount: (id: string) => void
   openAccount: (
     type: 'live' | 'demo',
+    productType: 'spot' | 'cfd' | 'futures',
     currency: string,
-    initialBalance?: number,
-    platformType?: 'integrated' | 'external',
-    platform?: string,
-    server?: string
-  ) => { success: boolean; message?: string }
-  editDemoBalance: (accountId: string, newBalance: number) => { success: boolean; message?: string }
+    initialBalance: number
+  ) => Promise<{ success: boolean; message?: string; account?: Account }>
+  editDemoBalance: (accountId: string, newBalance: number) => Promise<{ success: boolean; message?: string }>
   toggleAccountStatus: (accountId: string) => void
 
   // Wallet Operations (internal - called by async wrappers)
@@ -114,16 +82,15 @@ interface AccountStore {
   processTransfer: (fromAccountId: string, toAccountId: string, amount: number, currency: string) => Promise<{ success: boolean; message: string; transactionId?: string }>
 
   // Trading Operations
-  executeBuy: (symbol: string, amount: number, price: number) => { success: boolean; message: string }
-  executeSell: (symbol: string, amount: number, price: number) => { success: boolean; message: string }
+  executeBuy: (symbol: string, amount: number, price: number) => Promise<{ success: boolean; message: string }>
+  executeSell: (symbol: string, amount: number, price: number) => Promise<{ success: boolean; message: string }>
 }
 
-export const useAccountStore = create<AccountStore>()(
-  persist(
-    (set, get) => ({
-      // Initial State
-      accounts: [],
-      activeAccountId: null,
+export const useAccountStore = create<AccountStore>()((set, get) => ({
+  // Initial State
+  accounts: [],
+  activeAccountId: null,
+  isLoading: false,
 
       // Selectors
       getActiveAccount: () => {
@@ -150,6 +117,72 @@ export const useAccountStore = create<AccountStore>()(
             obj[key] = value
             return obj
           }, {} as Record<string, number>)
+      },
+
+      // Fetch accounts from backend API
+      fetchAccounts: async () => {
+        set({ isLoading: true })
+        try {
+          // Get JWT token from auth store
+          const token = await useAuthStore.getState().getAccessToken()
+          if (!token) {
+            console.error('No access token available')
+            set({ accounts: [], isLoading: false })
+            return
+          }
+
+          // Call backend API
+          const response = await fetch(getApiUrl('/api/v1/accounts'), {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (!response.ok) {
+            throw new Error(`Failed to fetch accounts: ${response.statusText}`)
+          }
+
+          const data = await response.json()
+
+          if (data.success && data.accounts) {
+            // Transform backend accounts to frontend Account type
+            const accounts: Account[] = data.accounts.map((acc: BackendAccount) => ({
+              id: acc.id, // Use UUID as the ID for API calls
+              accountNumber: acc.account_number, // Display number for UI
+              type: acc.type,
+              productType: acc.product_type,
+              currency: acc.currency,
+              status: acc.status,
+              balances: acc.balances.reduce((obj: Record<string, number>, bal: BackendBalance) => {
+                obj[bal.currency] = bal.amount
+                return obj
+              }, {} as Record<string, number>),
+              createdAt: new Date(acc.created_at).getTime(),
+              platformType: 'integrated', // All server accounts are integrated
+              platform: 'Brokerage Web',
+              server: 'Primary Server',
+            }))
+
+            set({ accounts, isLoading: false })
+
+            // Set first active account if none is set
+            if (!get().activeAccountId && accounts.length > 0) {
+              const firstActive = accounts.find(acc => acc.status === 'active')
+              if (firstActive) {
+                set({ activeAccountId: firstActive.id })
+              }
+            }
+          } else {
+            set({ accounts: [], isLoading: false })
+          }
+        } catch (error) {
+          console.error('Error fetching accounts:', error)
+          const showToast = useUIStore.getState().showToast
+          showToast('Failed to load accounts from server', 'error')
+          set({ accounts: [], isLoading: false })
+        }
       },
 
       // FX Rates Helper
@@ -236,40 +269,101 @@ export const useAccountStore = create<AccountStore>()(
         showToast(`Switched to account ${id}`, 'success')
       },
 
-      openAccount: (type, currency, initialBalance, platformType, platform, server) => {
+      openAccount: async (type, productType, currency, initialBalance) => {
         const { accounts } = get()
         const showToast = useUIStore.getState().showToast
 
+        // Validation
         if (type === 'demo') {
           const demoCount = accounts.filter(acc => acc.type === 'demo').length
           if (demoCount >= 5) {
             showToast('Maximum number of demo accounts reached (5).', 'error')
             return { success: false, message: 'Maximum number of demo accounts reached (5).' }
           }
-          if (initialBalance === undefined || initialBalance < 100 || initialBalance > 1000000) {
-            showToast('Invalid starting balance for demo account.', 'error')
+          if (initialBalance < 100 || initialBalance > 1000000) {
+            showToast('Demo account balance must be between $100 and $1,000,000.', 'error')
             return { success: false, message: 'Invalid starting balance.' }
           }
         }
 
-        const newAccount: Account = {
-          id: generateAccountId(type),
-          type,
-          currency,
-          balances: { [currency]: type === 'demo' ? initialBalance! : 0 },
-          createdAt: Date.now(),
-          status: 'active',
-          platformType: platformType || 'integrated',
-          platform: platform || 'Brokerage Web',
-          server: server || 'Primary Server',
-        }
+        try {
+          // Get JWT token
+          const token = await useAuthStore.getState().getAccessToken()
+          if (!token) {
+            showToast('You must be logged in to create an account', 'error')
+            return { success: false, message: 'Not authenticated' }
+          }
 
-        set(state => ({ accounts: [...state.accounts, newAccount] }))
-        showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} account ${newAccount.id} created.`, 'success')
-        return { success: true, message: `${type.charAt(0).toUpperCase() + type.slice(1)} account created successfully!` }
+          // Call backend API to create account
+          const response = await fetch(getApiUrl('/api/v1/accounts'), {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              type,
+              product_type: productType,
+              currency,
+              initial_balance: initialBalance,
+            }),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Failed to create account' }))
+            throw new Error(errorData.message || 'Failed to create account')
+          }
+
+          const data = await response.json()
+
+          if (data.success && data.account) {
+            // Transform backend account to frontend Account type
+            const backendAccount: BackendAccount = data.account
+            const newAccount: Account = {
+              id: backendAccount.id, // Use UUID as the ID for API calls
+              accountNumber: backendAccount.account_number, // Display number for UI
+              type: backendAccount.type,
+              productType: backendAccount.product_type,
+              currency: backendAccount.currency,
+              status: backendAccount.status,
+              balances: backendAccount.balances.reduce((obj: Record<string, number>, bal: BackendBalance) => {
+                obj[bal.currency] = bal.amount
+                return obj
+              }, {} as Record<string, number>),
+              createdAt: new Date(backendAccount.created_at).getTime(),
+              platformType: 'integrated',
+              platform: 'Brokerage Web',
+              server: 'Primary Server',
+            }
+
+            // Add to local state
+            set(state => ({ accounts: [...state.accounts, newAccount] }))
+
+            showToast(
+              `${type.charAt(0).toUpperCase() + type.slice(1)} ${productType.toUpperCase()} account ${newAccount.accountNumber} created successfully!`,
+              'success'
+            )
+
+            return {
+              success: true,
+              message: 'Account created successfully!',
+              account: newAccount,
+            }
+          } else {
+            throw new Error('Invalid response from server')
+          }
+        } catch (error) {
+          console.error('Error creating account:', error)
+          const errorMessage = error instanceof Error ? error.message : 'Failed to create account'
+          showToast(errorMessage, 'error')
+          return {
+            success: false,
+            message: errorMessage,
+          }
+        }
       },
 
-      editDemoBalance: (accountId, newBalance) => {
+      editDemoBalance: async (accountId, newBalance) => {
         const showToast = useUIStore.getState().showToast
 
         if (isNaN(newBalance) || newBalance < 100 || newBalance > 1000000) {
@@ -277,23 +371,66 @@ export const useAccountStore = create<AccountStore>()(
           return { success: false, message: 'Invalid balance amount.' }
         }
 
-        let updated = false
-        set(state => ({
-          accounts: state.accounts.map(acc => {
-            if (acc.id === accountId && acc.type === 'demo') {
-              updated = true
-              return { ...acc, balances: { ...acc.balances, [acc.currency]: newBalance } }
-            }
-            return acc
-          })
-        }))
-
-        if (updated) {
-          showToast(`Demo account ${accountId} balance updated.`, 'success')
-          return { success: true, message: 'Balance updated successfully!' }
-        } else {
-          showToast(`Could not find Demo account ${accountId} to update.`, 'error')
+        const account = get().accounts.find(acc => acc.id === accountId)
+        if (!account || account.type !== 'demo') {
+          showToast('Could not find Demo account to update.', 'error')
           return { success: false, message: 'Account not found or is not a Demo account.' }
+        }
+
+        const currentBalance = account.balances[account.currency] || 0
+        const difference = newBalance - currentBalance
+
+        if (difference === 0) {
+          return { success: true, message: 'Balance unchanged.' }
+        }
+
+        try {
+          // Get JWT token
+          const token = await useAuthStore.getState().getAccessToken()
+          if (!token) {
+            showToast('You must be logged in to edit balance', 'error')
+            return { success: false, message: 'Not authenticated' }
+          }
+
+          // Call backend API to create adjustment transaction
+          const response = await fetch(getApiUrl('/api/v1/transactions'), {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              account_id: accountId,
+              type: 'deposit', // Always use deposit for demo adjustments
+              currency: account.currency,
+              amount: Math.abs(difference),
+              description: difference > 0
+                ? `Demo Balance Adjustment (Added ${formatBalance(difference, account.currency)})`
+                : `Demo Balance Adjustment (Removed ${formatBalance(Math.abs(difference), account.currency)})`,
+            }),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Failed to update balance' }))
+            throw new Error(errorData.message || 'Failed to update balance')
+          }
+
+          const data = await response.json()
+
+          if (data.success) {
+            // Refetch accounts to get updated balances
+            await get().fetchAccounts()
+
+            showToast(`Demo account balance updated to ${formatBalance(newBalance, account.currency)}`, 'success')
+            return { success: true, message: 'Balance updated successfully!' }
+          } else {
+            throw new Error('Invalid response from server')
+          }
+        } catch (error) {
+          console.error('Edit balance error:', error)
+          const errorMessage = error instanceof Error ? error.message : 'Failed to update balance'
+          showToast(errorMessage, 'error')
+          return { success: false, message: errorMessage }
         }
       },
 
@@ -424,137 +561,160 @@ export const useAccountStore = create<AccountStore>()(
       // Async Wallet Operations (for UI)
       processDeposit: async (accountId, amount, currency, paymentIntentId, metadata) => {
         const showToast = useUIStore.getState().showToast
-        const addTransaction = useTransactionStore.getState().addTransaction
-        const updateTransactionStatus = useTransactionStore.getState().updateTransactionStatus
-
-        // Create pending transaction
-        const transaction = addTransaction({
-          type: 'deposit',
-          status: 'pending',
-          accountId,
-          amount,
-          currency,
-          paymentIntentId,
-          metadata,
-        })
 
         try {
-          // Simulate async processing (Stripe payment confirmation)
-          await new Promise(resolve => setTimeout(resolve, 1500))
+          // Get JWT token
+          const token = await useAuthStore.getState().getAccessToken()
+          if (!token) {
+            showToast('You must be logged in to make deposits', 'error')
+            return { success: false, message: 'Not authenticated' }
+          }
 
-          // Execute the deposit
-          const result = get()._executeDeposit(accountId, amount, currency)
+          // Call backend API to create transaction
+          const response = await fetch(getApiUrl('/api/v1/transactions'), {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              account_id: accountId,
+              type: 'deposit',
+              currency: currency,
+              amount: amount,
+              description: paymentIntentId ? `Deposit via ${metadata?.cardBrand || metadata?.fpxBank || 'payment gateway'} - ${paymentIntentId}` : 'Manual deposit',
+            }),
+          })
 
-          if (result.success) {
-            // Update transaction to completed
-            updateTransactionStatus(transaction.id, 'completed')
-            showToast(`${formatBalance(amount, currency)} deposited to ${accountId}.`, 'success')
-            return { success: true, message: result.message, transactionId: transaction.id }
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Failed to process deposit' }))
+            throw new Error(errorData.message || 'Failed to process deposit')
+          }
+
+          const data = await response.json()
+
+          if (data.success && data.transaction) {
+            // Refetch accounts to get updated balances
+            await get().fetchAccounts()
+
+            showToast(`${formatBalance(amount, currency)} deposited successfully!`, 'success')
+            return { success: true, message: 'Deposit successful', transactionId: data.transaction.id }
           } else {
-            // Update transaction to failed
-            updateTransactionStatus(transaction.id, 'failed', result.message)
-            showToast(result.message, 'error')
-            return { success: false, message: result.message, transactionId: transaction.id }
+            throw new Error('Invalid response from server')
           }
         } catch (error) {
+          console.error('Deposit error:', error)
           const errorMessage = error instanceof Error ? error.message : 'Deposit failed'
-          updateTransactionStatus(transaction.id, 'failed', errorMessage)
           showToast(errorMessage, 'error')
-          return { success: false, message: errorMessage, transactionId: transaction.id }
+          return { success: false, message: errorMessage }
         }
       },
 
       processWithdrawal: async (accountId, amount, currency, bankDetails) => {
         const showToast = useUIStore.getState().showToast
-        const addTransaction = useTransactionStore.getState().addTransaction
-        const updateTransactionStatus = useTransactionStore.getState().updateTransactionStatus
-
-        // CRITICAL: Execute the withdrawal IMMEDIATELY to prevent double-spending
-        // This debits the user's balance and places a "hold" on the funds
-        const result = get()._executeWithdraw(accountId, amount, currency)
-
-        if (!result.success) {
-          // If withdrawal fails (e.g., insufficient funds), don't create transaction
-          showToast(result.message, 'error')
-          return { success: false, message: result.message }
-        }
-
-        // Balance is now debited. Create pending transaction to track the withdrawal
-        const transaction = addTransaction({
-          type: 'withdraw',
-          status: 'pending',
-          accountId,
-          amount,
-          currency,
-          metadata: bankDetails,
-        })
-
-        showToast(`Withdrawal request for ${formatBalance(amount, currency)} is being processed.`, 'success')
 
         try {
-          // Auto-approval after 45 seconds (simulates admin review)
-          setTimeout(() => {
-            // Update transaction status to completed
-            // Do NOT call _executeWithdraw again - balance was already debited
-            updateTransactionStatus(transaction.id, 'completed')
-            showToast(`Withdrawal of ${formatBalance(amount, currency)} completed.`, 'success')
-          }, 45000) // 45 seconds
+          // Get JWT token
+          const token = await useAuthStore.getState().getAccessToken()
+          if (!token) {
+            showToast('You must be logged in to make withdrawals', 'error')
+            return { success: false, message: 'Not authenticated' }
+          }
 
-          return { success: true, message: 'Withdrawal is being processed', transactionId: transaction.id }
+          // Call backend API to create transaction
+          const response = await fetch(getApiUrl('/api/v1/transactions'), {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              account_id: accountId,
+              type: 'withdrawal',
+              currency: currency,
+              amount: amount,
+              description: bankDetails ? `Withdrawal to ${bankDetails.fpxBank || 'bank account'}` : 'Manual withdrawal',
+            }),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Failed to process withdrawal' }))
+            throw new Error(errorData.message || 'Failed to process withdrawal')
+          }
+
+          const data = await response.json()
+
+          if (data.success && data.transaction) {
+            // Refetch accounts to get updated balances
+            await get().fetchAccounts()
+
+            showToast(`${formatBalance(amount, currency)} withdrawn successfully!`, 'success')
+            return { success: true, message: 'Withdrawal successful', transactionId: data.transaction.id }
+          } else {
+            throw new Error('Invalid response from server')
+          }
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Withdrawal processing error'
-          // Note: Balance has already been debited, so we still mark as completed
-          // In a real system, you'd need to refund if processing fails
-          updateTransactionStatus(transaction.id, 'failed', errorMessage)
+          console.error('Withdrawal error:', error)
+          const errorMessage = error instanceof Error ? error.message : 'Withdrawal failed'
           showToast(errorMessage, 'error')
-          return { success: false, message: errorMessage, transactionId: transaction.id }
+          return { success: false, message: errorMessage }
         }
       },
 
       processTransfer: async (fromAccountId, toAccountId, amount, currency) => {
         const showToast = useUIStore.getState().showToast
-        const addTransaction = useTransactionStore.getState().addTransaction
-        const updateTransactionStatus = useTransactionStore.getState().updateTransactionStatus
-
-        // Create pending transaction
-        const transaction = addTransaction({
-          type: 'transfer',
-          status: 'pending',
-          accountId: fromAccountId,
-          amount,
-          currency,
-          fromAccountId,
-          toAccountId,
-        })
 
         try {
-          // Simulate async processing
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          // Get JWT token
+          const token = await useAuthStore.getState().getAccessToken()
+          if (!token) {
+            showToast('You must be logged in to make transfers', 'error')
+            return { success: false, message: 'Not authenticated' }
+          }
 
-          // Execute the transfer
-          const result = get()._executeTransfer(fromAccountId, toAccountId, amount, currency)
+          // Call backend API to create transaction
+          const response = await fetch(getApiUrl('/api/v1/transactions'), {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              account_id: fromAccountId,
+              type: 'transfer',
+              currency: currency,
+              amount: amount,
+              target_account_id: toAccountId,
+              description: `Transfer from ${fromAccountId} to ${toAccountId}`,
+            }),
+          })
 
-          if (result.success) {
-            // Update transaction to completed
-            updateTransactionStatus(transaction.id, 'completed')
-            showToast(`Transferred ${formatBalance(amount, currency)} from ${fromAccountId} to ${toAccountId}.`, 'success')
-            return { success: true, message: result.message, transactionId: transaction.id }
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Failed to process transfer' }))
+            throw new Error(errorData.message || 'Failed to process transfer')
+          }
+
+          const data = await response.json()
+
+          if (data.success && data.transaction) {
+            // Refetch accounts to get updated balances
+            await get().fetchAccounts()
+
+            showToast(`${formatBalance(amount, currency)} transferred successfully!`, 'success')
+            return { success: true, message: 'Transfer successful', transactionId: data.transaction.id }
           } else {
-            // Update transaction to failed
-            updateTransactionStatus(transaction.id, 'failed', result.message)
-            showToast(result.message, 'error')
-            return { success: false, message: result.message, transactionId: transaction.id }
+            throw new Error('Invalid response from server')
           }
         } catch (error) {
+          console.error('Transfer error:', error)
           const errorMessage = error instanceof Error ? error.message : 'Transfer failed'
-          updateTransactionStatus(transaction.id, 'failed', errorMessage)
           showToast(errorMessage, 'error')
-          return { success: false, message: errorMessage, transactionId: transaction.id }
+          return { success: false, message: errorMessage }
         }
       },
 
       // Trading Operations
-      executeBuy: (symbol, amount, price) => {
+      executeBuy: async (symbol, amount, price) => {
         const activeAccount = get().getActiveAccount()
         const { activeAccountId } = get()
         const showToast = useUIStore.getState().showToast
@@ -563,93 +723,110 @@ export const useAccountStore = create<AccountStore>()(
           return { success: false, message: 'No active account selected.' }
         }
 
-        const totalCost = amount * price
-        const baseCurrency = symbol.replace(/USDT?$/, '')
-        const quoteCurrency = activeAccount.currency
-        const currentQuoteBalance = activeAccount.balances[quoteCurrency] ?? 0
-
-        if (totalCost > currentQuoteBalance) {
-          showToast('Insufficient funds to place buy order.', 'error')
-          return { success: false, message: `Insufficient ${quoteCurrency} balance.` }
-        }
-
-        set(state => ({
-          accounts: state.accounts.map(acc => {
-            if (acc.id === activeAccountId) {
-              const currentBaseBalance = acc.balances[baseCurrency] ?? 0
-              return {
-                ...acc,
-                balances: {
-                  ...acc.balances,
-                  [quoteCurrency]: currentQuoteBalance - totalCost,
-                  [baseCurrency]: currentBaseBalance + amount
-                }
-              }
-            }
-            return acc
-          })
-        }))
-
-        showToast(`Bought ${amount.toFixed(6)} ${baseCurrency} on ${activeAccount.id}.`, 'success')
-        return { success: true, message: 'Buy order executed.' }
-      },
-
-      executeSell: (symbol, amount, price) => {
-        const activeAccount = get().getActiveAccount()
-        const { activeAccountId } = get()
-        const showToast = useUIStore.getState().showToast
-
-        if (!activeAccount) {
-          return { success: false, message: 'No active account selected.' }
-        }
-
-        const totalValue = amount * price
-        const baseCurrency = symbol.replace(/USDT?$/, '')
-        const quoteCurrency = activeAccount.currency
-        const currentBaseBalance = activeAccount.balances[baseCurrency] ?? 0
-
-        if (amount > currentBaseBalance) {
-          showToast(`Insufficient ${baseCurrency} to place sell order.`, 'error')
-          return { success: false, message: `Insufficient ${baseCurrency} balance.` }
-        }
-
-        set(state => ({
-          accounts: state.accounts.map(acc => {
-            if (acc.id === activeAccountId) {
-              const currentQuoteBalance = acc.balances[quoteCurrency] ?? 0
-              return {
-                ...acc,
-                balances: {
-                  ...acc.balances,
-                  [quoteCurrency]: currentQuoteBalance + totalValue,
-                  [baseCurrency]: currentBaseBalance - amount
-                }
-              }
-            }
-            return acc
-          })
-        }))
-
-        showToast(`Sold ${amount.toFixed(6)} ${baseCurrency} on ${activeAccount.id}.`, 'success')
-        return { success: true, message: 'Sell order executed.' }
-      },
-    }),
-    {
-      name: 'account-store',
-      // Persist accounts and activeAccountId
-      partialize: (state) => ({
-        accounts: state.accounts,
-        activeAccountId: state.activeAccountId,
-      }),
-      // Initialize with default accounts if empty
-      onRehydrateStorage: () => (state) => {
-        if (state && state.accounts.length === 0) {
-          state.accounts = getDefaultAccounts()
-          if (state.accounts.length > 0) {
-            state.activeAccountId = state.accounts[0].id
+        try {
+          // Get JWT token
+          const token = await useAuthStore.getState().getAccessToken()
+          if (!token) {
+            showToast('You must be logged in to trade', 'error')
+            return { success: false, message: 'Not authenticated' }
           }
+
+          // Call backend API to create order
+          const response = await fetch(getApiUrl('/api/v1/orders'), {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              account_id: activeAccountId,
+              symbol: symbol,
+              side: 'buy',
+              type: 'market',
+              amount_base: amount,
+            }),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Failed to execute buy order' }))
+            throw new Error(errorData.message || 'Failed to execute buy order')
+          }
+
+          const data = await response.json()
+
+          if (data.success && data.order) {
+            // Refetch accounts to get updated balances
+            await get().fetchAccounts()
+
+            const baseCurrency = symbol.replace(/USDT?$/, '')
+            showToast(`Bought ${amount.toFixed(6)} ${baseCurrency}`, 'success')
+            return { success: true, message: 'Buy order executed.', orderId: data.order.id }
+          } else {
+            throw new Error('Invalid response from server')
+          }
+        } catch (error) {
+          console.error('Buy order error:', error)
+          const errorMessage = error instanceof Error ? error.message : 'Buy order failed'
+          showToast(errorMessage, 'error')
+          return { success: false, message: errorMessage }
         }
       },
-    }
-  )
-)
+
+      executeSell: async (symbol, amount, price) => {
+        const activeAccount = get().getActiveAccount()
+        const { activeAccountId } = get()
+        const showToast = useUIStore.getState().showToast
+
+        if (!activeAccount) {
+          return { success: false, message: 'No active account selected.' }
+        }
+
+        try {
+          // Get JWT token
+          const token = await useAuthStore.getState().getAccessToken()
+          if (!token) {
+            showToast('You must be logged in to trade', 'error')
+            return { success: false, message: 'Not authenticated' }
+          }
+
+          // Call backend API to create order
+          const response = await fetch(getApiUrl('/api/v1/orders'), {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              account_id: activeAccountId,
+              symbol: symbol,
+              side: 'sell',
+              type: 'market',
+              amount_base: amount,
+            }),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Failed to execute sell order' }))
+            throw new Error(errorData.message || 'Failed to execute sell order')
+          }
+
+          const data = await response.json()
+
+          if (data.success && data.order) {
+            // Refetch accounts to get updated balances
+            await get().fetchAccounts()
+
+            const baseCurrency = symbol.replace(/USDT?$/, '')
+            showToast(`Sold ${amount.toFixed(6)} ${baseCurrency}`, 'success')
+            return { success: true, message: 'Sell order executed.', orderId: data.order.id }
+          } else {
+            throw new Error('Invalid response from server')
+          }
+        } catch (error) {
+          console.error('Sell order error:', error)
+          const errorMessage = error instanceof Error ? error.message : 'Sell order failed'
+          showToast(errorMessage, 'error')
+          return { success: false, message: errorMessage }
+        }
+      },
+}))

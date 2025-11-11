@@ -4,7 +4,9 @@ export type AccountStatus = 'active' | 'deactivated' | 'suspended'
 
 export type Account = {
   id: string
+  accountNumber?: string
   type: 'live' | 'demo'
+  productType?: 'spot' | 'cfd' | 'futures'
   currency: string
   balances: Record<string, number>
   createdAt: number
@@ -12,6 +14,29 @@ export type Account = {
   platformType: 'integrated' | 'external'
   platform?: string
   server?: string
+}
+
+// Backend API response types
+export type BackendAccount = {
+  id: string
+  user_id: string
+  account_number: string
+  type: 'live' | 'demo'
+  product_type: 'spot' | 'cfd' | 'futures'
+  currency: string
+  status: AccountStatus
+  created_at: string
+  updated_at: string
+  balances: BackendBalance[]
+}
+
+export type BackendBalance = {
+  id: string
+  account_id: string
+  currency: string
+  amount: number
+  created_at: string
+  updated_at: string
 }
 
 export type Page = 'dashboard' | 'trading' | 'account' | 'wallet' | 'history'
@@ -56,6 +81,9 @@ export type Transaction = {
   // For transfers
   fromAccountId?: string
   toAccountId?: string
+  targetAccountId?: string // Backend uses this field for transfers
+  // Description from backend
+  description?: string
   // Error information
   errorMessage?: string
 }

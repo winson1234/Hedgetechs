@@ -51,7 +51,7 @@ interface OrderStore {
   cancelPendingOrder: (orderId: string) => { success: boolean; message: string }
 
   // Order Execution
-  executePendingOrder: (orderId: string, executionPrice: number, fee?: number) => { success: boolean; message: string }
+  executePendingOrder: (orderId: string, executionPrice: number, fee?: number) => Promise<{ success: boolean; message: string }>
   recordExecutedOrder: (order: Omit<ExecutedOrder, 'id' | 'timestamp'>) => { success: boolean; message: string }
 
   // Auto-execution Logic
@@ -142,7 +142,7 @@ export const useOrderStore = create<OrderStore>()(
       },
 
       // Execute Pending Order
-      executePendingOrder: (orderId, executionPrice, fee = 0) => {
+      executePendingOrder: async (orderId, executionPrice, fee = 0) => {
         const showToast = useUIStore.getState().showToast
         const { pendingOrders } = get()
         const order = pendingOrders.find(o => o.id === orderId)
@@ -155,8 +155,8 @@ export const useOrderStore = create<OrderStore>()(
         // Execute the trade using accountStore
         const accountStore = useAccountStore.getState()
         const result = order.side === 'buy'
-          ? accountStore.executeBuy(order.symbol, order.amount, executionPrice)
-          : accountStore.executeSell(order.symbol, order.amount, executionPrice)
+          ? await accountStore.executeBuy(order.symbol, order.amount, executionPrice)
+          : await accountStore.executeSell(order.symbol, order.amount, executionPrice)
 
         if (!result.success) {
           // Execution failed - keep the order pending
@@ -285,7 +285,8 @@ export const useOrderStore = create<OrderStore>()(
               `Limit Price: ${order.price}, Current Market Price: ${currentPrice}`
             )
 
-            get().executePendingOrder(order.id, order.price)
+            // Fire and forget - don't await to allow other orders to process
+            void get().executePendingOrder(order.id, order.price)
           }
         })
       },

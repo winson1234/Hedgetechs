@@ -8,7 +8,7 @@ type EditBalanceModalProps = {
   isOpen: boolean;
   onClose: () => void;
   account: Account | null | undefined; // The demo account to edit
-  editDemoBalance: (accountId: string, newBalance: number) => EditBalanceResult;
+  editDemoBalance: (accountId: string, newBalance: number) => Promise<EditBalanceResult>;
   onBalanceEdited: (message: string) => void; // Callback for success toast
 };
 
@@ -69,11 +69,8 @@ function EditBalanceModal({
     setError(null);
     setIsLoading(true);
 
-    // Simulate delay
-    await new Promise(resolve => setTimeout(resolve, 300));
-
     const balanceNum = parseFloat(newBalance);
-    const result = editDemoBalance(account.id, balanceNum);
+    const result = await editDemoBalance(account.id, balanceNum);
 
     if (result.success) {
       onBalanceEdited(result.message || 'Demo balance updated successfully!');

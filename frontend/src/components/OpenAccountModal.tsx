@@ -1,37 +1,38 @@
 import { useState, useEffect, memo } from 'react';
 
+import type { Account } from '../types'
+
 // Define expected return type from openAccount function
-type OpenAccountResult = { success: boolean; message?: string };
+type OpenAccountResult = {
+  success: boolean
+  message?: string
+  account?: Account
+}
 
 type OpenAccountModalProps = {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen: boolean
+  onClose: () => void
   openAccount: (
     type: 'live' | 'demo',
+    productType: 'spot' | 'cfd' | 'futures',
     currency: string,
-    initialBalance?: number,
-    platformType?: 'integrated' | 'external',
-    platform?: string,
-    server?: string
-  ) => OpenAccountResult;
-  onAccountCreated: (message: string) => void;
-};
+    initialBalance: number
+  ) => Promise<OpenAccountResult>
+  onAccountCreated: (message: string) => void
+}
 
 // Supported Currencies
-const supportedCurrencies = ['USD', 'EUR', 'MYR', 'JPY'];
-const demoInitialBalancePresets = [1000, 5000, 10000, 50000, 100000];
-const MIN_DEMO_BALANCE = 100;
-const MAX_DEMO_BALANCE = 1000000;
+const supportedCurrencies = ['USD', 'EUR', 'MYR', 'JPY']
+const demoInitialBalancePresets = [1000, 5000, 10000, 50000, 100000]
+const MIN_DEMO_BALANCE = 100
+const MAX_DEMO_BALANCE = 1000000
 
-// Platform options for external accounts
-const externalPlatforms = ['MT4', 'MT5', 'cTrader', 'TradingView'];
-const externalServers = [
-  'FPBroker-Live01',
-  'FPBroker-Live02',
-  'FPBroker-Demo01',
-  'FPBroker-Demo02',
-];
-
+// Product types for trading accounts
+const productTypes: Array<{ value: 'spot' | 'cfd' | 'futures'; label: string; description: string }> = [
+  { value: 'spot', label: 'Spot', description: 'Trade assets at current market prices' },
+  { value: 'cfd', label: 'CFD', description: 'Contracts for Difference trading' },
+  { value: 'futures', label: 'Futures', description: 'Futures contracts trading' },
+]
 
 function OpenAccountModal({
   isOpen,
@@ -39,29 +40,25 @@ function OpenAccountModal({
   openAccount,
   onAccountCreated,
 }: OpenAccountModalProps) {
-  const [accountType, setAccountType] = useState<'live' | 'demo'>('live');
-  const [platformType, setPlatformType] = useState<'integrated' | 'external'>('integrated');
-  const [selectedCurrency, setSelectedCurrency] = useState<string>('USD');
-  const [initialBalance, setInitialBalance] = useState<string>('10000');
-  const [selectedPlatform, setSelectedPlatform] = useState<string>('MT4');
-  const [selectedServer, setSelectedServer] = useState<string>('FPBroker-Live01');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [balanceError, setBalanceError] = useState<string | null>(null);
+  const [accountType, setAccountType] = useState<'live' | 'demo'>('live')
+  const [productType, setProductType] = useState<'spot' | 'cfd' | 'futures'>('spot')
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('USD')
+  const [initialBalance, setInitialBalance] = useState<string>('10000')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [balanceError, setBalanceError] = useState<string | null>(null)
 
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setPlatformType('integrated');
-      setSelectedCurrency('USD');
-      setInitialBalance('10000');
-      setSelectedPlatform('MT4');
-      setSelectedServer('FPBroker-Live01');
-      setError(null);
-      setBalanceError(null);
-      setIsLoading(false);
+      setProductType('spot')
+      setSelectedCurrency('USD')
+      setInitialBalance('10000')
+      setError(null)
+      setBalanceError(null)
+      setIsLoading(false)
     }
-  }, [isOpen]);
+  }, [isOpen])
 
    // Validate demo balance
   useEffect(() => {
@@ -81,35 +78,37 @@ function OpenAccountModal({
 
 
   const handleSubmit = async () => {
-    setError(null);
+    setError(null)
     // Ensure demo balance is valid before proceeding
     if (accountType === 'demo' && balanceError) {
-        return;
+      return
     }
 
-    setIsLoading(true);
+    setIsLoading(true)
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      const balanceNum = accountType === 'demo' ? parseFloat(initialBalance) : 0
 
-    const balanceNum = accountType === 'demo' ? parseFloat(initialBalance) : undefined;
+      const result = await openAccount(
+        accountType,
+        productType,
+        selectedCurrency,
+        balanceNum
+      )
 
-    const result = openAccount(
-      accountType,
-      selectedCurrency,
-      balanceNum,
-      platformType,
-      platformType === 'external' ? selectedPlatform : 'Brokerage Web',
-      platformType === 'external' ? selectedServer : 'Primary Server'
-    );
-
-    if (result.success) {
-      onAccountCreated(result.message || 'Account created successfully!');
-    } else {
-      setError(result.message || 'Failed to open account. Please try again.');
+      if (result.success) {
+        onAccountCreated(result.message || 'Account created successfully!')
+        onClose() // Close modal on success
+      } else {
+        setError(result.message || 'Failed to open account. Please try again.')
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to open account. Please try again.'
+      setError(errorMessage)
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false);
-  };
+  }
 
   if (!isOpen) return null;
 
@@ -173,39 +172,29 @@ function OpenAccountModal({
             </div>
           </div>
 
-          {/* Platform Type Toggle */}
+          {/* Product Type Selector */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Platform Type
+              Product Type
             </label>
             <div className="flex gap-1 bg-slate-100 dark:bg-slate-900 rounded-lg p-1">
-              <button
-                onClick={() => setPlatformType('integrated')}
-                disabled={isLoading}
-                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition ${
-                  platformType === 'integrated'
-                    ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
-                }`}
-              >
-                Integrated
-              </button>
-              <button
-                onClick={() => setPlatformType('external')}
-                disabled={isLoading}
-                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition ${
-                  platformType === 'external'
-                    ? 'bg-white dark:bg-slate-700 text-orange-700 dark:text-orange-300 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
-                }`}
-              >
-                External
-              </button>
+              {productTypes.map((pt) => (
+                <button
+                  key={pt.value}
+                  onClick={() => setProductType(pt.value)}
+                  disabled={isLoading}
+                  className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition ${
+                    productType === pt.value
+                      ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
+                  }`}
+                >
+                  {pt.label}
+                </button>
+              ))}
             </div>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {platformType === 'integrated'
-                ? 'Trade directly on our web platform'
-                : 'Connect an external trading platform (e.g., MT4, MT5)'}
+              {productTypes.find(pt => pt.value === productType)?.description}
             </p>
           </div>
 
@@ -225,52 +214,15 @@ function OpenAccountModal({
                 <option key={curr} value={curr}>{curr}</option>
               ))}
             </select>
-            {accountType === 'live' && platformType === 'integrated' && (
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Live accounts start with a 0 balance. Use the Deposit function after creation.</p>
+            {accountType === 'live' && (
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Live accounts start with a 0 balance. Use the Deposit function after creation.
+              </p>
             )}
           </div>
 
-          {/* Platform Selection (External Only) */}
-          {platformType === 'external' && (
-            <>
-              <div>
-                <label htmlFor="platform" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Trading Platform
-                </label>
-                <select
-                  id="platform"
-                  value={selectedPlatform}
-                  onChange={(e) => setSelectedPlatform(e.target.value)}
-                  disabled={isLoading}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm disabled:opacity-70"
-                >
-                  {externalPlatforms.map(platform => (
-                    <option key={platform} value={platform}>{platform}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="server" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Server
-                </label>
-                <select
-                  id="server"
-                  value={selectedServer}
-                  onChange={(e) => setSelectedServer(e.target.value)}
-                  disabled={isLoading}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm disabled:opacity-70"
-                >
-                  {externalServers.map(server => (
-                    <option key={server} value={server}>{server}</option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
-
-          {/* Initial Balance (Demo Only, Integrated Only) */}
-          {accountType === 'demo' && platformType === 'integrated' && (
+          {/* Initial Balance (Demo Only) */}
+          {accountType === 'demo' && (
             <div>
               <label htmlFor="initialBalance" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Starting Balance ({selectedCurrency})

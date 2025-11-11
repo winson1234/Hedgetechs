@@ -6,18 +6,33 @@ import fs from 'fs'
 // Use localhost for development, Fly.io for production preview
 const isDev = process.env.NODE_ENV !== 'production'
 
+// Check if running in Docker (via environment variable)
+const isDockerEnv = !!process.env.VITE_DOCKER_BACKEND_URL
+
 // Check for mkcert-generated SSL certificates (for local HTTPS development)
 const certPath = path.resolve(__dirname, '..', 'localhost+2.pem')
 const keyPath = path.resolve(__dirname, '..', 'localhost+2-key.pem')
 const hasCertificates = fs.existsSync(certPath) && fs.existsSync(keyPath)
 
-// Use HTTPS for local development if certificates are available
-const BACKEND_URL = isDev
-  ? (hasCertificates ? 'https://localhost:8080' : 'http://localhost:8080')
-  : 'https://brokerageproject.fly.dev'
+// Determine backend URL based on environment
+let BACKEND_URL: string
+if (isDockerEnv) {
+  // Docker mode: use Docker service name
+  BACKEND_URL = process.env.VITE_DOCKER_BACKEND_URL!
+} else if (isDev) {
+  // Local development: use HTTPS if certificates are available
+  BACKEND_URL = hasCertificates ? 'https://localhost:8080' : 'http://localhost:8080'
+} else {
+  // Production: use Fly.io URL
+  BACKEND_URL = 'https://brokerageproject.fly.dev'
+}
 
 // Log configuration for developer visibility
-if (isDev && hasCertificates) {
+if (isDockerEnv) {
+  console.log('🐳 Running in Docker environment')
+  console.log('   Frontend: http://localhost:5173')
+  console.log('   Backend:  ' + BACKEND_URL)
+} else if (isDev && hasCertificates) {
   console.log('✅ mkcert certificates found - using HTTPS for local development')
   console.log('   Frontend: https://localhost:5173')
   console.log('   Backend:  https://localhost:8080')
@@ -35,8 +50,8 @@ export default defineConfig({
   envDir: path.resolve(__dirname, '..'),
   server: {
     port: 5173,
-    // Enable HTTPS if certificates are available
-    ...(hasCertificates && {
+    // Enable HTTPS if certificates are available and not in Docker
+    ...(!isDockerEnv && hasCertificates && {
       https: {
         key: fs.readFileSync(keyPath),
         cert: fs.readFileSync(certPath),

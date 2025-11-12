@@ -36,10 +36,20 @@ interface AccountState {
   error: string | null;
 }
 
+// Load active account from localStorage
+const loadActiveAccountId = (): string | null => {
+  try {
+    const stored = localStorage.getItem('activeAccountId');
+    return stored;
+  } catch {
+    return null;
+  }
+};
+
 // Initial state
 const initialState: AccountState = {
   accounts: [],
-  activeAccountId: null,
+  activeAccountId: loadActiveAccountId(),
   loading: false,
   error: null,
 };
@@ -159,6 +169,12 @@ const accountSlice = createSlice({
     // Set active account
     setActiveAccount: (state, action: PayloadAction<string>) => {
       state.activeAccountId = action.payload;
+      // Persist to localStorage
+      try {
+        localStorage.setItem('activeAccountId', action.payload);
+      } catch (error) {
+        console.error('Failed to save active account to localStorage:', error);
+      }
     },
 
     // Clear error
@@ -170,6 +186,12 @@ const accountSlice = createSlice({
     clearAccounts: (state) => {
       state.accounts = [];
       state.activeAccountId = null;
+      // Clear from localStorage
+      try {
+        localStorage.removeItem('activeAccountId');
+      } catch (error) {
+        console.error('Failed to clear active account from localStorage:', error);
+      }
     },
   },
   extraReducers: (builder) => {
@@ -183,9 +205,18 @@ const accountSlice = createSlice({
         state.loading = false;
         state.accounts = action.payload;
 
-        // Set active account to first account if none selected
-        if (!state.activeAccountId && action.payload.length > 0) {
+        // Validate activeAccountId still exists in accounts
+        const accountExists = state.activeAccountId && action.payload.some((acc: Account) => acc.id === state.activeAccountId);
+
+        if (!accountExists && action.payload.length > 0) {
+          // Set active account to first account if none selected or invalid
           state.activeAccountId = action.payload[0].id;
+          // Persist to localStorage
+          try {
+            localStorage.setItem('activeAccountId', action.payload[0].id);
+          } catch (error) {
+            console.error('Failed to save active account to localStorage:', error);
+          }
         }
       })
       .addCase(fetchAccounts.rejected, (state, action) => {

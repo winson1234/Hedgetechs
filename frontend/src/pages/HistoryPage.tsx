@@ -60,13 +60,13 @@ const getStatusColor = (status: string) => {
 
 // Export to CSV helper
 const exportToCSV = (items: HistoryItem[], filename: string) => {
-  const headers = ['Type', 'ID', 'Symbol', 'Amount', 'Status', 'Date'];
+  const headers = ['Type', 'Number', 'Symbol', 'Amount', 'Status', 'Date'];
   const rows = items.map(item => {
     if (item.itemType === 'transaction') {
       const txn = item as Transaction;
       return [
         txn.type,
-        txn.id,
+        txn.transactionNumber,
         '-',
         txn.amount.toString(),
         txn.status,
@@ -76,7 +76,7 @@ const exportToCSV = (items: HistoryItem[], filename: string) => {
       const order = item as ExecutedOrder;
       return [
         `${order.side} (executed)`,
-        order.id,
+        order.orderNumber || order.id,
         order.symbol,
         order.amount.toString(),
         'completed',
@@ -86,7 +86,7 @@ const exportToCSV = (items: HistoryItem[], filename: string) => {
       const order = item as PendingOrder;
       return [
         `${order.side} (pending)`,
-        order.id,
+        order.orderNumber || order.id,
         order.symbol,
         order.amount.toString(),
         'pending',
@@ -194,16 +194,20 @@ export default function HistoryPage() {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(item => {
-        const id = item.id.toLowerCase();
         if (item.itemType === 'transaction') {
           const txn = item as Transaction;
-          return id.includes(query) ||
+          return txn.transactionNumber.toLowerCase().includes(query) ||
                  txn.type.includes(query) ||
                  txn.amount.toString().includes(query) ||
                  txn.accountId.toLowerCase().includes(query);
+        } else if (item.itemType === 'executedOrder') {
+          const order = item as ExecutedOrder;
+          return (order.orderNumber && order.orderNumber.toLowerCase().includes(query)) ||
+                 order.symbol.toLowerCase().includes(query) ||
+                 order.amount.toString().includes(query);
         } else {
-          const order = item as ExecutedOrder | PendingOrder;
-          return id.includes(query) ||
+          const order = item as PendingOrder;
+          return (order.orderNumber && order.orderNumber.toLowerCase().includes(query)) ||
                  order.symbol.toLowerCase().includes(query) ||
                  order.amount.toString().includes(query);
         }

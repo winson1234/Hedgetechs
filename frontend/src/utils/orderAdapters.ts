@@ -10,6 +10,7 @@ import type { Order as ReduxOrder, PendingOrder as ReduxPendingOrder } from '../
  */
 export interface LegacyExecutedOrder {
   id: string;
+  orderNumber: string; // Human-readable order number: ORD-00001
   accountId: string;
   symbol: string;
   side: 'buy' | 'sell';
@@ -28,6 +29,7 @@ export interface LegacyExecutedOrder {
  */
 export interface LegacyPendingOrder {
   id: string;
+  orderNumber: string; // Human-readable order number: ORD-00001
   accountId: string;
   symbol: string;
   side: 'buy' | 'sell';
@@ -52,6 +54,7 @@ export function adaptExecutedOrder(order: ReduxOrder): LegacyExecutedOrder {
 
   return {
     id: order.id,
+    orderNumber: order.order_number, // Human-readable number
     accountId: order.account_id,
     symbol: order.symbol,
     side: order.side,
@@ -72,6 +75,7 @@ export function adaptExecutedOrder(order: ReduxOrder): LegacyExecutedOrder {
 export function adaptPendingOrder(order: ReduxPendingOrder): LegacyPendingOrder {
   return {
     id: order.id,
+    orderNumber: order.id, // TODO: Backend needs to add order_number to pending_orders table
     accountId: order.account_id,
     symbol: order.symbol,
     side: order.side,

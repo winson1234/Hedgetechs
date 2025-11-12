@@ -172,6 +172,53 @@ export const cancelPendingOrder = createAsyncThunk(
   }
 );
 
+// Execute market order
+export const executeMarketOrder = createAsyncThunk(
+  'order/executeMarketOrder',
+  async (
+    orderData: {
+      account_id: string;
+      symbol: string;
+      side: 'buy' | 'sell';
+      amount_base: number;
+      current_price: number; // Current market price passed from frontend
+    },
+    { getState, rejectWithValue }
+  ) => {
+    try {
+      const token = getAuthToken(getState as () => RootState);
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch('/api/v1/orders', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          account_id: orderData.account_id,
+          symbol: orderData.symbol,
+          side: orderData.side,
+          type: 'market',
+          amount_base: orderData.amount_base,
+          limit_price: orderData.current_price, // Pass current price for market execution
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to execute market order');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to execute market order';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // Order slice
 const orderSlice = createSlice({
   name: 'order',
@@ -248,6 +295,24 @@ const orderSlice = createSlice({
         }
       })
       .addCase(cancelPendingOrder.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Execute market order
+    builder
+      .addCase(executeMarketOrder.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(executeMarketOrder.fulfilled, (state, action) => {
+        state.loading = false;
+        // Add executed order to history
+        if (action.payload.order) {
+          state.orders.unshift(action.payload.order);
+        }
+      })
+      .addCase(executeMarketOrder.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });

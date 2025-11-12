@@ -25,11 +25,27 @@ const initialState: AuthState = {
 // Sign up
 export const signUp = createAsyncThunk(
   'auth/signUp',
-  async ({ email, password }: { email: string; password: string }, { rejectWithValue }) => {
+  async ({
+    email,
+    password,
+    fullName,
+    country
+  }: {
+    email: string;
+    password: string;
+    fullName?: string;
+    country?: string;
+  }, { rejectWithValue }) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            country: country,
+          }
+        }
       });
 
       if (error) throw error;

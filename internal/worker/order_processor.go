@@ -199,6 +199,60 @@ func (op *OrderProcessor) processPendingOrdersForSymbol(symbol string, currentPr
 	}
 }
 
+// getEquivalentCurrencyForWorker returns the equivalent currency for USD/USDT interchangeability
+// For trading purposes, USD and USDT are treated as equivalent (1:1 parity)
+func getEquivalentCurrencyForWorker(currency string) string {
+	if currency == "USDT" {
+		return "USD"
+	}
+	if currency == "USD" {
+		return "USDT"
+	}
+	return currency
+}
+
+// getBalanceWithFallbackForWorker checks balance for a currency, with fallback to equivalent currency
+// Returns: actualCurrency (the one that exists), balance, error
+func (op *OrderProcessor) getBalanceWithFallbackForWorker(ctx context.Context, accountID, preferredCurrency string) (string, float64, error) {
+	// Try preferred currency first
+	var balance float64
+	err := op.db.QueryRow(ctx,
+		"SELECT amount FROM balances WHERE account_id = $1 AND currency = $2",
+		accountID, preferredCurrency,
+	).Scan(&balance)
+
+	if err == nil {
+		return preferredCurrency, balance, nil
+	}
+
+	// Check if it's a "no rows" error (balance doesn't exist)
+	if err.Error() == "no rows in result set" {
+		// Try equivalent currency
+		equivalentCurrency := getEquivalentCurrencyForWorker(preferredCurrency)
+		if equivalentCurrency == preferredCurrency {
+			// No equivalent exists
+			return preferredCurrency, 0, nil
+		}
+
+		err = op.db.QueryRow(ctx,
+			"SELECT amount FROM balances WHERE account_id = $1 AND currency = $2",
+			accountID, equivalentCurrency,
+		).Scan(&balance)
+
+		if err != nil && err.Error() == "no rows in result set" {
+			return preferredCurrency, 0, nil
+		}
+
+		if err != nil {
+			return "", 0, fmt.Errorf("failed to check equivalent balance: %w", err)
+		}
+
+		return equivalentCurrency, balance, nil
+	}
+
+	return "", 0, fmt.Errorf("failed to check balance: %w", err)
+}
+
 // executePendingOrder executes a pending order that has been triggered
 func (op *OrderProcessor) executePendingOrder(ctx context.Context, order models.PendingOrder, currentPrice float64) {
 	// Get execution price (use limit price if set, otherwise current price)
@@ -212,21 +266,106 @@ func (op *OrderProcessor) executePendingOrder(ctx context.Context, order models.
 	}
 	defer tx.Rollback(ctx)
 
-	// NOTE: In production, calculate total cost and update account balances:
-	// totalCost := order.Quantity * executionPrice
-	// - Check account balance
-	// - Deduct funds for buy orders
-	// - Credit funds for sell orders
-	// - Create balance transaction records
+	// Get instrument quote currency for balance checks
+	var quoteCurrency string
+	err = tx.QueryRow(ctx, "SELECT quote_currency FROM instruments WHERE symbol = $1", order.Symbol).Scan(&quoteCurrency)
+	if err != nil {
+		log.Printf("❌ Failed to get quote currency for %s: %v", order.Symbol, err)
+		return
+	}
 
-	// Update account balance (simplified - in production you'd need more complex logic)
-	// For now, we'll just mark the order as executed
-	// In production, you would:
-	// 1. Check account balance
-	// 2. Deduct funds for buy orders
-	// 3. Credit funds for sell orders
-	// 4. Create balance transaction records
-	// 5. Create order history records
+	// Calculate costs
+	totalCost := order.Quantity * executionPrice
+	fee := totalCost * 0.001 // 0.1% trading fee
+
+	// Update balances based on order side
+	if order.Side == "buy" {
+		// BUY: Deduct quote currency (e.g., USDT) + fee, Add base currency (e.g., BTC)
+		requiredAmount := totalCost + fee
+
+		// Check balance (with USD/USDT fallback)
+		actualQuoteCurrency, currentBalance, err := op.getBalanceWithFallbackForWorker(ctx, order.AccountID.String(), quoteCurrency)
+		if err != nil {
+			log.Printf("❌ Failed to check balance for order %s: %v", order.ID, err)
+			return
+		}
+
+		if currentBalance < requiredAmount {
+			log.Printf("❌ Insufficient %s balance for order %s (required: %.8f, available: %.8f)",
+				actualQuoteCurrency, order.ID, requiredAmount, currentBalance)
+			// Mark order as failed
+			tx.Exec(ctx, "UPDATE pending_orders SET status = 'failed', failure_reason = $1, updated_at = NOW() WHERE id = $2",
+				"insufficient balance", order.ID)
+			tx.Commit(ctx)
+			return
+		}
+
+		// Deduct quote currency (using actual currency found)
+		_, err = tx.Exec(ctx, "UPDATE balances SET amount = amount - $1, updated_at = NOW() WHERE account_id = $2 AND currency = $3",
+			requiredAmount, order.AccountID, actualQuoteCurrency)
+		if err != nil {
+			log.Printf("❌ Failed to deduct %s: %v", quoteCurrency, err)
+			return
+		}
+
+		// Add base currency (extract from symbol, e.g., BTC from BTCUSDT)
+		baseCurrency := order.Symbol[:len(order.Symbol)-len(quoteCurrency)]
+		_, err = tx.Exec(ctx,
+			`INSERT INTO balances (id, account_id, currency, amount, created_at, updated_at)
+			 VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
+			 ON CONFLICT (account_id, currency) DO UPDATE SET amount = balances.amount + $3, updated_at = NOW()`,
+			order.AccountID, baseCurrency, order.Quantity)
+		if err != nil {
+			log.Printf("❌ Failed to add %s: %v", baseCurrency, err)
+			return
+		}
+	} else {
+		// SELL: Deduct base currency, Add quote currency - fee
+		baseCurrency := order.Symbol[:len(order.Symbol)-len(quoteCurrency)]
+
+		// Check balance (with fallback)
+		actualBaseCurrency, currentBalance, err := op.getBalanceWithFallbackForWorker(ctx, order.AccountID.String(), baseCurrency)
+		if err != nil {
+			log.Printf("❌ Failed to check balance for order %s: %v", order.ID, err)
+			return
+		}
+
+		if currentBalance < order.Quantity {
+			log.Printf("❌ Insufficient %s balance for order %s (required: %.8f, available: %.8f)",
+				actualBaseCurrency, order.ID, order.Quantity, currentBalance)
+			// Mark order as failed
+			tx.Exec(ctx, "UPDATE pending_orders SET status = 'failed', failure_reason = $1, updated_at = NOW() WHERE id = $2",
+				"insufficient balance", order.ID)
+			tx.Commit(ctx)
+			return
+		}
+
+		// Deduct base currency (using actual currency found)
+		_, err = tx.Exec(ctx, "UPDATE balances SET amount = amount - $1, updated_at = NOW() WHERE account_id = $2 AND currency = $3",
+			order.Quantity, order.AccountID, actualBaseCurrency)
+		if err != nil {
+			log.Printf("❌ Failed to deduct %s: %v", actualBaseCurrency, err)
+			return
+		}
+
+		// Add quote currency (proceeds - fee) - use actual quote currency with fallback
+		receiveAmount := totalCost - fee
+		actualQuoteCurrency, _, err := op.getBalanceWithFallbackForWorker(ctx, order.AccountID.String(), quoteCurrency)
+		if err != nil {
+			log.Printf("❌ Failed to check quote currency for order %s: %v", order.ID, err)
+			return
+		}
+
+		_, err = tx.Exec(ctx,
+			`INSERT INTO balances (id, account_id, currency, amount, created_at, updated_at)
+			 VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
+			 ON CONFLICT (account_id, currency) DO UPDATE SET amount = balances.amount + $3, updated_at = NOW()`,
+			order.AccountID, actualQuoteCurrency, receiveAmount)
+		if err != nil {
+			log.Printf("❌ Failed to add %s: %v", quoteCurrency, err)
+			return
+		}
+	}
 
 	// Update pending order status to executed
 	_, err = tx.Exec(ctx,

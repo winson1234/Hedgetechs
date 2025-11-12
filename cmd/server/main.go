@@ -132,18 +132,21 @@ func main() {
 		}
 	}()
 
+	// Create a wrapper that sends Binance messages to messageBroadcaster
+	// This allows both WebSocket clients AND the order processor to receive price updates
+	broadcastWrapper := &hub.Hub{
+		Broadcast: messageBroadcaster, // Messages go to broadcaster, which fans out to hub and order processor
+		Register:  make(chan *hub.Client), // Dummy channels (not used by Binance streams)
+		Unregister: make(chan *hub.Client),
+	}
+
 	// Start Binance WebSocket streams for real-time market data
 	// Messages are sent to messageBroadcaster which fans out to hub and order processor
-	log.Println("Starting Binance WebSocket streams")
-	go binance.StreamTrades(h)  // TODO: Modify to send to messageBroadcaster
-	go binance.StreamDepth(h)   // TODO: Modify to send to messageBroadcaster
+	log.Println("Starting Binance WebSocket streams with order processor integration")
+	go binance.StreamTrades(broadcastWrapper)
+	go binance.StreamDepth(broadcastWrapper)
 
-	// NOTE: Currently binance streams send directly to hub.Broadcast
-	// For event-driven order processing to work, we need to either:
-	// 1. Modify binance client to accept multiple broadcast channels, OR
-	// 2. Create a hub wrapper that also forwards to order processor, OR
-	// 3. Have order processor subscribe as a hub client (requires refactoring)
-	// For now, order processor will work once binance integration is updated
+	log.Println("✅ Binance streams connected to order processor - pending orders will auto-execute!")
 
 	// Initialize forex service using Frankfurter API (free, no API key required)
 	log.Println("Initializing forex service with Frankfurter API (no API key required)")

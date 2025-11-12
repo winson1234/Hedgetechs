@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -10,12 +11,13 @@ import (
 	"brokerageProject/internal/database"
 	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/models"
+	"brokerageProject/internal/services"
 
 	"github.com/google/uuid"
 )
 
 // CreateOrder handles POST /api/v1/orders
-// Creates a new trading order
+// Creates a new trading order and executes it if it's a market order
 func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	userID, err := middleware.GetUserIDFromContext(r.Context())
 	if err != nil {
@@ -35,6 +37,20 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate limit/stop prices for respective order types
+	if req.Type == models.OrderTypeLimit || req.Type == models.OrderTypeStopLimit {
+		if req.LimitPrice == nil || *req.LimitPrice <= 0 {
+			respondWithJSONError(w, http.StatusBadRequest, "validation_error", "limit_price is required and must be positive for limit orders")
+			return
+		}
+	}
+	if req.Type == models.OrderTypeStop || req.Type == models.OrderTypeStopLimit {
+		if req.StopPrice == nil || *req.StopPrice <= 0 {
+			respondWithJSONError(w, http.StatusBadRequest, "validation_error", "stop_price is required and must be positive for stop orders")
+			return
+		}
+	}
+
 	pool, err := database.GetPool()
 	if err != nil {
 		log.Printf("Database pool error: %v", err)
@@ -42,7 +58,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second) // Increased timeout for execution
 	defer cancel()
 
 	// Verify account belongs to user
@@ -91,7 +107,79 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch created order
+	// For market orders, execute immediately
+	if req.Type == models.OrderTypeMarket {
+		// Get current market price
+		// NOTE: In production, you should fetch this from your price service/cache
+		// For now, we require the frontend to pass the current price
+		var executionPrice float64
+		if req.LimitPrice != nil && *req.LimitPrice > 0 {
+			// Frontend can pass current price via limit_price for market orders
+			executionPrice = *req.LimitPrice
+		} else {
+			// Fetch from database (last known price from recent orders or price cache)
+			err = pool.QueryRow(ctx,
+				`SELECT COALESCE(average_fill_price, 0)
+				 FROM orders
+				 WHERE symbol = $1 AND status = 'filled' AND average_fill_price IS NOT NULL
+				 ORDER BY updated_at DESC LIMIT 1`,
+				req.Symbol,
+			).Scan(&executionPrice)
+			if err != nil || executionPrice == 0 {
+				// No recent orders, reject the market order
+				log.Printf("Cannot execute market order: no recent price data for %s", req.Symbol)
+				// Update order to rejected
+				pool.Exec(ctx, "UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2", models.OrderStatusRejected, orderID)
+				respondWithJSONError(w, http.StatusBadRequest, "execution_error", "cannot execute market order: no current price available. please use limit order or pass current price")
+				return
+			}
+		}
+
+		// Execute the order
+		executionService := services.NewOrderExecutionService(pool)
+		result, err := executionService.ExecuteOrder(ctx, orderID, executionPrice)
+		if err != nil {
+			log.Printf("Failed to execute order %s: %v", orderNumber, err)
+			respondWithJSONError(w, http.StatusInternalServerError, "execution_error", fmt.Sprintf("failed to execute order: %v", err))
+			return
+		}
+
+		// Log execution result
+		executionService.LogOrderExecution(ctx, result)
+
+		if !result.Success {
+			// Execution failed (e.g., insufficient balance)
+			// Update order to rejected
+			pool.Exec(ctx, "UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2", models.OrderStatusRejected, orderID)
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   "execution_failed",
+				"message": result.Message,
+				"order":   result.Order,
+			})
+			return
+		}
+
+		// Order executed successfully
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		response := map[string]interface{}{
+			"success": true,
+			"message": result.Message,
+			"order":   result.Order,
+		}
+		if result.Contract != nil {
+			response["contract"] = result.Contract
+		}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// For limit/stop orders, just return the pending order
+	// These will be executed by the order matching engine later
 	var order models.Order
 	err = pool.QueryRow(ctx,
 		`SELECT id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, filled_amount, average_fill_price, created_at, updated_at
@@ -112,6 +200,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
+		"message": "order created and pending execution",
 		"order":   order,
 	})
 }

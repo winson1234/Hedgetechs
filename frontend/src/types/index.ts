@@ -69,6 +69,7 @@ export type PaymentMethodMetadata = {
 
 export type Transaction = {
   id: string
+  transactionNumber: string  // Human-readable: TXN-00001
   type: TransactionType
   status: TransactionStatus
   accountId: string

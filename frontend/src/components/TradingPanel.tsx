@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
-import { setActiveAccount } from '../store/slices/accountSlice';
-import { createPendingOrder } from '../store/slices/orderSlice';
+import { setActiveAccount, fetchAccounts } from '../store/slices/accountSlice';
+import { createPendingOrder, executeMarketOrder, fetchOrders } from '../store/slices/orderSlice';
+import { addToast } from '../store/slices/uiSlice';
 import { formatPrice } from '../utils/priceUtils';
 
 type TradingMode = 'spot' | 'cross' | 'isolated' | 'grid';
@@ -317,29 +318,78 @@ export default function TradingPanel() {
         .unwrap()
         .then(() => {
           console.log('Pending order placed successfully');
+          // Show success toast
+          dispatch(addToast({
+            type: 'success',
+            message: `${orderType === 'stop-limit' ? 'Stop-limit' : 'Limit'} order placed successfully`,
+            duration: 5000,
+          }));
         })
         .catch((error) => {
           console.error('Failed to place pending order:', error);
+          // Show error toast
+          dispatch(addToast({
+            type: 'error',
+            message: `Failed to place order: ${error}`,
+            duration: 5000,
+          }));
         });
     } else {
-      // Market orders - TODO: Implement immediate execution via backend
-      // For now, just log the intent
+      // Market orders - Execute immediately
       if (isNaN(currentPrice) || currentPrice <= 0) {
         console.error("Cannot execute market order: Invalid current price.");
+        dispatch(addToast({
+          type: 'error',
+          message: 'Cannot execute market order: Invalid current price',
+          duration: 5000,
+        }));
         return;
       }
 
-      // TODO: Implement executeBuy/executeSell backend endpoints
-      console.log(`Market ${side} order:`, {
-        symbol: activeInstrument,
-        quantity: qty,
-        price: currentPrice,
-        accountId: activeAccountId
-      });
+      if (!activeAccountId) {
+        console.error('No active account selected');
+        dispatch(addToast({
+          type: 'error',
+          message: 'No active account selected',
+          duration: 5000,
+        }));
+        return;
+      }
 
-      // TODO: After backend implementation, record the executed order
-      // For now, market orders are not fully supported
-      console.warn('Market orders require backend implementation');
+      // Execute market order via backend
+      dispatch(executeMarketOrder({
+        account_id: activeAccountId,
+        symbol: activeInstrument,
+        side,
+        amount_base: qty,
+        current_price: currentPrice,
+      }))
+        .unwrap()
+        .then(() => {
+          // Show success toast
+          dispatch(addToast({
+            type: 'success',
+            message: `Market ${side} order executed successfully`,
+            duration: 5000,
+          }));
+
+          // Refresh account balances
+          dispatch(fetchAccounts());
+
+          // Refresh order history
+          if (activeAccountId) {
+            dispatch(fetchOrders(activeAccountId));
+          }
+        })
+        .catch((error) => {
+          // Show error toast
+          console.error('Failed to execute market order:', error);
+          dispatch(addToast({
+            type: 'error',
+            message: `Failed to execute order: ${error}`,
+            duration: 5000,
+          }));
+        });
     }
 
     // Create TP/SL orders if enabled (applies to all order types)

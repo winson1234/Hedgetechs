@@ -21,6 +21,7 @@ export interface PaymentMethodMetadata {
 
 export interface Transaction {
   id: string;
+  transactionNumber: string; // Human-readable: TXN-00001
   type: TransactionType;
   status: TransactionStatus;
   accountId: string;
@@ -59,6 +60,40 @@ const getAuthToken = (getState: () => RootState) => {
   return state.auth.session?.access_token || null;
 };
 
+// Backend transaction type (snake_case with time.Time strings)
+interface BackendTransaction {
+  id: string;
+  account_id: string;
+  transaction_number: string;
+  type: string;
+  currency: string;
+  amount: number;
+  status: string;
+  target_account_id?: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string; // ISO timestamp string
+  updated_at: string;
+}
+
+// Transform backend transaction to frontend format
+const transformTransaction = (backend: BackendTransaction): Transaction => {
+  return {
+    id: backend.id,
+    transactionNumber: backend.transaction_number,  // Human-readable number
+    type: backend.type as TransactionType,
+    status: backend.status as TransactionStatus,
+    accountId: backend.account_id,
+    amount: backend.amount,
+    currency: backend.currency,
+    timestamp: new Date(backend.created_at).getTime(), // Convert ISO string to milliseconds
+    targetAccountId: backend.target_account_id,
+    toAccountId: backend.target_account_id,
+    description: backend.description,
+    metadata: backend.metadata as PaymentMethodMetadata | undefined,
+  };
+};
+
 // Async thunks
 
 // Fetch transactions
@@ -77,7 +112,13 @@ export const fetchTransactions = createAsyncThunk(
 
       if (!response.ok) throw new Error('Failed to fetch transactions');
       const data = await response.json();
-      return data.transactions || [];
+
+      // Transform backend transactions to frontend format
+      const transactions = (data.transactions || []).map((txn: BackendTransaction) =>
+        transformTransaction(txn)
+      );
+
+      return transactions;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch transactions';
       return rejectWithValue(message);
@@ -126,7 +167,7 @@ export const createDeposit = createAsyncThunk(
 
       if (!response.ok) throw new Error('Failed to create deposit');
       const data = await response.json();
-      return data.transaction;
+      return transformTransaction(data.transaction);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create deposit';
       return rejectWithValue(message);
@@ -172,7 +213,7 @@ export const createWithdrawal = createAsyncThunk(
 
       if (!response.ok) throw new Error('Failed to create withdrawal');
       const data = await response.json();
-      return data.transaction;
+      return transformTransaction(data.transaction);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create withdrawal';
       return rejectWithValue(message);
@@ -218,7 +259,7 @@ export const createTransfer = createAsyncThunk(
 
       if (!response.ok) throw new Error('Failed to create transfer');
       const data = await response.json();
-      return data.transaction;
+      return transformTransaction(data.transaction);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create transfer';
       return rejectWithValue(message);

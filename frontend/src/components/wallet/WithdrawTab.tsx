@@ -6,6 +6,7 @@ import { formatBalance } from '../../utils/format';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { addToast } from '../../store/slices/uiSlice';
 import { createWithdrawal } from '../../store/slices/transactionSlice';
+import { fetchAccounts } from '../../store/slices/accountSlice';
 import type { PaymentMethodMetadata } from '../../types';
 
 // Validation schema (will add .refine for balance check)
@@ -47,6 +48,9 @@ function WithdrawTab() {
         currency,
         metadata: bankDetails
       })).unwrap();
+
+      // Refresh account balances to show updated balance
+      dispatch(fetchAccounts());
     } catch (error) {
       console.error('Withdrawal failed:', error);
       throw error;

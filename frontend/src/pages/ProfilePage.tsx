@@ -22,10 +22,10 @@ export default function ProfilePage() {
   };
 
 const [profileData, setProfileData] = useState({
-  name: user?.email?.split('@')[0] || 'User',
+  name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User',
   email: user?.email || 'user@example.com',
   phone: '',
-  country: 'United States',
+  country: user?.user_metadata?.country || 'United States',
   language: 'English (US)',
   timezone: 'GMT+8 (Kuala Lumpur)',
   currency: 'USD ($)',

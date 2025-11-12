@@ -288,7 +288,7 @@ export default function AccountPage() {
             )}
           </div>
         </div>
-        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 truncate">{acc.id}</p>
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 truncate">{acc.account_number}</p>
 
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1">
@@ -341,8 +341,8 @@ export default function AccountPage() {
                     <div className="space-y-4 text-sm">
                         {/* Account Information */}
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                             <div className="text-slate-500 dark:text-slate-400">Account ID:</div>
-                             <div className="font-medium text-slate-700 dark:text-slate-300 truncate text-right">{selectedAccount.id}</div>
+                             <div className="text-slate-500 dark:text-slate-400">Account Number:</div>
+                             <div className="font-medium text-slate-700 dark:text-slate-300 truncate text-right">{selectedAccount.account_number}</div>
 
                              <div className="text-slate-500 dark:text-slate-400">Type:</div>
                              <div className="text-right">
@@ -477,9 +477,9 @@ export default function AccountPage() {
       <OpenAccountModal
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreateModal}
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         openAccount={(type: string, productType: string, currency: string, initialBalance: number) => {
           // TODO: Implement openAccount in Redux - use createAccount thunk
-          console.log('Open account:', type, productType, currency, initialBalance);
           return Promise.resolve({ success: true, message: 'Account created', account: {} as Account });
         }}
         onAccountCreated={handleAccountCreated}
@@ -488,9 +488,9 @@ export default function AccountPage() {
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
         account={accountToEdit}
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         editDemoBalance={(accountId: string, newBalance: number) => {
           // TODO: Implement editDemoBalance in Redux
-          console.log('Edit balance:', accountId, newBalance);
           return Promise.resolve({ success: true, message: 'Balance updated' });
         }}
         onBalanceEdited={handleBalanceEdited}

@@ -46,7 +46,6 @@ export default function App() {
         if (!response.ok) throw new Error('Failed to fetch 24h ticker data')
         const data = await response.json()
         dispatch(hydrateFrom24hData(data))
-        console.log('[App] Hydrated ticker data for', instruments.length, 'instruments')
       } catch (err) {
         console.error('Failed to hydrate price store:', err)
         dispatch(setLoading(false))

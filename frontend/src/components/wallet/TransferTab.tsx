@@ -6,6 +6,7 @@ import { formatBalance } from '../../utils/format';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { addToast } from '../../store/slices/uiSlice';
 import { createTransfer } from '../../store/slices/transactionSlice';
+import { fetchAccounts } from '../../store/slices/accountSlice';
 
 // Base validation schema
 const transferSchemaBase = z.object({
@@ -43,6 +44,9 @@ function TransferTab() {
         amount,
         currency
       })).unwrap();
+
+      // Refresh account balances to show updated balance
+      dispatch(fetchAccounts());
     } catch (error) {
       console.error('Transfer failed:', error);
       throw error;

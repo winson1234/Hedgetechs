@@ -7,6 +7,7 @@ import { formatBalance } from '../../utils/format';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { addToast, selectIsDarkMode } from '../../store/slices/uiSlice';
 import { createDeposit } from '../../store/slices/transactionSlice';
+import { fetchAccounts } from '../../store/slices/accountSlice';
 import type { PaymentMethodMetadata } from '../../types';
 import { CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements, ExpressCheckoutElement } from '@stripe/react-stripe-js';
 import type { StripeCardNumberElement, StripeExpressCheckoutElementConfirmEvent } from '@stripe/stripe-js';
@@ -73,7 +74,10 @@ function DepositTab() {
         paymentIntentId,
         metadata
       })).unwrap();
-      
+
+      // Refresh account balances to show updated balance
+      dispatch(fetchAccounts());
+
       return result;
     } catch (error) {
       console.error('Deposit failed:', error);
@@ -315,16 +319,14 @@ function DepositTab() {
 
             processDeposit(accountId, amount, accountCurrency, paymentIntentId, {
               fpxBank: redirectStatus || 'redirect',
-            }).then((result) => {
-              if (result.success) {
-                showToast('Payment successful!', 'success');
-
-                // Transaction processed successfully
-              } else {
-                showToast(result.message, 'error');
-                // Clean up URL
-                window.history.replaceState({}, document.title, window.location.pathname);
-              }
+            }).then(() => {
+              showToast('Payment successful!', 'success');
+              // Transaction processed successfully
+              setIsProcessing(false);
+            }).catch((error) => {
+              showToast(error instanceof Error ? error.message : 'Deposit failed', 'error');
+              // Clean up URL
+              window.history.replaceState({}, document.title, window.location.pathname);
               setIsProcessing(false);
             });
           } else {
@@ -593,18 +595,18 @@ function DepositTab() {
               clearInterval(pollInterval);
 
               // Process deposit in account store
-              const result = await processDeposit(
-                data.accountId,
-                data.amount,
-                account.currency,
-                paymentIntent.id,
-                {
-                  cardBrand: cardBrand,
-                  last4: '****',
-                }
-              );
+              try {
+                await processDeposit(
+                  data.accountId,
+                  data.amount,
+                  account.currency,
+                  paymentIntent.id,
+                  {
+                    cardBrand: cardBrand,
+                    last4: '****',
+                  }
+                );
 
-              if (result.success) {
                 reset();
                 // Clear card elements only for card payments
                 if (selectedTab === 'card' && elements) {
@@ -613,10 +615,8 @@ function DepositTab() {
                   setCardBrand('');
                 }
                 showToast('Deposit successful!', 'success');
-
-                // Transaction processed successfully
-              } else {
-                showToast(result.message, 'error');
+              } catch (error) {
+                showToast(error instanceof Error ? error.message : 'Deposit failed', 'error');
               }
               setIsProcessing(false);
             } else if (statusData.status === 'requires_payment_method' || statusData.status === 'canceled') {

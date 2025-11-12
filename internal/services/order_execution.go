@@ -275,9 +275,9 @@ func (s *OrderExecutionService) executeSpotOrder(
 	tx pgx.Tx,
 	order *models.Order,
 	executionPrice float64,
-	notionalValue float64,
+	_ float64, // notionalValue - unused, calculated in ExecuteSpotTrade
 	fee float64,
-	accountCurrency string,
+	_ string, // accountCurrency - unused
 	quoteCurrency string,
 ) (*ExecutionResult, error) {
 	// Use shared spot trading logic
@@ -327,8 +327,8 @@ func (s *OrderExecutionService) executeLeveragedOrder(
 	notionalValue float64,
 	fee float64,
 	accountCurrency string,
-	quoteCurrency string,
-	productType string,
+	_ string, // quoteCurrency - unused in leveraged orders
+	_ string, // productType - unused, could be used for different contract types in future
 ) (*ExecutionResult, error) {
 	// For leveraged trading, we create a contract (position) instead of exchanging currencies
 

@@ -645,7 +645,7 @@ function DepositTab() {
     }
   };
 
-  const liveAccounts = accounts.filter(acc => acc.type === 'live');
+  const liveAccounts = useMemo(() => accounts.filter(acc => acc.type === 'live'), [accounts]);
 
   if (liveAccounts.length === 0) {
     return (

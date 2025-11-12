@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAssetPrices } from '../hooks/useAssetPrices';
-import { useConfig } from '../hooks/useConfig';
+import { CURRENCIES } from '../config/constants';
 import { useAppDispatch, useAppSelector } from '../store';
 import { setActiveAccount, type Account } from '../store/slices/accountSlice';
 import { setActiveWalletTab, addToast } from '../store/slices/uiSlice';
@@ -27,8 +27,7 @@ export default function AccountPage() {
   const accounts = useAppSelector((state) => state.account.accounts);
   const activeAccountId = useAppSelector((state) => state.account.activeAccountId);
 
-  // Get configuration and asset prices
-  const { currencies } = useConfig();
+  // Get asset prices
   const { prices: assetPrices, loading: pricesLoading } = useAssetPrices();
   const [activeTab, setActiveTab] = useState<AccountTab>('live');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -60,9 +59,9 @@ export default function AccountPage() {
 
     if (holdings.length === 0) return [];
 
-    // Calculate USD values for each holding using currencies from config API
+    // Calculate USD values for each holding using currencies from config constants
     const holdingsWithUsd = holdings.map(([currency, amount]) => {
-      const isFiat = currencies.includes(currency);
+      const isFiat = CURRENCIES.includes(currency as typeof CURRENCIES[number]);
       let usdValue = 0;
 
       if (isFiat) {
@@ -85,7 +84,7 @@ export default function AccountPage() {
       usdValue: h.usdValue,
       percentage: totalUsd > 0 ? (h.usdValue / totalUsd) * 100 : 0,
     }));
-  }, [assetPrices, currencies]);
+  }, [assetPrices]);
 
   // Calculate allocations for selected account
   const selectedAccountAllocations = useMemo(() => {

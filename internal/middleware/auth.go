@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"brokerageProject/internal/utils"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -69,7 +70,7 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Extract IP address and user agent from request
-		ipAddress := getClientIP(r)
+		ipAddress := utils.GetClientIP(r)
 		userAgent := r.UserAgent()
 
 		// Inject user information and request metadata into the request context
@@ -158,25 +159,6 @@ func GetUserAgentFromContext(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("user agent not found in context")
 	}
 	return userAgent, nil
-}
-
-// getClientIP extracts the client's IP address from the request
-func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header (for proxies/load balancers)
-	xff := r.Header.Get("X-Forwarded-For")
-	if xff != "" {
-		// X-Forwarded-For can contain multiple IPs, take the first one
-		return strings.Split(xff, ",")[0]
-	}
-
-	// Check X-Real-IP header
-	xri := r.Header.Get("X-Real-IP")
-	if xri != "" {
-		return xri
-	}
-
-	// Fall back to RemoteAddr
-	return r.RemoteAddr
 }
 
 // respondWithError sends a JSON error response

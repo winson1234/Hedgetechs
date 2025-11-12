@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { setShowAnalyticsPanel } from '../store/slices/uiSlice';
 import { getApiUrl } from '../config/api';
-import { useConfig } from '../hooks/useConfig';
+import { CURRENCIES } from '../config/constants';
 
 // Forex rate data type
 type ForexRate = {
@@ -28,9 +28,6 @@ const AnalyticsPanel: React.FC = () => {
   const isOpen = useAppSelector(state => state.ui.showAnalyticsPanel);
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
 
-  // Get configuration from backend
-  const { currencies } = useConfig();
-
   const onClose = () => {
     dispatch(setShowAnalyticsPanel(false));
   };
@@ -45,9 +42,9 @@ const AnalyticsPanel: React.FC = () => {
 
   const fetchForexRates = useCallback(async () => {
     // Generate forex pairs dynamically from currencies config (all pairs with USD)
-    const forexPairs = currencies
-      .filter(curr => curr !== 'USD')
-      .map(curr => ({
+    const forexPairs = CURRENCIES
+      .filter((curr: string) => curr !== 'USD')
+      .map((curr: string) => ({
         from: curr,
         to: 'USD',
         label: `${curr}/USD`
@@ -90,7 +87,7 @@ const AnalyticsPanel: React.FC = () => {
       setError(error instanceof Error ? error.message : 'Failed to fetch forex rates');
     }
     setLoading(false);
-  }, [currencies]);
+  }, []);
 
   const fetchIndicator = useCallback(async (type: string, symbol: string, periodVal: number) => {
     setLoading(true);

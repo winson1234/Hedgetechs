@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"brokerageProject/internal/utils"
 	"context"
 	"fmt"
 	"net/http"
@@ -62,10 +63,18 @@ func (rl *RateLimiter) cleanupInactiveLimiters() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		rl.mu.Lock()
 		// In production, you'd track last access time and remove old entries
 		// For now, we'll keep all limiters (acceptable for reasonable user counts)
-		rl.mu.Unlock()
+		// TODO: Implement last access tracking and cleanup logic
+		// Example:
+		// rl.mu.Lock()
+		// now := time.Now()
+		// for userID, limiter := range rl.limiters {
+		//     if now.Sub(limiter.LastAccess) > 1*time.Hour {
+		//         delete(rl.limiters, userID)
+		//     }
+		// }
+		// rl.mu.Unlock()
 	}
 }
 
@@ -168,7 +177,7 @@ func IPRateLimitMiddleware(requestsPerMinute, burst int) func(http.HandlerFunc) 
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			// Get client IP address
-			ip := getClientIPForRateLimit(r)
+			ip := utils.GetClientIP(r)
 
 			// Get limiter for this IP
 			limiter := ipRateLimiter.GetIPLimiter(ip)
@@ -186,26 +195,6 @@ func IPRateLimitMiddleware(requestsPerMinute, burst int) func(http.HandlerFunc) 
 			next.ServeHTTP(w, r)
 		}
 	}
-}
-
-// getClientIPForRateLimit extracts the client's IP address from the request
-// Note: auth.go already has a getClientIP function, so we use a different name here
-func getClientIPForRateLimit(r *http.Request) string {
-	// Check X-Forwarded-For header (for proxies/load balancers)
-	xff := r.Header.Get("X-Forwarded-For")
-	if xff != "" {
-		// X-Forwarded-For can contain multiple IPs, take the first one
-		return xff
-	}
-
-	// Check X-Real-IP header
-	xri := r.Header.Get("X-Real-IP")
-	if xri != "" {
-		return xri
-	}
-
-	// Fall back to RemoteAddr
-	return r.RemoteAddr
 }
 
 // Helper function to store rate limit info in context (for audit logging)

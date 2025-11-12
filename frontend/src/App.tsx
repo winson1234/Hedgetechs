@@ -5,6 +5,9 @@ import PublicRoute from './components/PublicRoute'
 import AppLayout from './components/AppLayout'
 import { useAppDispatch, useAppSelector } from './store'
 import { fetchAccounts } from './store/slices/accountSlice'
+import { hydrateFrom24hData, setLoading } from './store/slices/priceSlice'
+import { useInstruments } from './hooks/useInstruments'
+import { getApiUrl } from './config/api'
 
 // Auth Pages
 import LoginPage from './pages/LoginPage'
@@ -18,8 +21,7 @@ import DashboardPage from './pages/DashboardPage'
 import TradingPage from './pages/TradingPage'
 import AccountPage from './components/AccountPage'
 import WalletPage from './pages/WalletPage'
-// TODO: HistoryPage needs extensive type refactoring to work with Redux slices
-// import HistoryPage from './pages/HistoryPage'
+import HistoryPage from './pages/HistoryPage'
 import ProfilePage from './pages/ProfilePage'
 import SecuritySettingsPage from './pages/SecuritySettingsPage'
 
@@ -27,6 +29,31 @@ export default function App() {
   const dispatch = useAppDispatch()
   const { user, loading: authLoading } = useAppSelector((state) => state.auth)
   const isLoggedIn = !!user
+
+  // Get instruments for hydrating price store
+  const { instruments } = useInstruments()
+
+  // Hydrate price store with 24h ticker data on mount (for ALL routes, including dashboard)
+  useEffect(() => {
+    // Wait for instruments to be loaded before hydrating
+    if (instruments.length === 0) return
+
+    const hydratePrices = async () => {
+      try {
+        // Build symbols list from instruments API
+        const symbols = instruments.map(inst => inst.symbol).join(',')
+        const response = await fetch(getApiUrl(`/api/v1/ticker?symbols=${symbols}`))
+        if (!response.ok) throw new Error('Failed to fetch 24h ticker data')
+        const data = await response.json()
+        dispatch(hydrateFrom24hData(data))
+        console.log('[App] Hydrated ticker data for', instruments.length, 'instruments')
+      } catch (err) {
+        console.error('Failed to hydrate price store:', err)
+        dispatch(setLoading(false))
+      }
+    }
+    hydratePrices()
+  }, [dispatch, instruments])
 
   // Fetch accounts when user is logged in
   useEffect(() => {
@@ -50,8 +77,7 @@ export default function App() {
           <Route path="/trading" element={<TradingPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/wallet" element={<WalletPage />} />
-          {/* TODO: HistoryPage temporarily disabled pending type refactoring */}
-          {/* <Route path="/history" element={<HistoryPage />} /> */}
+          <Route path="/history" element={<HistoryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings/security" element={<SecuritySettingsPage />} />
         </Route>

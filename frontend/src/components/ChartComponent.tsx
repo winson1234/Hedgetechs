@@ -1,7 +1,5 @@
-import React, { useEffect, useRef, useContext, useState, useCallback } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp, CandlestickData, IPriceLine, MouseEventParams, Time } from 'lightweight-charts'
-import { WebSocketContext } from '../context/WebSocketContext'
-import type { PriceMessage } from '../hooks/useWebSocket'
 import { useAppDispatch, useAppSelector } from '../store'
 import { setShowAnalyticsPanel } from '../store/slices/uiSlice'
 import ChartHeader from './ChartHeader'
@@ -90,9 +88,9 @@ export default function ChartComponent() {
     return timeframeSecondsMap[tf] || 3600 // default to 1h if not found
   }
   const timeframeSeconds = getTimeframeSeconds(timeframe)
-  
-  const ws = useContext(WebSocketContext)
-  const lastMessage = ws?.lastMessage ?? null
+
+  // Get current price from Redux store (updated by WebSocket middleware)
+  const currentPrice = useAppSelector(state => state.price.currentPrices[symbol])
 
   // Helper function to convert LineStyle to lightweight-charts numeric format
   const getNumericLineStyle = (style: string): 0 | 1 | 2 => {
@@ -225,18 +223,11 @@ export default function ChartComponent() {
     }
   }, [timeframe, symbol])
 
-  // live update handler: append/update candles based on ws ticks
-  // Filter messages to only process data for the currently selected symbol
+  // live update handler: append/update candles based on Redux price updates
   useEffect(() => {
-    if (!lastMessage || !seriesRef.current) return
-    const msg: PriceMessage = lastMessage
-    
-    // CRITICAL: Only process WebSocket messages that match the current symbol
-    if (msg.symbol !== symbol) {
-      return // Ignore messages from other symbols
-    }
-    
-    const price = typeof msg.price === 'string' ? parseFloat(msg.price) : msg.price
+    if (!currentPrice || !seriesRef.current) return
+
+    const price = currentPrice.price
     if (Number.isNaN(price) || !price) return
 
     // Update price line only if we have historical data loaded
@@ -244,11 +235,11 @@ export default function ChartComponent() {
       if (priceLineRef.current) {
         seriesRef.current.removePriceLine(priceLineRef.current)
       }
-      
+
       // Determine color based on last bar
       const isUp = price >= lastBarRef.current.close
       const lineColor = isUp ? '#10b981' : '#ef4444'
-      
+
       priceLineRef.current = seriesRef.current.createPriceLine({
         price: price,
         color: lineColor,
@@ -260,18 +251,18 @@ export default function ChartComponent() {
     }
 
     // compute candle time (UTCTimestamp in seconds)
-    const tickSec = Math.floor(msg.time / 1000)
+    const tickSec = Math.floor(currentPrice.timestamp / 1000)
     const candleTime = (Math.floor(tickSec / timeframeSeconds) * timeframeSeconds) as UTCTimestamp
 
     const current = lastBarRef.current
-    
+
     // CRITICAL: Prevent updating with older timestamps (causes "Cannot update oldest data" error)
     if (current && candleTime < current.time) {
-      // Ignore WebSocket updates that would create candles older than the last known candle
+      // Ignore updates that would create candles older than the last known candle
       // This can happen with longer timeframes (1w, 1M) when switching timeframes
       return
     }
-    
+
     if (current && current.time === candleTime) {
       // update existing candle
       const updated: CandlestickData<UTCTimestamp> = {
@@ -284,7 +275,7 @@ export default function ChartComponent() {
       // update chart and lastBarRef
       seriesRef.current.update(updated)
       lastBarRef.current = updated
-      
+
       // Update OHLCV display
       const volume = volumeDataRef.current.get(candleTime) || 0
       setOhlcv({
@@ -299,7 +290,7 @@ export default function ChartComponent() {
       const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
       seriesRef.current.update(newBar)
       lastBarRef.current = newBar
-      
+
       // Initialize volume for new candle
       volumeDataRef.current.set(candleTime, 0)
       setOhlcv({
@@ -314,7 +305,7 @@ export default function ChartComponent() {
       const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
       seriesRef.current.update(newBar)
       lastBarRef.current = newBar
-      
+
       volumeDataRef.current.set(candleTime, 0)
       setOhlcv({
         open: newBar.open,
@@ -324,7 +315,7 @@ export default function ChartComponent() {
         volume: 0
       })
     }
-  }, [lastMessage, timeframeSeconds, symbol])
+  }, [currentPrice, timeframeSeconds, symbol])
 
   // Helper function to save drawings to localStorage
   const saveDrawingsToLocalStorage = useCallback((drawingsToSave: Drawing[]) => {

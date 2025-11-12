@@ -41,10 +41,10 @@ func HandleWebSocket(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Create a hub client with a per-client send channel
-	// Increased buffer size to match broadcast buffer for 24 concurrent instrument streams
+	// Increased buffer size for 24 concurrent instrument streams (~340 msg/sec peak)
 	client := &hub.Client{
 		Conn: conn,
-		Send: make(chan []byte, 2048), // Match broadcast buffer size (24 instruments)
+		Send: make(chan []byte, 8192), // 4x increase to handle high-frequency updates
 	}
 
 	// Register the new client with the hub
@@ -57,12 +57,36 @@ func HandleWebSocket(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			h.Unregister <- c
 		}()
-		for msg := range c.Send {
-			// Set write deadline to avoid blocking forever
-			c.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err := c.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-				log.Printf("Error writing to client: %v", err)
-				return
+
+		// Send ping every 30 seconds to keep connection alive
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case msg, ok := <-c.Send:
+				if !ok {
+					// Channel closed, exit gracefully
+					c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+					return
+				}
+
+				// Set write deadline to avoid blocking forever
+				c.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				if err := c.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+					// Don't log normal connection closures
+					if !websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
+						log.Printf("Error writing to client: %v", err)
+					}
+					return
+				}
+
+			case <-ticker.C:
+				// Send ping to keep connection alive
+				c.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					return
+				}
 			}
 		}
 	}(client)
@@ -72,15 +96,24 @@ func HandleWebSocket(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			h.Unregister <- c // Ensure unregistration on exit/error
 		}()
+
+		// Set up pong handler to respond to pings from client
+		c.Conn.SetPongHandler(func(string) error {
+			c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			return nil
+		})
+
+		// Set initial read deadline
+		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+
 		for {
-			// Read messages (optional, needed to detect close)
+			// Read messages (optional, needed to detect close and pings)
 			_, _, err := c.Conn.ReadMessage()
 			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
 					log.Printf("Client read error: %v", err)
-				} else {
-					log.Println("Client disconnected normally")
 				}
+				// Don't log normal disconnections
 				break // Exit loop on error/disconnection
 			}
 			// Process incoming client message here if needed in the future
@@ -624,4 +657,125 @@ func stripHTMLTags(s string) string {
 		}
 	}
 	return strings.TrimSpace(s)
+}
+
+// --- Configuration Endpoints ---
+
+// HandleConfigCurrencies returns the list of supported fiat currencies
+// GET /api/v1/config/currencies
+func HandleConfigCurrencies(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	currencies := []string{"USD", "EUR", "MYR", "JPY"}
+
+	response := map[string]interface{}{
+		"currencies": currencies,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// ProductType represents a tradable product type configuration
+type ProductType struct {
+	Value       string `json:"value"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+}
+
+// HandleConfigProductTypes returns the list of supported product types
+// GET /api/v1/config/product-types
+func HandleConfigProductTypes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	productTypes := []ProductType{
+		{
+			Value:       "spot",
+			Label:       "Spot",
+			Description: "Trade assets at current market prices",
+		},
+		{
+			Value:       "cfd",
+			Label:       "CFD",
+			Description: "Contracts for Difference trading",
+		},
+		{
+			Value:       "futures",
+			Label:       "Futures",
+			Description: "Futures contracts trading",
+		},
+	}
+
+	response := map[string]interface{}{
+		"product_types": productTypes,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// Instrument represents a tradable instrument with metadata
+type Instrument struct {
+	Symbol      string `json:"symbol"`
+	DisplayName string `json:"displayName"`
+	BaseCurrency string `json:"baseCurrency"`
+	Category    string `json:"category"` // "major", "defi", "altcoin"
+	IconUrl     string `json:"iconUrl"`  // CoinGecko image URL
+}
+
+// HandleInstruments returns the list of supported trading instruments
+// GET /api/v1/instruments
+func HandleInstruments(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	instruments := []Instrument{
+		// Major (7)
+		{Symbol: "BTCUSDT", DisplayName: "BTC/USD", BaseCurrency: "BTC", Category: "major", IconUrl: "https://assets.coingecko.com/coins/images/1/small/bitcoin.png"},
+		{Symbol: "ETHUSDT", DisplayName: "ETH/USD", BaseCurrency: "ETH", Category: "major", IconUrl: "https://assets.coingecko.com/coins/images/279/small/ethereum.png"},
+		{Symbol: "BNBUSDT", DisplayName: "BNB/USD", BaseCurrency: "BNB", Category: "major", IconUrl: "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png"},
+		{Symbol: "SOLUSDT", DisplayName: "SOL/USD", BaseCurrency: "SOL", Category: "major", IconUrl: "https://assets.coingecko.com/coins/images/4128/small/solana.png"},
+		{Symbol: "XRPUSDT", DisplayName: "XRP/USD", BaseCurrency: "XRP", Category: "major", IconUrl: "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png"},
+		{Symbol: "ADAUSDT", DisplayName: "ADA/USD", BaseCurrency: "ADA", Category: "major", IconUrl: "https://assets.coingecko.com/coins/images/975/small/cardano.png"},
+		{Symbol: "AVAXUSDT", DisplayName: "AVAX/USD", BaseCurrency: "AVAX", Category: "major", IconUrl: "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png"},
+
+		// DeFi/Layer2 (8)
+		{Symbol: "MATICUSDT", DisplayName: "MATIC/USD", BaseCurrency: "MATIC", Category: "defi", IconUrl: "https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png"},
+		{Symbol: "LINKUSDT", DisplayName: "LINK/USD", BaseCurrency: "LINK", Category: "defi", IconUrl: "https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png"},
+		{Symbol: "UNIUSDT", DisplayName: "UNI/USD", BaseCurrency: "UNI", Category: "defi", IconUrl: "https://assets.coingecko.com/coins/images/12504/small/uni.jpg"},
+		{Symbol: "ATOMUSDT", DisplayName: "ATOM/USD", BaseCurrency: "ATOM", Category: "defi", IconUrl: "https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png"},
+		{Symbol: "DOTUSDT", DisplayName: "DOT/USD", BaseCurrency: "DOT", Category: "defi", IconUrl: "https://assets.coingecko.com/coins/images/12171/small/polkadot.png"},
+		{Symbol: "ARBUSDT", DisplayName: "ARB/USD", BaseCurrency: "ARB", Category: "defi", IconUrl: "https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg"},
+		{Symbol: "OPUSDT", DisplayName: "OP/USD", BaseCurrency: "OP", Category: "defi", IconUrl: "https://assets.coingecko.com/coins/images/25244/small/Optimism.png"},
+		{Symbol: "APTUSDT", DisplayName: "APT/USD", BaseCurrency: "APT", Category: "defi", IconUrl: "https://assets.coingecko.com/coins/images/26455/small/aptos_round.png"},
+
+		// Altcoin (9)
+		{Symbol: "DOGEUSDT", DisplayName: "DOGE/USD", BaseCurrency: "DOGE", Category: "altcoin", IconUrl: "https://assets.coingecko.com/coins/images/5/small/dogecoin.png"},
+		{Symbol: "LTCUSDT", DisplayName: "LTC/USD", BaseCurrency: "LTC", Category: "altcoin", IconUrl: "https://assets.coingecko.com/coins/images/2/small/litecoin.png"},
+		{Symbol: "SHIBUSDT", DisplayName: "SHIB/USD", BaseCurrency: "SHIB", Category: "altcoin", IconUrl: "https://assets.coingecko.com/coins/images/11939/small/shiba.png"},
+		{Symbol: "NEARUSDT", DisplayName: "NEAR/USD", BaseCurrency: "NEAR", Category: "altcoin", IconUrl: "https://assets.coingecko.com/coins/images/10365/small/near.jpg"},
+		{Symbol: "ICPUSDT", DisplayName: "ICP/USD", BaseCurrency: "ICP", Category: "altcoin", IconUrl: "https://assets.coingecko.com/coins/images/14495/small/Internet_Computer_logo.png"},
+		{Symbol: "FILUSDT", DisplayName: "FIL/USD", BaseCurrency: "FIL", Category: "altcoin", IconUrl: "https://assets.coingecko.com/coins/images/12817/small/filecoin.png"},
+		{Symbol: "SUIUSDT", DisplayName: "SUI/USD", BaseCurrency: "SUI", Category: "altcoin", IconUrl: "https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg"},
+		{Symbol: "STXUSDT", DisplayName: "STX/USD", BaseCurrency: "STX", Category: "altcoin", IconUrl: "https://assets.coingecko.com/coins/images/2069/small/Stacks_logo_full.png"},
+		{Symbol: "TONUSDT", DisplayName: "TON/USD", BaseCurrency: "TON", Category: "altcoin", IconUrl: "https://assets.coingecko.com/coins/images/17980/small/ton_symbol.png"},
+	}
+
+	response := map[string]interface{}{
+		"instruments": instruments,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }

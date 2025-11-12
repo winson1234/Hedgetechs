@@ -18,6 +18,13 @@ interface OrderBookData {
   asks: OrderBookLevel[];
 }
 
+interface Trade {
+  price: number;
+  quantity: number;
+  time: number;
+  isBuyerMaker: boolean;
+}
+
 interface HistoricalPrice {
   timestamp: number;
   open: number;
@@ -30,11 +37,20 @@ interface HistoricalPrice {
 interface Ticker24h {
   symbol: string;
   lastPrice: string;
+  priceChangePercent?: string; // 24h price change percentage
+  volume?: string; // 24h volume
+}
+
+interface TickerData {
+  priceChangePercent: number; // 24h price change percentage
+  volume24h: number; // 24h trading volume
 }
 
 interface PriceState {
   currentPrices: Record<string, PriceData>; // symbol -> price data
+  tickers: Record<string, TickerData>; // symbol -> 24h ticker stats
   orderBooks: Record<string, OrderBookData>; // symbol -> order book
+  trades: Record<string, Trade[]>; // symbol -> recent trades (max 50 per symbol)
   historicalPrices: Record<string, HistoricalPrice[]>; // symbol -> klines
   loading: boolean;
   error: string | null;
@@ -43,7 +59,9 @@ interface PriceState {
 // Initial state
 const initialState: PriceState = {
   currentPrices: {},
+  tickers: {},
   orderBooks: {},
+  trades: {},
   historicalPrices: {},
   loading: false,
   error: null,
@@ -85,6 +103,12 @@ const priceSlice = createSlice({
           price: parseFloat(ticker.lastPrice),
           timestamp,
         };
+
+        // Store ticker statistics (percentage change and volume)
+        state.tickers[ticker.symbol] = {
+          priceChangePercent: ticker.priceChangePercent ? parseFloat(ticker.priceChangePercent) : 0,
+          volume24h: ticker.volume ? parseFloat(ticker.volume) : 0,
+        };
       });
       state.loading = false;
     },
@@ -100,10 +124,21 @@ const priceSlice = createSlice({
       state.orderBooks[symbol] = { symbol, bids, asks };
     },
 
+    // Add trade (called by WebSocket middleware)
+    addTrade: (state, action: PayloadAction<{ symbol: string; trade: Trade }>) => {
+      const { symbol, trade } = action.payload;
+      if (!state.trades[symbol]) {
+        state.trades[symbol] = [];
+      }
+      // Add to beginning and keep only last 50 trades
+      state.trades[symbol] = [trade, ...state.trades[symbol]].slice(0, 50);
+    },
+
     // Clear price data
     clearPriceData: (state) => {
       state.currentPrices = {};
       state.orderBooks = {};
+      state.trades = {};
       state.historicalPrices = {};
     },
 
@@ -131,5 +166,5 @@ const priceSlice = createSlice({
   },
 });
 
-export const { updateCurrentPrice, hydrateFrom24hData, setLoading, updateOrderBook, clearPriceData, clearError } = priceSlice.actions;
+export const { updateCurrentPrice, hydrateFrom24hData, setLoading, updateOrderBook, addTrade, clearPriceData, clearError } = priceSlice.actions;
 export default priceSlice.reducer;

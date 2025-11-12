@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useAppSelector } from '../../store';
 
 // Utility function to format balance
@@ -12,11 +13,15 @@ const formatBalance = (value: number, currency: string) => {
 
 export default function TradeHistoryTab() {
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
-  const orderHistory = useAppSelector(state => 
-    state.order.orders.filter(order => 
-      order.symbol === activeInstrument && 
+  const allOrders = useAppSelector(state => state.order.orders);
+
+  // Memoize filtered orders to prevent unnecessary rerenders
+  const orderHistory = useMemo(() =>
+    allOrders.filter(order =>
+      order.symbol === activeInstrument &&
       (order.status === 'filled' || order.status === 'partially_filled')
-    )
+    ),
+    [allOrders, activeInstrument]
   );
 
   // Format timestamp to readable date

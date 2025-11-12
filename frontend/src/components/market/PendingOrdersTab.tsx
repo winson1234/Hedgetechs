@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { cancelPendingOrder } from '../../store/slices/orderSlice';
 
@@ -14,8 +15,12 @@ const formatBalance = (value: number, currency: string) => {
 export default function PendingOrdersTab() {
   const dispatch = useAppDispatch();
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
-  const pendingOrders = useAppSelector(state => 
-    state.order.pendingOrders.filter(order => order.symbol === activeInstrument)
+  const allPendingOrders = useAppSelector(state => state.order.pendingOrders);
+
+  // Memoize filtered orders to prevent unnecessary rerenders
+  const pendingOrders = useMemo(() =>
+    allPendingOrders.filter(order => order.symbol === activeInstrument),
+    [allPendingOrders, activeInstrument]
   );
 
   const handleCancel = (orderId: string) => {

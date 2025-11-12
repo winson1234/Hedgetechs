@@ -34,7 +34,7 @@ const initialState: UIState = {
   activeInstrument: 'BTCUSDT', // Default to Bitcoin
   activeWalletTab: 'overview',
   showAnalyticsPanel: false,
-  isSidebarExpanded: true, // Default to expanded
+  isSidebarExpanded: false, // Default to collapsed
   toasts: [],
   modals: {
     openAccountModal: false,

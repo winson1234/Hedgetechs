@@ -1,50 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { useAssetPrices } from '../hooks/useAssetPrices'
+import { useInstruments, type InstrumentCategory } from '../hooks/useInstruments'
 import { useAppDispatch, useAppSelector } from '../store'
 import { setActiveInstrument } from '../store/slices/uiSlice'
 import { formatPrice, formatPercentChange } from '../utils/priceUtils'
-
-type InstrumentCategory = 'major' | 'defi' | 'altcoin'
-
-interface InstrumentSymbol {
-  symbol: string
-  displayName: string
-  baseCurrency: string
-  iconUrl: string
-  category: InstrumentCategory
-}
-
-const instrumentSymbols: InstrumentSymbol[] = [
-  // Major (7)
-  { symbol: 'BTCUSDT', displayName: 'BTC/USD', baseCurrency: 'BTC', category: 'major', iconUrl: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png' },
-  { symbol: 'ETHUSDT', displayName: 'ETH/USD', baseCurrency: 'ETH', category: 'major', iconUrl: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png' },
-  { symbol: 'BNBUSDT', displayName: 'BNB/USD', baseCurrency: 'BNB', category: 'major', iconUrl: 'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png' },
-  { symbol: 'SOLUSDT', displayName: 'SOL/USD', baseCurrency: 'SOL', category: 'major', iconUrl: 'https://assets.coingecko.com/coins/images/4128/small/solana.png' },
-  { symbol: 'XRPUSDT', displayName: 'XRP/USD', baseCurrency: 'XRP', category: 'major', iconUrl: 'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png' },
-  { symbol: 'ADAUSDT', displayName: 'ADA/USD', baseCurrency: 'ADA', category: 'major', iconUrl: 'https://assets.coingecko.com/coins/images/975/small/cardano.png' },
-  { symbol: 'AVAXUSDT', displayName: 'AVAX/USD', baseCurrency: 'AVAX', category: 'major', iconUrl: 'https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png' },
-
-  // DeFi/Layer2 (8)
-  { symbol: 'MATICUSDT', displayName: 'MATIC/USD', baseCurrency: 'MATIC', category: 'defi', iconUrl: 'https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png' },
-  { symbol: 'LINKUSDT', displayName: 'LINK/USD', baseCurrency: 'LINK', category: 'defi', iconUrl: 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png' },
-  { symbol: 'UNIUSDT', displayName: 'UNI/USD', baseCurrency: 'UNI', category: 'defi', iconUrl: 'https://assets.coingecko.com/coins/images/12504/small/uni.jpg' },
-  { symbol: 'ATOMUSDT', displayName: 'ATOM/USD', baseCurrency: 'ATOM', category: 'defi', iconUrl: 'https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png' },
-  { symbol: 'DOTUSDT', displayName: 'DOT/USD', baseCurrency: 'DOT', category: 'defi', iconUrl: 'https://assets.coingecko.com/coins/images/12171/small/polkadot.png' },
-  { symbol: 'ARBUSDT', displayName: 'ARB/USD', baseCurrency: 'ARB', category: 'defi', iconUrl: 'https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg' },
-  { symbol: 'OPUSDT', displayName: 'OP/USD', baseCurrency: 'OP', category: 'defi', iconUrl: 'https://assets.coingecko.com/coins/images/25244/small/Optimism.png' },
-  { symbol: 'APTUSDT', displayName: 'APT/USD', baseCurrency: 'APT', category: 'defi', iconUrl: 'https://assets.coingecko.com/coins/images/26455/small/aptos_round.png' },
-
-  // Altcoin (9)
-  { symbol: 'DOGEUSDT', displayName: 'DOGE/USD', baseCurrency: 'DOGE', category: 'altcoin', iconUrl: 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png' },
-  { symbol: 'LTCUSDT', displayName: 'LTC/USD', baseCurrency: 'LTC', category: 'altcoin', iconUrl: 'https://assets.coingecko.com/coins/images/2/small/litecoin.png' },
-  { symbol: 'SHIBUSDT', displayName: 'SHIB/USD', baseCurrency: 'SHIB', category: 'altcoin', iconUrl: 'https://assets.coingecko.com/coins/images/11939/small/shiba.png' },
-  { symbol: 'NEARUSDT', displayName: 'NEAR/USD', baseCurrency: 'NEAR', category: 'altcoin', iconUrl: 'https://assets.coingecko.com/coins/images/10365/small/near.jpg' },
-  { symbol: 'ICPUSDT', displayName: 'ICP/USD', baseCurrency: 'ICP', category: 'altcoin', iconUrl: 'https://assets.coingecko.com/coins/images/14495/small/Internet_Computer_logo.png' },
-  { symbol: 'FILUSDT', displayName: 'FIL/USD', baseCurrency: 'FIL', category: 'altcoin', iconUrl: 'https://assets.coingecko.com/coins/images/12817/small/filecoin.png' },
-  { symbol: 'SUIUSDT', displayName: 'SUI/USD', baseCurrency: 'SUI', category: 'altcoin', iconUrl: 'https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg' },
-  { symbol: 'STXUSDT', displayName: 'STX/USD', baseCurrency: 'STX', category: 'altcoin', iconUrl: 'https://assets.coingecko.com/coins/images/2069/small/Stacks_logo_full.png' },
-  { symbol: 'TONUSDT', displayName: 'TON/USD', baseCurrency: 'TON', category: 'altcoin', iconUrl: 'https://assets.coingecko.com/coins/images/17980/small/ton_symbol.png' },
-]
 
 type CategoryFilter = 'all' | InstrumentCategory
 
@@ -53,8 +12,10 @@ export default function InstrumentsPanel() {
   // Access Redux state
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
   const priceData = useAppSelector(state => state.price.currentPrices);
+  const tickerData = useAppSelector(state => state.price.tickers);
 
-  // Get asset prices
+  // Get instruments from backend API and asset prices
+  const { instruments: instrumentSymbols, loading: instrumentsLoading } = useInstruments();
   const { prices: assetPrices, loading: pricesLoading } = useAssetPrices();
   const [searchQuery, setSearchQuery] = useState('')
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
@@ -112,7 +73,8 @@ export default function InstrumentsPanel() {
     return instrumentSymbols.map(inst => {
       const price = assetPrices[inst.symbol] || 0
       const priceInfo = priceData[inst.symbol]
-      const changePercent = 0 // Will be updated by WebSocket in future
+      const ticker = tickerData[inst.symbol]
+      const changePercent = ticker?.priceChangePercent || 0 // Real 24h change from ticker data
 
       // Check if instrument has received data (within last 10 seconds)
       const lastUpdate = priceInfo?.timestamp || 0
@@ -132,7 +94,7 @@ export default function InstrumentsPanel() {
         isLoading,
       }
     })
-  }, [assetPrices, priceData])
+  }, [assetPrices, priceData, tickerData, instrumentSymbols])
 
   // Filter instruments based on search, favorites, and category
   const filteredInstruments = instruments.filter(item => {
@@ -266,7 +228,7 @@ export default function InstrumentsPanel() {
         )}
       </div>
 
-      {pricesLoading ? (
+      {(pricesLoading || instrumentsLoading) ? (
         <div className="space-y-2">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="py-3 px-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse">

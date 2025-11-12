@@ -149,6 +149,7 @@ func main() {
 	log.Println("Initializing forex service with Frankfurter API (no API key required)")
 	forexService := services.NewMassiveService("")
 	analyticsHandler := api.NewAnalyticsHandler(forexService)
+	fxRatesHandler := api.NewFXRatesHandler(forexService)
 
 	// Configure the HTTP server
 	// WebSocket handler uses the hub instance (with CORS)
@@ -163,6 +164,12 @@ func main() {
 	http.HandleFunc(config.NewsAPIPath, api.CORSMiddleware(allowHEAD(api.HandleNews)))
 	// REST handler for forex rates analytics (with CORS and HEAD support for health checks)
 	http.HandleFunc(config.AnalyticsAPIPath, api.CORSMiddleware(allowHEAD(analyticsHandler.HandleAnalytics)))
+	// REST handler for bulk FX rates (with CORS and HEAD support for wallet overview)
+	http.HandleFunc("/api/v1/fx-rates", api.CORSMiddleware(allowHEAD(fxRatesHandler.HandleFXRates)))
+	// REST handler for config: supported currencies (with CORS and HEAD support)
+	http.HandleFunc("/api/v1/config/currencies", api.CORSMiddleware(allowHEAD(api.HandleConfigCurrencies)))
+	// REST handler for config: product types (with CORS and HEAD support)
+	http.HandleFunc("/api/v1/config/product-types", api.CORSMiddleware(allowHEAD(api.HandleConfigProductTypes)))
 	// REST handler for Stripe payment intent creation (with CORS)
 	http.HandleFunc(config.PaymentIntentAPIPath, api.CORSMiddleware(api.HandleCreatePaymentIntent))
 	// REST handler for Stripe payment status check (with CORS)
@@ -178,18 +185,19 @@ func main() {
 	// POST /api/v1/accounts - Create a new trading account
 	// GET /api/v1/accounts - List all user's accounts
 	http.HandleFunc("/api/v1/accounts", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodPost:
 			// Apply CORS and Auth middleware for POST requests
 			api.CORSMiddleware(middleware.AuthMiddleware(api.CreateAccount))(w, r)
-		} else if r.Method == http.MethodGet {
+		case http.MethodGet:
 			// Apply CORS and Auth middleware for GET requests
 			api.CORSMiddleware(middleware.AuthMiddleware(api.GetAccounts))(w, r)
-		} else if r.Method == http.MethodOptions {
+		case http.MethodOptions:
 			// Handle preflight CORS requests
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})(w, r)
-		} else {
+		default:
 			// Method not allowed
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
@@ -197,14 +205,15 @@ func main() {
 
 	// PATCH /api/v1/accounts/metadata?id={uuid} - Update account metadata (nickname, color, icon)
 	http.HandleFunc("/api/v1/accounts/metadata", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPatch || r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodPatch, http.MethodPost:
 			// Apply CORS, Auth, and Rate Limit middleware
 			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.UpdateAccountMetadata)))(w, r)
-		} else if r.Method == http.MethodOptions {
+		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})(w, r)
-		} else {
+		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	})
@@ -213,35 +222,37 @@ func main() {
 	// POST /api/v1/pending-orders - Create a new pending limit/stop-limit order
 	// GET /api/v1/pending-orders?account_id={uuid} - List pending orders for account
 	http.HandleFunc("/api/v1/pending-orders", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodPost:
 			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.CreatePendingOrder)))(w, r)
-		} else if r.Method == http.MethodGet {
+		case http.MethodGet:
 			api.CORSMiddleware(middleware.AuthMiddleware(api.GetPendingOrders))(w, r)
-		} else if r.Method == http.MethodOptions {
+		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})(w, r)
-		} else {
+		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	})
 
 	// DELETE /api/v1/pending-orders/cancel?id={uuid} - Cancel a pending order
 	http.HandleFunc("/api/v1/pending-orders/cancel", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodDelete || r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodDelete, http.MethodPost:
 			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.CancelPendingOrder)))(w, r)
-		} else if r.Method == http.MethodOptions {
+		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})(w, r)
-		} else {
+		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	})
 
 	// Instruments endpoints (public - no auth required)
 	// GET /api/v1/instruments - List all tradeable instruments
-	http.HandleFunc("/api/v1/instruments", api.CORSMiddleware(allowHEAD(api.GetInstruments)))
+	http.HandleFunc("/api/v1/instruments", api.CORSMiddleware(allowHEAD(api.HandleInstruments)))
 	// GET /api/v1/instruments/symbol?symbol=BTCUSDT - Get instrument by symbol
 	http.HandleFunc("/api/v1/instruments/symbol", api.CORSMiddleware(allowHEAD(api.GetInstrumentBySymbol)))
 
@@ -249,15 +260,16 @@ func main() {
 	// POST /api/v1/transactions - Create transaction (deposit/withdrawal/transfer)
 	// GET /api/v1/transactions?account_id={uuid} - List transactions for account
 	http.HandleFunc("/api/v1/transactions", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodPost:
 			api.CORSMiddleware(middleware.AuthMiddleware(api.CreateTransaction))(w, r)
-		} else if r.Method == http.MethodGet {
+		case http.MethodGet:
 			api.CORSMiddleware(middleware.AuthMiddleware(api.GetTransactions))(w, r)
-		} else if r.Method == http.MethodOptions {
+		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})(w, r)
-		} else {
+		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	})
@@ -266,28 +278,30 @@ func main() {
 	// POST /api/v1/orders - Create a new order
 	// GET /api/v1/orders?account_id={uuid} - List orders for account
 	http.HandleFunc("/api/v1/orders", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodPost:
 			api.CORSMiddleware(middleware.AuthMiddleware(api.CreateOrder))(w, r)
-		} else if r.Method == http.MethodGet {
+		case http.MethodGet:
 			api.CORSMiddleware(middleware.AuthMiddleware(api.GetOrders))(w, r)
-		} else if r.Method == http.MethodOptions {
+		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})(w, r)
-		} else {
+		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	})
 
 	// POST /api/v1/orders/cancel?order_id={uuid} - Cancel an order
 	http.HandleFunc("/api/v1/orders/cancel", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodPost:
 			api.CORSMiddleware(middleware.AuthMiddleware(api.CancelOrder))(w, r)
-		} else if r.Method == http.MethodOptions {
+		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})(w, r)
-		} else {
+		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	})
@@ -296,41 +310,44 @@ func main() {
 	// POST /api/v1/contracts - Open a new position
 	// GET /api/v1/contracts?account_id={uuid}&status=open - List contracts
 	http.HandleFunc("/api/v1/contracts", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodPost:
 			api.CORSMiddleware(middleware.AuthMiddleware(api.CreateContract))(w, r)
-		} else if r.Method == http.MethodGet {
+		case http.MethodGet:
 			api.CORSMiddleware(middleware.AuthMiddleware(api.GetContracts))(w, r)
-		} else if r.Method == http.MethodOptions {
+		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})(w, r)
-		} else {
+		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	})
 
 	// POST /api/v1/contracts/close?contract_id={uuid} - Close a position
 	http.HandleFunc("/api/v1/contracts/close", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodPost:
 			api.CORSMiddleware(middleware.AuthMiddleware(api.CloseContract))(w, r)
-		} else if r.Method == http.MethodOptions {
+		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})(w, r)
-		} else {
+		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	})
 
 	// PATCH /api/v1/contracts/tpsl?contract_id={uuid} - Update TP/SL
 	http.HandleFunc("/api/v1/contracts/tpsl", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPatch || r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodPatch, http.MethodPost:
 			api.CORSMiddleware(middleware.AuthMiddleware(api.UpdateContractTPSL))(w, r)
-		} else if r.Method == http.MethodOptions {
+		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})(w, r)
-		} else {
+		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	})

@@ -29,8 +29,16 @@ const authPersistConfig = {
   whitelist: ['user', 'session'], // Only persist user and session data
 };
 
-// Create persisted auth reducer
+// Persist UI configuration - persist theme and sidebar state
+const uiPersistConfig = {
+  key: 'ui',
+  storage,
+  whitelist: ['theme', 'isSidebarExpanded'], // Only persist theme and sidebar state
+};
+
+// Create persisted reducers
 const persistedAuthReducer = persistReducer(authPersistConfig, authReducer);
+const persistedUiReducer = persistReducer(uiPersistConfig, uiReducer);
 
 // Configure store
 export const store = configureStore({
@@ -39,7 +47,7 @@ export const store = configureStore({
     account: accountReducer,
     order: orderReducer,
     price: priceReducer,
-    ui: uiReducer,
+    ui: persistedUiReducer,
     transaction: transactionReducer,
   },
   middleware: (getDefaultMiddleware) =>

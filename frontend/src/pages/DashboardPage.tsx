@@ -1,9 +1,9 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store';
 import { signOut } from '../store/slices/authSlice';
 import { setTheme, setActiveInstrument, selectIsDarkMode } from '../store/slices/uiSlice';
-import { WebSocketContext } from '../context/WebSocketContext';
+import { useInstruments } from '../hooks/useInstruments';
 import MiniSparklineChart from '../components/MiniSparklineChart';
 import { getApiUrl } from '../config/api';
 import './dashboard.css';
@@ -18,13 +18,47 @@ interface CryptoData {
   gradient: string;
 }
 
+// UI-specific properties for each crypto (emoji icons and gradient backgrounds)
+const cryptoUIProperties: Record<string, { icon: string; gradient: string }> = {
+  'BTCUSDT': { icon: '₿', gradient: 'linear-gradient(135deg, #f7931a, #ff9500)' },
+  'ETHUSDT': { icon: 'Ξ', gradient: 'linear-gradient(135deg, #627eea, #8a9cff)' },
+  'BNBUSDT': { icon: 'B', gradient: 'linear-gradient(135deg, #f3ba2f, #ffd700)' },
+  'SOLUSDT': { icon: '◎', gradient: 'linear-gradient(135deg, #9945ff, #14f195)' },
+  'XRPUSDT': { icon: '✕', gradient: 'linear-gradient(135deg, #23292f, #3d4853)' },
+  'ADAUSDT': { icon: '₳', gradient: 'linear-gradient(135deg, #0033ad, #3468d6)' },
+  'AVAXUSDT': { icon: '▲', gradient: 'linear-gradient(135deg, #e84142, #ff6b6b)' },
+  'MATICUSDT': { icon: '⬡', gradient: 'linear-gradient(135deg, #8247e5, #a77bf3)' },
+  'LINKUSDT': { icon: '⬡', gradient: 'linear-gradient(135deg, #2a5ada, #5c8bf5)' },
+  'UNIUSDT': { icon: '🦄', gradient: 'linear-gradient(135deg, #ff007a, #ff6bae)' },
+  'ATOMUSDT': { icon: '⚛', gradient: 'linear-gradient(135deg, #2e3148, #5064fb)' },
+  'DOTUSDT': { icon: '●', gradient: 'linear-gradient(135deg, #e6007a, #ff4d9e)' },
+  'ARBUSDT': { icon: '◆', gradient: 'linear-gradient(135deg, #2d374b, #4a90e2)' },
+  'OPUSDT': { icon: '○', gradient: 'linear-gradient(135deg, #ff0420, #ff6b8a)' },
+  'APTUSDT': { icon: 'A', gradient: 'linear-gradient(135deg, #00d4aa, #40e5cc)' },
+  'DOGEUSDT': { icon: 'Ð', gradient: 'linear-gradient(135deg, #c2a633, #f0d068)' },
+  'LTCUSDT': { icon: 'Ł', gradient: 'linear-gradient(135deg, #345d9d, #5c8bd6)' },
+  'SHIBUSDT': { icon: '🐕', gradient: 'linear-gradient(135deg, #ffa409, #ffcd5d)' },
+  'NEARUSDT': { icon: 'N', gradient: 'linear-gradient(135deg, #00c08b, #00f395)' },
+  'ICPUSDT': { icon: '∞', gradient: 'linear-gradient(135deg, #29abe2, #6dd5f5)' },
+  'FILUSDT': { icon: 'F', gradient: 'linear-gradient(135deg, #0090ff, #42b4ff)' },
+  'SUIUSDT': { icon: 'S', gradient: 'linear-gradient(135deg, #4da2ff, #7ec8ff)' },
+  'STXUSDT': { icon: '⬢', gradient: 'linear-gradient(135deg, #5546ff, #7e72ff)' },
+  'TONUSDT': { icon: '◇', gradient: 'linear-gradient(135deg, #0088cc, #229ed9)' },
+};
+
 export default function DashboardPage() {
   const dispatch = useAppDispatch();
   const isLoggedIn = useAppSelector(state => !!state.auth.session);
   const user = useAppSelector(state => state.auth.user);
   const isDarkMode = useAppSelector(selectIsDarkMode);
+
+  // Get instruments from backend API
+  const { instruments } = useInstruments();
+
+  // Get current prices and ticker data from Redux store (updated by WebSocket middleware)
+  const currentPrices = useAppSelector(state => state.price.currentPrices);
+  const tickerData = useAppSelector(state => state.price.tickers);
   const navigate = useNavigate();
-  const ws = useContext(WebSocketContext);
   const [activeMarketTab, setActiveMarketTab] = useState('all');
   const [activeNewsTab, setActiveNewsTab] = useState('all');
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
@@ -78,38 +112,29 @@ const cancelLogout = () => {
   setIsLoggingOut(false);
   setFadeOut(false);
 };
-  // Real-time cryptocurrency data from WebSocket (all 24 instruments)
-  const [cryptoData, setCryptoData] = useState<CryptoData[]>([
-    // Major (7)
-    { symbol: 'BTCUSDT', name: 'Bitcoin', price: 0, change: 0, volume24h: 0, icon: '₿', gradient: 'linear-gradient(135deg, #f7931a, #ff9500)' },
-    { symbol: 'ETHUSDT', name: 'Ethereum', price: 0, change: 0, volume24h: 0, icon: 'Ξ', gradient: 'linear-gradient(135deg, #627eea, #8a9cff)' },
-    { symbol: 'BNBUSDT', name: 'Binance Coin', price: 0, change: 0, volume24h: 0, icon: 'B', gradient: 'linear-gradient(135deg, #f3ba2f, #ffd700)' },
-    { symbol: 'SOLUSDT', name: 'Solana', price: 0, change: 0, volume24h: 0, icon: '◎', gradient: 'linear-gradient(135deg, #9945ff, #14f195)' },
-    { symbol: 'XRPUSDT', name: 'Ripple', price: 0, change: 0, volume24h: 0, icon: '✕', gradient: 'linear-gradient(135deg, #23292f, #3d4853)' },
-    { symbol: 'ADAUSDT', name: 'Cardano', price: 0, change: 0, volume24h: 0, icon: '₳', gradient: 'linear-gradient(135deg, #0033ad, #3468d6)' },
-    { symbol: 'AVAXUSDT', name: 'Avalanche', price: 0, change: 0, volume24h: 0, icon: '▲', gradient: 'linear-gradient(135deg, #e84142, #ff6b6b)' },
 
-    // DeFi/Layer2 (8)
-    { symbol: 'MATICUSDT', name: 'Polygon', price: 0, change: 0, volume24h: 0, icon: '⬡', gradient: 'linear-gradient(135deg, #8247e5, #a77bf3)' },
-    { symbol: 'LINKUSDT', name: 'Chainlink', price: 0, change: 0, volume24h: 0, icon: '⬡', gradient: 'linear-gradient(135deg, #2a5ada, #5c8bf5)' },
-    { symbol: 'UNIUSDT', name: 'Uniswap', price: 0, change: 0, volume24h: 0, icon: '🦄', gradient: 'linear-gradient(135deg, #ff007a, #ff6bae)' },
-    { symbol: 'ATOMUSDT', name: 'Cosmos', price: 0, change: 0, volume24h: 0, icon: '⚛', gradient: 'linear-gradient(135deg, #2e3148, #5064fb)' },
-    { symbol: 'DOTUSDT', name: 'Polkadot', price: 0, change: 0, volume24h: 0, icon: '●', gradient: 'linear-gradient(135deg, #e6007a, #ff4d9e)' },
-    { symbol: 'ARBUSDT', name: 'Arbitrum', price: 0, change: 0, volume24h: 0, icon: '◆', gradient: 'linear-gradient(135deg, #2d374b, #4a90e2)' },
-    { symbol: 'OPUSDT', name: 'Optimism', price: 0, change: 0, volume24h: 0, icon: '○', gradient: 'linear-gradient(135deg, #ff0420, #ff6b8a)' },
-    { symbol: 'APTUSDT', name: 'Aptos', price: 0, change: 0, volume24h: 0, icon: 'A', gradient: 'linear-gradient(135deg, #00d4aa, #40e5cc)' },
+  // Real-time cryptocurrency data from WebSocket (all instruments from API)
+  // Computed directly from instruments + Redux price/ticker data
+  const cryptoData = useMemo<CryptoData[]>(() => {
+    return instruments.map(inst => {
+      const uiProps = cryptoUIProperties[inst.symbol] || {
+        icon: inst.baseCurrency.charAt(0),
+        gradient: 'linear-gradient(135deg, #6366f1, #8b5cf6)'
+      };
+      const priceData = currentPrices[inst.symbol];
+      const ticker = tickerData[inst.symbol];
 
-    // Altcoin (9)
-    { symbol: 'DOGEUSDT', name: 'Dogecoin', price: 0, change: 0, volume24h: 0, icon: 'Ð', gradient: 'linear-gradient(135deg, #c2a633, #f0d068)' },
-    { symbol: 'LTCUSDT', name: 'Litecoin', price: 0, change: 0, volume24h: 0, icon: 'Ł', gradient: 'linear-gradient(135deg, #345d9d, #5c8bd6)' },
-    { symbol: 'SHIBUSDT', name: 'Shiba Inu', price: 0, change: 0, volume24h: 0, icon: '🐕', gradient: 'linear-gradient(135deg, #ffa409, #ffcd5d)' },
-    { symbol: 'NEARUSDT', name: 'Near Protocol', price: 0, change: 0, volume24h: 0, icon: 'N', gradient: 'linear-gradient(135deg, #00c08b, #00f395)' },
-    { symbol: 'ICPUSDT', name: 'Internet Computer', price: 0, change: 0, volume24h: 0, icon: '∞', gradient: 'linear-gradient(135deg, #29abe2, #6dd5f5)' },
-    { symbol: 'FILUSDT', name: 'Filecoin', price: 0, change: 0, volume24h: 0, icon: 'F', gradient: 'linear-gradient(135deg, #0090ff, #42b4ff)' },
-    { symbol: 'SUIUSDT', name: 'Sui', price: 0, change: 0, volume24h: 0, icon: 'S', gradient: 'linear-gradient(135deg, #4da2ff, #7ec8ff)' },
-    { symbol: 'STXUSDT', name: 'Stacks', price: 0, change: 0, volume24h: 0, icon: '⬢', gradient: 'linear-gradient(135deg, #5546ff, #7e72ff)' },
-    { symbol: 'TONUSDT', name: 'Toncoin', price: 0, change: 0, volume24h: 0, icon: '◇', gradient: 'linear-gradient(135deg, #0088cc, #229ed9)' },
-  ]);
+      return {
+        symbol: inst.symbol,
+        name: inst.displayName.replace('/USD', '').replace('USDT', ''),
+        price: priceData ? priceData.price : 0,
+        change: ticker ? ticker.priceChangePercent : 0,
+        volume24h: ticker ? ticker.volume24h : 0,
+        icon: uiProps.icon,
+        gradient: uiProps.gradient
+      };
+    });
+  }, [instruments, currentPrices, tickerData]);
 
   const handleLogout = () => {
     setShowLogoutModal(true);
@@ -117,92 +142,31 @@ const cancelLogout = () => {
   };
 
   const toggleThemeMode = () => {
-    dispatch(setTheme(isDarkMode ? 'light' : 'dark'));
+    const newTheme = isDarkMode ? 'light' : 'dark';
+    dispatch(setTheme(newTheme));
+    // Apply theme to both document.documentElement (for Tailwind) and body (for dashboard.css)
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.body.classList.remove('light-mode');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.add('light-mode');
+    }
   };
 
-  // WebSocket message handler for real-time price updates
+  // Sync theme on mount and when isDarkMode changes
   useEffect(() => {
-    if (!ws?.lastMessage) return;
-
-    const data = ws.lastMessage;
-
-    // Handle trade updates from Binance
-    if (data.type === 'trade') {
-      const price = typeof data.price === 'string' ? parseFloat(data.price) : data.price;
-      const symbol = data.symbol;
-
-      setCryptoData(prevData =>
-        prevData.map(crypto => {
-          if (crypto.symbol === symbol) {
-            // Only update price, preserve 24h change and volume from ticker API
-            // This ensures accurate 24h statistics instead of real-time fluctuations
-            return {
-              ...crypto,
-              price,  // Real-time price update only
-              // change: preserved from ticker API
-              // volume24h: preserved from ticker API
-            };
-          }
-          return crypto;
-        })
-      );
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      document.body.classList.remove('light-mode');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.add('light-mode');
     }
-  }, [ws?.lastMessage]);
+  }, [isDarkMode]);
 
-  // Fetch initial 24h ticker data with retry logic
-  useEffect(() => {
-    const fetchInitialData = async (retries = 3): Promise<void> => {
-      try {
-        const symbols = cryptoData.map(c => c.symbol).join(',');
-        const response = await fetch(getApiUrl(`/api/v1/ticker?symbols=${symbols}`));
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: Failed to fetch ticker data`);
-        }
-
-        const tickerData = await response.json() as Array<{
-          symbol: string;
-          lastPrice: string;
-          priceChangePercent: string;
-          volume: string;  // 24h trading volume
-        }>;
-
-        // Update crypto data with 24h statistics including volume
-        setCryptoData(prevData =>
-          prevData.map(crypto => {
-            const ticker = tickerData.find((t) => t.symbol === crypto.symbol);
-            if (ticker) {
-              const price = parseFloat(ticker.lastPrice);
-              const change = parseFloat(ticker.priceChangePercent);
-              const volume24h = parseFloat(ticker.volume);
-
-              return {
-                ...crypto,
-                price,
-                change,
-                volume24h,
-              };
-            }
-            return crypto;
-          })
-        );
-      } catch (err) {
-        console.error(`Error fetching initial ticker data (${4 - retries}/3):`, err);
-
-        // Retry with exponential backoff
-        if (retries > 1) {
-          const delay = (4 - retries) * 2000; // 2s, 4s
-          console.log(`Retrying in ${delay / 1000}s...`);
-          setTimeout(() => fetchInitialData(retries - 1), delay);
-        } else {
-          console.error('All retries failed. Prices may not be displayed correctly.');
-        }
-      }
-    };
-
-    fetchInitialData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  // No need for separate ticker fetch - AppLayout already hydrates Redux with ticker data
+  // cryptoData is now computed directly from Redux state via useMemo above
 
   interface NewsItem {
     id: number;

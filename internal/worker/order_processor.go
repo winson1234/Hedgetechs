@@ -32,7 +32,7 @@ type PriceUpdate struct {
 func NewOrderProcessor(db *pgxpool.Pool) *OrderProcessor {
 	return &OrderProcessor{
 		db:             db,
-		MessageChannel: make(chan []byte, 2048),      // Large buffer to match hub's broadcast channel
+		MessageChannel: make(chan []byte, 8192),      // Increased buffer to match hub's broadcast channel
 		priceData:      make(chan PriceUpdate, 256), // Buffered channel for parsed price updates
 		quit:           make(chan bool),
 	}

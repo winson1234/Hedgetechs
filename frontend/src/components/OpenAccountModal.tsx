@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react';
+import { useConfig } from '../hooks/useConfig';
 
 import type { Account } from '../store/slices/accountSlice'
 
@@ -21,18 +22,9 @@ type OpenAccountModalProps = {
   onAccountCreated: (message: string) => void
 }
 
-// Supported Currencies
-const supportedCurrencies = ['USD', 'EUR', 'MYR', 'JPY']
 const demoInitialBalancePresets = [1000, 5000, 10000, 50000, 100000]
 const MIN_DEMO_BALANCE = 100
 const MAX_DEMO_BALANCE = 1000000
-
-// Product types for trading accounts
-const productTypes: Array<{ value: 'spot' | 'cfd' | 'futures'; label: string; description: string }> = [
-  { value: 'spot', label: 'Spot', description: 'Trade assets at current market prices' },
-  { value: 'cfd', label: 'CFD', description: 'Contracts for Difference trading' },
-  { value: 'futures', label: 'Futures', description: 'Futures contracts trading' },
-]
 
 function OpenAccountModal({
   isOpen,
@@ -40,6 +32,9 @@ function OpenAccountModal({
   openAccount,
   onAccountCreated,
 }: OpenAccountModalProps) {
+  // Fetch configuration from backend
+  const { currencies, productTypes, loading: configLoading, error: configError } = useConfig();
+
   const [accountType, setAccountType] = useState<'live' | 'demo'>('live')
   const [productType, setProductType] = useState<'spot' | 'cfd' | 'futures'>('spot')
   const [selectedCurrency, setSelectedCurrency] = useState<string>('USD')
@@ -177,25 +172,33 @@ function OpenAccountModal({
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Product Type
             </label>
-            <div className="flex gap-1 bg-slate-100 dark:bg-slate-900 rounded-lg p-1">
-              {productTypes.map((pt) => (
-                <button
-                  key={pt.value}
-                  onClick={() => setProductType(pt.value)}
-                  disabled={isLoading}
-                  className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition ${
-                    productType === pt.value
-                      ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
-                  }`}
-                >
-                  {pt.label}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {productTypes.find(pt => pt.value === productType)?.description}
-            </p>
+            {configLoading ? (
+              <div className="flex items-center justify-center py-4 text-sm text-slate-500 dark:text-slate-400">
+                Loading product types...
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-1 bg-slate-100 dark:bg-slate-900 rounded-lg p-1">
+                  {productTypes.map((pt) => (
+                    <button
+                      key={pt.value}
+                      onClick={() => setProductType(pt.value as 'spot' | 'cfd' | 'futures')}
+                      disabled={isLoading}
+                      className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition ${
+                        productType === pt.value
+                          ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
+                      }`}
+                    >
+                      {pt.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {productTypes.find(pt => pt.value === productType)?.description}
+                </p>
+              </>
+            )}
           </div>
 
           {/* Currency Selection */}
@@ -203,21 +206,29 @@ function OpenAccountModal({
             <label htmlFor="currency" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Base Currency
             </label>
-            <select
-              id="currency"
-              value={selectedCurrency}
-              onChange={(e) => setSelectedCurrency(e.target.value)}
-              disabled={isLoading}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm disabled:opacity-70"
-            >
-              {supportedCurrencies.map(curr => (
-                <option key={curr} value={curr}>{curr}</option>
-              ))}
-            </select>
-            {accountType === 'live' && (
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Live accounts start with a 0 balance. Use the Deposit function after creation.
-              </p>
+            {configLoading ? (
+              <div className="flex items-center justify-center py-4 text-sm text-slate-500 dark:text-slate-400">
+                Loading currencies...
+              </div>
+            ) : (
+              <>
+                <select
+                  id="currency"
+                  value={selectedCurrency}
+                  onChange={(e) => setSelectedCurrency(e.target.value)}
+                  disabled={isLoading || currencies.length === 0}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm disabled:opacity-70"
+                >
+                  {currencies.map(curr => (
+                    <option key={curr} value={curr}>{curr}</option>
+                  ))}
+                </select>
+                {accountType === 'live' && (
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Live accounts start with a 0 balance. Use the Deposit function after creation.
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -264,6 +275,13 @@ function OpenAccountModal({
             </div>
           )}
 
+          {/* Configuration Error Message */}
+          {configError && (
+            <p className="text-sm text-red-600 dark:text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded border border-red-200 dark:border-red-800">
+              Failed to load configuration: {configError}
+            </p>
+          )}
+
           {/* General Error Message */}
           {error && (
             <p className="text-sm text-red-600 dark:text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded border border-red-200 dark:border-red-800">
@@ -283,7 +301,7 @@ function OpenAccountModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={isLoading || (accountType === 'demo' && !!balanceError)} // Disable if loading or balance error
+            disabled={isLoading || configLoading || !!configError || (accountType === 'demo' && !!balanceError)} // Disable if loading, config error, or balance error
             className="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[100px]" // Min width to prevent size change
           >
             {isLoading ? (

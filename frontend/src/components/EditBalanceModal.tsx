@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import type { Account } from '../types';
+import type { Account } from '../store/slices/accountSlice';
 
 // Define expected return type from edit function
 type EditBalanceResult = { success: boolean; message?: string };
@@ -32,7 +32,8 @@ function EditBalanceModal({
   useEffect(() => {
     if (isOpen && account) {
       // Pre-fill with current base currency balance
-      setNewBalance(String(account.balances[account.currency] ?? ''));
+      const currentBalance = account.balances.find(b => b.currency === account.currency)?.amount ?? 0;
+      setNewBalance(String(currentBalance));
       setError(null);
       setBalanceError(null);
       setIsLoading(false);
@@ -117,7 +118,7 @@ function EditBalanceModal({
              <span className="text-slate-500 dark:text-slate-400">Current Balance: </span>
              <span className="font-semibold text-slate-700 dark:text-slate-200">
                 {
-                 (account.balances[account.currency] ?? 0).toLocaleString('en-US', {
+                 (account.balances.find(b => b.currency === account.currency)?.amount ?? 0).toLocaleString('en-US', {
                     style: 'currency',
                     currency: account.currency,
                     minimumFractionDigits: 2,

@@ -34,8 +34,9 @@ export const signUp = createAsyncThunk(
 
       if (error) throw error;
       return { user: data.user, session: data.session };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Sign up failed');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Sign up failed';
+      return rejectWithValue(message);
     }
   }
 );
@@ -52,8 +53,9 @@ export const signIn = createAsyncThunk(
 
       if (error) throw error;
       return { user: data.user, session: data.session };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Sign in failed');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Sign in failed';
+      return rejectWithValue(message);
     }
   }
 );
@@ -66,8 +68,9 @@ export const signOut = createAsyncThunk(
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       return null;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Sign out failed');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Sign out failed';
+      return rejectWithValue(message);
     }
   }
 );
@@ -80,8 +83,9 @@ export const refreshSession = createAsyncThunk(
       const { data, error } = await supabase.auth.getSession();
       if (error) throw error;
       return { user: data.session?.user || null, session: data.session };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Session refresh failed');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Session refresh failed';
+      return rejectWithValue(message);
     }
   }
 );

@@ -1,9 +1,10 @@
 import React, { createContext, useCallback, useEffect, useRef, useState } from 'react'
 import type { PriceMessage } from '../hooks/useWebSocket'
-import { usePriceStore } from '../stores/priceStore'
-import { useOrderStore } from '../stores/orderStore'
-import { useAccountStore } from '../stores/accountStore'
-import { useUIStore } from '../stores/uiStore'
+import { useAppDispatch } from '../store'
+import { updateCurrentPrice } from '../store/slices/priceSlice'
+import { addToast } from '../store/slices/uiSlice'
+import { createDeposit } from '../store/slices/transactionSlice'
+import { fetchAccounts } from '../store/slices/accountSlice'
 
 type WSState = {
   connecting: boolean
@@ -19,6 +20,8 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   const [connecting, setConnecting] = useState(false)
   const [connected, setConnected] = useState(false)
   const [lastMessage, setLastMessage] = useState<PriceMessage | null>(null)
+
+  const dispatch = useAppDispatch()
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectRef = useRef<number>(1000)
@@ -69,26 +72,36 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
           const currency = payload.currency
           const paymentIntentId = payload.paymentIntentId
 
-          // Call processDeposit in accountStore
-          useAccountStore.getState().processDeposit(
+          // Dispatch createDeposit thunk to create the deposit transaction
+          dispatch(createDeposit({
             accountId,
             amount,
             currency,
             paymentIntentId,
-            undefined // PaymentMethodMetadata doesn't have a method field
-          ).then((result) => {
-            if (result.success) {
-              useUIStore.getState().showToast(`Crypto deposit of ${amount} ${currency} completed!`, 'success')
+            metadata: payload.method ? { cardBrand: payload.method } : undefined
+          }))
+            .unwrap()
+            .then(() => {
+              dispatch(addToast({
+                type: 'success',
+                message: `Crypto deposit of ${amount} ${currency} completed!`,
+                duration: 5000
+              }))
+
+              // Refresh accounts to get updated balances
+              dispatch(fetchAccounts())
 
               // Clear pending deposit from localStorage
               localStorage.removeItem('pending_crypto_deposit')
-            } else {
-              useUIStore.getState().showToast(result.message, 'error')
-            }
-          }).catch((error) => {
-            console.error('Failed to process crypto deposit:', error)
-            useUIStore.getState().showToast('Failed to process crypto deposit', 'error')
-          })
+            })
+            .catch((error) => {
+              console.error('Failed to process crypto deposit:', error)
+              dispatch(addToast({
+                type: 'error',
+                message: 'Failed to process crypto deposit',
+                duration: 5000
+              }))
+            })
 
           return // Don't process as price message
         }
@@ -98,10 +111,15 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
         if (priceMsg.symbol && priceMsg.price) {
           const price = typeof priceMsg.price === 'string' ? parseFloat(priceMsg.price) : priceMsg.price
           if (!isNaN(price)) {
-            usePriceStore.getState().updateCurrentPrice(priceMsg.symbol, price)
+            // Dispatch price update to Redux
+            dispatch(updateCurrentPrice({
+              symbol: priceMsg.symbol,
+              price,
+              timestamp: Date.now()
+            }))
 
-            // Real-time order matching: check pending orders immediately on every price tick
-            useOrderStore.getState().processPendingOrders(priceMsg.symbol, price)
+            // Note: Pending order processing is handled automatically by the backend's order processor
+            // No need to process orders on the frontend
           }
         }
 
@@ -134,7 +152,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
       // Optionally, we could set a local error state here for diagnostics.
       // console.debug('WebSocket error', ev)
     }
-  }, [])
+  }, [dispatch])
 
   useEffect(() => {
     closedRef.current = false

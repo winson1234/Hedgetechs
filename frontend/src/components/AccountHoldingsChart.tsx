@@ -21,7 +21,7 @@ type AssetAllocation = {
 interface AccountHoldingsChartProps {
   allocations: AssetAllocation[];
   totalValue: number; // Total account value for live center label
-  formatBalance: (balance: number | undefined, currency: string | undefined) => string;
+  formatBalance: (amount: number, currency: string) => string;
 }
 
 function AccountHoldingsChart({

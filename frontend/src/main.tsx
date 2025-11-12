@@ -5,7 +5,6 @@ import { Provider } from 'react-redux'
 import { PersistGate } from 'redux-persist/integration/react'
 import { store, persistor, useAppDispatch, useAppSelector } from './store'
 import { refreshSession, setSession } from './store/slices/authSlice'
-import { setTheme } from './store/slices/uiSlice'
 import App from './App'
 import './index.css'
 import { Elements } from '@stripe/react-stripe-js'
@@ -57,7 +56,6 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 // Theme wrapper component to apply theme on load
 function ThemeWrapper({ children }: { children: React.ReactNode }) {
   const theme = useAppSelector((state) => state.ui.theme)
-  const dispatch = useAppDispatch()
 
   useEffect(() => {
     // Apply theme to document

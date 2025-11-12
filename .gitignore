@@ -39,6 +39,8 @@ Thumbs.db
 # Build artifacts
 *.exe
 server.exe
+build/
+dist/
 
 # Temp files
 *.tmp

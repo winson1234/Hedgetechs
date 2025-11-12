@@ -94,7 +94,7 @@ export const websocketMiddleware: Middleware = (store) => {
         reconnectTimeout = setTimeout(() => {
           reconnectAttempts++;
           connect();
-        }, delay);
+        }, delay) as unknown as number;
       } else {
         console.error('[WebSocket] Max reconnection attempts reached. Please refresh the page.');
       }

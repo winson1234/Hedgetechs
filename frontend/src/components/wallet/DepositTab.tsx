@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useMemo } from 'react';
+import { useState, useEffect, useRef, memo, useMemo, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,6 +7,7 @@ import { formatBalance } from '../../utils/format';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { addToast, selectIsDarkMode } from '../../store/slices/uiSlice';
 import { createDeposit } from '../../store/slices/transactionSlice';
+import type { PaymentMethodMetadata } from '../../types';
 import { CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements, ExpressCheckoutElement } from '@stripe/react-stripe-js';
 import type { StripeCardNumberElement, StripeExpressCheckoutElementConfirmEvent } from '@stripe/stripe-js';
 
@@ -57,12 +58,12 @@ function DepositTab() {
   );
 
   // Helper function to show toast
-  const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' | 'info') => {
     dispatch(addToast({ message, type }));
-  };
+  }, [dispatch]);
 
   // Helper function to process deposit (calls backend API and dispatches Redux action)
-  const processDeposit = async (accountId: string, amount: number, currency: string, paymentIntentId?: string, metadata?: any) => {
+  const processDeposit = useCallback(async (accountId: string, amount: number, currency: string, paymentIntentId?: string, metadata?: PaymentMethodMetadata) => {
     try {
       // Dispatch Redux action to create deposit transaction
       const result = await dispatch(createDeposit({
@@ -78,7 +79,7 @@ function DepositTab() {
       console.error('Deposit failed:', error);
       throw error;
     }
-  };
+  }, [dispatch]);
 
   // Helper function to get FX rates
   const getFXRates = async () => {

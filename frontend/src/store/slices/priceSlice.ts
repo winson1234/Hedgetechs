@@ -27,6 +27,11 @@ interface HistoricalPrice {
   volume: number;
 }
 
+interface Ticker24h {
+  symbol: string;
+  lastPrice: string;
+}
+
 interface PriceState {
   currentPrices: Record<string, PriceData>; // symbol -> price data
   orderBooks: Record<string, OrderBookData>; // symbol -> order book
@@ -53,8 +58,9 @@ export const fetchHistoricalPrices = createAsyncThunk(
       if (!response.ok) throw new Error('Failed to fetch historical prices');
       const data = await response.json();
       return { symbol, klines: data.klines };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch historical prices');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch historical prices';
+      return rejectWithValue(message);
     }
   }
 );
@@ -71,9 +77,9 @@ const priceSlice = createSlice({
     },
 
     // Hydrate from 24h ticker data
-    hydrateFrom24hData: (state, action: PayloadAction<any[]>) => {
+    hydrateFrom24hData: (state, action: PayloadAction<Ticker24h[]>) => {
       const timestamp = Date.now();
-      action.payload.forEach((ticker: any) => {
+      action.payload.forEach((ticker) => {
         state.currentPrices[ticker.symbol] = {
           symbol: ticker.symbol,
           price: parseFloat(ticker.lastPrice),

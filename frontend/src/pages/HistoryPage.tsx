@@ -1,8 +1,15 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '../store';
 import { fetchTransactions } from '../store/slices/transactionSlice';
+import { fetchOrders, fetchPendingOrders } from '../store/slices/orderSlice';
 import { formatBalance } from '../utils/format';
 import type { Transaction, TransactionStatus, TransactionType } from '../types';
+import {
+  type LegacyExecutedOrder as ExecutedOrder,
+  type LegacyPendingOrder as PendingOrder,
+  adaptExecutedOrder,
+  adaptPendingOrder
+} from '../utils/orderAdapters';
 import TransactionDetailModal from '../components/TransactionDetailModal';
 import HistorySummaryCards from '../components/HistorySummaryCards';
 
@@ -10,6 +17,12 @@ type HistoryTab = 'all' | 'trades' | 'transactions';
 type HistoryItem = (Transaction | ExecutedOrder | PendingOrder) & { itemType: 'transaction' | 'executedOrder' | 'pendingOrder' };
 type SortOption = 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc';
 type DateRangeOption = 'all' | 'today' | 'week' | 'month' | 'custom';
+
+// Helper to get timestamp from different item types
+const getItemTimestamp = (item: HistoryItem): number => {
+  // All item types (Transaction, ExecutedOrder, PendingOrder) now have timestamp
+  return item.timestamp;
+};
 
 // Helper function to format timestamp
 const formatDate = (timestamp: number): string => {
@@ -117,22 +130,33 @@ export default function HistoryPage() {
 
   // Get data from Redux stores
   const dispatch = useAppDispatch();
-  const transactions = useAppSelector(state => state.transaction.transactions);
-  const executedOrders = useAppSelector(state => state.order.orders);
-  const pendingOrders = useAppSelector(state => state.order.pendingOrders);
-  const accounts = useAppSelector(state => state.account.accounts);
+  const transactions = useAppSelector((state) => state.transaction.transactions);
+  const reduxExecutedOrders = useAppSelector((state) => state.order.orders);
+  const reduxPendingOrders = useAppSelector((state) => state.order.pendingOrders);
+  const accounts = useAppSelector((state) => state.account.accounts);
+
+  // Transform Redux orders to legacy format using adapters
+  const executedOrders = useMemo(() => {
+    return reduxExecutedOrders.map(adaptExecutedOrder);
+  }, [reduxExecutedOrders]);
+
+  const pendingOrders = useMemo(() => {
+    return reduxPendingOrders.map(adaptPendingOrder);
+  }, [reduxPendingOrders]);
 
   // Get all live accounts
   const liveAccounts = useMemo(() => {
-    return accounts.filter(acc => acc.type === 'live');
+    return accounts.filter((acc) => acc.type === 'live');
   }, [accounts]);
 
-  // Fetch transactions from ALL live accounts (demo accounts are excluded)
+  // Fetch transactions, orders, and pending orders from ALL live accounts
   useEffect(() => {
     if (liveAccounts.length > 0) {
-      // Fetch transactions for each live account
-      liveAccounts.forEach(acc => {
+      // Fetch data for each live account
+      liveAccounts.forEach((acc) => {
         dispatch(fetchTransactions(acc.id));
+        dispatch(fetchOrders(acc.id));
+        dispatch(fetchPendingOrders(acc.id));
       });
     }
   }, [liveAccounts, dispatch]);
@@ -140,9 +164,9 @@ export default function HistoryPage() {
   // Combined and sorted history
   const allHistory = useMemo<HistoryItem[]>(() => {
     const items: HistoryItem[] = [
-      ...transactions.map(t => ({ ...t, itemType: 'transaction' as const })),
-      ...executedOrders.map(o => ({ ...o, itemType: 'executedOrder' as const })),
-      ...pendingOrders.map(o => ({ ...o, itemType: 'pendingOrder' as const })),
+      ...transactions.map((t) => ({ ...t, itemType: 'transaction' as const })),
+      ...executedOrders.map((o) => ({ ...o, itemType: 'executedOrder' as const })),
+      ...pendingOrders.map((o) => ({ ...o, itemType: 'pendingOrder' as const })),
     ];
 
     return items.sort((a, b) => b.timestamp - a.timestamp);
@@ -375,7 +399,7 @@ export default function HistoryPage() {
   const renderDescription = (item: HistoryItem) => {
     if (item.itemType === 'transaction') {
       const txn = item as Transaction;
-      const account = accounts.find(a => a.id === txn.accountId);
+      const account = accounts.find((a) => a.id === txn.accountId);
 
       switch (txn.type) {
         case 'deposit':
@@ -388,7 +412,7 @@ export default function HistoryPage() {
                 {txn.description || (txn.metadata?.cardBrand && txn.metadata?.last4
                   ? `${txn.metadata.cardBrand.toUpperCase()} •••• ${txn.metadata.last4}`
                   : 'Card payment')}
-                {!txn.description && account && ` → Account ${account.accountNumber}`}
+                {!txn.description && account && ` → Account ${account.account_number}`}
               </p>
             </div>
           );
@@ -399,7 +423,7 @@ export default function HistoryPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 {txn.description || (txn.metadata?.bankName || 'Bank')}
                 {!txn.description && txn.metadata?.accountLast4 && ` •••• ${txn.metadata.accountLast4}`}
-                {!txn.description && account && ` ← Account ${account.accountNumber}`}
+                {!txn.description && account && ` ← Account ${account.account_number}`}
               </p>
             </div>
           );
@@ -830,7 +854,7 @@ export default function HistoryPage() {
                     {/* Date */}
                     <div className="text-right">
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        {formatDate(item.timestamp)}
+                        {formatDate(getItemTimestamp(item))}
                       </p>
                     </div>
                   </div>

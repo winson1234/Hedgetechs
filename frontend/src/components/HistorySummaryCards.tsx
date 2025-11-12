@@ -1,4 +1,4 @@
-import { formatBalance } from '../stores/accountStore';
+import { formatBalance } from '../utils/formatters';
 import type { Transaction } from '../types';
 
 interface HistorySummaryCardsProps {

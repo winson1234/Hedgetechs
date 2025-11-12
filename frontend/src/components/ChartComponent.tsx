@@ -36,7 +36,7 @@ export default function ChartComponent() {
   const [timeframe, setTimeframe] = useState('1h');
   const [activeDrawingTool, setActiveDrawingTool] = useState<Drawing['type'] | null>(null);
   const [drawings, setDrawings] = useState<Drawing[]>([]);
-  const [drawingState, setDrawingState] = useState<any>(null);
+  const [drawingState, setDrawingState] = useState<{ type: 'trendline' | 'rectangle'; point1: { time: number; price: number } } | null>(null);
   const [activeDrawingColor, setActiveDrawingColor] = useState('#3b82f6');
   const [activeLineWidth, setActiveLineWidth] = useState(2);
   const [activeLineStyle, setActiveLineStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid');

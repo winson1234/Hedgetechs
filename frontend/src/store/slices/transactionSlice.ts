@@ -78,8 +78,9 @@ export const fetchTransactions = createAsyncThunk(
       if (!response.ok) throw new Error('Failed to fetch transactions');
       const data = await response.json();
       return data.transactions || [];
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch transactions');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch transactions';
+      return rejectWithValue(message);
     }
   }
 );
@@ -126,8 +127,9 @@ export const createDeposit = createAsyncThunk(
       if (!response.ok) throw new Error('Failed to create deposit');
       const data = await response.json();
       return data.transaction;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to create deposit');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create deposit';
+      return rejectWithValue(message);
     }
   }
 );
@@ -171,8 +173,9 @@ export const createWithdrawal = createAsyncThunk(
       if (!response.ok) throw new Error('Failed to create withdrawal');
       const data = await response.json();
       return data.transaction;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to create withdrawal');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create withdrawal';
+      return rejectWithValue(message);
     }
   }
 );
@@ -216,8 +219,9 @@ export const createTransfer = createAsyncThunk(
       if (!response.ok) throw new Error('Failed to create transfer');
       const data = await response.json();
       return data.transaction;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to create transfer');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create transfer';
+      return rejectWithValue(message);
     }
   }
 );

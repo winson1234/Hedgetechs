@@ -12,7 +12,7 @@ type AssetAllocation = {
 interface AccountHoldingsRendererProps {
   allocations: AssetAllocation[];
   liveValue: number;
-  formatBalance: (amount: number | undefined, currency: string | undefined) => string;
+  formatBalance: (amount: number, currency: string) => string;
 }
 
 interface TooltipPayload {

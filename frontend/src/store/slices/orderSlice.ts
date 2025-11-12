@@ -1,8 +1,8 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { RootState } from '../index';
 
-// Types
-interface Order {
+// Types - Export for use in other components
+export interface Order {
   id: string;
   user_id: string;
   account_id: string;
@@ -20,7 +20,7 @@ interface Order {
   updated_at: string;
 }
 
-interface PendingOrder {
+export interface PendingOrder {
   id: string;
   user_id: string;
   account_id: string;
@@ -78,8 +78,9 @@ export const fetchOrders = createAsyncThunk(
       if (!response.ok) throw new Error('Failed to fetch orders');
       const data = await response.json();
       return data.orders;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch orders');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch orders';
+      return rejectWithValue(message);
     }
   }
 );
@@ -101,8 +102,9 @@ export const fetchPendingOrders = createAsyncThunk(
       if (!response.ok) throw new Error('Failed to fetch pending orders');
       const data = await response.json();
       return data.orders;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch pending orders');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch pending orders';
+      return rejectWithValue(message);
     }
   }
 );
@@ -138,8 +140,9 @@ export const createPendingOrder = createAsyncThunk(
       if (!response.ok) throw new Error('Failed to create pending order');
       const data = await response.json();
       return data.order;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to create pending order');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create pending order';
+      return rejectWithValue(message);
     }
   }
 );
@@ -162,8 +165,9 @@ export const cancelPendingOrder = createAsyncThunk(
       if (!response.ok) throw new Error('Failed to cancel pending order');
       const data = await response.json();
       return data.order;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to cancel pending order');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to cancel pending order';
+      return rejectWithValue(message);
     }
   }
 );

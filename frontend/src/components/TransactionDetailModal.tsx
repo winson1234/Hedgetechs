@@ -1,6 +1,9 @@
-import { formatBalance } from '../stores/accountStore';
+import { formatBalance } from '../utils/formatters';
 import type { Transaction } from '../types';
-import type { ExecutedOrder, PendingOrder } from '../stores/orderStore';
+import {
+  type LegacyExecutedOrder as ExecutedOrder,
+  type LegacyPendingOrder as PendingOrder
+} from '../utils/orderAdapters';
 
 type DetailItem = (Transaction | ExecutedOrder | PendingOrder) & {
   itemType: 'transaction' | 'executedOrder' | 'pendingOrder'

@@ -4,30 +4,21 @@ import { setActiveAccount } from '../store/slices/accountSlice';
 import { createPendingOrder } from '../store/slices/orderSlice';
 import { formatPrice } from '../utils/priceUtils';
 
-// Define the expected structure for a price update message from WebSocket
-type PriceUpdate = {
-  symbol: string;
-  price: string | number;
-  time: number;
-  quantity?: string | number;
-  isBuyerMaker?: boolean;
-};
-
 type TradingMode = 'spot' | 'cross' | 'isolated' | 'grid';
 type OrderType = 'limit' | 'market' | 'stop-limit';
 
 export default function TradingPanel() {
   // Access Redux store
   const dispatch = useAppDispatch();
-  const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
-  const { accounts, activeAccountId } = useAppSelector(state => state.account);
-  const { currentPrices } = useAppSelector(state => state.price);
+  const activeInstrument = useAppSelector((state) => state.ui.activeInstrument);
+  const { accounts, activeAccountId } = useAppSelector((state) => state.account);
+  const { currentPrices } = useAppSelector((state) => state.price);
 
   // Get active account
-  const activeAccount = accounts.find(acc => acc.id === activeAccountId);
+  const activeAccount = accounts.find((acc) => acc.id === activeAccountId);
 
   // Get balance from active account (in account's currency)
-  const accountBalance = activeAccount?.balances.find(b => b.currency === activeAccount.currency)?.amount || 0;
+  const accountBalance = activeAccount?.balances.find((b) => b.currency === activeAccount.currency)?.amount || 0;
   const accountCurrency = activeAccount?.currency || 'USD';
 
   // Get crypto holdings (simplified - would need proper implementation)
@@ -313,56 +304,46 @@ export default function TradingPanel() {
         return;
       }
 
-      const result = addPendingOrder({
-        accountId: activeAccountId,
-        type: orderType,
+      // Dispatch createPendingOrder thunk
+      dispatch(createPendingOrder({
+        account_id: activeAccountId,
+        type: orderType === 'stop-limit' ? 'stop_limit' : 'limit',
         side,
         symbol: activeInstrument,
-        price, // Limit price
-        amount: qty,
-        stopPrice: orderType === 'stop-limit' ? stopPriceNum : undefined,
-      });
-
-      if (!result.success) {
-        console.error('Failed to place pending order:', result.message);
-      }
+        quantity: qty,
+        trigger_price: orderType === 'stop-limit' ? stopPriceNum : price,
+        limit_price: price,
+      }))
+        .unwrap()
+        .then(() => {
+          console.log('Pending order placed successfully');
+        })
+        .catch((error) => {
+          console.error('Failed to place pending order:', error);
+        });
     } else {
-      // Market orders execute immediately via accountStore
-      // Ensure currentPrice is valid before executing market order
-       if (isNaN(currentPrice) || currentPrice <= 0) {
-           console.error("Cannot execute market order: Invalid current price.");
-           return;
-       }
-
-      const result =
-        side === 'buy'
-          ? await executeBuy(activeInstrument, qty, currentPrice)
-          : await executeSell(activeInstrument, qty, currentPrice);
-
-      if (!result.success) {
-        console.error("Market order execution failed:", result.message);
+      // Market orders - TODO: Implement immediate execution via backend
+      // For now, just log the intent
+      if (isNaN(currentPrice) || currentPrice <= 0) {
+        console.error("Cannot execute market order: Invalid current price.");
         return;
       }
 
-      // Record the executed market order in order history
-      if (activeAccountId) {
-        const fee = getFeeAmount();
-        const total = qty * currentPrice;
-        recordExecutedOrder({
-          accountId: activeAccountId,
-          symbol: activeInstrument,
-          side,
-          type: 'market',
-          amount: qty,
-          executionPrice: currentPrice,
-          fee,
-          total: total + fee,
-          wasFromPending: false,
-        });
-      }
+      // TODO: Implement executeBuy/executeSell backend endpoints
+      console.log(`Market ${side} order:`, {
+        symbol: activeInstrument,
+        quantity: qty,
+        price: currentPrice,
+        accountId: activeAccountId
+      });
 
-      // Create TP/SL orders if enabled
-      if (enableTPSL && activeAccountId) {
+      // TODO: After backend implementation, record the executed order
+      // For now, market orders are not fully supported
+      console.warn('Market orders require backend implementation');
+    }
+
+    // Create TP/SL orders if enabled (applies to all order types)
+    if (enableTPSL && activeAccountId) {
         const tpTriggerNum = parseFloat(tpTrigger);
         const tpLimitNum = parseFloat(tpLimit);
         const slTriggerNum = parseFloat(slTrigger);
@@ -393,38 +374,32 @@ export default function TradingPanel() {
           }
         }
 
-        // Generate a shared linkedOrderId for OCO functionality
-        const linkedOrderId = hasValidTP && hasValidSL ? crypto.randomUUID() : undefined;
-
         // Create TP order (stop-limit order in opposite direction)
         if (hasValidTP) {
-          addPendingOrder({
-            accountId: activeAccountId,
-            type: 'stop-limit',
+          dispatch(createPendingOrder({
+            account_id: activeAccountId,
+            type: 'stop_limit',
             side: side === 'buy' ? 'sell' : 'buy', // Opposite side to close position
             symbol: activeInstrument,
-            price: tpLimitNum, // Limit price
-            amount: qty,
-            stopPrice: tpTriggerNum, // Trigger price
-            linkedOrderId,
-          });
+            quantity: qty,
+            trigger_price: tpTriggerNum,
+            limit_price: tpLimitNum,
+          }));
         }
 
         // Create SL order (stop-limit order in opposite direction)
         if (hasValidSL) {
-          addPendingOrder({
-            accountId: activeAccountId,
-            type: 'stop-limit',
+          dispatch(createPendingOrder({
+            account_id: activeAccountId,
+            type: 'stop_limit',
             side: side === 'buy' ? 'sell' : 'buy', // Opposite side to close position
             symbol: activeInstrument,
-            price: slLimitNum, // Limit price
-            amount: qty,
-            stopPrice: slTriggerNum, // Trigger price
-            linkedOrderId,
-          });
+            quantity: qty,
+            trigger_price: slTriggerNum,
+            limit_price: slLimitNum,
+          }));
         }
       }
-    }
 
     // Reset form after placing order
     setAmount('');
@@ -547,7 +522,7 @@ export default function TradingPanel() {
             value={activeAccountId || ''}
             onChange={(e) => setActiveAccount(e.target.value)}
             className="max-w-[140px] min-w-0 px-1.5 py-1 text-[11px] bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-700 dark:text-slate-300 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-            title={accounts.find(acc => acc.id === activeAccountId)?.id}
+            title={accounts.find((acc) => acc.id === activeAccountId)?.id}
           >
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>

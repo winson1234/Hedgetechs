@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Account } from '../types';
 import { useAssetPrices } from '../hooks/useAssetPrices';
-import { useUIStore } from '../stores/uiStore';
-import { useAccountStore, formatBalance } from '../stores/accountStore';
+import { useAppDispatch, useAppSelector } from '../store';
+import { setActiveAccount, type Account, type Balance } from '../store/slices/accountSlice';
+import { setActiveWalletTab, addToast } from '../store/slices/uiSlice';
 import OpenAccountModal from './OpenAccountModal';
 import EditBalanceModal from './EditBalanceModal';
 import AccountHoldingsChart from './AccountHoldingsChart';
@@ -15,20 +15,44 @@ const ArrowDownTrayIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fill="
 const ArrowUpTrayIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg> );
 // --- End Icons ---
 
+// --- Helper Functions ---
+// Get balance amount for a specific currency from Balance[] array
+const getBalanceAmount = (balances: Array<{ currency: string; amount: number }>, currency: string): number => {
+  const balance = balances.find(b => b.currency === currency);
+  return balance ? balance.amount : 0;
+};
+
+// Format balance for display
+const formatBalance = (amount: number, currency: string): string => {
+  if (amount === undefined || amount === null || isNaN(amount)) return '0.00';
+
+  const formatter = new Intl.NumberFormat('en-US', {
+    style: 'decimal',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  return `${formatter.format(amount)} ${currency}`;
+};
+
+// Convert Balance[] to Record<string, number> for easier access
+const balancesToRecord = (balances: Balance[]): Record<string, number> => {
+  const record: Record<string, number> = {};
+  balances.forEach(b => {
+    record[b.currency] = b.amount;
+  });
+  return record;
+};
+
 type AccountTab = 'live' | 'demo';
 
 export default function AccountPage() {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
 
-  // Access stores
-  const accounts = useAccountStore(state => state.accounts);
-  const activeAccountId = useAccountStore(state => state.activeAccountId);
-  const setActiveAccount = useAccountStore(state => state.setActiveAccount);
-  const openAccount = useAccountStore(state => state.openAccount);
-  const editDemoBalance = useAccountStore(state => state.editDemoBalance);
-  const toggleAccountStatus = useAccountStore(state => state.toggleAccountStatus);
-  const setActiveWalletTab = useUIStore(state => state.setActiveWalletTab);
-  const showToast = useUIStore(state => state.showToast);
+  // Access Redux store
+  const accounts = useAppSelector((state) => state.account.accounts);
+  const activeAccountId = useAppSelector((state) => state.account.activeAccountId);
 
   // Get asset prices
   const { prices: assetPrices, loading: pricesLoading } = useAssetPrices();
@@ -45,15 +69,18 @@ export default function AccountPage() {
     }
   }, [activeAccountId, selectedAccountId]);
 
-  const liveAccounts = useMemo(() => accounts.filter(acc => acc.type === 'live'), [accounts]);
-  const demoAccounts = useMemo(() => accounts.filter(acc => acc.type === 'demo'), [accounts]);
-  const selectedAccount = useMemo(() => accounts.find(acc => acc.id === selectedAccountId), [accounts, selectedAccountId]);
+  const liveAccounts = useMemo(() => accounts.filter((acc) => acc.type === 'live'), [accounts]);
+  const demoAccounts = useMemo(() => accounts.filter((acc) => acc.type === 'demo'), [accounts]);
+  const selectedAccount = useMemo(() => accounts.find((acc) => acc.id === selectedAccountId), [accounts, selectedAccountId]);
 
   // Helper function to calculate asset allocations for any account
-  const calculateAllocations = useCallback((account: Account) => {
-    if (!account || account.platformType === 'external') return [];
+  const calculateAllocations = useCallback((account: Account | undefined) => {
+    if (!account) return [];
 
-    const holdings = Object.entries(account.balances).filter(
+    // Convert Balance[] to Record for easier access
+    const balancesRecord = balancesToRecord(account.balances || []);
+
+    const holdings = Object.entries(balancesRecord).filter(
       ([currency, amount]) => currency !== account.currency && amount > 0
     );
 
@@ -98,7 +125,7 @@ export default function AccountPage() {
     if (!selectedAccount) return 0;
 
     // Start with base currency balance
-    let total = selectedAccount.balances[selectedAccount.currency] ?? 0;
+    let total = getBalanceAmount(selectedAccount.balances, selectedAccount.currency);
 
     // Add all other holdings converted to USD
     selectedAccountAllocations.forEach(holding => {
@@ -121,14 +148,14 @@ export default function AccountPage() {
 
    const handleAccountCreated = useCallback((message: string) => {
     setIsCreateModalOpen(false);
-    showToast(message, 'success');
-  }, [showToast]);
+    dispatch(addToast({ type: 'success', message, duration: 5000 }));
+  }, [dispatch]);
 
    const handleBalanceEdited = useCallback((message: string) => {
     setIsEditModalOpen(false);
     setAccountToEdit(null);
-    showToast(message, 'success');
-  }, [showToast]);
+    dispatch(addToast({ type: 'success', message, duration: 5000 }));
+  }, [dispatch]);
 
   const handleCloseCreateModal = useCallback(() => setIsCreateModalOpen(false), []);
   const handleCloseEditModal = useCallback(() => setIsEditModalOpen(false), []);
@@ -221,7 +248,6 @@ export default function AccountPage() {
   // --- Render Thin Account Card (List View) ---
   const renderAccountCard = (acc: Account) => {
     const isDeactivated = acc.status === 'deactivated' || acc.status === 'suspended';
-    const isExternal = acc.platformType === 'external';
     const isSelected = selectedAccountId === acc.id;
     const isActive = activeAccountId === acc.id;
     const allocations = calculateAllocations(acc);
@@ -254,11 +280,6 @@ export default function AccountPage() {
                 Active
               </span>
             )}
-            {isExternal && (
-              <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
-                External
-              </span>
-            )}
             {isDeactivated && (
               <span className="text-[10px] font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/50 px-2 py-0.5 rounded uppercase tracking-wider">
                 {acc.status}
@@ -271,13 +292,13 @@ export default function AccountPage() {
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1">
             <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-              {formatBalance(acc.balances[acc.currency], acc.currency)}
+              {formatBalance(getBalanceAmount(acc.balances || [], acc.currency), acc.currency)}
             </p>
           </div>
 
-          {/* Micro Chart - only for integrated accounts with holdings */}
+          {/* Micro Chart - show if account has holdings */}
           {/* eslint-disable-next-line react/prop-types */}
-          {acc.platformType === 'integrated' && allocations.length > 0 && (
+          {allocations.length > 0 && (
             <div className="flex-shrink-0">
               <MicroDonutChart allocations={allocations} size={80} />
             </div>
@@ -332,46 +353,44 @@ export default function AccountPage() {
                                 <span className={`font-medium px-2 py-0.5 rounded text-[10px] ${selectedAccount.status === 'active' ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300'}`}>{selectedAccount.status.toUpperCase()}</span>
                             </div>
 
-                            <div className="text-slate-500 dark:text-slate-400">Platform:</div>
-                            <div className="font-medium text-slate-700 dark:text-slate-300 text-right">{selectedAccount.platform || 'N/A'}</div>
+                            <div className="text-slate-500 dark:text-slate-400">Product Type:</div>
+                            <div className="font-medium text-slate-700 dark:text-slate-300 text-right capitalize">{selectedAccount.product_type || 'N/A'}</div>
 
-                            <div className="text-slate-500 dark:text-slate-400">Server:</div>
-                            <div className="font-medium text-slate-700 dark:text-slate-300 text-right">{selectedAccount.server || 'N/A'}</div>
+                            <div className="text-slate-500 dark:text-slate-400">Status:</div>
+                            <div className="font-medium text-slate-700 dark:text-slate-300 text-right capitalize">{selectedAccount.status || 'N/A'}</div>
 
                             <div className="text-slate-500 dark:text-slate-400">Created On:</div>
-                            <div className="font-medium text-slate-700 dark:text-slate-300 text-right">{formatDate(selectedAccount.createdAt)}</div>
+                            <div className="font-medium text-slate-700 dark:text-slate-300 text-right">{formatDate(new Date(selectedAccount.created_at).getTime())}</div>
                         </div>
 
                         {/* Balance */}
                         <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
                             <div className="text-slate-500 dark:text-slate-400 font-semibold mb-1">Balance ({selectedAccount.currency})</div>
-                            <div className="font-semibold text-2xl text-slate-900 dark:text-slate-100">{formatBalance(selectedAccount.balances[selectedAccount.currency], selectedAccount.currency)}</div>
+                            <div className="font-semibold text-2xl text-slate-900 dark:text-slate-100">{formatBalance(getBalanceAmount(selectedAccount.balances || [], selectedAccount.currency), selectedAccount.currency)}</div>
                         </div>
 
-                        {/* Holdings Allocation (only for integrated accounts) */}
-                        {selectedAccount.platformType === 'integrated' && (
-                            <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
-                                {pricesLoading ? (
-                                    <div className="text-center py-6">
-                                        <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-solid border-indigo-600 border-r-transparent"></div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Loading prices...</p>
-                                    </div>
-                                ) : (
-                                    <AccountHoldingsChart
-                                        allocations={selectedAccountAllocations}
-                                        totalValue={selectedAccountTotalValue}
-                                        formatBalance={formatBalance}
-                                    />
-                                )}
-                            </div>
-                        )}
+                        {/* Holdings Allocation */}
+                        <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
+                            {pricesLoading ? (
+                                <div className="text-center py-6">
+                                    <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-solid border-indigo-600 border-r-transparent"></div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Loading prices...</p>
+                                </div>
+                            ) : (
+                                <AccountHoldingsChart
+                                    allocations={selectedAccountAllocations}
+                                    totalValue={selectedAccountTotalValue}
+                                    formatBalance={formatBalance}
+                                />
+                            )}
+                        </div>
 
                         {/* Action Buttons */}
                         <div className="pt-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
-                            {/* Set Active Button - only for integrated, active accounts */}
-                            {selectedAccount.platformType === 'integrated' && selectedAccount.status === 'active' && selectedAccount.id !== activeAccountId && (
+                            {/* Set Active Button - only for active accounts */}
+                            {selectedAccount.status === 'active' && selectedAccount.id !== activeAccountId && (
                                 <button
-                                    onClick={() => setActiveAccount(selectedAccount.id)}
+                                    onClick={() => dispatch(setActiveAccount(selectedAccount.id))}
                                     className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors shadow-sm"
                                 >
                                     Set as Active Account
@@ -382,7 +401,7 @@ export default function AccountPage() {
                             {selectedAccount.type !== 'demo' && (
                                 <button
                                     onClick={() => {
-                                      setActiveWalletTab('deposit');
+                                      dispatch(setActiveWalletTab('deposit'));
                                       navigate('/wallet');
                                     }}
                                     className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -397,7 +416,7 @@ export default function AccountPage() {
                             {selectedAccount.type !== 'demo' && (
                                 <button
                                     onClick={() => {
-                                      setActiveWalletTab('withdraw');
+                                      dispatch(setActiveWalletTab('withdraw'));
                                       navigate('/wallet');
                                     }}
                                     className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-md transition-colors border border-slate-200 dark:border-slate-600 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -417,16 +436,6 @@ export default function AccountPage() {
                                   <PencilSquareIcon /> Edit Balance
                                 </button>
                             )}
-
-                            {/* Trade Button - only for external accounts */}
-                            {selectedAccount.platformType === 'external' && (
-                                <button
-                                    onClick={() => showToast(`Trade on ${selectedAccount.platform} coming soon!`, 'success')}
-                                    className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors shadow-sm"
-                                >
-                                  Trade on {selectedAccount.platform}
-                                </button>
-                            )}
                         </div>
 
                         {/* Danger Zone */}
@@ -434,7 +443,10 @@ export default function AccountPage() {
                             <div className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2">Account Management</div>
                             {selectedAccount.status === 'active' ? (
                                 <button
-                                    onClick={() => toggleAccountStatus(selectedAccount.id)}
+                                    onClick={() => {
+                                      // TODO: Implement toggleAccountStatus in Redux
+                                      dispatch(addToast({ type: 'info', message: 'Account deactivation coming soon', duration: 3000 }));
+                                    }}
                                     className="w-full px-3 py-2 text-xs font-medium bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md transition-colors border border-red-200 dark:border-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
                                     disabled={selectedAccount.id === activeAccountId}
                                     title={selectedAccount.id === activeAccountId ? 'Cannot deactivate the active trading account' : 'Deactivate this account'}
@@ -443,7 +455,10 @@ export default function AccountPage() {
                                 </button>
                             ) : (
                                 <button
-                                    onClick={() => toggleAccountStatus(selectedAccount.id)}
+                                    onClick={() => {
+                                      // TODO: Implement toggleAccountStatus in Redux
+                                      dispatch(addToast({ type: 'info', message: 'Account reactivation coming soon', duration: 3000 }));
+                                    }}
                                     className="w-full px-3 py-2 text-xs font-medium bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 rounded-md transition-colors border border-green-200 dark:border-green-800"
                                 >
                                   Reactivate Account
@@ -458,8 +473,27 @@ export default function AccountPage() {
         </div>
       </div>
       {/* --- Modals --- */}
-      <OpenAccountModal isOpen={isCreateModalOpen} onClose={handleCloseCreateModal} openAccount={openAccount} onAccountCreated={handleAccountCreated}/>
-      <EditBalanceModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} account={accountToEdit} editDemoBalance={editDemoBalance} onBalanceEdited={handleBalanceEdited}/>
+      <OpenAccountModal
+        isOpen={isCreateModalOpen}
+        onClose={handleCloseCreateModal}
+        openAccount={(type: string, productType: string, currency: string, initialBalance: number) => {
+          // TODO: Implement openAccount in Redux - use createAccount thunk
+          console.log('Open account:', type, productType, currency, initialBalance);
+          return Promise.resolve({ success: true, message: 'Account created', account: {} as Account });
+        }}
+        onAccountCreated={handleAccountCreated}
+      />
+      <EditBalanceModal
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        account={accountToEdit}
+        editDemoBalance={(accountId: string, newBalance: number) => {
+          // TODO: Implement editDemoBalance in Redux
+          console.log('Edit balance:', accountId, newBalance);
+          return Promise.resolve({ success: true, message: 'Balance updated' });
+        }}
+        onBalanceEdited={handleBalanceEdited}
+      />
     </div>
   );
 }

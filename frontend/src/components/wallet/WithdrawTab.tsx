@@ -6,6 +6,7 @@ import { formatBalance } from '../../utils/format';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { addToast } from '../../store/slices/uiSlice';
 import { createWithdrawal } from '../../store/slices/transactionSlice';
+import type { PaymentMethodMetadata } from '../../types';
 
 // Validation schema (will add .refine for balance check)
 const withdrawSchemaBase = z.object({
@@ -38,7 +39,7 @@ function WithdrawTab() {
   };
 
   // Helper function to process withdrawal
-  const processWithdrawal = async (accountId: string, amount: number, currency: string, bankDetails: any) => {
+  const processWithdrawal = async (accountId: string, amount: number, currency: string, bankDetails: PaymentMethodMetadata) => {
     try {
       await dispatch(createWithdrawal({
         accountId,

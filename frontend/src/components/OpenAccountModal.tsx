@@ -1,6 +1,6 @@
 import { useState, useEffect, memo } from 'react';
 
-import type { Account } from '../types'
+import type { Account } from '../store/slices/accountSlice'
 
 // Define expected return type from openAccount function
 type OpenAccountResult = {

@@ -128,15 +128,16 @@ useEffect(() => {
   }
 
   try {
+    // Note: name and country are not used by Supabase signUp but could be stored in user_metadata
     await dispatch(signUp({
-      name: `${formData.firstName} ${formData.lastName}`,
       email: formData.email,
-      country: formData.country,
       password: formData.password
     })).unwrap();
+    // TODO: Update user metadata with name and country after signup
     navigate('/profile');
-  } catch (error: any) {
-    alert(error?.message || 'Registration failed');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Registration failed';
+    alert(message);
   }
   };
 

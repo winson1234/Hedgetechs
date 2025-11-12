@@ -1,8 +1,8 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '../index';
 
-// Types
-interface Balance {
+// Types - Export for use in components
+export interface Balance {
   id: string;
   account_id: string;
   currency: string;
@@ -11,7 +11,7 @@ interface Balance {
   updated_at: string;
 }
 
-interface Account {
+export interface Account {
   id: string;
   user_id: string;
   account_number: string;
@@ -69,8 +69,9 @@ export const fetchAccounts = createAsyncThunk(
       if (!response.ok) throw new Error('Failed to fetch accounts');
       const data = await response.json();
       return data.accounts;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch accounts');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch accounts';
+      return rejectWithValue(message);
     }
   }
 );
@@ -108,8 +109,9 @@ export const createAccount = createAsyncThunk(
       if (!response.ok) throw new Error('Failed to create account');
       const data = await response.json();
       return data.account;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to create account');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create account';
+      return rejectWithValue(message);
     }
   }
 );
@@ -142,8 +144,9 @@ export const updateAccountMetadata = createAsyncThunk(
       if (!response.ok) throw new Error('Failed to update account metadata');
       const data = await response.json();
       return data.account;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to update account metadata');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update account metadata';
+      return rejectWithValue(message);
     }
   }
 );

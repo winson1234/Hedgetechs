@@ -1,15 +1,6 @@
 import { useMemo } from 'react';
 import { useAppSelector } from '../../store';
-
-// Utility function to format balance
-const formatBalance = (value: number, currency: string) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency === 'USD' ? 'USD' : 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  }).format(value);
-};
+import { formatCurrency } from '../../utils/formatters';
 
 export default function TradeHistoryTab() {
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
@@ -117,7 +108,7 @@ export default function TradeHistoryTab() {
                   <div className="flex justify-between">
                     <span className="text-slate-600 dark:text-slate-400">Avg Price:</span>
                     <span className="font-medium text-slate-900 dark:text-slate-100">
-                      {formatBalance(order.average_fill_price || 0, 'USD')}
+                      {formatCurrency(order.average_fill_price || 0, 'USD')}
                     </span>
                   </div>
 
@@ -134,7 +125,7 @@ export default function TradeHistoryTab() {
                   <div className="flex justify-between">
                     <span className="text-slate-600 dark:text-slate-400">Total:</span>
                     <span className="font-semibold text-slate-900 dark:text-slate-100">
-                      {formatBalance((order.average_fill_price || 0) * order.filled_amount, 'USD')}
+                      {formatCurrency((order.average_fill_price || 0) * order.filled_amount, 'USD')}
                     </span>
                   </div>
                 </div>

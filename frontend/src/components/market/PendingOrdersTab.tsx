@@ -1,16 +1,7 @@
 import { useMemo } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { cancelPendingOrder } from '../../store/slices/orderSlice';
-
-// Utility function to format balance (replace with actual implementation if needed)
-const formatBalance = (value: number, currency: string) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency === 'USD' ? 'USD' : 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  }).format(value);
-};
+import { formatCurrency } from '../../utils/formatters';
 
 export default function PendingOrdersTab() {
   const dispatch = useAppDispatch();
@@ -121,7 +112,7 @@ export default function PendingOrdersTab() {
                     {order.type === 'limit' ? 'Limit Price:' : 'Limit Price:'}
                   </span>
                   <span className="font-medium text-slate-900 dark:text-slate-100">
-                    {formatBalance(order.trigger_price, 'USD')}
+                    {formatCurrency(order.trigger_price, 'USD')}
                   </span>
                 </div>
 
@@ -129,7 +120,7 @@ export default function PendingOrdersTab() {
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-600 dark:text-slate-400">Stop Price:</span>
                     <span className="font-medium text-slate-900 dark:text-slate-100">
-                      {formatBalance(order.limit_price, 'USD')}
+                      {formatCurrency(order.limit_price, 'USD')}
                     </span>
                   </div>
                 )}
@@ -137,7 +128,7 @@ export default function PendingOrdersTab() {
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-600 dark:text-slate-400">Total:</span>
                   <span className="font-semibold text-slate-900 dark:text-slate-100">
-                    {formatBalance(order.quantity * order.trigger_price, 'USD')}
+                    {formatCurrency(order.quantity * order.trigger_price, 'USD')}
                   </span>
                 </div>
 
@@ -157,11 +148,11 @@ export default function PendingOrdersTab() {
                 <span className="text-xs text-slate-500 dark:text-slate-400">
                   {order.type === 'limit'
                     ? order.side === 'buy'
-                      ? `Executes when price ≤ ${formatBalance(order.trigger_price, 'USD')}`
-                      : `Executes when price ≥ ${formatBalance(order.trigger_price, 'USD')}`
+                      ? `Executes when price ≤ ${formatCurrency(order.trigger_price, 'USD')}`
+                      : `Executes when price ≥ ${formatCurrency(order.trigger_price, 'USD')}`
                     : order.side === 'buy'
-                    ? `Stops at ${formatBalance(order.limit_price || 0, 'USD')}`
-                    : `Stops at ${formatBalance(order.limit_price || 0, 'USD')}`}
+                    ? `Stops at ${formatCurrency(order.limit_price || 0, 'USD')}`
+                    : `Stops at ${formatCurrency(order.limit_price || 0, 'USD')}`}
                 </span>
               </div>
             </div>

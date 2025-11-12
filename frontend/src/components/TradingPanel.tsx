@@ -81,14 +81,12 @@ export default function TradingPanel() {
   useEffect(() => {
     const priceData = currentPrices[activeInstrument];
     if (priceData && priceData.price > 0) {
-      // Check if the price has actually changed to avoid unnecessary processing
-      if (priceData.price !== currentPrice) {
-        setCurrentPrice(priceData.price);
-        // TODO: Pending order processing should be handled in Redux middleware or App.tsx
-        // processPendingOrders(activeInstrument, priceData.price);
-      }
+      // Update current price when price data changes
+      setCurrentPrice(priceData.price);
+      // TODO: Pending order processing should be handled in Redux middleware or App.tsx
+      // processPendingOrders(activeInstrument, priceData.price);
     }
-  }, [currentPrices, activeInstrument, currentPrice]);
+  }, [currentPrices, activeInstrument]);
 
   // --- End of Price Update Logic ---
 

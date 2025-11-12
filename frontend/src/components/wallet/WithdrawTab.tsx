@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, memo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { formatBalance } from '../../utils/format';
+import { formatCurrency } from '../../utils/formatters';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { addToast } from '../../store/slices/uiSlice';
 import { createWithdrawal } from '../../store/slices/transactionSlice';
@@ -92,7 +92,7 @@ function WithdrawTab() {
     withdrawSchemaBase.refine(
       (data) => data.amount <= availableBalance,
       {
-        message: `Insufficient funds. Available: ${formatBalance(availableBalance, selectedAccount?.currency || 'USD')}`,
+        message: `Insufficient funds. Available: ${formatCurrency(availableBalance, selectedAccount?.currency || 'USD')}`,
         path: ['amount'],
       }
     ),
@@ -180,7 +180,7 @@ function WithdrawTab() {
               const balance = acc.balances.find(b => b.currency === acc.currency);
               return (
                 <option key={acc.id} value={acc.id}>
-                  {acc.id} - {formatBalance(balance?.amount || 0, acc.currency)}
+                  {acc.id} - {formatCurrency(balance?.amount || 0, acc.currency)}
                 </option>
               );
             })}
@@ -197,7 +197,7 @@ function WithdrawTab() {
               Amount to Withdraw
             </label>
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              Available: {formatBalance(availableBalance, selectedAccount?.currency || 'USD')}
+              Available: {formatCurrency(availableBalance, selectedAccount?.currency || 'USD')}
             </span>
           </div>
           <div className="relative">

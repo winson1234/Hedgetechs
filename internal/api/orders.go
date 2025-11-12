@@ -109,30 +109,17 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	// For market orders, execute immediately
 	if req.Type == models.OrderTypeMarket {
-		// Get current market price
-		// NOTE: In production, you should fetch this from your price service/cache
-		// For now, we require the frontend to pass the current price
-		var executionPrice float64
-		if req.LimitPrice != nil && *req.LimitPrice > 0 {
-			// Frontend can pass current price via limit_price for market orders
-			executionPrice = *req.LimitPrice
-		} else {
-			// Fetch from database (last known price from recent orders or price cache)
-			err = pool.QueryRow(ctx,
-				`SELECT COALESCE(average_fill_price, 0)
-				 FROM orders
-				 WHERE symbol = $1 AND status = 'filled' AND average_fill_price IS NOT NULL
-				 ORDER BY updated_at DESC LIMIT 1`,
-				req.Symbol,
-			).Scan(&executionPrice)
-			if err != nil || executionPrice == 0 {
-				// No recent orders, reject the market order
-				log.Printf("Cannot execute market order: no recent price data for %s", req.Symbol)
-				// Update order to rejected
-				pool.Exec(ctx, "UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2", models.OrderStatusRejected, orderID)
-				respondWithJSONError(w, http.StatusBadRequest, "execution_error", "cannot execute market order: no current price available. please use limit order or pass current price")
-				return
-			}
+		// SECURITY: Get current market price from trusted backend price cache
+		// NEVER trust prices from frontend (prevents price spoofing attacks)
+		priceCache := services.GetGlobalPriceCache()
+		executionPrice, err := priceCache.GetPrice(req.Symbol)
+		if err != nil {
+			// No recent price data available from WebSocket stream
+			log.Printf("Cannot execute market order for %s: %v", req.Symbol, err)
+			// Update order to rejected
+			pool.Exec(ctx, "UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2", models.OrderStatusRejected, orderID)
+			respondWithJSONError(w, http.StatusBadRequest, "execution_error", fmt.Sprintf("cannot execute market order: %v", err))
+			return
 		}
 
 		// Execute the order

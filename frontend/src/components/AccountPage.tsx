@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAssetPrices } from '../hooks/useAssetPrices';
 import { useConfig } from '../hooks/useConfig';
 import { useAppDispatch, useAppSelector } from '../store';
-import { setActiveAccount, type Account, type Balance } from '../store/slices/accountSlice';
+import { setActiveAccount, type Account } from '../store/slices/accountSlice';
 import { setActiveWalletTab, addToast } from '../store/slices/uiSlice';
 import OpenAccountModal from './OpenAccountModal';
 import EditBalanceModal from './EditBalanceModal';
 import AccountHoldingsChart from './AccountHoldingsChart';
+import { formatBalance, getBalanceAmount, balancesToRecord } from '../utils/formatters';
 
 // --- Icons ---
 const PlusIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg> );
@@ -15,35 +16,6 @@ const PencilSquareIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fill="n
 const ArrowDownTrayIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg> );
 const ArrowUpTrayIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg> );
 // --- End Icons ---
-
-// --- Helper Functions ---
-// Get balance amount for a specific currency from Balance[] array
-const getBalanceAmount = (balances: Array<{ currency: string; amount: number }>, currency: string): number => {
-  const balance = balances.find(b => b.currency === currency);
-  return balance ? balance.amount : 0;
-};
-
-// Format balance for display
-const formatBalance = (amount: number, currency: string): string => {
-  if (amount === undefined || amount === null || isNaN(amount)) return '0.00';
-
-  const formatter = new Intl.NumberFormat('en-US', {
-    style: 'decimal',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-  return `${formatter.format(amount)} ${currency}`;
-};
-
-// Convert Balance[] to Record<string, number> for easier access
-const balancesToRecord = (balances: Balance[]): Record<string, number> => {
-  const record: Record<string, number> = {};
-  balances.forEach(b => {
-    record[b.currency] = b.amount;
-  });
-  return record;
-};
 
 type AccountTab = 'live' | 'demo';
 

@@ -118,6 +118,15 @@ func getEquivalentCurrency(currency string) string {
 	return currency
 }
 
+// isInsufficientBalanceError checks if an error is an insufficient balance error
+func isInsufficientBalanceError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errMsg := err.Error()
+	return len(errMsg) > 12 && errMsg[:12] == "insufficient"
+}
+
 // getBalanceWithFallback checks balance for a currency, with fallback to equivalent currency
 // Returns: actualCurrency (the one that exists), balance, error
 func (s *OrderExecutionService) getBalanceWithFallback(ctx context.Context, tx pgx.Tx, accountID uuid.UUID, preferredCurrency string) (string, float64, error) {
@@ -159,7 +168,108 @@ func (s *OrderExecutionService) getBalanceWithFallback(ctx context.Context, tx p
 	return equivalentCurrency, balance, nil
 }
 
+// ExecuteSpotTrade executes spot trading logic (balance updates only)
+// This is a shared method used by both market orders and pending orders
+// Returns: baseCurrency, actualQuoteCurrency, actualBaseCurrency, error
+func (s *OrderExecutionService) ExecuteSpotTrade(
+	ctx context.Context,
+	tx pgx.Tx,
+	accountID uuid.UUID,
+	symbol string,
+	side models.OrderSide,
+	amountBase float64,
+	executionPrice float64,
+	quoteCurrency string,
+) (baseCurrency string, actualQuote string, actualBase string, err error) {
+	// Calculate notional value and fees
+	notionalValue := amountBase * executionPrice
+	feeRate := 0.001 // 0.1% trading fee (standard for exchanges)
+	fee := notionalValue * feeRate
+
+	// Extract base currency from symbol (e.g., BTC from BTCUSDT)
+	baseCurrency = symbol[:len(symbol)-len(quoteCurrency)]
+
+	if side == models.OrderSideBuy {
+		// BUY: Deduct quote currency (USDT) + fee, Add base currency (BTC)
+		requiredAmount := notionalValue + fee
+		actualQuoteCurrency, currentBalance, err := s.getBalanceWithFallback(ctx, tx, accountID, quoteCurrency)
+		if err != nil {
+			return "", "", "", err
+		}
+
+		if currentBalance < requiredAmount {
+			return "", "", "", fmt.Errorf("insufficient %s balance (required: %.8f, available: %.8f)", actualQuoteCurrency, requiredAmount, currentBalance)
+		}
+
+		// Deduct quote currency + fee
+		_, err = tx.Exec(ctx,
+			`UPDATE balances SET amount = amount - $1, updated_at = NOW()
+			 WHERE account_id = $2 AND currency = $3`,
+			requiredAmount, accountID, actualQuoteCurrency,
+		)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to deduct quote currency: %w", err)
+		}
+
+		// Add base currency
+		_, err = tx.Exec(ctx,
+			`INSERT INTO balances (id, account_id, currency, amount, created_at, updated_at)
+			 VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
+			 ON CONFLICT (account_id, currency)
+			 DO UPDATE SET amount = balances.amount + $3, updated_at = NOW()`,
+			accountID, baseCurrency, amountBase,
+		)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to add base currency: %w", err)
+		}
+
+		return baseCurrency, actualQuoteCurrency, "", nil
+
+	} else { // SELL
+		// SELL: Deduct base currency (BTC), Add quote currency (USDT) - fee
+		actualBaseCurrency, currentBalance, err := s.getBalanceWithFallback(ctx, tx, accountID, baseCurrency)
+		if err != nil {
+			return "", "", "", err
+		}
+
+		if currentBalance < amountBase {
+			return "", "", "", fmt.Errorf("insufficient %s balance (required: %.8f, available: %.8f)", actualBaseCurrency, amountBase, currentBalance)
+		}
+
+		// Deduct base currency
+		_, err = tx.Exec(ctx,
+			`UPDATE balances SET amount = amount - $1, updated_at = NOW()
+			 WHERE account_id = $2 AND currency = $3`,
+			amountBase, accountID, actualBaseCurrency,
+		)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to deduct base currency: %w", err)
+		}
+
+		// Add quote currency (notional - fee)
+		receiveAmount := notionalValue - fee
+		actualQuoteCurrency, _, err := s.getBalanceWithFallback(ctx, tx, accountID, quoteCurrency)
+		if err != nil {
+			return "", "", "", err
+		}
+
+		_, err = tx.Exec(ctx,
+			`INSERT INTO balances (id, account_id, currency, amount, created_at, updated_at)
+			 VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
+			 ON CONFLICT (account_id, currency)
+			 DO UPDATE SET amount = balances.amount + $3, updated_at = NOW()`,
+			accountID, actualQuoteCurrency, receiveAmount,
+		)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to add quote currency: %w", err)
+		}
+
+		return baseCurrency, actualQuoteCurrency, actualBaseCurrency, nil
+	}
+}
+
 // executeSpotOrder executes a spot order (non-leveraged)
+// This now delegates to ExecuteSpotTrade for the actual balance updates
 func (s *OrderExecutionService) executeSpotOrder(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -170,96 +280,22 @@ func (s *OrderExecutionService) executeSpotOrder(
 	accountCurrency string,
 	quoteCurrency string,
 ) (*ExecutionResult, error) {
-	// For spot trading:
-	// BUY:  Deduct quote currency (USDT) + fee, Add base currency (BTC)
-	// SELL: Deduct base currency (BTC), Add quote currency (USDT) - fee
-
-	if order.Side == models.OrderSideBuy {
-		// Check if account has enough quote currency balance (with USD/USDT fallback)
-		requiredAmount := notionalValue + fee
-		actualQuoteCurrency, currentBalance, err := s.getBalanceWithFallback(ctx, tx, order.AccountID, quoteCurrency)
-		if err != nil {
-			return nil, err
-		}
-
-		if currentBalance < requiredAmount {
+	// Use shared spot trading logic
+	_, _, _, err := s.ExecuteSpotTrade(ctx, tx, order.AccountID, order.Symbol, order.Side, order.AmountBase, executionPrice, quoteCurrency)
+	if err != nil {
+		// Check if it's an insufficient balance error (not a system error)
+		if isInsufficientBalanceError(err) {
 			return &ExecutionResult{
 				Order:   *order,
 				Success: false,
-				Message: fmt.Sprintf("insufficient %s balance (required: %.8f, available: %.8f)", actualQuoteCurrency, requiredAmount, currentBalance),
+				Message: err.Error(),
 			}, nil
 		}
-
-		// Deduct quote currency + fee (using actual currency found)
-		_, err = tx.Exec(ctx,
-			`UPDATE balances SET amount = amount - $1, updated_at = NOW()
-			 WHERE account_id = $2 AND currency = $3`,
-			requiredAmount, order.AccountID, actualQuoteCurrency,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to deduct quote currency: %w", err)
-		}
-
-		// Add base currency
-		baseCurrency := order.Symbol[:len(order.Symbol)-len(quoteCurrency)] // e.g., BTC from BTCUSDT
-		_, err = tx.Exec(ctx,
-			`INSERT INTO balances (id, account_id, currency, amount, created_at, updated_at)
-			 VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
-			 ON CONFLICT (account_id, currency)
-			 DO UPDATE SET amount = balances.amount + $3, updated_at = NOW()`,
-			order.AccountID, baseCurrency, order.AmountBase,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to add base currency: %w", err)
-		}
-
-	} else { // SELL
-		// Check if account has enough base currency
-		baseCurrency := order.Symbol[:len(order.Symbol)-len(quoteCurrency)]
-		actualBaseCurrency, currentBalance, err := s.getBalanceWithFallback(ctx, tx, order.AccountID, baseCurrency)
-		if err != nil {
-			return nil, err
-		}
-
-		if currentBalance < order.AmountBase {
-			return &ExecutionResult{
-				Order:   *order,
-				Success: false,
-				Message: fmt.Sprintf("insufficient %s balance (required: %.8f, available: %.8f)", actualBaseCurrency, order.AmountBase, currentBalance),
-			}, nil
-		}
-
-		// Deduct base currency (using actual currency found)
-		_, err = tx.Exec(ctx,
-			`UPDATE balances SET amount = amount - $1, updated_at = NOW()
-			 WHERE account_id = $2 AND currency = $3`,
-			order.AmountBase, order.AccountID, actualBaseCurrency,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to deduct base currency: %w", err)
-		}
-
-		// Add quote currency (notional - fee) - use actual quote currency with fallback
-		receiveAmount := notionalValue - fee
-		actualQuoteCurrency, _, err := s.getBalanceWithFallback(ctx, tx, order.AccountID, quoteCurrency)
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = tx.Exec(ctx,
-			`INSERT INTO balances (id, account_id, currency, amount, created_at, updated_at)
-			 VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
-			 ON CONFLICT (account_id, currency)
-			 DO UPDATE SET amount = balances.amount + $3, updated_at = NOW()`,
-			order.AccountID, actualQuoteCurrency, receiveAmount,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to add quote currency: %w", err)
-		}
+		return nil, err
 	}
 
 	// Update order status
-	_, err := tx.Exec(ctx,
+	_, err = tx.Exec(ctx,
 		`UPDATE orders SET status = $1, filled_amount = $2, average_fill_price = $3, updated_at = NOW()
 		 WHERE id = $4`,
 		models.OrderStatusFilled, order.AmountBase, executionPrice, order.ID,

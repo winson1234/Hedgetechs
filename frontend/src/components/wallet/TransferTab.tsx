@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, memo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { formatBalance } from '../../utils/format';
+import { formatCurrency } from '../../utils/formatters';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { addToast } from '../../store/slices/uiSlice';
 import { createTransfer } from '../../store/slices/transactionSlice';
@@ -118,7 +118,7 @@ function TransferTab() {
       .refine(
         (data) => data.amount <= availableBalance,
         {
-          message: `Insufficient funds. Available: ${formatBalance(availableBalance, fromAccount?.currency || 'USD')}`,
+          message: `Insufficient funds. Available: ${formatCurrency(availableBalance, fromAccount?.currency || 'USD')}`,
           path: ['amount'],
         }
       ),
@@ -261,7 +261,7 @@ function TransferTab() {
               const balance = acc.balances.find(b => b.currency === acc.currency);
               return (
                 <option key={acc.id} value={acc.id}>
-                  {acc.id} ({acc.type}) - {formatBalance(balance?.amount || 0, acc.currency)}
+                  {acc.id} ({acc.type}) - {formatCurrency(balance?.amount || 0, acc.currency)}
                 </option>
               );
             })}
@@ -293,7 +293,7 @@ function TransferTab() {
               const balance = acc.balances.find(b => b.currency === acc.currency);
               return (
                 <option key={acc.id} value={acc.id}>
-                  {acc.id} ({acc.type}) - {formatBalance(balance?.amount || 0, acc.currency)}
+                  {acc.id} ({acc.type}) - {formatCurrency(balance?.amount || 0, acc.currency)}
                 </option>
               );
             })}
@@ -315,7 +315,7 @@ function TransferTab() {
               Amount to Transfer
             </label>
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              Available: {formatBalance(availableBalance, fromAccount?.currency || 'USD')}
+              Available: {formatCurrency(availableBalance, fromAccount?.currency || 'USD')}
             </span>
           </div>
           <div className="relative">

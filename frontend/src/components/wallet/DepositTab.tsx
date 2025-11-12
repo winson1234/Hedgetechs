@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getApiUrl } from '../../config/api';
-import { formatBalance } from '../../utils/format';
+import { formatCurrency } from '../../utils/formatters';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { addToast, selectIsDarkMode } from '../../store/slices/uiSlice';
 import { createDeposit } from '../../store/slices/transactionSlice';
@@ -231,7 +231,7 @@ function DepositTab() {
 
           // Process deposit
           processDeposit(accountId, amount, currency);
-          showToast(`Successfully deposited ${formatBalance(amount, currency)} via Express Checkout`, 'success');
+          showToast(`Successfully deposited ${formatCurrency(amount, currency)} via Express Checkout`, 'success');
           setIsProcessing(false);
 
           // Reset form
@@ -850,7 +850,7 @@ function DepositTab() {
                 const balance = acc.balances.find(b => b.currency === acc.currency);
                 return (
                   <option key={acc.id} value={acc.id}>
-                    {acc.id} - {formatBalance(balance?.amount || 0, acc.currency)}
+                    {acc.id} - {formatCurrency(balance?.amount || 0, acc.currency)}
                   </option>
                 );
               })}
@@ -990,7 +990,7 @@ function DepositTab() {
                 const balance = acc.balances.find(b => b.currency === acc.currency);
                 return (
                   <option key={acc.id} value={acc.id}>
-                    {acc.id} - {formatBalance(balance?.amount || 0, acc.currency)}
+                    {acc.id} - {formatCurrency(balance?.amount || 0, acc.currency)}
                   </option>
                 );
               })}
@@ -1136,7 +1136,7 @@ function DepositTab() {
                 const balance = acc.balances.find(b => b.currency === acc.currency);
                 return (
                   <option key={acc.id} value={acc.id}>
-                    {acc.id} - {formatBalance(balance?.amount || 0, acc.currency)}
+                    {acc.id} - {formatCurrency(balance?.amount || 0, acc.currency)}
                   </option>
                 );
               })}

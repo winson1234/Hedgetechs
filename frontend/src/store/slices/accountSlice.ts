@@ -1,33 +1,16 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '../index';
+import type { BackendAccount, BackendBalance } from '../../types';
 
-// Types - Export for use in components
-export interface Balance {
-  id: string;
-  account_id: string;
-  currency: string;
-  amount: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Account {
-  id: string;
-  user_id: string;
-  account_number: string;
-  type: 'live' | 'demo';
-  product_type: 'spot' | 'cfd' | 'futures';
-  currency: string;
-  status: 'active' | 'deactivated' | 'suspended';
-  created_at: string;
-  updated_at: string;
+// Re-export centralized types for backward compatibility
+export type Balance = BackendBalance;
+export type Account = BackendAccount & {
   nickname?: string | null;
   color?: string | null;
   icon?: string | null;
   last_accessed_at?: string | null;
   access_count: number;
-  balances: Balance[];
-}
+};
 
 interface AccountState {
   accounts: Account[];

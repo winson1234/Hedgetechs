@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from 'react';
-import { formatBalance } from '../../utils/format';
+import { formatCurrency } from '../../utils/formatters';
 import { useAppSelector } from '../../store';
 import { useAssetPrices } from '../../hooks/useAssetPrices';
 import { getApiUrl } from '../../config/api';
@@ -109,7 +109,7 @@ export default function WalletOverview() {
             Total Portfolio Value
           </p>
           <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-            {formatBalance(totalPortfolioValue, 'USD')}
+            {formatCurrency(totalPortfolioValue, 'USD')}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Across all accounts
@@ -124,7 +124,7 @@ export default function WalletOverview() {
               <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-2 py-0.5 rounded uppercase">Live</span>
             </div>
             <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-              {formatBalance(totalLiveValue, 'USD')}
+              {formatCurrency(totalLiveValue, 'USD')}
             </p>
           </div>
           <div className="p-5 rounded-lg bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700/50">
@@ -133,7 +133,7 @@ export default function WalletOverview() {
               <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded uppercase">Demo</span>
             </div>
             <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-              {formatBalance(totalDemoValue, 'USD')}
+              {formatCurrency(totalDemoValue, 'USD')}
             </p>
           </div>
         </div>
@@ -141,7 +141,7 @@ export default function WalletOverview() {
 
       <PortfolioAllocation
         accounts={accounts}
-        formatBalance={formatBalance}
+        formatBalance={formatCurrency}
         assetPrices={assetPrices}
         pricesLoading={pricesLoading}
         totalPortfolioValue={totalPortfolioValue}

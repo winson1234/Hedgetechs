@@ -135,14 +135,28 @@ func (po *PendingOrder) ShouldExecute(currentPrice float64) bool {
 		}
 	}
 
-	// Stop-limit orders: More complex logic
+	// Stop-limit orders: Trigger at stop price BUT only if limit price is still valid
+	// This prevents execution if market gaps past the limit (gap protection)
 	if po.Type == OrderExecutionTypeStopLimit {
+		if po.LimitPrice == nil {
+			// Stop-limit requires a limit price
+			return false
+		}
+
 		if po.Side == OrderSideBuy {
 			// Buy stop-limit: Execute when price rises to or above trigger price
-			return currentPrice >= po.TriggerPrice
+			// BUT only if current price is still at or below the limit price
+			// Example: Stop at $50,000, Limit at $51,000
+			// - Price at $50,500: ✅ Execute (stop hit, within limit)
+			// - Price at $52,000: ❌ Don't execute (stop hit, but gapped past limit)
+			return currentPrice >= po.TriggerPrice && currentPrice <= *po.LimitPrice
 		} else {
 			// Sell stop-limit: Execute when price drops to or below trigger price
-			return currentPrice <= po.TriggerPrice
+			// BUT only if current price is still at or above the limit price
+			// Example: Stop at $50,000, Limit at $49,000
+			// - Price at $49,500: ✅ Execute (stop hit, within limit)
+			// - Price at $48,000: ❌ Don't execute (stop hit, but gapped past limit)
+			return currentPrice <= po.TriggerPrice && currentPrice >= *po.LimitPrice
 		}
 	}
 
@@ -150,10 +164,27 @@ func (po *PendingOrder) ShouldExecute(currentPrice float64) bool {
 }
 
 // GetExecutionPrice returns the price at which the order should execute
+// Implements traditional "best execution" - provides price improvement when available
 func (po *PendingOrder) GetExecutionPrice(currentPrice float64) float64 {
-	// If limit price is set, use it; otherwise use current price
-	if po.LimitPrice != nil {
+	// If no limit price, execute at current market price
+	if po.LimitPrice == nil {
+		return currentPrice
+	}
+
+	// Best execution logic: give user the better price when possible
+	if po.Side == OrderSideBuy {
+		// Buy orders: Never pay more than limit price
+		// If market is cheaper, execute at market price (price improvement)
+		if currentPrice < *po.LimitPrice {
+			return currentPrice
+		}
+		return *po.LimitPrice
+	} else {
+		// Sell orders: Never receive less than limit price
+		// If market is higher, execute at market price (price improvement)
+		if currentPrice > *po.LimitPrice {
+			return currentPrice
+		}
 		return *po.LimitPrice
 	}
-	return currentPrice
 }

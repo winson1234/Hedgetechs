@@ -10,11 +10,15 @@ import (
 	"brokerageProject/internal/services"
 	"brokerageProject/internal/utils"
 	"brokerageProject/internal/worker"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/joho/godotenv"
 )
 
@@ -55,19 +59,28 @@ func main() {
 	// Initialize database connection pool
 	log.Println("Initializing database connection...")
 	if err := database.InitDB(); err != nil {
-		log.Printf("WARNING: Failed to initialize database: %v", err)
-		log.Println("Account management features will not be available")
-	} else {
-		log.Println("Database connection initialized successfully")
-		// Ensure database connection is closed on shutdown
-		defer database.Close()
-
-		// Initialize audit logger (requires database)
-		dbPool, err := database.GetPool()
-		if err == nil {
-			utils.InitGlobalAuditLogger(dbPool)
-		}
+		log.Fatalf("CRITICAL: Failed to initialize database: %v", err)
 	}
+	log.Println("Database connection initialized successfully")
+
+	// Ensure database connection is closed on shutdown
+	defer database.Close()
+
+	// Run database migrations
+	log.Println("Running database migrations...")
+	if err := runMigrations(); err != nil {
+		log.Printf("WARNING: Migration error: %v", err)
+		log.Println("Continuing with existing schema...")
+	} else {
+		log.Println("✅ Database migrations completed successfully")
+	}
+
+	// Initialize audit logger (requires database)
+	dbPool, err := database.GetPool()
+	if err != nil {
+		log.Fatalf("CRITICAL: Failed to get database pool: %v", err)
+	}
+	utils.InitGlobalAuditLogger(dbPool)
 
 	// Initialize rate limiter (100 requests per minute per user, burst of 20)
 	middleware.InitRateLimiter(100, 20)
@@ -309,6 +322,21 @@ func main() {
 		}
 	})
 
+	// History endpoints (protected with JWT authentication)
+	// GET /api/v1/history - Batch endpoint for all user history (transactions + orders + pending orders)
+	http.HandleFunc("/api/v1/history", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			api.CORSMiddleware(middleware.AuthMiddleware(api.GetBatchHistory))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Contracts endpoints (protected with JWT authentication)
 	// POST /api/v1/contracts - Open a new position
 	// GET /api/v1/contracts?account_id={uuid}&status=open - List contracts
@@ -381,4 +409,47 @@ func main() {
 	log.Printf("No SSL certificates found - starting HTTP server on http://localhost%s", serverAddress)
 	log.Println("Tip: For HTTPS in development, generate certificates with mkcert (see HTTPS_SETUP.md)")
 	log.Fatal(http.ListenAndServe(serverAddress, nil))
+}
+
+// runMigrations runs database migrations using golang-migrate
+func runMigrations() error {
+	// Get database URL from environment
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		return fmt.Errorf("DATABASE_URL environment variable is not set")
+	}
+
+	// Construct migrations path
+	migrationsPath := "file://internal/database/migrations"
+
+	// Check if running from cmd/server directory
+	if _, err := os.Stat("../../internal/database/migrations"); err == nil {
+		migrationsPath = "file://../../internal/database/migrations"
+	}
+
+	// Create migration instance
+	m, err := migrate.New(migrationsPath, dbURL)
+	if err != nil {
+		return fmt.Errorf("failed to create migrate instance: %w", err)
+	}
+	defer m.Close()
+
+	// Run migrations
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	// Get current version
+	version, dirty, err := m.Version()
+	if err != nil && err != migrate.ErrNilVersion {
+		return fmt.Errorf("failed to get migration version: %w", err)
+	}
+
+	if dirty {
+		log.Printf("WARNING: Database is in dirty state at version %d", version)
+	} else {
+		log.Printf("Database is at migration version: %d", version)
+	}
+
+	return nil
 }

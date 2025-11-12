@@ -52,12 +52,12 @@ const (
 
 // User represents a user profile (extends auth.users)
 type User struct {
-	ID        uuid.UUID  `json:"id"`
-	Email     string     `json:"email"`
-	FullName  *string    `json:"full_name,omitempty"`
-	Country   *string    `json:"country,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	FullName  *string   `json:"full_name,omitempty"`
+	Country   *string   `json:"country,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Account represents a trading account
@@ -73,11 +73,11 @@ type Account struct {
 	UpdatedAt     time.Time     `json:"updated_at"`
 
 	// UX personalization fields (production features)
-	Nickname       *string    `json:"nickname,omitempty"`        // User-defined nickname (e.g., "My Trading Account")
-	Color          *string    `json:"color,omitempty"`           // Hex color code for visual identification
-	Icon           *string    `json:"icon,omitempty"`            // Icon identifier (e.g., "wallet", "chart")
+	Nickname       *string    `json:"nickname,omitempty"`         // User-defined nickname (e.g., "My Trading Account")
+	Color          *string    `json:"color,omitempty"`            // Hex color code for visual identification
+	Icon           *string    `json:"icon,omitempty"`             // Icon identifier (e.g., "wallet", "chart")
 	LastAccessedAt *time.Time `json:"last_accessed_at,omitempty"` // Last time account was accessed
-	AccessCount    int        `json:"access_count"`              // Total number of accesses
+	AccessCount    int        `json:"access_count"`               // Total number of accesses
 
 	// Balances will be populated when fetching account details
 	Balances []Balance `json:"balances,omitempty"`
@@ -97,12 +97,13 @@ type Balance struct {
 type Transaction struct {
 	ID                uuid.UUID         `json:"id"`
 	AccountID         uuid.UUID         `json:"account_id"`
-	TransactionNumber string            `json:"transaction_number"`  // Display number: TXN-00001
+	TransactionNumber string            `json:"transaction_number"` // Display number: TXN-00001
 	Type              TransactionType   `json:"type"`
 	Currency          string            `json:"currency"`
 	Amount            float64           `json:"amount"`
 	Status            TransactionStatus `json:"status"`
 	TargetAccountID   *uuid.UUID        `json:"target_account_id,omitempty"`
+	ContractID        *uuid.UUID        `json:"contract_id,omitempty"`
 	Description       *string           `json:"description,omitempty"`
 	Metadata          map[string]any    `json:"metadata,omitempty"`
 	CreatedAt         time.Time         `json:"created_at"`
@@ -111,9 +112,9 @@ type Transaction struct {
 
 // CreateAccountRequest represents the request body for creating a new account
 type CreateAccountRequest struct {
-	Type           AccountType `json:"type"`           // "live" or "demo"
-	ProductType    ProductType `json:"product_type"`   // "spot", "cfd", or "futures"
-	Currency       string      `json:"currency"`       // e.g., "USD", "EUR"
+	Type           AccountType `json:"type"`            // "live" or "demo"
+	ProductType    ProductType `json:"product_type"`    // "spot", "cfd", or "futures"
+	Currency       string      `json:"currency"`        // e.g., "USD", "EUR"
 	InitialBalance float64     `json:"initial_balance"` // Initial balance amount
 }
 
@@ -196,11 +197,11 @@ func (e *ValidationError) Error() string {
 type KYCDocumentType string
 
 const (
-	KYCDocumentTypePassport        KYCDocumentType = "passport"
-	KYCDocumentTypeDriversLicense  KYCDocumentType = "drivers_license"
-	KYCDocumentTypeNationalID      KYCDocumentType = "national_id"
-	KYCDocumentTypeProofOfAddress  KYCDocumentType = "proof_of_address"
-	KYCDocumentTypeSelfie          KYCDocumentType = "selfie"
+	KYCDocumentTypePassport       KYCDocumentType = "passport"
+	KYCDocumentTypeDriversLicense KYCDocumentType = "drivers_license"
+	KYCDocumentTypeNationalID     KYCDocumentType = "national_id"
+	KYCDocumentTypeProofOfAddress KYCDocumentType = "proof_of_address"
+	KYCDocumentTypeSelfie         KYCDocumentType = "selfie"
 )
 
 // KYCStatus represents the status of a KYC document
@@ -230,19 +231,19 @@ type KYCDocument struct {
 
 // Instrument represents a tradeable instrument
 type Instrument struct {
-	Symbol               string    `json:"symbol"`
-	Name                 *string   `json:"name,omitempty"`
-	BaseCurrency         *string   `json:"base_currency,omitempty"`
-	QuoteCurrency        *string   `json:"quote_currency,omitempty"`
-	InstrumentType       *string   `json:"instrument_type,omitempty"` // crypto, forex, commodity
-	IsTradeable          bool      `json:"is_tradeable"`
-	LeverageCap          int       `json:"leverage_cap"`
-	SpreadAdjustmentBps  int       `json:"spread_adjustment_bps"`
-	MinOrderSize         *float64  `json:"min_order_size,omitempty"`
-	MaxOrderSize         *float64  `json:"max_order_size,omitempty"`
-	TickSize             *float64  `json:"tick_size,omitempty"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	Symbol              string    `json:"symbol"`
+	Name                *string   `json:"name,omitempty"`
+	BaseCurrency        *string   `json:"base_currency,omitempty"`
+	QuoteCurrency       *string   `json:"quote_currency,omitempty"`
+	InstrumentType      *string   `json:"instrument_type,omitempty"` // crypto, forex, commodity
+	IsTradeable         bool      `json:"is_tradeable"`
+	LeverageCap         int       `json:"leverage_cap"`
+	SpreadAdjustmentBps int       `json:"spread_adjustment_bps"`
+	MinOrderSize        *float64  `json:"min_order_size,omitempty"`
+	MaxOrderSize        *float64  `json:"max_order_size,omitempty"`
+	TickSize            *float64  `json:"tick_size,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // ================================================================
@@ -284,7 +285,7 @@ type Order struct {
 	UserID           uuid.UUID   `json:"user_id"`
 	AccountID        uuid.UUID   `json:"account_id"`
 	Symbol           string      `json:"symbol"`
-	OrderNumber      string      `json:"order_number"`  // Display number: ORD-00001
+	OrderNumber      string      `json:"order_number"` // Display number: ORD-00001
 	Side             OrderSide   `json:"side"`
 	Type             OrderType   `json:"type"`
 	Status           OrderStatus `json:"status"`
@@ -335,7 +336,7 @@ type Contract struct {
 	UserID         uuid.UUID      `json:"user_id"`
 	AccountID      uuid.UUID      `json:"account_id"`
 	Symbol         string         `json:"symbol"`
-	ContractNumber string         `json:"contract_number"`  // Display number: CNT-00001
+	ContractNumber string         `json:"contract_number"` // Display number: CNT-00001
 	Side           ContractSide   `json:"side"`
 	Status         ContractStatus `json:"status"`
 	LotSize        float64        `json:"lot_size"`
@@ -355,14 +356,14 @@ type Contract struct {
 
 // CreateContractRequest represents the request to create a contract
 type CreateContractRequest struct {
-	AccountID  uuid.UUID `json:"account_id"`
-	Symbol     string    `json:"symbol"`
+	AccountID  uuid.UUID    `json:"account_id"`
+	Symbol     string       `json:"symbol"`
 	Side       ContractSide `json:"side"`
-	LotSize    float64   `json:"lot_size"`
-	EntryPrice float64   `json:"entry_price"`
-	Leverage   int       `json:"leverage"`
-	TPPrice    *float64  `json:"tp_price,omitempty"`
-	SLPrice    *float64  `json:"sl_price,omitempty"`
+	LotSize    float64      `json:"lot_size"`
+	EntryPrice float64      `json:"entry_price"`
+	Leverage   int          `json:"leverage"`
+	TPPrice    *float64     `json:"tp_price,omitempty"`
+	SLPrice    *float64     `json:"sl_price,omitempty"`
 }
 
 // UpdateContractTPSLRequest represents the request to update TP/SL

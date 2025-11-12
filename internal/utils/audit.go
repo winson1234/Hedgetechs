@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"brokerageProject/internal/models"
 
@@ -90,11 +91,14 @@ func (al *AuditLogger) LogFromRequest(ctx context.Context, r *http.Request, entr
 }
 
 // GetClientIP extracts the client's IP address from the request
+// Checks X-Forwarded-For, X-Real-IP headers, and falls back to RemoteAddr
 func GetClientIP(r *http.Request) string {
 	// Check X-Forwarded-For header (for proxies/load balancers)
 	xff := r.Header.Get("X-Forwarded-For")
 	if xff != "" {
-		return xff
+		// X-Forwarded-For can contain multiple IPs, take the first one
+		ips := strings.Split(xff, ",")
+		return strings.TrimSpace(ips[0])
 	}
 
 	// Check X-Real-IP header

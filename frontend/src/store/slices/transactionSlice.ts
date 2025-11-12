@@ -1,45 +1,14 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '../index';
+import type {
+  Transaction,
+  TransactionStatus,
+  TransactionType,
+  PaymentMethodMetadata
+} from '../../types';
 
-// Types
-export type TransactionStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type TransactionType = 'deposit' | 'withdraw' | 'transfer';
-
-export interface PaymentMethodMetadata {
-  // For card payments
-  cardBrand?: string;
-  last4?: string;
-  expiryMonth?: number;
-  expiryYear?: number;
-  // For bank transfers
-  bankName?: string;
-  accountLast4?: string;
-  routingNumber?: string;
-  // For FPX payments (Malaysia online banking)
-  fpxBank?: string;
-}
-
-export interface Transaction {
-  id: string;
-  transactionNumber: string; // Human-readable: TXN-00001
-  type: TransactionType;
-  status: TransactionStatus;
-  accountId: string;
-  amount: number;
-  currency: string;
-  timestamp: number;
-  // Payment processor info
-  paymentIntentId?: string;
-  metadata?: PaymentMethodMetadata;
-  // For transfers
-  fromAccountId?: string;
-  toAccountId?: string;
-  targetAccountId?: string;
-  // Description from backend
-  description?: string;
-  // Error information
-  errorMessage?: string;
-}
+// Re-export centralized types for backward compatibility
+export type { Transaction, TransactionStatus, TransactionType, PaymentMethodMetadata };
 
 interface TransactionState {
   transactions: Transaction[];
@@ -76,8 +45,11 @@ interface BackendTransaction {
   updated_at: string;
 }
 
-// Transform backend transaction to frontend format
-const transformTransaction = (backend: BackendTransaction): Transaction => {
+// Backend transaction type (export for use in other components)
+export type { BackendTransaction };
+
+// Transform backend transaction to frontend format (export for use in batch history)
+export const transformTransaction = (backend: BackendTransaction): Transaction => {
   return {
     id: backend.id,
     transactionNumber: backend.transaction_number,  // Human-readable number

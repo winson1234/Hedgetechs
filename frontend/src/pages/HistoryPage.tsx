@@ -1,9 +1,9 @@
-import { useMemo, useState, useEffect } from 'react';
-import { useAppSelector, useAppDispatch } from '../store';
-import { fetchTransactions } from '../store/slices/transactionSlice';
-import { fetchOrders, fetchPendingOrders } from '../store/slices/orderSlice';
-import { formatBalance } from '../utils/format';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { useAppSelector } from '../store';
+import { formatCurrency } from '../utils/formatters';
 import type { Transaction, TransactionStatus, TransactionType } from '../types';
+import { transformTransaction, type BackendTransaction } from '../store/slices/transactionSlice';
+import { type Order as ReduxOrder, type PendingOrder as ReduxPendingOrder } from '../store/slices/orderSlice';
 import {
   type LegacyExecutedOrder as ExecutedOrder,
   type LegacyPendingOrder as PendingOrder,
@@ -128,12 +128,15 @@ export default function HistoryPage() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [showFilters, setShowFilters] = useState(false);
 
+  // Batch history data state (from new batch endpoint)
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [reduxExecutedOrders, setReduxExecutedOrders] = useState<ReduxOrder[]>([]);
+  const [reduxPendingOrders, setReduxPendingOrders] = useState<ReduxPendingOrder[]>([]);
+  const isFetchingRef = useRef(false);
+
   // Get data from Redux stores
-  const dispatch = useAppDispatch();
-  const transactions = useAppSelector((state) => state.transaction.transactions);
-  const reduxExecutedOrders = useAppSelector((state) => state.order.orders);
-  const reduxPendingOrders = useAppSelector((state) => state.order.pendingOrders);
   const accounts = useAppSelector((state) => state.account.accounts);
+  const authToken = useAppSelector((state) => state.auth.session?.access_token);
 
   // Transform Redux orders to legacy format using adapters
   const executedOrders = useMemo(() => {
@@ -149,17 +152,50 @@ export default function HistoryPage() {
     return accounts.filter((acc) => acc.type === 'live');
   }, [accounts]);
 
-  // Fetch transactions, orders, and pending orders from ALL live accounts
+  // Fetch batch history data (transactions + orders + pending orders) in a single API call
   useEffect(() => {
-    if (liveAccounts.length > 0) {
-      // Fetch data for each live account
-      liveAccounts.forEach((acc) => {
-        dispatch(fetchTransactions(acc.id));
-        dispatch(fetchOrders(acc.id));
-        dispatch(fetchPendingOrders(acc.id));
-      });
-    }
-  }, [liveAccounts, dispatch]);
+    const fetchBatchHistory = async () => {
+      // Guard against no accounts or no auth token
+      if (liveAccounts.length === 0 || !authToken) return;
+
+      // Prevent concurrent fetches using ref
+      if (isFetchingRef.current) return;
+
+      isFetchingRef.current = true;
+
+      try {
+        const response = await fetch('/api/v1/history', {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          console.error('Failed to fetch batch history:', response.statusText);
+          return;
+        }
+
+        const data = await response.json();
+
+        // Update local state with batch data
+        if (data.success) {
+          // Transform backend transactions to frontend format
+          const transformedTransactions = (data.transactions || []).map((txn: BackendTransaction) =>
+            transformTransaction(txn)
+          );
+          setTransactions(transformedTransactions);
+          setReduxExecutedOrders(data.orders || []);
+          setReduxPendingOrders(data.pending_orders || []);
+        }
+      } catch (error) {
+        console.error('Error fetching batch history:', error);
+      } finally {
+        isFetchingRef.current = false;
+      }
+    };
+
+    fetchBatchHistory();
+  }, [liveAccounts.length, authToken]);
 
   // Combined and sorted history
   const allHistory = useMemo<HistoryItem[]>(() => {
@@ -451,7 +487,7 @@ export default function HistoryPage() {
             {order.side === 'buy' ? 'Buy' : 'Sell'} {order.symbol}
           </p>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            {order.amount.toFixed(6)} @ {formatBalance(order.executionPrice, 'USD')}
+            {order.amount.toFixed(6)} @ {formatCurrency(order.executionPrice, 'USD')}
             {order.wasFromPending && ' (Limit Order)'}
           </p>
         </div>
@@ -466,8 +502,8 @@ export default function HistoryPage() {
             {order.side === 'buy' ? 'Buy' : 'Sell'} {order.symbol} (Pending)
           </p>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            {order.amount.toFixed(6)} @ {formatBalance(order.price, 'USD')}
-            {order.type === 'stop-limit' && order.stopPrice && ` (Stop: ${formatBalance(order.stopPrice, 'USD')})`}
+            {order.amount.toFixed(6)} @ {formatCurrency(order.price, 'USD')}
+            {order.type === 'stop-limit' && order.stopPrice && ` (Stop: ${formatCurrency(order.stopPrice, 'USD')})`}
           </p>
         </div>
       );
@@ -484,7 +520,7 @@ export default function HistoryPage() {
       return (
         <div className="text-right">
           <p className={`font-semibold ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-            {isPositive ? '+' : '-'}{formatBalance(txn.amount, txn.currency)}
+            {isPositive ? '+' : '-'}{formatCurrency(txn.amount, txn.currency)}
           </p>
         </div>
       );
@@ -495,10 +531,10 @@ export default function HistoryPage() {
       return (
         <div className="text-right">
           <p className={`font-semibold ${order.side === 'buy' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-            {formatBalance(order.total, 'USD')}
+            {formatCurrency(order.total, 'USD')}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Fee: {formatBalance(order.fee, 'USD')}
+            Fee: {formatCurrency(order.fee, 'USD')}
           </p>
         </div>
       );
@@ -510,7 +546,7 @@ export default function HistoryPage() {
       return (
         <div className="text-right">
           <p className="font-semibold text-slate-700 dark:text-slate-300">
-            ~{formatBalance(estimatedTotal, 'USD')}
+            ~{formatCurrency(estimatedTotal, 'USD')}
           </p>
         </div>
       );

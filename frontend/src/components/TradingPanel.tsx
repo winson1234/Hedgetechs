@@ -47,7 +47,7 @@ export default function TradingPanel() {
   // Fetch orders from database when component mounts or account changes
   useEffect(() => {
     if (activeAccountId) {
-      dispatch(fetchOrders({ accountId: activeAccountId }));
+      dispatch(fetchOrders(activeAccountId));
     }
   }, [activeAccountId, dispatch]);
 
@@ -58,6 +58,13 @@ export default function TradingPanel() {
   const [buyWithEUR, setBuyWithEUR] = useState<boolean>(false);
   const [enableTPSL, setEnableTPSL] = useState<boolean>(false);
   const feeLevel = 0.1; // 0.1% default fee
+
+  // Leverage state (for CFD accounts)
+  const [leverage, setLeverage] = useState<number>(1);
+
+  // Detect if account is CFD
+  const isCFD = activeAccount?.product_type === 'cfd';
+  const isSpot = activeAccount?.product_type === 'spot' || !activeAccount?.product_type;
 
   // Price and order inputs
   const [currentPrice, setCurrentPrice] = useState<number>(0);
@@ -153,13 +160,12 @@ export default function TradingPanel() {
 
     if (!isNaN(qty) && qty > 0 && !isNaN(priceForCalc) && priceForCalc > 0) {
       // Lots calculation (1 lot = 100,000 units in forex, for crypto we use direct amount)
-      const calculatedLots = tradingMode === 'spot' ? qty : qty / 100000;
+      const calculatedLots = isSpot ? qty : qty / 100000;
       setLots(calculatedLots);
 
       // Margin calculation (for leveraged trading)
-      const leverage = tradingMode === 'spot' ? 1 : tradingMode === 'cross' ? 10 : 5; // Example leverage
       const totalValue = qty * priceForCalc;
-      const calculatedMargin = totalValue / leverage;
+      const calculatedMargin = isCFD ? totalValue / leverage : totalValue; // CFD uses leverage, Spot doesn't
       setMargin(calculatedMargin);
 
       // Pip value calculation (1 pip = 0.0001 for most pairs)
@@ -172,7 +178,7 @@ export default function TradingPanel() {
       setMargin(0);
       setPipValue(0);
     }
-  }, [amount, limitPrice, currentPrice, orderType, tradingMode, quoteCurrency]); // Added quoteCurrency
+  }, [amount, limitPrice, currentPrice, orderType, leverage, isCFD, isSpot, quoteCurrency]);
 
   // Calculate fee amount
   const getFeeAmount = useCallback((): number => {
@@ -320,6 +326,7 @@ export default function TradingPanel() {
         quantity: qty,
         trigger_price: orderType === 'stop-limit' ? stopPriceNum : price,
         limit_price: price,
+        leverage: isCFD ? leverage : 1, // Pass leverage for CFD accounts
       }))
         .unwrap()
         .then(() => {
@@ -369,6 +376,7 @@ export default function TradingPanel() {
         side,
         amount_base: qty,
         current_price: currentPrice,
+        leverage: isCFD ? leverage : 1, // Pass leverage for CFD accounts
       }))
         .unwrap()
         .then(() => {
@@ -480,28 +488,36 @@ export default function TradingPanel() {
         </div>
       </div>
 
-      {/* Trading Mode Tabs */}
-      <div className="flex gap-1.5 mb-4 bg-slate-100 dark:bg-slate-800 rounded-lg p-1.5">
-        {(['spot', 'cross', 'isolated', 'grid'] as TradingMode[]).map((mode) => (
-          <button
-            key={mode}
-            onClick={() => setTradingMode(mode)}
-            className={`flex-1 px-2 py-2 text-xs sm:text-sm font-semibold rounded-md transition capitalize ${
-              tradingMode === mode
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-                // Apply subtle styling for non-spot modes instead of disabling
-                : mode !== 'spot'
-                ? 'text-slate-400 dark:text-slate-600 cursor-not-allowed' // Less prominent text, not-allowed cursor
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200' // Normal hover for spot
-            }`}
-            // Add disabled attribute only if interaction should truly be blocked
-             disabled={mode !== 'spot'}
-            title={mode !== 'spot' ? 'Coming soon' : ''}
-          >
-            {mode}
-          </button>
-        ))}
-      </div>
+      {/* Trading Mode Tabs - Show CFD for CFD accounts, normal tabs for Spot */}
+      {isCFD ? (
+        <div className="flex gap-1.5 mb-4 bg-slate-100 dark:bg-slate-800 rounded-lg p-1.5">
+          <div className="flex-1 px-2 py-2 text-xs sm:text-sm font-semibold rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm text-center">
+            CFD
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-1.5 mb-4 bg-slate-100 dark:bg-slate-800 rounded-lg p-1.5">
+          {(['spot', 'cross', 'isolated', 'grid'] as TradingMode[]).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setTradingMode(mode)}
+              className={`flex-1 px-2 py-2 text-xs sm:text-sm font-semibold rounded-md transition capitalize ${
+                tradingMode === mode
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                  // Apply subtle styling for non-spot modes instead of disabling
+                  : mode !== 'spot'
+                  ? 'text-slate-400 dark:text-slate-600 cursor-not-allowed' // Less prominent text, not-allowed cursor
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200' // Normal hover for spot
+              }`}
+              // Add disabled attribute only if interaction should truly be blocked
+               disabled={mode !== 'spot'}
+              title={mode !== 'spot' ? 'Coming soon' : ''}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Order Type Tabs */}
       <div className="flex gap-1.5 mb-4 bg-slate-100 dark:bg-slate-800 rounded-lg p-1.5">
@@ -706,6 +722,30 @@ export default function TradingPanel() {
             </div>
         </div>
 
+        {/* Leverage Selector (only for CFD accounts) */}
+        {isCFD && (
+          <div>
+            <label className="block text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">
+              Leverage
+            </label>
+            <select
+              value={leverage}
+              onChange={(e) => setLeverage(parseInt(e.target.value))}
+              className="w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-100"
+            >
+              <option value="1">1x (No Leverage)</option>
+              <option value="5">5x</option>
+              <option value="10">10x</option>
+              <option value="20">20x</option>
+              <option value="50">50x</option>
+              <option value="100">100x</option>
+            </select>
+            <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+              Margin Required: {formatPrice(margin)} {accountCurrency}
+            </p>
+          </div>
+        )}
+
 
         {/* TP/SL Toggle */}
         {/* Make this clickable but indicate placeholder */}
@@ -826,7 +866,7 @@ export default function TradingPanel() {
                 (orderType !== 'market' && (parseFloat(getTotal() || 'Infinity') > usdBalance)) // Check total against balance for limit/stop
             }
           >
-            Buy {baseCurrency}
+            {isCFD ? 'Long' : `Buy ${baseCurrency}`}
           </button>
           <button
             onClick={() => handleOrder('sell')}
@@ -835,12 +875,12 @@ export default function TradingPanel() {
              // Also disable if price is needed but invalid (for limit/stop-limit)
             disabled={
                 parseFloat(amount || '0') <= 0 || // Amount must be positive
-                parseFloat(amount || '0') > currentHolding || // Cannot sell more than held
+                (isSpot && parseFloat(amount || '0') > currentHolding) || // Spot: Cannot sell more than held, CFD: can short without holding
                 (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) || // Need valid price for market
                 ((orderType === 'limit' || orderType === 'stop-limit') && (isNaN(parseFloat(limitPrice)) || parseFloat(limitPrice) <= 0)) // Need valid limit price
             }
           >
-            Sell {baseCurrency}
+            {isCFD ? 'Short' : `Sell ${baseCurrency}`}
           </button>
         </div>
       </div>

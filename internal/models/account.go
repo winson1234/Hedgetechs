@@ -236,6 +236,7 @@ type Instrument struct {
 	BaseCurrency        *string   `json:"base_currency,omitempty"`
 	QuoteCurrency       *string   `json:"quote_currency,omitempty"`
 	InstrumentType      *string   `json:"instrument_type,omitempty"` // crypto, forex, commodity
+	Category            *string   `json:"category,omitempty"`        // major, defi, altcoin, forex, commodity
 	IsTradeable         bool      `json:"is_tradeable"`
 	LeverageCap         int       `json:"leverage_cap"`
 	SpreadAdjustmentBps int       `json:"spread_adjustment_bps"`
@@ -292,6 +293,7 @@ type Order struct {
 	AmountBase       float64     `json:"amount_base"`
 	LimitPrice       *float64    `json:"limit_price,omitempty"`
 	StopPrice        *float64    `json:"stop_price,omitempty"`
+	Leverage         int         `json:"leverage"` // Leverage multiplier (1 for spot, >1 for CFD/Futures)
 	FilledAmount     float64     `json:"filled_amount"`
 	AverageFillPrice *float64    `json:"average_fill_price,omitempty"`
 	CreatedAt        time.Time   `json:"created_at"`
@@ -307,6 +309,7 @@ type CreateOrderRequest struct {
 	AmountBase float64   `json:"amount_base"`
 	LimitPrice *float64  `json:"limit_price,omitempty"`
 	StopPrice  *float64  `json:"stop_price,omitempty"`
+	Leverage   int       `json:"leverage"` // Leverage multiplier (default: 1)
 }
 
 // ================================================================
@@ -332,26 +335,27 @@ const (
 
 // Contract represents an open position/contract
 type Contract struct {
-	ID             uuid.UUID      `json:"id"`
-	UserID         uuid.UUID      `json:"user_id"`
-	AccountID      uuid.UUID      `json:"account_id"`
-	Symbol         string         `json:"symbol"`
-	ContractNumber string         `json:"contract_number"` // Display number: CNT-00001
-	Side           ContractSide   `json:"side"`
-	Status         ContractStatus `json:"status"`
-	LotSize        float64        `json:"lot_size"`
-	EntryPrice     float64        `json:"entry_price"`
-	MarginUsed     float64        `json:"margin_used"`
-	Leverage       int            `json:"leverage"`
-	TPPrice        *float64       `json:"tp_price,omitempty"`
-	SLPrice        *float64       `json:"sl_price,omitempty"`
-	ClosePrice     *float64       `json:"close_price,omitempty"`
-	PnL            *float64       `json:"pnl,omitempty"`
-	Swap           float64        `json:"swap"`
-	Commission     float64        `json:"commission"`
-	CreatedAt      time.Time      `json:"created_at"`
-	ClosedAt       *time.Time     `json:"closed_at,omitempty"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	ID               uuid.UUID      `json:"id"`
+	UserID           uuid.UUID      `json:"user_id"`
+	AccountID        uuid.UUID      `json:"account_id"`
+	Symbol           string         `json:"symbol"`
+	ContractNumber   string         `json:"contract_number"` // Display number: CNT-00001
+	Side             ContractSide   `json:"side"`
+	Status           ContractStatus `json:"status"`
+	LotSize          float64        `json:"lot_size"`
+	EntryPrice       float64        `json:"entry_price"`
+	MarginUsed       float64        `json:"margin_used"`
+	Leverage         int            `json:"leverage"`
+	LiquidationPrice *float64       `json:"liquidation_price,omitempty"` // Price at which position gets liquidated
+	TPPrice          *float64       `json:"tp_price,omitempty"`
+	SLPrice          *float64       `json:"sl_price,omitempty"`
+	ClosePrice       *float64       `json:"close_price,omitempty"`
+	PnL              *float64       `json:"pnl,omitempty"`
+	Swap             float64        `json:"swap"`
+	Commission       float64        `json:"commission"`
+	CreatedAt        time.Time      `json:"created_at"`
+	ClosedAt         *time.Time     `json:"closed_at,omitempty"`
+	UpdatedAt        time.Time      `json:"updated_at"`
 }
 
 // CreateContractRequest represents the request to create a contract

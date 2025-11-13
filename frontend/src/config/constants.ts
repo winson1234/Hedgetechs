@@ -11,17 +11,17 @@ export interface ProductType {
 export const PRODUCT_TYPES: ProductType[] = [
   {
     value: 'spot',
-    label: 'Spot Trading',
+    label: 'Spot',
     description: 'Buy and sell assets at current market prices with immediate settlement'
   },
   {
     value: 'cfd',
-    label: 'CFD Trading',
+    label: 'CFD',
     description: 'Trade contracts for difference with leverage, without owning the underlying asset'
   },
   {
     value: 'futures',
-    label: 'Futures Trading',
+    label: 'Futures',
     description: 'Trade standardized contracts for future delivery with leverage'
   }
 ];

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAssetPrices } from '../hooks/useAssetPrices';
 import { CURRENCIES } from '../config/constants';
 import { useAppDispatch, useAppSelector } from '../store';
-import { setActiveAccount, type Account } from '../store/slices/accountSlice';
+import { setActiveAccount, createAccount, fetchAccounts, type Account } from '../store/slices/accountSlice';
 import { setActiveWalletTab, addToast } from '../store/slices/uiSlice';
 import OpenAccountModal from './OpenAccountModal';
 import EditBalanceModal from './EditBalanceModal';
@@ -448,10 +448,29 @@ export default function AccountPage() {
       <OpenAccountModal
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreateModal}
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        openAccount={(type: string, productType: string, currency: string, initialBalance: number) => {
-          // TODO: Implement openAccount in Redux - use createAccount thunk
-          return Promise.resolve({ success: true, message: 'Account created', account: {} as Account });
+        openAccount={async (type: string, productType: string, currency: string, initialBalance: number) => {
+          try {
+            const result = await dispatch(createAccount({
+              type: type as 'live' | 'demo',
+              product_type: productType as 'spot' | 'cfd' | 'futures',
+              currency,
+              initial_balance: initialBalance,
+            })).unwrap();
+
+            // Refresh accounts list after creation
+            await dispatch(fetchAccounts());
+
+            return {
+              success: true,
+              message: `${type.charAt(0).toUpperCase() + type.slice(1)} ${productType.toUpperCase()} account created successfully!`,
+              account: result,
+            };
+          } catch (error) {
+            return {
+              success: false,
+              message: error instanceof Error ? error.message : 'Failed to create account',
+            };
+          }
         }}
         onAccountCreated={handleAccountCreated}
       />

@@ -82,12 +82,60 @@ export default function InstrumentsPanel() {
       const isActive = lastUpdate > 0 && (now - lastUpdate) < 10000
       const isLoading = lastUpdate === 0
 
+      // Support both legacy and new API format
+      const displayName = inst.displayName || inst.name || inst.symbol
+      const baseCurrency = inst.baseCurrency || inst.base_currency || inst.symbol.replace('USDT', '')
+
+      // Use icon URL if available, otherwise map ALL currencies to icons
+      let iconUrl = inst.iconUrl || ''
+      if (!iconUrl && inst.base_currency) {
+        // Complete icon mapping for ALL 26 instruments in database
+        const iconMap: Record<string, string> = {
+          // Major Cryptocurrencies
+          'BTC': 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png',
+          'ETH': 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
+          'BNB': 'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png',
+          'SOL': 'https://assets.coingecko.com/coins/images/4128/small/solana.png',
+          'XRP': 'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png',
+          'ADA': 'https://assets.coingecko.com/coins/images/975/small/cardano.png',
+          'AVAX': 'https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png',
+
+          // DeFi / Layer 2
+          'MATIC': 'https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png',
+          'LINK': 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png',
+          'UNI': 'https://assets.coingecko.com/coins/images/12504/small/uni.jpg',
+          'ATOM': 'https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png',
+          'DOT': 'https://assets.coingecko.com/coins/images/12171/small/polkadot.png',
+          'ARB': 'https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg',
+          'OP': 'https://assets.coingecko.com/coins/images/25244/small/Optimism.png',
+          'APT': 'https://assets.coingecko.com/coins/images/26455/small/aptos_round.png',
+
+          // Altcoins
+          'DOGE': 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png',
+          'LTC': 'https://assets.coingecko.com/coins/images/2/small/litecoin.png',
+          'SHIB': 'https://assets.coingecko.com/coins/images/11939/small/shiba.png',
+          'NEAR': 'https://assets.coingecko.com/coins/images/10365/small/near.jpg',
+          'ICP': 'https://assets.coingecko.com/coins/images/14495/small/Internet_Computer_logo.png',
+          'FIL': 'https://assets.coingecko.com/coins/images/12817/small/filecoin.png',
+          'SUI': 'https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg',
+          'STX': 'https://assets.coingecko.com/coins/images/2069/small/Stacks_logo_full.png',
+          'TON': 'https://assets.coingecko.com/coins/images/17980/small/ton_symbol.png',
+
+          // Forex & Commodities (CFD instruments)
+          'EUR': 'https://hatscripts.github.io/circle-flags/flags/eu.svg',
+          'PAXG': 'https://assets.coingecko.com/coins/images/9519/small/paxg.PNG',
+        }
+        iconUrl = iconMap[inst.base_currency] || ''
+      }
+
+      const category = inst.category || 'altcoin'
+
       return {
         symbol: inst.symbol,
-        displayName: inst.displayName,
-        baseCurrency: inst.baseCurrency,
-        iconUrl: inst.iconUrl,
-        category: inst.category,
+        displayName: baseCurrency, // Show BTC instead of Bitcoin
+        baseCurrency: baseCurrency,
+        iconUrl: iconUrl,
+        category: category,
         price: price,
         change: changePercent,
         isActive,
@@ -108,8 +156,8 @@ export default function InstrumentsPanel() {
       const query = searchQuery.toLowerCase()
       const matchesSearch =
         item.symbol.toLowerCase().includes(query) ||
-        item.displayName.toLowerCase().includes(query) ||
-        item.baseCurrency.toLowerCase().includes(query)
+        (item.displayName?.toLowerCase() || '').includes(query) ||
+        (item.baseCurrency?.toLowerCase() || '').includes(query)
       if (!matchesSearch) return false
     }
 
@@ -128,6 +176,8 @@ export default function InstrumentsPanel() {
       major: instruments.filter(i => i.category === 'major').length,
       defi: instruments.filter(i => i.category === 'defi').length,
       altcoin: instruments.filter(i => i.category === 'altcoin').length,
+      forex: instruments.filter(i => i.category === 'forex').length,
+      commodity: instruments.filter(i => i.category === 'commodity').length,
     }
   }, [instruments])
 
@@ -153,8 +203,8 @@ export default function InstrumentsPanel() {
         </button>
       </div>
 
-      {/* Category Filter Tabs */}
-      <div className="flex gap-1 mb-3 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+      {/* Category Filter Tabs - Row 1: Crypto */}
+      <div className="flex gap-1 mb-2 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
         <button
           onClick={() => setCategoryFilter('all')}
           className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition ${
@@ -194,6 +244,30 @@ export default function InstrumentsPanel() {
           }`}
         >
           Altcoin ({categoryCounts.altcoin})
+        </button>
+      </div>
+
+      {/* Category Filter Tabs - Row 2: CFD */}
+      <div className="flex gap-1 mb-3 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+        <button
+          onClick={() => setCategoryFilter('forex')}
+          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition ${
+            categoryFilter === 'forex'
+              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          Forex ({categoryCounts.forex})
+        </button>
+        <button
+          onClick={() => setCategoryFilter('commodity')}
+          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition ${
+            categoryFilter === 'commodity'
+              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          Commodity ({categoryCounts.commodity})
         </button>
       </div>
 

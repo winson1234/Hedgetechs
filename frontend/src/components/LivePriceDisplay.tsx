@@ -15,9 +15,54 @@ export default function LivePriceDisplay({ symbol }: LivePriceDisplayProps) {
   const symbolIcons = useMemo(() => {
     const map: Record<string, { iconUrl: string; baseCurrency: string }> = {}
     instruments.forEach(inst => {
+      // Support both legacy and new API format
+      const baseCurrency = inst.baseCurrency || inst.base_currency || inst.symbol.replace('USDT', '')
+
+      // Use icon URL if available, otherwise map ALL currencies to icons
+      let iconUrl = inst.iconUrl || ''
+      if (!iconUrl && inst.base_currency) {
+        // Complete icon mapping for ALL 26 instruments in database
+        const iconMap: Record<string, string> = {
+          // Major Cryptocurrencies
+          'BTC': 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png',
+          'ETH': 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
+          'BNB': 'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png',
+          'SOL': 'https://assets.coingecko.com/coins/images/4128/small/solana.png',
+          'XRP': 'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png',
+          'ADA': 'https://assets.coingecko.com/coins/images/975/small/cardano.png',
+          'AVAX': 'https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png',
+
+          // DeFi / Layer 2
+          'MATIC': 'https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png',
+          'LINK': 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png',
+          'UNI': 'https://assets.coingecko.com/coins/images/12504/small/uni.jpg',
+          'ATOM': 'https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png',
+          'DOT': 'https://assets.coingecko.com/coins/images/12171/small/polkadot.png',
+          'ARB': 'https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg',
+          'OP': 'https://assets.coingecko.com/coins/images/25244/small/Optimism.png',
+          'APT': 'https://assets.coingecko.com/coins/images/26455/small/aptos_round.png',
+
+          // Altcoins
+          'DOGE': 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png',
+          'LTC': 'https://assets.coingecko.com/coins/images/2/small/litecoin.png',
+          'SHIB': 'https://assets.coingecko.com/coins/images/11939/small/shiba.png',
+          'NEAR': 'https://assets.coingecko.com/coins/images/10365/small/near.jpg',
+          'ICP': 'https://assets.coingecko.com/coins/images/14495/small/Internet_Computer_logo.png',
+          'FIL': 'https://assets.coingecko.com/coins/images/12817/small/filecoin.png',
+          'SUI': 'https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg',
+          'STX': 'https://assets.coingecko.com/coins/images/2069/small/Stacks_logo_full.png',
+          'TON': 'https://assets.coingecko.com/coins/images/17980/small/ton_symbol.png',
+
+          // Forex & Commodities (CFD instruments)
+          'EUR': 'https://hatscripts.github.io/circle-flags/flags/eu.svg',
+          'PAXG': 'https://assets.coingecko.com/coins/images/9519/small/paxg.PNG',
+        }
+        iconUrl = iconMap[inst.base_currency] || ''
+      }
+
       map[inst.symbol] = {
-        iconUrl: inst.iconUrl,
-        baseCurrency: inst.baseCurrency
+        iconUrl: iconUrl,
+        baseCurrency: baseCurrency
       }
     })
     return map

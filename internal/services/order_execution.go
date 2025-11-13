@@ -46,7 +46,7 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 	var accountCurrency, productType, quoteCurrency string
 	err = tx.QueryRow(ctx,
 		`SELECT o.id, o.user_id, o.account_id, o.symbol, o.order_number, o.side, o.type,
-		        o.status, o.amount_base, o.limit_price, o.stop_price, o.filled_amount,
+		        o.status, o.amount_base, o.limit_price, o.stop_price, o.leverage, o.filled_amount,
 		        o.average_fill_price, o.created_at, o.updated_at,
 		        a.currency, a.product_type,
 		        i.quote_currency
@@ -58,7 +58,7 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 	).Scan(
 		&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.OrderNumber,
 		&order.Side, &order.Type, &order.Status, &order.AmountBase, &order.LimitPrice,
-		&order.StopPrice, &order.FilledAmount, &order.AverageFillPrice,
+		&order.StopPrice, &order.Leverage, &order.FilledAmount, &order.AverageFillPrice,
 		&order.CreatedAt, &order.UpdatedAt,
 		&accountCurrency, &productType, &quoteCurrency,
 	)
@@ -357,7 +357,7 @@ func (s *OrderExecutionService) executeLeveragedOrder(
 ) (*ExecutionResult, error) {
 	// For leveraged trading, we create a contract (position) instead of exchanging currencies
 
-	// Get instrument leverage cap
+	// Get instrument leverage cap for validation
 	var leverageCap int
 	err := tx.QueryRow(ctx,
 		`SELECT leverage_cap FROM instruments WHERE symbol = $1`,
@@ -367,10 +367,19 @@ func (s *OrderExecutionService) executeLeveragedOrder(
 		return nil, fmt.Errorf("failed to get leverage cap: %w", err)
 	}
 
-	// Use default leverage of 10x (or could be passed from frontend)
-	leverage := leverageCap
+	// Use user-selected leverage from order (default to 1 if not set)
+	leverage := order.Leverage
+	if leverage < 1 {
+		leverage = 1
+	}
+
+	// Validate leverage doesn't exceed instrument's cap
 	if leverage > leverageCap {
-		leverage = leverageCap
+		return &ExecutionResult{
+			Order:   *order,
+			Success: false,
+			Message: fmt.Sprintf("leverage %dx exceeds instrument cap of %dx", leverage, leverageCap),
+		}, nil
 	}
 
 	// Calculate required margin
@@ -415,15 +424,26 @@ func (s *OrderExecutionService) executeLeveragedOrder(
 		contractSide = models.ContractSideShort
 	}
 
+	// Calculate liquidation price (90% maintenance margin threshold)
+	// Long: liquidationPrice = entryPrice × (1 - 1/leverage × 0.9)
+	// Short: liquidationPrice = entryPrice × (1 + 1/leverage × 0.9)
+	var liquidationPrice float64
+	marginRatio := 1.0 / float64(leverage) * 0.9
+	if contractSide == models.ContractSideLong {
+		liquidationPrice = executionPrice * (1.0 - marginRatio)
+	} else {
+		liquidationPrice = executionPrice * (1.0 + marginRatio)
+	}
+
 	// Create contract (position)
 	contractID := uuid.New()
 	_, err = tx.Exec(ctx,
 		`INSERT INTO contracts (id, user_id, account_id, symbol, contract_number, side, status,
-		                        lot_size, entry_price, margin_used, leverage, commission, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())`,
+		                        lot_size, entry_price, margin_used, leverage, commission, liquidation_price, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
 		contractID, order.UserID, order.AccountID, order.Symbol, contractNumber,
 		contractSide, models.ContractStatusOpen, order.AmountBase, executionPrice,
-		marginRequired-fee, leverage, fee,
+		marginRequired-fee, leverage, fee, liquidationPrice,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create contract: %w", err)
@@ -443,14 +463,14 @@ func (s *OrderExecutionService) executeLeveragedOrder(
 	var contract models.Contract
 	err = tx.QueryRow(ctx,
 		`SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size,
-		        entry_price, margin_used, leverage, tp_price, sl_price, close_price, pnl,
+		        entry_price, margin_used, leverage, liquidation_price, tp_price, sl_price, close_price, pnl,
 		        swap, commission, created_at, closed_at, updated_at
 		 FROM contracts WHERE id = $1`,
 		contractID,
 	).Scan(
 		&contract.ID, &contract.UserID, &contract.AccountID, &contract.Symbol, &contract.ContractNumber,
 		&contract.Side, &contract.Status, &contract.LotSize, &contract.EntryPrice, &contract.MarginUsed,
-		&contract.Leverage, &contract.TPPrice, &contract.SLPrice, &contract.ClosePrice, &contract.PnL,
+		&contract.Leverage, &contract.LiquidationPrice, &contract.TPPrice, &contract.SLPrice, &contract.ClosePrice, &contract.PnL,
 		&contract.Swap, &contract.Commission, &contract.CreatedAt, &contract.ClosedAt, &contract.UpdatedAt,
 	)
 	if err != nil {

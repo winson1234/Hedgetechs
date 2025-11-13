@@ -26,7 +26,7 @@ func GetInstruments(w http.ResponseWriter, r *http.Request) {
 
 	// Query for all tradeable instruments
 	rows, err := pool.Query(ctx,
-		`SELECT symbol, name, base_currency, quote_currency, instrument_type,
+		`SELECT symbol, name, base_currency, quote_currency, instrument_type, category,
 		        is_tradeable, leverage_cap, spread_adjustment_bps,
 		        min_order_size, max_order_size, tick_size, created_at, updated_at
 		 FROM instruments
@@ -45,7 +45,7 @@ func GetInstruments(w http.ResponseWriter, r *http.Request) {
 		var instrument models.Instrument
 		err := rows.Scan(
 			&instrument.Symbol, &instrument.Name, &instrument.BaseCurrency,
-			&instrument.QuoteCurrency, &instrument.InstrumentType,
+			&instrument.QuoteCurrency, &instrument.InstrumentType, &instrument.Category,
 			&instrument.IsTradeable, &instrument.LeverageCap, &instrument.SpreadAdjustmentBps,
 			&instrument.MinOrderSize, &instrument.MaxOrderSize, &instrument.TickSize,
 			&instrument.CreatedAt, &instrument.UpdatedAt,

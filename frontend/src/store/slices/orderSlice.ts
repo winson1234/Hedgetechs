@@ -122,6 +122,7 @@ export const createPendingOrder = createAsyncThunk(
       quantity: number;
       trigger_price: number;
       limit_price?: number;
+      leverage?: number; // Add leverage for CFD orders
     },
     { getState, rejectWithValue }
   ) => {
@@ -183,6 +184,7 @@ export const executeMarketOrder = createAsyncThunk(
       side: 'buy' | 'sell';
       amount_base: number;
       current_price: number; // Current market price passed from frontend
+      leverage?: number; // Add leverage for CFD orders
     },
     { getState, rejectWithValue }
   ) => {
@@ -203,6 +205,7 @@ export const executeMarketOrder = createAsyncThunk(
           type: 'market',
           amount_base: orderData.amount_base,
           limit_price: orderData.current_price, // Pass current price for market execution
+          leverage: orderData.leverage || 1, // Pass leverage for CFD
         }),
       });
 

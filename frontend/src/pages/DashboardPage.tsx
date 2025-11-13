@@ -117,8 +117,53 @@ const cancelLogout = () => {
   // Computed directly from instruments + Redux price/ticker data
   const cryptoData = useMemo<CryptoData[]>(() => {
     return instruments.map(inst => {
+      // Support both legacy (displayName, baseCurrency) and new API format (name, base_currency)
+      const baseCurr = inst.baseCurrency || inst.base_currency || inst.symbol.replace('USDT', '');
+
+      // Use icon URL if available (from legacy API), otherwise use CoinGecko-style URLs
+      let iconUrl = inst.iconUrl || '';
+      if (!iconUrl && inst.base_currency) {
+        // Complete icon mapping for ALL 26 instruments in database
+        const iconMap: Record<string, string> = {
+          // Major Cryptocurrencies
+          'BTC': 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png',
+          'ETH': 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
+          'BNB': 'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png',
+          'SOL': 'https://assets.coingecko.com/coins/images/4128/small/solana.png',
+          'XRP': 'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png',
+          'ADA': 'https://assets.coingecko.com/coins/images/975/small/cardano.png',
+          'AVAX': 'https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png',
+
+          // DeFi / Layer 2
+          'MATIC': 'https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png',
+          'LINK': 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png',
+          'UNI': 'https://assets.coingecko.com/coins/images/12504/small/uni.jpg',
+          'ATOM': 'https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png',
+          'DOT': 'https://assets.coingecko.com/coins/images/12171/small/polkadot.png',
+          'ARB': 'https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg',
+          'OP': 'https://assets.coingecko.com/coins/images/25244/small/Optimism.png',
+          'APT': 'https://assets.coingecko.com/coins/images/26455/small/aptos_round.png',
+
+          // Altcoins
+          'DOGE': 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png',
+          'LTC': 'https://assets.coingecko.com/coins/images/2/small/litecoin.png',
+          'SHIB': 'https://assets.coingecko.com/coins/images/11939/small/shiba.png',
+          'NEAR': 'https://assets.coingecko.com/coins/images/10365/small/near.jpg',
+          'ICP': 'https://assets.coingecko.com/coins/images/14495/small/Internet_Computer_logo.png',
+          'FIL': 'https://assets.coingecko.com/coins/images/12817/small/filecoin.png',
+          'SUI': 'https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg',
+          'STX': 'https://assets.coingecko.com/coins/images/2069/small/Stacks_logo_full.png',
+          'TON': 'https://assets.coingecko.com/coins/images/17980/small/ton_symbol.png',
+
+          // Forex & Commodities (CFD instruments)
+          'EUR': 'https://hatscripts.github.io/circle-flags/flags/eu.svg',
+          'PAXG': 'https://assets.coingecko.com/coins/images/9519/small/paxg.PNG',
+        };
+        iconUrl = iconMap[inst.base_currency] || '';
+      }
+
       const uiProps = cryptoUIProperties[inst.symbol] || {
-        icon: inst.baseCurrency.charAt(0),
+        icon: iconUrl || baseCurr,
         gradient: 'linear-gradient(135deg, #6366f1, #8b5cf6)'
       };
       const priceData = currentPrices[inst.symbol];
@@ -126,7 +171,7 @@ const cancelLogout = () => {
 
       return {
         symbol: inst.symbol,
-        name: inst.displayName.replace('/USD', '').replace('USDT', ''),
+        name: baseCurr, // Show symbol (BTC) instead of full name (Bitcoin)
         price: priceData ? priceData.price : 0,
         change: ticker ? ticker.priceChangePercent : 0,
         volume24h: ticker ? ticker.volume24h : 0,
@@ -773,7 +818,25 @@ const cancelLogout = () => {
               <div key={crypto.symbol} className="crypto-row">
                 <div className="crypto-col" style={{ textAlign: 'left' }}>
                   <div className="crypto-info">
-                    <div className="crypto-icon" style={{ background: crypto.gradient }}>{crypto.icon}</div>
+                    <div className="crypto-icon" style={{ background: crypto.gradient }}>
+                      {crypto.icon.startsWith('http') ? (
+                        <img
+                          src={crypto.icon}
+                          alt={crypto.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = crypto.name.charAt(0);
+                            }
+                          }}
+                        />
+                      ) : (
+                        crypto.icon
+                      )}
+                    </div>
                     <div>
                       <div className="crypto-symbol">{crypto.symbol.replace('USDT', '')}</div>
                       <div className="crypto-name">{crypto.name}</div>

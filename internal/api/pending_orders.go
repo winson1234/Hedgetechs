@@ -112,15 +112,21 @@ func CreatePendingOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create pending order with order_number
+	// Set default leverage if not provided
+	leverage := req.Leverage
+	if leverage < 1 {
+		leverage = 1
+	}
+
+	// Create pending order with order_number and leverage
 	orderID := uuid.New()
 	_, err = tx.Exec(ctx,
 		`INSERT INTO pending_orders (
-			id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price, status, order_number, created_at, updated_at
+			id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price, leverage, status, order_number, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10, NOW(), NOW()
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, NOW(), NOW()
 		)`,
-		orderID, userID, req.AccountID, req.Symbol, req.Type, req.Side, req.Quantity, req.TriggerPrice, req.LimitPrice, orderNumber,
+		orderID, userID, req.AccountID, req.Symbol, req.Type, req.Side, req.Quantity, req.TriggerPrice, req.LimitPrice, leverage, orderNumber,
 	)
 	if err != nil {
 		log.Printf("Failed to insert pending order: %v", err)

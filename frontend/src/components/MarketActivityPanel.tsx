@@ -2,15 +2,22 @@ import React, { useState } from 'react';
 import { useAppSelector } from '../store';
 import PendingOrdersTab from './market/PendingOrdersTab';
 import TradeHistoryTab from './market/TradeHistoryTab';
+import PositionsTable from './market/PositionsTable';
 import { formatPrice, formatQuantity } from '../utils/priceUtils';
 
-type TabType = 'orderbook' | 'trades' | 'pending' | 'history';
+type TabType = 'orderbook' | 'trades' | 'pending' | 'history' | 'positions';
 
 export default function MarketActivityPanel() {
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
   // Get order book and trades from Redux store (updated by WebSocket middleware)
   const orderBook = useAppSelector(state => state.price.orderBooks[activeInstrument]);
   const trades = useAppSelector(state => state.price.trades[activeInstrument]) || [];
+
+  // Get active account to check product type
+  const { accounts, activeAccountId } = useAppSelector(state => state.account);
+  const activeAccount = accounts.find(acc => acc.id === activeAccountId);
+  const isCFD = activeAccount?.product_type === 'cfd';
+
   const [activeTab, setActiveTab] = useState<TabType>('orderbook');
 
   // Convert Redux order book format to component format
@@ -77,6 +84,18 @@ export default function MarketActivityPanel() {
         >
           Trade History
         </button>
+        {isCFD && (
+          <button
+            onClick={() => setActiveTab('positions')}
+            className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+              activeTab === 'positions'
+                ? 'text-blue-500 border-b-2 border-blue-500'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
+            }`}
+          >
+            Positions
+          </button>
+        )}
       </div>
 
       {/* Tab Content */}
@@ -183,6 +202,8 @@ export default function MarketActivityPanel() {
         {activeTab === 'pending' && <PendingOrdersTab />}
 
         {activeTab === 'history' && <TradeHistoryTab />}
+
+        {activeTab === 'positions' && isCFD && <PositionsTable />}
       </div>
     </div>
   );

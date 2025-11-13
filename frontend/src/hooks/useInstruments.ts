@@ -4,10 +4,23 @@ export type InstrumentCategory = 'major' | 'defi' | 'altcoin';
 
 export interface Instrument {
   symbol: string;
-  displayName: string;
-  baseCurrency: string;
-  category: InstrumentCategory;
-  iconUrl: string;
+  name?: string | null;
+  base_currency?: string | null;
+  quote_currency?: string | null;
+  instrument_type?: string | null;
+  category?: string | null; // major, defi, altcoin, forex, commodity (from database)
+  is_tradeable: boolean;
+  leverage_cap: number;
+  spread_adjustment_bps?: number;
+  min_order_size?: number | null;
+  max_order_size?: number | null;
+  tick_size?: number | null;
+  created_at?: string;
+  updated_at?: string;
+  // Legacy fields for backward compatibility
+  displayName?: string;
+  baseCurrency?: string;
+  iconUrl?: string;
 }
 
 interface InstrumentsData {

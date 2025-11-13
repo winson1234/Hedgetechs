@@ -228,5 +228,4 @@ var GlobalAuditLogger *AuditLogger
 // InitGlobalAuditLogger initializes the global audit logger
 func InitGlobalAuditLogger(db *pgxpool.Pool) {
 	GlobalAuditLogger = NewAuditLogger(db)
-	log.Println("✅ Audit logger initialized")
 }

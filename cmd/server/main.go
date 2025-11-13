@@ -72,7 +72,7 @@ func main() {
 		log.Printf("WARNING: Migration error: %v", err)
 		log.Println("Continuing with existing schema...")
 	} else {
-		log.Println("✅ Database migrations completed successfully")
+		log.Println("Database migrations completed successfully")
 	}
 
 	// Initialize audit logger (requires database)
@@ -84,7 +84,6 @@ func main() {
 
 	// Initialize rate limiter (100 requests per minute per user, burst of 20)
 	middleware.InitRateLimiter(100, 20)
-	log.Println("✅ Rate limiter initialized (100 req/min per user)")
 
 	// Get port from environment (required for Render deployment)
 	// Falls back to 8080 for local development
@@ -117,9 +116,8 @@ func main() {
 	if dbPool, err := database.GetPool(); err == nil {
 		orderProcessor = worker.NewOrderProcessor(dbPool)
 		go orderProcessor.Run()
-		log.Println("✅ Event-driven order processor started")
 	} else {
-		log.Println("⚠️  Order processor disabled (database not available)")
+		log.Println("WARNING: Order processor disabled (database not available)")
 	}
 
 	// Create message broadcaster that fans out to both hub and order processor
@@ -131,7 +129,7 @@ func main() {
 			select {
 			case h.Broadcast <- msg:
 			default:
-				log.Println("⚠️  Hub broadcast channel full, dropping message")
+				// Hub channel full, drop message silently
 			}
 
 			// Forward to order processor for pending order execution (non-blocking)
@@ -155,14 +153,11 @@ func main() {
 
 	// Start Binance WebSocket streams for real-time market data
 	// Messages are sent to messageBroadcaster which fans out to hub and order processor
-	log.Println("Starting Binance WebSocket streams with order processor integration")
 	go binance.StreamTrades(broadcastWrapper)
 	go binance.StreamDepth(broadcastWrapper)
-
-	log.Println("✅ Binance streams connected to order processor - pending orders will auto-execute!")
+	log.Println("Binance WebSocket streams started")
 
 	// Initialize forex service using Frankfurter API (free, no API key required)
-	log.Println("Initializing forex service with Frankfurter API (no API key required)")
 	forexService := services.NewMassiveService("")
 	analyticsHandler := api.NewAnalyticsHandler(forexService)
 	fxRatesHandler := api.NewFXRatesHandler(forexService)
@@ -268,7 +263,7 @@ func main() {
 
 	// Instruments endpoints (public - no auth required)
 	// GET /api/v1/instruments - List all tradeable instruments
-	http.HandleFunc("/api/v1/instruments", api.CORSMiddleware(allowHEAD(api.HandleInstruments)))
+	http.HandleFunc("/api/v1/instruments", api.CORSMiddleware(allowHEAD(api.GetInstruments)))
 	// GET /api/v1/instruments/symbol?symbol=BTCUSDT - Get instrument by symbol
 	http.HandleFunc("/api/v1/instruments/symbol", api.CORSMiddleware(allowHEAD(api.GetInstrumentBySymbol)))
 

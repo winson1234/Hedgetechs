@@ -37,6 +37,7 @@ type PendingOrder struct {
 	Quantity       float64            `json:"quantity"`       // Amount to buy/sell
 	TriggerPrice   float64            `json:"trigger_price"`  // Price at which order triggers
 	LimitPrice     *float64           `json:"limit_price,omitempty"` // Limit price (optional)
+	Leverage       int                `json:"leverage"`       // Leverage multiplier (1 for spot, >1 for CFD/Futures)
 	Status         PendingOrderStatus `json:"status"`         // Current status
 	ExecutedAt     *time.Time         `json:"executed_at,omitempty"` // When executed
 	ExecutedPrice  *float64           `json:"executed_price,omitempty"` // Actual execution price
@@ -54,6 +55,7 @@ type CreatePendingOrderRequest struct {
 	Quantity     float64            `json:"quantity"`     // Amount to buy/sell
 	TriggerPrice float64            `json:"trigger_price"` // Price at which order triggers
 	LimitPrice   *float64           `json:"limit_price,omitempty"` // Optional limit price
+	Leverage     int                `json:"leverage"`     // Leverage multiplier (default: 1)
 }
 
 // CreatePendingOrderResponse represents the response after creating a pending order
@@ -112,6 +114,15 @@ func (r *CreatePendingOrderRequest) Validate() error {
 
 	if r.LimitPrice != nil && *r.LimitPrice <= 0 {
 		return &ValidationError{Field: "limit_price", Message: "must be greater than zero"}
+	}
+
+	// Validate leverage
+	if r.Leverage < 1 {
+		return &ValidationError{Field: "leverage", Message: "must be at least 1"}
+	}
+
+	if r.Leverage > 500 {
+		return &ValidationError{Field: "leverage", Message: "must not exceed 500"}
 	}
 
 	return nil

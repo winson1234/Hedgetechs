@@ -5,7 +5,6 @@ import { createPendingOrder, executeMarketOrder, fetchOrders } from '../store/sl
 import { addToast } from '../store/slices/uiSlice';
 import { formatPrice } from '../utils/priceUtils';
 
-type TradingMode = 'spot' | 'cross' | 'isolated' | 'grid';
 type OrderType = 'limit' | 'market' | 'stop-limit';
 type ProductType = 'spot' | 'cfd' | 'futures';
 
@@ -55,11 +54,8 @@ export default function TradingPanel() {
     }
   }, [activeAccountId, dispatch]);
 
-  // Trading mode and settings
-  const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
+  // Trading settings
   const [orderType, setOrderType] = useState<OrderType>('limit');
-  const [isRecurring, setIsRecurring] = useState<boolean>(false);
-  const [buyWithEUR, setBuyWithEUR] = useState<boolean>(false);
   const [enableTPSL, setEnableTPSL] = useState<boolean>(false);
   const feeLevel = 0.1; // 0.1% default fee
 
@@ -138,8 +134,6 @@ export default function TradingPanel() {
     setSlTrigger('');
     setSlLimit('');
     // Reset toggles as well
-    setIsRecurring(false);
-    setBuyWithEUR(false);
     setEnableTPSL(false);
     // Note: Pending orders are managed by orderStore, no need to clear them here
   }, [activeInstrument]);
@@ -508,11 +502,15 @@ export default function TradingPanel() {
             <button
               key={product}
               onClick={() => setSelectedProductType(product)}
+              disabled={product === 'futures'}
               className={`flex-1 px-2 py-2 text-xs sm:text-sm font-semibold rounded-md transition uppercase ${
                 selectedProductType === product
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                  : product === 'futures'
+                  ? 'text-slate-400 dark:text-slate-600 cursor-not-allowed'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
+              title={product === 'futures' ? 'Coming soon' : ''}
             >
               {product}
             </button>
@@ -524,29 +522,6 @@ export default function TradingPanel() {
           </p>
         )}
       </div>
-
-      {/* Trading Mode Tabs - Only show for Spot */}
-      {isSpot && (
-        <div className="flex gap-1.5 mb-4 bg-slate-100 dark:bg-slate-800 rounded-lg p-1.5">
-          {(['spot', 'cross', 'isolated', 'grid'] as TradingMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setTradingMode(mode)}
-              className={`flex-1 px-2 py-2 text-xs sm:text-sm font-semibold rounded-md transition capitalize ${
-                tradingMode === mode
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-                  : mode !== 'spot'
-                  ? 'text-slate-400 dark:text-slate-600 cursor-not-allowed'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-              disabled={mode !== 'spot'}
-              title={mode !== 'spot' ? 'Coming soon' : ''}
-            >
-              {mode}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Order Type Tabs */}
       <div className="flex gap-1.5 mb-4 bg-slate-100 dark:bg-slate-800 rounded-lg p-1.5">
@@ -581,37 +556,6 @@ export default function TradingPanel() {
         >
           Stop-Limit
         </button>
-      </div>
-
-      {/* Recurring and Buy with EUR Toggles */}
-      {/* Keep these clickable but indicate they are placeholders */}
-      <div className="flex items-center justify-between mb-5 text-sm">
-        <label className="flex items-center gap-2.5 cursor-pointer" title="Recurring Order (Coming soon)">
-          <div className="relative">
-            <input
-              type="checkbox"
-              checked={isRecurring}
-              onChange={(e) => { setIsRecurring(e.target.checked);}}
-              className="sr-only peer"
-            />
-            <div className="w-10 h-5 bg-slate-300 dark:bg-slate-700 rounded-full peer-checked:bg-blue-500 transition"></div>
-            <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5"></div>
-          </div>
-          <span className="text-slate-700 dark:text-slate-300 font-medium">Recurring</span>
-        </label>
-        <label className="flex items-center gap-2.5 cursor-pointer" title="Buy with EUR (Coming soon)">
-          <div className="relative">
-            <input
-              type="checkbox"
-              checked={buyWithEUR}
-              onChange={(e) => { setBuyWithEUR(e.target.checked);}}
-              className="sr-only peer"
-            />
-            <div className="w-10 h-5 bg-slate-300 dark:bg-slate-700 rounded-full peer-checked:bg-blue-500 transition"></div>
-            <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5"></div>
-          </div>
-          <span className="text-slate-700 dark:text-slate-300 font-medium">Buy with EUR</span>
-        </label>
       </div>
 
       {/* Available Balance Breakdown */}

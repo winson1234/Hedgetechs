@@ -6,6 +6,7 @@ import (
 	"brokerageProject/internal/config"
 	"brokerageProject/internal/database"
 	"brokerageProject/internal/hub"
+	"brokerageProject/internal/market_data/twelvedata"
 	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/services"
 	"brokerageProject/internal/utils"
@@ -151,29 +152,48 @@ func main() {
 		Unregister: make(chan *hub.Client),
 	}
 
-	// Start Binance WebSocket streams for real-time market data
-	// Messages are sent to messageBroadcaster which fans out to hub and order processor
-	go binance.StreamTrades(broadcastWrapper)
+	// LEGACY: Start old Binance WebSocket streams (still working for orderbook)
+	// TODO: Remove these once fully migrated to Provider interface
 	go binance.StreamDepth(broadcastWrapper)
-	log.Println("Binance WebSocket streams started")
+	log.Println("Binance Depth WebSocket stream started (legacy)")
 
-	// Initialize market data service for real-time forex/commodity prices via Twelve Data WebSocket
-	// This handles WTI, BRENT, NATGAS, CADJPY, AUDNZD, EURGBP
-	marketDataService, err := services.NewMarketDataService(
-		config.TwelveDataAPIKey,
-		config.StaticPrices,
-		messageBroadcaster, // Use same broadcast channel as Binance
-	)
+	// HYBRID MARKET DATA ENGINE: Real-Time Crypto + Smart-Polling Commodities
+	// Initialize market data service using the Provider interface pattern
+	marketDataService, err := services.NewMarketDataService(messageBroadcaster)
 	if err != nil {
-		log.Printf("WARNING: Failed to initialize market data service: %v", err)
-		log.Println("Continuing without forex/commodity data (crypto-only mode)")
-	} else {
-		// Initialize with static prices immediately (for instant UI responsiveness)
-		marketDataService.InitializeWithStaticPrices(config.StaticPrices)
+		log.Fatalf("CRITICAL: Failed to initialize market data service: %v", err)
+	}
 
-		// Start Twelve Data WebSocket connection
-		marketDataService.Start()
-		log.Println("Market data service started (Twelve Data WebSocket)")
+	// Initialize with static prices immediately (for instant UI responsiveness)
+	marketDataService.InitializeWithStaticPrices(config.StaticPrices)
+
+	// Provider 1: Binance WebSocket (Real-Time Crypto)
+	binanceProvider := binance.NewProvider()
+	marketDataService.AddProvider(binanceProvider)
+	log.Println("Registered Binance Provider (real-time crypto WebSocket)")
+
+	// Provider 2: Twelve Data Smart Polling Adapter (Commodities/Forex)
+	if config.TwelveDataAPIKey != "" {
+		twelveDataProvider := twelvedata.NewAdapter(
+			config.TwelveDataAPIKey,
+			config.TwelveDataPollInterval,
+			config.EnableExternalFetch,
+		)
+		marketDataService.AddProvider(twelveDataProvider)
+		log.Printf("Registered Twelve Data Provider (smart polling: interval=%v, fetch=%v)",
+			config.TwelveDataPollInterval, config.EnableExternalFetch)
+	} else {
+		log.Println("WARNING: TWELVE_DATA_API_KEY not set. Commodities/Forex will use static prices only.")
+	}
+
+	// Start all providers
+	// Crypto symbols are handled by Binance provider (ignored by Twelve Data)
+	// Forex/Commodity symbols are handled by Twelve Data provider (ignored by Binance)
+	allSymbols := []string{"WTI", "BRENT", "NATGAS", "CADJPY", "AUDNZD", "EURGBP"}
+	if err := marketDataService.Start(allSymbols); err != nil {
+		log.Printf("WARNING: Market data service failed to start: %v", err)
+	} else {
+		log.Println("Market data service started successfully (Hybrid Engine: Crypto + Commodities)")
 	}
 
 	// Initialize forex service using Frankfurter API (free, no API key required)

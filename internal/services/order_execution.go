@@ -111,14 +111,19 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 			routingDecision = &RoutingDecision{ShouldRouteToLP: false}
 		}
 
+		var execErr error
 		if routingDecision.ShouldRouteToLP {
 			// A-Book: Route to external LP
 			log.Printf("Routing order %s to LP: %s", order.OrderNumber, routingDecision.Reason)
-			result, err = s.ExecuteExternalOrder(ctx, tx, &order, routingService.GetConfig().PrimaryLPProvider, notionalValue, fee, accountCurrency)
+			result, execErr = s.ExecuteExternalOrder(ctx, tx, &order, routingService.GetConfig().PrimaryLPProvider, notionalValue, fee, accountCurrency)
 		} else {
 			// B-Book: Execute internally with dual-position hedging
 			log.Printf("Executing order %s internally (B-Book): %s", order.OrderNumber, routingDecision.Reason)
-			result, err = s.ExecuteDualPositionOrder(ctx, tx, &order, executionPrice, notionalValue, fee, accountCurrency)
+			result, execErr = s.ExecuteDualPositionOrder(ctx, tx, &order, executionPrice, notionalValue, fee, accountCurrency)
+		}
+
+		if execErr != nil {
+			return nil, execErr
 		}
 	}
 

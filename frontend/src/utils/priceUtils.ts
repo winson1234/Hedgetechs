@@ -42,11 +42,13 @@ export function getQuantityPrecision(amount: number): number {
   if (amount >= 1000) return 2;     // Large amounts: 1000.12
   if (amount >= 1) return 4;        // Standard: 10.1234
   if (amount >= 0.001) return 6;    // Small: 0.001234
-  return 8;                          // Very small: 0.00000123
+  if (amount >= 0.00001) return 8;  // Very small: 0.00001234
+  return 12;                         // Extremely small: show up to 12 decimals
 }
 
 /**
  * Formats a quantity/amount with appropriate precision
+ * Removes trailing zeros for cleaner display
  * @param amount - The amount to format
  * @param forcePrecision - Optional: force specific precision
  * @returns Formatted amount string
@@ -54,12 +56,15 @@ export function getQuantityPrecision(amount: number): number {
 export function formatQuantity(amount: number | string, forcePrecision?: number): string {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
 
-  if (isNaN(numAmount)) {
+  if (isNaN(numAmount) || numAmount === 0) {
     return '0.0000';
   }
 
   const precision = forcePrecision !== undefined ? forcePrecision : getQuantityPrecision(numAmount);
-  return numAmount.toFixed(precision);
+  const formatted = numAmount.toFixed(precision);
+  
+  // Remove trailing zeros but keep at least one decimal place
+  return formatted.replace(/\.?0+$/, match => match.includes('.') ? '.0' : '');
 }
 
 /**

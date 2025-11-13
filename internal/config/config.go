@@ -1,6 +1,10 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strconv"
+	"time"
+)
 
 // --- Configuration ---
 
@@ -20,12 +24,20 @@ const BinanceRestURL = "https://api.binance.com/api/v3/klines"
 const BinanceTicker24hURL = "https://api.binance.com/api/v3/ticker/24hr"
 
 // Market Data Provider Configuration
-// Twelve Data WebSocket for real-time Forex/Commodities (WTI, Brent, Natural Gas, CADJPY, AUDNZD, EURGBP)
+// Twelve Data Smart Polling for Forex/Commodities (WTI, Brent, Natural Gas, CADJPY, AUDNZD, EURGBP)
 var (
 	MarketDataProvider = os.Getenv("MARKET_DATA_PROVIDER") // "twelvedata"
 	TwelveDataAPIKey   = os.Getenv("TWELVE_DATA_API_KEY")
 
-	// Static fallback prices for instant boot (used before first WebSocket update arrives)
+	// Polling interval for Twelve Data REST API (default: 9 minutes = ~160 calls/day)
+	// This is parsed from TWELVE_DATA_POLL_INTERVAL env var (e.g., "9m", "10m", "1m")
+	TwelveDataPollInterval = parsePollInterval(os.Getenv("TWELVE_DATA_POLL_INTERVAL"), 9*time.Minute)
+
+	// Safety switch: disable API calls during development to save credits
+	// Set to "false" to use simulation only (useful for testing UI without burning API credits)
+	EnableExternalFetch = parseBool(os.Getenv("ENABLE_EXTERNAL_FETCH"), true)
+
+	// Static fallback prices for instant boot (used before first API snapshot arrives)
 	StaticPrices = map[string]float64{
 		"WTI":    75.00,  // WTI Crude Oil (USD per barrel)
 		"BRENT":  79.00,  // Brent Crude Oil (USD per barrel)
@@ -35,6 +47,30 @@ var (
 		"EURGBP": 0.86,   // Euro / British Pound
 	}
 )
+
+// parsePollInterval parses a duration string (e.g., "9m", "10m") or returns default
+func parsePollInterval(value string, defaultValue time.Duration) time.Duration {
+	if value == "" {
+		return defaultValue
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		return defaultValue
+	}
+	return duration
+}
+
+// parseBool parses a boolean string ("true"/"false") or returns default
+func parseBool(value string, defaultValue bool) bool {
+	if value == "" {
+		return defaultValue
+	}
+	result, err := strconv.ParseBool(value)
+	if err != nil {
+		return defaultValue
+	}
+	return result
+}
 
 // Crypto sources
 const CoinDeskRSSURL = "https://www.coindesk.com/arc/outboundfeeds/rss/"

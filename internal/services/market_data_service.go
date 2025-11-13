@@ -1,7 +1,7 @@
 package services
 
 import (
-	"brokerageProject/internal/market_data/twelvedata"
+	"brokerageProject/internal/market_data"
 	"brokerageProject/internal/models"
 	"encoding/json"
 	"fmt"
@@ -9,77 +9,86 @@ import (
 	"time"
 )
 
-// MarketDataService orchestrates real-time market data from multiple sources:
-// 1. Binance WebSocket (crypto) - handled externally in main.go
-// 2. Twelve Data WebSocket (forex/commodities) - real-time price updates
+// MarketDataService orchestrates real-time market data from multiple providers:
+// 1. Binance Provider (crypto) - real-time WebSocket stream
+// 2. Twelve Data Provider (forex/commodities) - smart polling with simulation
+//
+// This service uses the Provider interface, allowing seamless switching between
+// real-time streams and simulated data without changing the orchestration logic.
 type MarketDataService struct {
-	twelveDataClient *twelvedata.Client
-	priceCache       *PriceCache
-	staticPrices     map[string]float64
-	broadcastChan    chan []byte // Channel to broadcast updates (connected to hub)
+	providers     []market_data.Provider // List of all active data providers
+	priceCache    *PriceCache
+	broadcastChan chan []byte // Channel to broadcast updates (connected to hub)
 }
 
 // NewMarketDataService creates a new market data orchestration service
+// The service manages multiple providers and broadcasts their updates
 func NewMarketDataService(
-	twelveDataAPIKey string,
-	staticPrices map[string]float64,
 	broadcastChan chan []byte,
 ) (*MarketDataService, error) {
 	service := &MarketDataService{
+		providers:     make([]market_data.Provider, 0),
 		priceCache:    GetGlobalPriceCache(),
-		staticPrices:  staticPrices,
 		broadcastChan: broadcastChan,
-	}
-
-	// Create Twelve Data WebSocket client with callback
-	if twelveDataAPIKey != "" {
-		service.twelveDataClient = twelvedata.NewClient(
-			twelveDataAPIKey,
-			func(symbol string, price float64) {
-				// This callback is invoked whenever Twelve Data sends a price update
-				service.handlePriceUpdate(symbol, price)
-			},
-		)
-	} else {
-		log.Println("WARNING: TWELVE_DATA_API_KEY not set. No real-time forex/commodity data will be available.")
 	}
 
 	return service, nil
 }
 
+// AddProvider registers a new market data provider
+// This allows the service to aggregate data from multiple sources
+func (s *MarketDataService) AddProvider(provider market_data.Provider) {
+	s.providers = append(s.providers, provider)
+}
+
 // InitializeWithStaticPrices immediately loads static prices for instant UI responsiveness
-// This is called on boot before WebSocket connection is established
+// This is called on boot to ensure the UI never shows "loading..." states
 func (s *MarketDataService) InitializeWithStaticPrices(staticPrices map[string]float64) {
-	log.Println("Initializing market data with static prices...")
+	log.Println("[MarketDataService] Initializing with static prices...")
 
 	// Immediately broadcast initial prices to UI
 	for symbol, price := range staticPrices {
 		s.broadcastUpdate(symbol, price)
 	}
 
-	log.Printf("Initialized %d symbols with static prices", len(staticPrices))
+	log.Printf("[MarketDataService] Initialized %d symbols with static prices", len(staticPrices))
 }
 
-// Start begins the Twelve Data WebSocket connection
-func (s *MarketDataService) Start() {
-	if s.twelveDataClient == nil {
-		log.Println("Twelve Data client not initialized. Skipping WebSocket connection.")
-		return
+// Start begins all registered providers
+func (s *MarketDataService) Start(symbols []string) error {
+	if len(s.providers) == 0 {
+		log.Println("[MarketDataService] WARNING: No providers registered")
+		return nil
 	}
 
-	log.Println("Starting Twelve Data WebSocket connection...")
-	s.twelveDataClient.Start()
+	log.Printf("[MarketDataService] Starting %d provider(s)...", len(s.providers))
+
+	// Start each provider with the unified callback
+	for i, provider := range s.providers {
+		if err := provider.Subscribe(symbols, s.handlePriceUpdate); err != nil {
+			log.Printf("[MarketDataService] WARNING: Provider %d failed to start: %v", i+1, err)
+			// Continue with other providers (fail-open strategy)
+		}
+	}
+
+	log.Println("[MarketDataService] All providers started successfully")
+	return nil
 }
 
-// Stop gracefully shuts down the WebSocket connection
+// Stop gracefully shuts down all providers
 func (s *MarketDataService) Stop() {
-	if s.twelveDataClient != nil {
-		log.Println("Stopping Twelve Data WebSocket connection...")
-		s.twelveDataClient.Stop()
+	log.Printf("[MarketDataService] Stopping %d provider(s)...", len(s.providers))
+
+	for _, provider := range s.providers {
+		provider.Stop()
 	}
+
+	log.Println("[MarketDataService] All providers stopped")
 }
 
-// handlePriceUpdate is the callback invoked by Twelve Data client for each price update
+// handlePriceUpdate is the unified callback invoked by all providers
+// This is where the "magic" happens: regardless of the source (WebSocket, polling, simulation),
+// all price updates flow through this single function
 func (s *MarketDataService) handlePriceUpdate(symbol string, price float64) {
 	s.broadcastUpdate(symbol, price)
 }
@@ -101,7 +110,7 @@ func (s *MarketDataService) broadcastUpdate(symbol string, price float64) {
 	// Marshal to JSON
 	updateJSON, err := json.Marshal(priceUpdate)
 	if err != nil {
-		log.Printf("ERROR: Failed to marshal price update for %s: %v", symbol, err)
+		log.Printf("[MarketDataService] ERROR: Failed to marshal price update for %s: %v", symbol, err)
 		return
 	}
 

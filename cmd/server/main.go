@@ -10,7 +10,6 @@ import (
 	"brokerageProject/internal/services"
 	"brokerageProject/internal/utils"
 	"brokerageProject/internal/worker"
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -158,26 +157,23 @@ func main() {
 	go binance.StreamDepth(broadcastWrapper)
 	log.Println("Binance WebSocket streams started")
 
-	// Initialize hybrid market data service (FMP + Brownian motion simulation)
-	// This handles forex/commodity prices (WTI, BRENT, NATGAS, CADJPY, AUDNZD, EURGBP)
-	persistenceFile := "./data/market_data_state.json"
+	// Initialize market data service for real-time forex/commodity prices via Twelve Data WebSocket
+	// This handles WTI, BRENT, NATGAS, CADJPY, AUDNZD, EURGBP
 	marketDataService, err := services.NewMarketDataService(
-		config.FMPAPIKey,
-		persistenceFile,
-		config.EnableFMPFetch,
+		config.TwelveDataAPIKey,
 		config.StaticPrices,
 		messageBroadcaster, // Use same broadcast channel as Binance
 	)
 	if err != nil {
 		log.Printf("WARNING: Failed to initialize market data service: %v", err)
-		log.Println("Continuing without FMP data (crypto-only mode)")
+		log.Println("Continuing without forex/commodity data (crypto-only mode)")
 	} else {
 		// Initialize with static prices immediately (for instant UI responsiveness)
 		marketDataService.InitializeWithStaticPrices(config.StaticPrices)
 
-		// Start hybrid polling in background (FMP snapshots + Brownian motion + order books)
-		go marketDataService.StartHybridPolling(context.Background())
-		log.Printf("Market data service started (FMP enabled: %v)", config.EnableFMPFetch)
+		// Start Twelve Data WebSocket connection
+		marketDataService.Start()
+		log.Println("Market data service started (Twelve Data WebSocket)")
 	}
 
 	// Initialize forex service using Frankfurter API (free, no API key required)

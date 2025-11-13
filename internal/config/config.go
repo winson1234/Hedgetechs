@@ -19,15 +19,13 @@ const BinanceDepthStreamURL = "wss://stream.binance.com:9443/stream?streams=btcu
 const BinanceRestURL = "https://api.binance.com/api/v3/klines"
 const BinanceTicker24hURL = "https://api.binance.com/api/v3/ticker/24hr"
 
-// FMP (Financial Modeling Prep) settings for Forex/Commodities market data
-// Used for WTI Oil, Brent Oil, Natural Gas, and forex pairs (CADJPY, AUDNZD, EURGBP)
+// Market Data Provider Configuration
+// Twelve Data WebSocket for real-time Forex/Commodities (WTI, Brent, Natural Gas, CADJPY, AUDNZD, EURGBP)
 var (
-	FMPAPIKey              = os.Getenv("FMP_API_KEY")
-	EnableFMPFetch         = os.Getenv("ENABLE_FMP_FETCH") == "true"
-	FMPPollIntervalSeconds = 360 // Default 6 minutes (can be overridden by env var)
+	MarketDataProvider = os.Getenv("MARKET_DATA_PROVIDER") // "twelvedata"
+	TwelveDataAPIKey   = os.Getenv("TWELVE_DATA_API_KEY")
 
-	// Static fallback prices for dev mode (when ENABLE_FMP_FETCH=false)
-	// These prices are used immediately on boot and provide instant UI responsiveness
+	// Static fallback prices for instant boot (used before first WebSocket update arrives)
 	StaticPrices = map[string]float64{
 		"WTI":    75.00,  // WTI Crude Oil (USD per barrel)
 		"BRENT":  79.00,  // Brent Crude Oil (USD per barrel)

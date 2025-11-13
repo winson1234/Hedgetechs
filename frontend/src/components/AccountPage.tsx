@@ -54,7 +54,7 @@ export default function AccountPage() {
     const balancesRecord = balancesToRecord(account.balances || []);
 
     const holdings = Object.entries(balancesRecord).filter(
-      ([currency, amount]) => currency !== account.currency && amount > 0
+      ([currency, amount]) => currency !== account.currency && amount > 0.0001 // Filter out dust/zero balances
     );
 
     if (holdings.length === 0) return [];

@@ -24,6 +24,7 @@ export interface PendingOrder {
   id: string;
   user_id: string;
   account_id: string;
+  order_number?: string;
   symbol: string;
   type: 'limit' | 'stop_limit';
   side: 'buy' | 'sell';

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { setActiveAccount, fetchAccounts } from '../store/slices/accountSlice';
 import { createPendingOrder, executeMarketOrder, fetchOrders } from '../store/slices/orderSlice';
@@ -18,30 +18,38 @@ export default function TradingPanel() {
   // Get active account
   const activeAccount = accounts.find((acc) => acc.id === activeAccountId);
 
-  // Get balance from active account (in account's currency)
-  const accountBalance = activeAccount?.balances.find((b) => b.currency === activeAccount.currency)?.amount || 0;
-  const accountCurrency = activeAccount?.currency || 'USD';
+  // Get combined USD + USDT balance (treated as equivalent 1:1)
+  const accountBalance = useMemo(() => {
+    if (!activeAccount) return 0;
+    const usdBal = activeAccount.balances.find((b) => b.currency === 'USD')?.amount || 0;
+    const usdtBal = activeAccount.balances.find((b) => b.currency === 'USDT')?.amount || 0;
+    return usdBal + usdtBal; // Combine USD + USDT
+  }, [activeAccount]);
 
-  // Get crypto holdings (simplified - would need proper implementation)
-  const cryptoHoldings: Record<string, number> = {}; // TODO: Implement proper crypto holdings tracking
+  const accountCurrency = 'USD'; // Display as USD (includes USDT)
 
-  // FX rates state for currency conversion
-  const [usdBalance, setUsdBalance] = useState<number>(accountBalance);
-
-  // Fetch FX rates and convert balance to USD
-  useEffect(() => {
-    const convertToUSD = async () => {
-      if (accountCurrency === 'USD') {
-        setUsdBalance(accountBalance);
-      } else {
-        // TODO: Implement FX rate conversion
-        // For now, use 1:1 conversion
-        setUsdBalance(accountBalance);
+  // Get crypto holdings from account balances
+  const cryptoHoldings: Record<string, number> = useMemo(() => {
+    if (!activeAccount) return {};
+    const holdings: Record<string, number> = {};
+    // Extract all non-USD/USDT balances as crypto holdings
+    activeAccount.balances.forEach((balance) => {
+      if (balance.currency !== 'USD' && balance.currency !== 'USDT') {
+        holdings[balance.currency] = balance.amount;
       }
-    };
+    });
+    return holdings;
+  }, [activeAccount]);
 
-    convertToUSD();
-  }, [accountBalance, accountCurrency]);
+  // Use combined balance directly (USD + USDT are equivalent)
+  const usdBalance = accountBalance;
+
+  // Fetch orders from database when component mounts or account changes
+  useEffect(() => {
+    if (activeAccountId) {
+      dispatch(fetchOrders({ accountId: activeAccountId }));
+    }
+  }, [activeAccountId, dispatch]);
 
   // Trading mode and settings
   const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
@@ -568,13 +576,13 @@ export default function TradingPanel() {
           {/* Account Switcher */}
           <select
             value={activeAccountId || ''}
-            onChange={(e) => setActiveAccount(e.target.value)}
+            onChange={(e) => dispatch(setActiveAccount(e.target.value))}
             className="max-w-[140px] min-w-0 px-1.5 py-1 text-[11px] bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-700 dark:text-slate-300 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-            title={accounts.find((acc) => acc.id === activeAccountId)?.id}
+            title={`Account ${accounts.find((acc) => acc.id === activeAccountId)?.account_number}`}
           >
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
-                {account.id.substring(0, 10)}... ({account.type === 'live' ? 'L' : 'D'})
+                {account.account_number} ({account.type === 'live' ? 'LIVE' : 'DEMO'})
               </option>
             ))}
           </select>

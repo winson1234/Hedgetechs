@@ -130,10 +130,10 @@ export default function TradeHistoryTab() {
                   </div>
                 </div>
 
-                {/* Order ID (small, bottom) */}
+                {/* Order Number (small, bottom) */}
                 <div className="mt-1.5 pt-1.5 border-t border-slate-200 dark:border-slate-700/50">
                   <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">
-                    ID: {order.id.substring(0, 16)}...
+                    ID: {order.orderNumber}
                   </span>
                 </div>
               </div>

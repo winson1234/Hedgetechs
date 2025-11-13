@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"brokerageProject/internal/models"
@@ -60,14 +61,33 @@ func (op *OrderProcessor) parsePriceUpdates() {
 	// Get global price cache for market order execution
 	priceCache := services.GetGlobalPriceCache()
 
+	messageCount := 0
+	parsedCount := 0
+
 	for {
 		select {
 		case message := <-op.MessageChannel:
+			messageCount++
+			// Log every 100th message to avoid spam
+			if messageCount%100 == 0 {
+				log.Printf("📊 Order processor received %d messages, parsed %d price updates", messageCount, parsedCount)
+			}
+
 			// Parse the message to extract symbol and price
 			priceUpdate, err := op.parseMessage(message)
 			if err != nil {
 				// Skip invalid messages (not all messages are price updates)
+				// Log first 5 parse failures for debugging
+				if parsedCount < 5 {
+					log.Printf("⚠️ Failed to parse message: %v (message: %s)", err, string(message[:min(len(message), 200)]))
+				}
 				continue
+			}
+
+			parsedCount++
+			// Log first successful parse
+			if parsedCount == 1 {
+				log.Printf("✅ First price update parsed: %s @ %.2f", priceUpdate.Symbol, priceUpdate.Price)
 			}
 
 			// Update global price cache (CRITICAL: used by market order execution)
@@ -93,56 +113,32 @@ func (op *OrderProcessor) parsePriceUpdates() {
 func (op *OrderProcessor) parseMessage(message []byte) (PriceUpdate, error) {
 	var update PriceUpdate
 
-	// Try to parse as JSON
-	var raw map[string]interface{}
-	if err := json.Unmarshal(message, &raw); err != nil {
+	// Define struct matching models.PriceUpdateMessage (from binance/client.go)
+	// This is the format sent by our Binance client, not raw Binance JSON
+	var incomingMsg struct {
+		Symbol string `json:"symbol"`
+		Price  string `json:"price"` // Note: This field is a string
+	}
+
+	// Parse the JSON
+	if err := json.Unmarshal(message, &incomingMsg); err != nil {
 		return update, fmt.Errorf("invalid JSON: %w", err)
 	}
 
-	// Check for trade message (from Binance WebSocket)
-	// Format: {"s": "BTCUSDT", "p": "50000.00", "e": "trade", ...}
-	if eventType, ok := raw["e"].(string); ok && eventType == "trade" {
-		symbol, _ := raw["s"].(string)
-		priceStr, _ := raw["p"].(string)
-
-		if symbol == "" || priceStr == "" {
-			return update, fmt.Errorf("missing symbol or price")
-		}
-
-		var price float64
-		_, err := fmt.Sscanf(priceStr, "%f", &price)
-		if err != nil {
-			return update, fmt.Errorf("invalid price format: %w", err)
-		}
-
-		update.Symbol = symbol
-		update.Price = price
-		return update, nil
+	// Validate fields to filter out non-price messages (like orderbook updates)
+	if incomingMsg.Symbol == "" || incomingMsg.Price == "" {
+		return update, fmt.Errorf("not a price update message")
 	}
 
-	// Check for aggregated trade message
-	// Format: {"s": "BTCUSDT", "p": "50000.00", "e": "aggTrade", ...}
-	if eventType, ok := raw["e"].(string); ok && eventType == "aggTrade" {
-		symbol, _ := raw["s"].(string)
-		priceStr, _ := raw["p"].(string)
-
-		if symbol == "" || priceStr == "" {
-			return update, fmt.Errorf("missing symbol or price")
-		}
-
-		var price float64
-		_, err := fmt.Sscanf(priceStr, "%f", &price)
-		if err != nil {
-			return update, fmt.Errorf("invalid price format: %w", err)
-		}
-
-		update.Symbol = symbol
-		update.Price = price
-		return update, nil
+	// Convert Price string to float64 using strconv for accurate financial precision
+	price, err := strconv.ParseFloat(incomingMsg.Price, 64)
+	if err != nil {
+		return update, fmt.Errorf("invalid price format: %w", err)
 	}
 
-	// Not a price update message, skip
-	return update, fmt.Errorf("not a price update")
+	update.Symbol = incomingMsg.Symbol
+	update.Price = price
+	return update, nil
 }
 
 // processOrders listens to price updates and executes pending orders when conditions are met
@@ -170,7 +166,7 @@ func (op *OrderProcessor) processPendingOrdersForSymbol(symbol string, currentPr
 	// Query pending orders for this symbol
 	// CRITICAL INDEX: This query uses idx_pending_orders_symbol_status for O(1) lookup
 	rows, err := op.db.Query(ctx,
-		`SELECT id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price
+		`SELECT id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price, status, order_number
 		 FROM pending_orders
 		 WHERE symbol = $1 AND status = 'pending'`,
 		symbol,
@@ -187,7 +183,7 @@ func (op *OrderProcessor) processPendingOrdersForSymbol(symbol string, currentPr
 		var order models.PendingOrder
 		err := rows.Scan(
 			&order.ID, &order.UserID, &order.AccountID, &order.Symbol,
-			&order.Type, &order.Side, &order.Quantity, &order.TriggerPrice, &order.LimitPrice,
+			&order.Type, &order.Side, &order.Quantity, &order.TriggerPrice, &order.LimitPrice, &order.Status, &order.OrderNumber,
 		)
 		if err != nil {
 			log.Printf("❌ Failed to scan pending order: %v", err)
@@ -196,10 +192,21 @@ func (op *OrderProcessor) processPendingOrdersForSymbol(symbol string, currentPr
 		orders = append(orders, order)
 	}
 
+	// Log order processing (only for first price update per symbol to avoid spam)
+	if len(orders) > 0 {
+		log.Printf("🔍 Processing %d pending orders for %s at price %.2f", len(orders), symbol, currentPrice)
+	}
+
 	// Process each order
 	for _, order := range orders {
 		// Check if order should execute
-		if order.ShouldExecute(currentPrice) {
+		shouldExecute := order.ShouldExecute(currentPrice)
+
+		// Log first order check for debugging
+		log.Printf("📋 Order %s: %s %s @ %.2f, Current: %.2f, ShouldExecute: %v",
+			*order.OrderNumber, order.Side, order.Type, order.TriggerPrice, currentPrice, shouldExecute)
+
+		if shouldExecute {
 			log.Printf("⚡ Executing pending order %s for %s at price %.8f", order.ID, order.Symbol, currentPrice)
 			op.executePendingOrder(ctx, order, currentPrice)
 		}
@@ -267,19 +274,27 @@ func (op *OrderProcessor) executePendingOrder(ctx context.Context, order models.
 
 	// Create order history record (insert into orders table)
 	orderID := uuid.New()
+
+	// Use the PRE-EXISTING order number from the pending order
+	orderNumber := "UNKNOWN" // Default fallback
+	if order.OrderNumber != nil {
+		orderNumber = *order.OrderNumber
+	}
+
 	_, err = tx.Exec(ctx,
 		`INSERT INTO orders (
 			id, user_id, account_id, symbol, order_number, side, type, status,
 			amount_base, limit_price, stop_price, filled_amount, average_fill_price,
 			created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, 'market', 'filled',
-			$7, $8, NULL, $7, $9,
+			$1, $2, $3, $4, $5, $6, $7, 'filled',
+			$8, $9, NULL, $8, $10,
 			NOW(), NOW()
 		)`,
 		orderID, order.UserID, order.AccountID, order.Symbol,
-		fmt.Sprintf("ORD-%s", orderID.String()[:8]), // Simplified order number
-		order.Side, order.Quantity, order.LimitPrice, executionPrice,
+		orderNumber, // Use the passed-through order number
+		order.Side, order.Type, // Preserve original order type
+		order.Quantity, order.LimitPrice, executionPrice,
 	)
 	if err != nil {
 		log.Printf("❌ Failed to create order history for pending order %s: %v", order.ID, err)

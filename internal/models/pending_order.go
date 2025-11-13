@@ -30,6 +30,7 @@ type PendingOrder struct {
 	ID             uuid.UUID          `json:"id"`
 	UserID         uuid.UUID          `json:"user_id"`
 	AccountID      uuid.UUID          `json:"account_id"`
+	OrderNumber    *string            `json:"order_number,omitempty"` // Human-readable order ID (e.g., "ORD-00042")
 	Symbol         string             `json:"symbol"`         // e.g., "BTCUSDT", "ETHUSDT"
 	Type           OrderExecutionType `json:"type"`           // "limit" or "stop_limit"
 	Side           OrderSide          `json:"side"`           // "buy" or "sell"

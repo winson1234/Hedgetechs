@@ -75,7 +75,7 @@ export function adaptExecutedOrder(order: ReduxOrder): LegacyExecutedOrder {
 export function adaptPendingOrder(order: ReduxPendingOrder): LegacyPendingOrder {
   return {
     id: order.id,
-    orderNumber: order.id, // TODO: Backend needs to add order_number to pending_orders table
+    orderNumber: order.order_number || order.id, // Use human-readable order_number, fallback to UUID
     accountId: order.account_id,
     symbol: order.symbol,
     side: order.side,

@@ -23,8 +23,10 @@ export default function Header() {
 
   const usdBalance = useMemo(() => {
     if (!activeAccount) return 0;
-    const usdBal = activeAccount.balances.find(b => b.currency === 'USD');
-    return usdBal?.amount || 0;
+    // Combine USD + USDT (treated as equivalent 1:1)
+    const usdBal = activeAccount.balances.find(b => b.currency === 'USD')?.amount || 0;
+    const usdtBal = activeAccount.balances.find(b => b.currency === 'USDT')?.amount || 0;
+    return usdBal + usdtBal;
   }, [activeAccount]);
 
   const accountCurrency = activeAccount?.currency || 'USD';

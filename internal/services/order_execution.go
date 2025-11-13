@@ -130,31 +130,56 @@ func isInsufficientBalanceError(err error) bool {
 // getBalanceWithFallback checks balance for a currency, with fallback to equivalent currency
 // Returns: actualCurrency (the one that exists), balance, error
 func (s *OrderExecutionService) getBalanceWithFallback(ctx context.Context, tx pgx.Tx, accountID uuid.UUID, preferredCurrency string) (string, float64, error) {
-	// Try preferred currency first
+	// Get equivalent currency (USD <-> USDT)
+	equivalentCurrency := getEquivalentCurrency(preferredCurrency)
+
+	// Check if preferred and equivalent are different (USD/USDT case)
+	if equivalentCurrency != preferredCurrency {
+		// USD and USDT are equivalent - check preferred first, then fallback
+		// IMPORTANT: Return the currency that ACTUALLY has enough balance, don't sum them!
+
+		// First try preferred currency
+		var preferredBalance float64
+		err := tx.QueryRow(ctx,
+			`SELECT COALESCE(amount, 0) FROM balances
+			 WHERE account_id = $1 AND currency = $2`,
+			accountID, preferredCurrency,
+		).Scan(&preferredBalance)
+
+		if err != nil && err != pgx.ErrNoRows {
+			return "", 0, fmt.Errorf("failed to check %s balance: %w", preferredCurrency, err)
+		}
+
+		// If preferred has balance, use it
+		if preferredBalance > 0 {
+			return preferredCurrency, preferredBalance, nil
+		}
+
+		// Try equivalent currency as fallback
+		var equivalentBalance float64
+		err = tx.QueryRow(ctx,
+			`SELECT COALESCE(amount, 0) FROM balances
+			 WHERE account_id = $1 AND currency = $2`,
+			accountID, equivalentCurrency,
+		).Scan(&equivalentBalance)
+
+		if err != nil && err != pgx.ErrNoRows {
+			return "", 0, fmt.Errorf("failed to check %s balance: %w", equivalentCurrency, err)
+		}
+
+		// Return whichever has more balance (or preferred if both zero)
+		if equivalentBalance > preferredBalance {
+			return equivalentCurrency, equivalentBalance, nil
+		}
+
+		return preferredCurrency, preferredBalance, nil
+	}
+
+	// For non-equivalent currencies, just check the single balance
 	var balance float64
 	err := tx.QueryRow(ctx,
 		`SELECT amount FROM balances WHERE account_id = $1 AND currency = $2`,
 		accountID, preferredCurrency,
-	).Scan(&balance)
-
-	if err == nil {
-		return preferredCurrency, balance, nil
-	}
-
-	if err != pgx.ErrNoRows {
-		return "", 0, fmt.Errorf("failed to check balance: %w", err)
-	}
-
-	// Try equivalent currency
-	equivalentCurrency := getEquivalentCurrency(preferredCurrency)
-	if equivalentCurrency == preferredCurrency {
-		// No equivalent exists
-		return preferredCurrency, 0, nil
-	}
-
-	err = tx.QueryRow(ctx,
-		`SELECT amount FROM balances WHERE account_id = $1 AND currency = $2`,
-		accountID, equivalentCurrency,
 	).Scan(&balance)
 
 	if err == pgx.ErrNoRows {
@@ -162,10 +187,10 @@ func (s *OrderExecutionService) getBalanceWithFallback(ctx context.Context, tx p
 	}
 
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to check equivalent balance: %w", err)
+		return "", 0, fmt.Errorf("failed to check balance: %w", err)
 	}
 
-	return equivalentCurrency, balance, nil
+	return preferredCurrency, balance, nil
 }
 
 // ExecuteSpotTrade executes spot trading logic (balance updates only)

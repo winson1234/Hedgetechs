@@ -11,6 +11,7 @@ import (
 	"brokerageProject/internal/database"
 	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/models"
+	"brokerageProject/internal/services"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -68,18 +69,68 @@ func CreatePendingOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create pending order
+	// Validate stop-limit orders: Ensure stop price hasn't been breached
+	if req.Type == models.OrderExecutionTypeStopLimit {
+		priceCache := services.GetGlobalPriceCache()
+		currentPrice, err := priceCache.GetPrice(req.Symbol)
+
+		if err == nil {
+			// Buy stop-limit: stop price must be ABOVE current market price
+			if req.Side == models.OrderSideBuy && currentPrice >= req.TriggerPrice {
+				msg := fmt.Sprintf("Buy stop price (%.2f) must be above current market price (%.2f)", req.TriggerPrice, currentPrice)
+				respondWithJSONError(w, http.StatusBadRequest, "validation_error", msg)
+				return
+			}
+
+			// Sell stop-limit: stop price must be BELOW current market price
+			if req.Side == models.OrderSideSell && currentPrice <= req.TriggerPrice {
+				msg := fmt.Sprintf("Sell stop price (%.2f) must be below current market price (%.2f)", req.TriggerPrice, currentPrice)
+				respondWithJSONError(w, http.StatusBadRequest, "validation_error", msg)
+				return
+			}
+		} else {
+			// Log warning but allow order placement if price data is unavailable
+			log.Printf("Warning: Could not get current price for %s to validate stop-limit: %v", req.Symbol, err)
+		}
+	}
+
+	// Start a transaction to ensure atomicity
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		log.Printf("Failed to begin transaction: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to create pending order")
+		return
+	}
+	defer tx.Rollback(ctx) // Rollback if not committed
+
+	// Generate order number INSIDE the transaction
+	var orderNumber string
+	err = tx.QueryRow(ctx, "SELECT generate_order_number()").Scan(&orderNumber)
+	if err != nil {
+		log.Printf("Failed to generate order number: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "generation_error", "failed to generate order number")
+		return
+	}
+
+	// Create pending order with order_number
 	orderID := uuid.New()
-	_, err = pool.Exec(ctx,
+	_, err = tx.Exec(ctx,
 		`INSERT INTO pending_orders (
-			id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price, status, created_at, updated_at
+			id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price, status, order_number, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', NOW(), NOW()
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10, NOW(), NOW()
 		)`,
-		orderID, userID, req.AccountID, req.Symbol, req.Type, req.Side, req.Quantity, req.TriggerPrice, req.LimitPrice,
+		orderID, userID, req.AccountID, req.Symbol, req.Type, req.Side, req.Quantity, req.TriggerPrice, req.LimitPrice, orderNumber,
 	)
 	if err != nil {
 		log.Printf("Failed to insert pending order: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to create pending order")
+		return
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("Failed to commit transaction: %v", err)
 		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to create pending order")
 		return
 	}
@@ -157,7 +208,7 @@ func GetPendingOrders(w http.ResponseWriter, r *http.Request) {
 	// Fetch pending orders
 	rows, err := pool.Query(ctx,
 		`SELECT id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price,
-		        status, executed_at, executed_price, failure_reason, created_at, updated_at
+		        status, executed_at, executed_price, failure_reason, created_at, updated_at, order_number
 		 FROM pending_orders
 		 WHERE account_id = $1
 		 ORDER BY created_at DESC`,
@@ -178,7 +229,7 @@ func GetPendingOrders(w http.ResponseWriter, r *http.Request) {
 			&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.Type, &order.Side,
 			&order.Quantity, &order.TriggerPrice, &order.LimitPrice, &order.Status,
 			&order.ExecutedAt, &order.ExecutedPrice, &order.FailureReason,
-			&order.CreatedAt, &order.UpdatedAt,
+			&order.CreatedAt, &order.UpdatedAt, &order.OrderNumber,
 		)
 		if err != nil {
 			log.Printf("Failed to scan pending order: %v", err)
@@ -301,7 +352,7 @@ func getPendingOrderByID(ctx context.Context, pool DBQuerier, orderID, userID uu
 	var order models.PendingOrder
 	err := pool.QueryRow(ctx,
 		`SELECT id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price,
-		        status, executed_at, executed_price, failure_reason, created_at, updated_at
+		        status, executed_at, executed_price, failure_reason, created_at, updated_at, order_number
 		 FROM pending_orders
 		 WHERE id = $1 AND user_id = $2`,
 		orderID, userID,
@@ -309,7 +360,7 @@ func getPendingOrderByID(ctx context.Context, pool DBQuerier, orderID, userID uu
 		&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.Type, &order.Side,
 		&order.Quantity, &order.TriggerPrice, &order.LimitPrice, &order.Status,
 		&order.ExecutedAt, &order.ExecutedPrice, &order.FailureReason,
-		&order.CreatedAt, &order.UpdatedAt,
+		&order.CreatedAt, &order.UpdatedAt, &order.OrderNumber,
 	)
 	if err != nil {
 		return order, fmt.Errorf("failed to fetch pending order: %w", err)

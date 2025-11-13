@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export type InstrumentCategory = 'major' | 'defi' | 'altcoin';
+export type InstrumentCategory = 'major' | 'defi' | 'altcoin' | 'forex' | 'commodity';
 
 export interface Instrument {
   symbol: string;

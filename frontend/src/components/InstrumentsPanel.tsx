@@ -83,7 +83,6 @@ export default function InstrumentsPanel() {
       const isLoading = lastUpdate === 0
 
       // Support both legacy and new API format
-      const displayName = inst.displayName || inst.name || inst.symbol
       const baseCurrency = inst.baseCurrency || inst.base_currency || inst.symbol.replace('USDT', '')
 
       // Use icon URL if available, otherwise map ALL currencies to icons

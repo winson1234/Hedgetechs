@@ -73,9 +73,8 @@ export const fetchAccounts = createAsyncThunk(
 export const createAccount = createAsyncThunk(
   'account/createAccount',
   async (
-    { type, product_type, currency, initial_balance }: {
+    { type, currency, initial_balance }: {
       type: 'live' | 'demo';
-      product_type: 'spot' | 'cfd' | 'futures';
       currency: string;
       initial_balance: number;
     },
@@ -93,7 +92,7 @@ export const createAccount = createAsyncThunk(
         },
         body: JSON.stringify({
           type,
-          product_type,
+          // product_type omitted - creates universal account (NULL in database)
           currency,
           initial_balance,
         }),

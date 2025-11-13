@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"brokerageProject/internal/database"
 	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/models"
+	"brokerageProject/internal/services"
 
 	"github.com/google/uuid"
 )
@@ -235,7 +237,7 @@ func GetContracts(w http.ResponseWriter, r *http.Request) {
 }
 
 // CloseContract handles POST /api/v1/contracts/{contract_id}/close
-// Closes an open contract
+// Closes an open contract with margin release (supports independent closure of hedged positions)
 func CloseContract(w http.ResponseWriter, r *http.Request) {
 	userID, err := middleware.GetUserIDFromContext(r.Context())
 	if err != nil {
@@ -279,13 +281,11 @@ func CloseContract(w http.ResponseWriter, r *http.Request) {
 	// Verify contract belongs to user and is open
 	var contractUserID uuid.UUID
 	var contractStatus models.ContractStatus
-	var side models.ContractSide
-	var lotSize, entryPrice, swap, commission float64
 
 	err = pool.QueryRow(ctx,
-		"SELECT user_id, status, side, lot_size, entry_price, swap, commission FROM contracts WHERE id = $1",
+		"SELECT user_id, status FROM contracts WHERE id = $1",
 		contractID,
-	).Scan(&contractUserID, &contractStatus, &side, &lotSize, &entryPrice, &swap, &commission)
+	).Scan(&contractUserID, &contractStatus)
 
 	if err != nil {
 		respondWithJSONError(w, http.StatusNotFound, "not_found", "contract not found")
@@ -300,39 +300,39 @@ func CloseContract(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Calculate PnL
-	var pnl float64
-	if side == models.ContractSideLong {
-		pnl = (req.ClosePrice - entryPrice) * lotSize
-	} else {
-		pnl = (entryPrice - req.ClosePrice) * lotSize
-	}
-
-	// Deduct swap and commission
-	pnl = pnl - swap - commission
-
-	// Update contract
-	now := time.Now()
-	_, err = pool.Exec(ctx,
-		`UPDATE contracts
-		 SET status = $1, close_price = $2, pnl = $3, closed_at = $4, updated_at = NOW()
-		 WHERE id = $5`,
-		models.ContractStatusClosed, req.ClosePrice, pnl, now, contractID,
-	)
+	// Use HedgingService for closure with margin release
+	hedgingService := services.NewHedgingService(pool)
+	err = hedgingService.ClosePositionWithMarginRelease(ctx, contractID, req.ClosePrice)
 	if err != nil {
-		log.Printf("Failed to close contract: %v", err)
-		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to close contract")
+		log.Printf("Failed to close contract with margin release: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "execution_error", fmt.Sprintf("failed to close contract: %v", err))
 		return
 	}
 
-	// TODO: Update account balance with PnL
+	// Fetch closed contract to return details
+	var contract models.Contract
+	err = pool.QueryRow(ctx,
+		`SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size, entry_price, margin_used, leverage,
+		        tp_price, sl_price, close_price, pnl, swap, commission, created_at, closed_at, updated_at
+		 FROM contracts WHERE id = $1`,
+		contractID,
+	).Scan(
+		&contract.ID, &contract.UserID, &contract.AccountID, &contract.Symbol, &contract.ContractNumber, &contract.Side, &contract.Status,
+		&contract.LotSize, &contract.EntryPrice, &contract.MarginUsed, &contract.Leverage,
+		&contract.TPPrice, &contract.SLPrice, &contract.ClosePrice, &contract.PnL,
+		&contract.Swap, &contract.Commission, &contract.CreatedAt, &contract.ClosedAt, &contract.UpdatedAt,
+	)
+	if err != nil {
+		log.Printf("Failed to fetch closed contract: %v", err)
+		// Contract was closed successfully, just couldn't fetch details
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "contract closed successfully",
-		"pnl":     pnl,
+		"success":  true,
+		"message":  "contract closed successfully with margin released",
+		"contract": contract,
 	})
 }
 

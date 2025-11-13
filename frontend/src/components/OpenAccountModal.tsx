@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import { CURRENCIES, PRODUCT_TYPES } from '../config/constants';
+import { CURRENCIES } from '../config/constants';
 
 import type { Account } from '../store/slices/accountSlice'
 
@@ -15,7 +15,6 @@ type OpenAccountModalProps = {
   onClose: () => void
   openAccount: (
     type: 'live' | 'demo',
-    productType: 'spot' | 'cfd' | 'futures',
     currency: string,
     initialBalance: number
   ) => Promise<OpenAccountResult>
@@ -33,7 +32,6 @@ function OpenAccountModal({
   onAccountCreated,
 }: OpenAccountModalProps) {
   const [accountType, setAccountType] = useState<'live' | 'demo'>('live')
-  const [productType, setProductType] = useState<'spot' | 'cfd' | 'futures'>('spot')
   const [selectedCurrency, setSelectedCurrency] = useState<string>('USD')
   const [initialBalance, setInitialBalance] = useState<string>('10000')
   const [isLoading, setIsLoading] = useState(false)
@@ -43,7 +41,6 @@ function OpenAccountModal({
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setProductType('spot')
       setSelectedCurrency('USD')
       setInitialBalance('10000')
       setError(null)
@@ -83,7 +80,6 @@ function OpenAccountModal({
 
       const result = await openAccount(
         accountType,
-        productType,
         selectedCurrency,
         balanceNum
       )
@@ -162,32 +158,6 @@ function OpenAccountModal({
                 Demo
               </button>
             </div>
-          </div>
-
-          {/* Product Type Selector */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Product Type
-            </label>
-            <div className="flex gap-1 bg-slate-100 dark:bg-slate-900 rounded-lg p-1">
-              {PRODUCT_TYPES.map((pt) => (
-                <button
-                  key={pt.value}
-                  onClick={() => setProductType(pt.value as 'spot' | 'cfd' | 'futures')}
-                  disabled={isLoading}
-                  className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition ${
-                    productType === pt.value
-                      ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
-                  }`}
-                >
-                  {pt.label}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {PRODUCT_TYPES.find((pt) => pt.value === productType)?.description}
-            </p>
           </div>
 
           {/* Currency Selection */}

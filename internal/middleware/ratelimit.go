@@ -197,11 +197,16 @@ func IPRateLimitMiddleware(requestsPerMinute, burst int) func(http.HandlerFunc) 
 	}
 }
 
+// rateLimitContextKey is the type for rate limit context keys
+type rateLimitContextKey string
+
+const rateLimitInfoKey rateLimitContextKey = "rateLimitInfo"
+
 // Helper function to store rate limit info in context (for audit logging)
 func AddRateLimitInfoToContext(ctx context.Context, remaining int, limit int) context.Context {
 	type rateLimitInfo struct {
 		Remaining int
 		Limit     int
 	}
-	return context.WithValue(ctx, "rateLimitInfo", rateLimitInfo{Remaining: remaining, Limit: limit})
+	return context.WithValue(ctx, rateLimitInfoKey, rateLimitInfo{Remaining: remaining, Limit: limit})
 }

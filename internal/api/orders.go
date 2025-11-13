@@ -31,24 +31,10 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate
-	if req.AmountBase <= 0 {
-		respondWithJSONError(w, http.StatusBadRequest, "validation_error", "amount_base must be positive")
+	// Validate using the model's Validate method
+	if err := req.Validate(); err != nil {
+		respondWithJSONError(w, http.StatusBadRequest, "validation_error", err.Error())
 		return
-	}
-
-	// Validate limit/stop prices for respective order types
-	if req.Type == models.OrderTypeLimit || req.Type == models.OrderTypeStopLimit {
-		if req.LimitPrice == nil || *req.LimitPrice <= 0 {
-			respondWithJSONError(w, http.StatusBadRequest, "validation_error", "limit_price is required and must be positive for limit orders")
-			return
-		}
-	}
-	if req.Type == models.OrderTypeStop || req.Type == models.OrderTypeStopLimit {
-		if req.StopPrice == nil || *req.StopPrice <= 0 {
-			respondWithJSONError(w, http.StatusBadRequest, "validation_error", "stop_price is required and must be positive for stop orders")
-			return
-		}
 	}
 
 	pool, err := database.GetPool()
@@ -100,12 +86,12 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 		leverage = 1
 	}
 
-	// Create order with leverage
+	// Create order with leverage and product_type
 	orderID := uuid.New()
 	_, err = pool.Exec(ctx,
-		`INSERT INTO orders (id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, filled_amount, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 0, NOW(), NOW())`,
-		orderID, userID, req.AccountID, req.Symbol, orderNumber, req.Side, req.Type, models.OrderStatusPending, req.AmountBase, req.LimitPrice, req.StopPrice, leverage,
+		`INSERT INTO orders (id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, product_type, filled_amount, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 0, NOW(), NOW())`,
+		orderID, userID, req.AccountID, req.Symbol, orderNumber, req.Side, req.Type, models.OrderStatusPending, req.AmountBase, req.LimitPrice, req.StopPrice, leverage, req.ProductType,
 	)
 	if err != nil {
 		log.Printf("Failed to insert order: %v", err)
@@ -175,12 +161,12 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	// These will be executed by the order matching engine later
 	var order models.Order
 	err = pool.QueryRow(ctx,
-		`SELECT id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, filled_amount, average_fill_price, created_at, updated_at
+		`SELECT id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, product_type, filled_amount, average_fill_price, created_at, updated_at
 		 FROM orders WHERE id = $1`,
 		orderID,
 	).Scan(
 		&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.OrderNumber, &order.Side, &order.Type, &order.Status,
-		&order.AmountBase, &order.LimitPrice, &order.StopPrice, &order.FilledAmount, &order.AverageFillPrice,
+		&order.AmountBase, &order.LimitPrice, &order.StopPrice, &order.Leverage, &order.ProductType, &order.FilledAmount, &order.AverageFillPrice,
 		&order.CreatedAt, &order.UpdatedAt,
 	)
 	if err != nil {

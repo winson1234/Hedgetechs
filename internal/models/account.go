@@ -66,7 +66,7 @@ type Account struct {
 	UserID        uuid.UUID     `json:"user_id"`
 	AccountNumber string        `json:"account_number"`
 	Type          AccountType   `json:"type"`
-	ProductType   ProductType   `json:"product_type"`
+	ProductType   *ProductType  `json:"product_type,omitempty"` // NULLABLE: Universal accounts have NULL product_type
 	Currency      string        `json:"currency"`
 	Status        AccountStatus `json:"status"`
 	CreatedAt     time.Time     `json:"created_at"`
@@ -112,10 +112,10 @@ type Transaction struct {
 
 // CreateAccountRequest represents the request body for creating a new account
 type CreateAccountRequest struct {
-	Type           AccountType `json:"type"`            // "live" or "demo"
-	ProductType    ProductType `json:"product_type"`    // "spot", "cfd", or "futures"
-	Currency       string      `json:"currency"`        // e.g., "USD", "EUR"
-	InitialBalance float64     `json:"initial_balance"` // Initial balance amount
+	Type           AccountType  `json:"type"`                       // "live" or "demo"
+	ProductType    *ProductType `json:"product_type,omitempty"`     // DEPRECATED: Optional for backward compatibility. New accounts are universal.
+	Currency       string       `json:"currency"`                   // e.g., "USD", "EUR"
+	InitialBalance float64      `json:"initial_balance"`            // Initial balance amount
 }
 
 // CreateAccountResponse represents the response after creating a new account
@@ -156,9 +156,12 @@ func (r *CreateAccountRequest) Validate() error {
 		return &ValidationError{Field: "type", Message: "must be 'live' or 'demo'"}
 	}
 
-	// Validate product type
-	if r.ProductType != ProductTypeSpot && r.ProductType != ProductTypeCFD && r.ProductType != ProductTypeFutures {
-		return &ValidationError{Field: "product_type", Message: "must be 'spot', 'cfd', or 'futures'"}
+	// Validate product type (ONLY if provided - for backward compatibility)
+	// New universal accounts should NOT set product_type
+	if r.ProductType != nil {
+		if *r.ProductType != ProductTypeSpot && *r.ProductType != ProductTypeCFD && *r.ProductType != ProductTypeFutures {
+			return &ValidationError{Field: "product_type", Message: "must be 'spot', 'cfd', or 'futures' if provided"}
+		}
 	}
 
 	// Validate currency
@@ -293,7 +296,8 @@ type Order struct {
 	AmountBase       float64     `json:"amount_base"`
 	LimitPrice       *float64    `json:"limit_price,omitempty"`
 	StopPrice        *float64    `json:"stop_price,omitempty"`
-	Leverage         int         `json:"leverage"` // Leverage multiplier (1 for spot, >1 for CFD/Futures)
+	Leverage         int         `json:"leverage"`      // Leverage multiplier (1 for spot, >1 for CFD/Futures)
+	ProductType      ProductType `json:"product_type"`  // NEW: Product type at order level (spot, cfd, futures)
 	FilledAmount     float64     `json:"filled_amount"`
 	AverageFillPrice *float64    `json:"average_fill_price,omitempty"`
 	CreatedAt        time.Time   `json:"created_at"`
@@ -302,14 +306,65 @@ type Order struct {
 
 // CreateOrderRequest represents the request to create an order
 type CreateOrderRequest struct {
-	AccountID  uuid.UUID `json:"account_id"`
-	Symbol     string    `json:"symbol"`
-	Side       OrderSide `json:"side"`
-	Type       OrderType `json:"type"`
-	AmountBase float64   `json:"amount_base"`
-	LimitPrice *float64  `json:"limit_price,omitempty"`
-	StopPrice  *float64  `json:"stop_price,omitempty"`
-	Leverage   int       `json:"leverage"` // Leverage multiplier (default: 1)
+	AccountID   uuid.UUID   `json:"account_id"`
+	Symbol      string      `json:"symbol"`
+	Side        OrderSide   `json:"side"`
+	Type        OrderType   `json:"type"`
+	AmountBase  float64     `json:"amount_base"`
+	LimitPrice  *float64    `json:"limit_price,omitempty"`
+	StopPrice   *float64    `json:"stop_price,omitempty"`
+	Leverage    int         `json:"leverage"`     // Leverage multiplier (default: 1)
+	ProductType ProductType `json:"product_type"` // NEW: "spot", "cfd", or "futures" - Required for universal accounts
+}
+
+// Validate validates the CreateOrderRequest
+func (r *CreateOrderRequest) Validate() error {
+	// Validate product type (required for universal accounts)
+	if r.ProductType != ProductTypeSpot && r.ProductType != ProductTypeCFD && r.ProductType != ProductTypeFutures {
+		return &ValidationError{Field: "product_type", Message: "must be 'spot', 'cfd', or 'futures'"}
+	}
+
+	// Validate symbol
+	if r.Symbol == "" {
+		return &ValidationError{Field: "symbol", Message: "is required"}
+	}
+
+	// Validate side
+	if r.Side != OrderSideBuy && r.Side != OrderSideSell {
+		return &ValidationError{Field: "side", Message: "must be 'buy' or 'sell'"}
+	}
+
+	// Validate type
+	if r.Type != OrderTypeMarket && r.Type != OrderTypeLimit && r.Type != OrderTypeStop && r.Type != OrderTypeStopLimit {
+		return &ValidationError{Field: "type", Message: "must be 'market', 'limit', 'stop', or 'stop_limit'"}
+	}
+
+	// Validate amount
+	if r.AmountBase <= 0 {
+		return &ValidationError{Field: "amount_base", Message: "must be greater than zero"}
+	}
+
+	// Validate leverage
+	if r.Leverage < 1 {
+		return &ValidationError{Field: "leverage", Message: "must be at least 1"}
+	}
+
+	// Spot orders cannot have leverage > 1
+	if r.ProductType == ProductTypeSpot && r.Leverage > 1 {
+		return &ValidationError{Field: "leverage", Message: "spot orders cannot have leverage greater than 1"}
+	}
+
+	// Limit orders require limit_price
+	if r.Type == OrderTypeLimit && r.LimitPrice == nil {
+		return &ValidationError{Field: "limit_price", Message: "is required for limit orders"}
+	}
+
+	// Stop orders require stop_price
+	if (r.Type == OrderTypeStop || r.Type == OrderTypeStopLimit) && r.StopPrice == nil {
+		return &ValidationError{Field: "stop_price", Message: "is required for stop orders"}
+	}
+
+	return nil
 }
 
 // ================================================================

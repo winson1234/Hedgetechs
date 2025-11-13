@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppSelector } from '../../store';
 import { formatCurrency } from '../../utils/formatters';
 
@@ -36,7 +36,7 @@ export default function PositionsTable() {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch open positions
-  const fetchPositions = async () => {
+  const fetchPositions = useCallback(async () => {
     if (!activeAccountId || !session?.access_token) return;
 
     try {
@@ -61,26 +61,42 @@ export default function PositionsTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeAccountId, session?.access_token]);
 
   // Fetch positions on mount and when account changes
   useEffect(() => {
     fetchPositions();
-  }, [activeAccountId, session?.access_token]);
+  }, [fetchPositions]);
 
   // Close position handler
-  const handleClosePosition = async (contractId: string) => {
+  const handleClosePosition = async (contractId: string, symbol: string) => {
     if (!session?.access_token) return;
 
     try {
+      // Get current market price for this symbol
+      const priceData = currentPrices[symbol];
+      const currentPrice = priceData?.price;
+
+      if (!currentPrice) {
+        alert('Unable to get current market price. Please try again.');
+        return;
+      }
+
       const response = await fetch(`/api/v1/contracts/close?contract_id=${contractId}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          close_price: currentPrice,
+        }),
       });
 
-      if (!response.ok) throw new Error('Failed to close position');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to close position');
+      }
 
       // Refresh positions after closing
       await fetchPositions();
@@ -226,7 +242,7 @@ export default function PositionsTable() {
                     </span>
                   </div>
                   <button
-                    onClick={() => handleClosePosition(position.id)}
+                    onClick={() => handleClosePosition(position.id, position.symbol)}
                     className="px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
                   >
                     Close

@@ -111,10 +111,10 @@ func (s *LiquidationService) CheckLiquidations(ctx context.Context, symbol strin
 // liquidatePosition closes a position at liquidation price and handles P&L
 func (s *LiquidationService) liquidatePosition(
 	ctx context.Context,
-	contractID, accountID, symbol string,
+	contractID, accountID, _ string, // symbol unused
 	side models.ContractSide,
 	lotSize, entryPrice, marginUsed, liquidationPrice float64,
-	contractNumber string,
+	_ string, // contractNumber unused
 ) error {
 	// Begin transaction
 	tx, err := s.pool.Begin(ctx)

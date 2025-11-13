@@ -187,6 +187,23 @@ func HandleKlines(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Check if symbol is not available on Binance (new forex/commodity instruments)
+	nonBinanceSymbols := map[string]bool{
+		"BRENTUSDT":  true,
+		"WTIUSDT":    true,
+		"NATGASUSDT": true,
+		"CADJPYUSDT": true,
+		"AUDNZDUSDT": true,
+		"EURGBPUSDT": true,
+	}
+
+	// For non-Binance symbols, return empty array (no historical data available yet)
+	if nonBinanceSymbols[symbol] {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("[]")) // Return empty klines array
+		return
+	}
+
 	// Build Binance REST API URL (uses binanceRestBase so tests can override)
 	u, err := url.Parse(binanceRestBase)
 	if err != nil {
@@ -352,56 +369,80 @@ func HandleTicker(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build Binance API URL
-	binanceURL := fmt.Sprintf("%s?symbols=[\"%s\"]", config.BinanceTicker24hURL,
-		strings.ReplaceAll(symbolsParam, ",", "\",\""))
-
-	log.Printf("Fetching tickers from Binance: %s", binanceURL)
-
-	// Make the request to Binance
-	resp, err := http.Get(binanceURL)
-	if err != nil {
-		log.Printf("Error fetching tickers from Binance API: %v", err)
-		http.Error(w, "Failed to fetch data from upstream provider", http.StatusBadGateway)
-		return
-	}
-	defer resp.Body.Close()
-
-	// Check Binance response status
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		log.Printf("Binance API returned non-OK status %d: %s", resp.StatusCode, string(bodyBytes))
-		http.Error(w, fmt.Sprintf("Upstream provider returned status %d", resp.StatusCode), http.StatusBadGateway)
-		return
+	// Separate symbols into Binance-supported and non-Binance symbols
+	nonBinanceSymbols := map[string]bool{
+		"BRENTUSDT":  true,
+		"WTIUSDT":    true,
+		"NATGASUSDT": true,
+		"CADJPYUSDT": true,
+		"AUDNZDUSDT": true,
+		"EURGBPUSDT": true,
 	}
 
-	// Read and parse response
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error reading Binance ticker response body: %v", err)
-		http.Error(w, "Failed to read upstream response", http.StatusBadGateway)
-		return
+	requestedSymbols := strings.Split(symbolsParam, ",")
+	var binanceSymbols []string
+	var nonBinanceList []string
+
+	for _, sym := range requestedSymbols {
+		if nonBinanceSymbols[sym] {
+			nonBinanceList = append(nonBinanceList, sym)
+		} else {
+			binanceSymbols = append(binanceSymbols, sym)
+		}
 	}
 
-	var binanceTickers []models.Binance24hTicker
-	if err := json.Unmarshal(bodyBytes, &binanceTickers); err != nil {
-		log.Printf("Error unmarshalling Binance ticker response: %v", err)
-		http.Error(w, "Failed to parse upstream response", http.StatusBadGateway)
-		return
-	}
-
-	// Convert to simplified response format
 	var tickers []models.TickerResponse
-	for _, bt := range binanceTickers {
+
+	// Fetch from Binance only for supported symbols
+	if len(binanceSymbols) > 0 {
+		binanceURL := fmt.Sprintf("%s?symbols=[\"%s\"]", config.BinanceTicker24hURL,
+			strings.Join(binanceSymbols, "\",\""))
+
+		log.Printf("Fetching tickers from Binance: %s", binanceURL)
+
+		resp, err := http.Get(binanceURL)
+		if err != nil {
+			log.Printf("Error fetching tickers from Binance API: %v", err)
+			http.Error(w, "Failed to fetch data from upstream provider", http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+
+		// Check Binance response status
+		if resp.StatusCode != http.StatusOK {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			log.Printf("Binance API returned non-OK status %d: %s", resp.StatusCode, string(bodyBytes))
+			http.Error(w, fmt.Sprintf("Upstream provider returned status %d", resp.StatusCode), http.StatusBadGateway)
+			return
+		}
+
+		// Read and parse Binance response
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Printf("Error reading Binance response: %v", err)
+			http.Error(w, "Failed to read upstream response", http.StatusBadGateway)
+			return
+		}
+
+		if err := json.Unmarshal(bodyBytes, &tickers); err != nil {
+			log.Printf("Error unmarshalling Binance tickers response: %v", err)
+			http.Error(w, "Failed to parse upstream response", http.StatusBadGateway)
+			return
+		}
+	}
+
+	// Add placeholder tickers for non-Binance symbols (zero values for now)
+	for _, sym := range nonBinanceList {
 		tickers = append(tickers, models.TickerResponse{
-			Symbol:             bt.Symbol,
-			LastPrice:          bt.LastPrice,
-			PriceChangePercent: bt.PriceChangePercent,
-			HighPrice:          bt.HighPrice,
-			LowPrice:           bt.LowPrice,
-			Volume:             bt.QuoteVolume, // Use quote volume (USDT value) to match Binance UI
+			Symbol:             sym,
+			LastPrice:          "0",
+			PriceChangePercent: "0.00",
+			HighPrice:          "0",
+			LowPrice:           "0",
+			Volume:             "0",
 		})
 	}
+
 
 	// Cache the result
 	tickerCache.Set(cacheKey, tickers, gocache.DefaultExpiration)

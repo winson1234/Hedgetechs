@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/shopspring/decimal"
 )
 
 // OrderExecutionService handles order execution logic
@@ -41,14 +42,14 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 	}
 	defer tx.Rollback(ctx)
 
-	// Fetch order details
+	// Fetch order details (product_type now comes from orders table)
 	var order models.Order
-	var accountCurrency, productType, quoteCurrency string
+	var accountCurrency, quoteCurrency string
 	err = tx.QueryRow(ctx,
 		`SELECT o.id, o.user_id, o.account_id, o.symbol, o.order_number, o.side, o.type,
-		        o.status, o.amount_base, o.limit_price, o.stop_price, o.leverage, o.filled_amount,
+		        o.status, o.amount_base, o.limit_price, o.stop_price, o.leverage, o.product_type, o.filled_amount,
 		        o.average_fill_price, o.created_at, o.updated_at,
-		        a.currency, a.product_type,
+		        a.currency,
 		        i.quote_currency
 		 FROM orders o
 		 JOIN accounts a ON o.account_id = a.id
@@ -58,9 +59,9 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 	).Scan(
 		&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.OrderNumber,
 		&order.Side, &order.Type, &order.Status, &order.AmountBase, &order.LimitPrice,
-		&order.StopPrice, &order.Leverage, &order.FilledAmount, &order.AverageFillPrice,
+		&order.StopPrice, &order.Leverage, &order.ProductType, &order.FilledAmount, &order.AverageFillPrice,
 		&order.CreatedAt, &order.UpdatedAt,
-		&accountCurrency, &productType, &quoteCurrency,
+		&accountCurrency, &quoteCurrency,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch order: %w", err)
@@ -80,14 +81,45 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 	feeRate := 0.001 // 0.1% trading fee (standard for exchanges)
 	fee := notionalValue * feeRate
 
-	// Check if this is spot or leveraged trading
-	isSpot := productType == "spot"
+	// Check if this is spot or leveraged trading (read from order.ProductType)
+	isSpot := order.ProductType == models.ProductTypeSpot
 
 	var result *ExecutionResult
 	if isSpot {
 		result, err = s.executeSpotOrder(ctx, tx, &order, executionPrice, notionalValue, fee, accountCurrency, quoteCurrency)
 	} else {
-		result, err = s.executeLeveragedOrder(ctx, tx, &order, executionPrice, notionalValue, fee, accountCurrency, quoteCurrency, productType)
+		// For leveraged products, check if we should route to LP (A-Book)
+		routingService := NewRoutingService(s.pool)
+
+		// Make routing decision based on order size and exposure
+		var orderSideStr string
+		if order.Side == models.OrderSideBuy {
+			orderSideStr = "buy"
+		} else {
+			orderSideStr = "sell"
+		}
+
+		routingDecision, err := routingService.ShouldRouteToLP(
+			ctx,
+			order.Symbol,
+			orderSideStr,
+			decimal.NewFromFloat(order.AmountBase),
+			decimal.NewFromFloat(executionPrice),
+		)
+		if err != nil {
+			log.Printf("Routing decision error: %v, defaulting to B-Book", err)
+			routingDecision = &RoutingDecision{ShouldRouteToLP: false}
+		}
+
+		if routingDecision.ShouldRouteToLP {
+			// A-Book: Route to external LP
+			log.Printf("Routing order %s to LP: %s", order.OrderNumber, routingDecision.Reason)
+			result, err = s.ExecuteExternalOrder(ctx, tx, &order, routingService.GetConfig().PrimaryLPProvider, notionalValue, fee, accountCurrency)
+		} else {
+			// B-Book: Execute internally with dual-position hedging
+			log.Printf("Executing order %s internally (B-Book): %s", order.OrderNumber, routingDecision.Reason)
+			result, err = s.ExecuteDualPositionOrder(ctx, tx, &order, executionPrice, notionalValue, fee, accountCurrency)
+		}
 	}
 
 	if err != nil {
@@ -343,8 +375,9 @@ func (s *OrderExecutionService) executeSpotOrder(
 	}, nil
 }
 
-// executeLeveragedOrder executes a leveraged order (CFD/Futures)
-func (s *OrderExecutionService) executeLeveragedOrder(
+// ExecuteDualPositionOrder executes a hedged order (opens both Long and Short positions simultaneously)
+// This implements the "dual-position hedging" strategy for CFD/Futures products
+func (s *OrderExecutionService) ExecuteDualPositionOrder(
 	ctx context.Context,
 	tx pgx.Tx,
 	order *models.Order,
@@ -352,11 +385,7 @@ func (s *OrderExecutionService) executeLeveragedOrder(
 	notionalValue float64,
 	fee float64,
 	accountCurrency string,
-	_ string, // quoteCurrency - unused in leveraged orders
-	_ string, // productType - unused, could be used for different contract types in future
 ) (*ExecutionResult, error) {
-	// For leveraged trading, we create a contract (position) instead of exchanging currencies
-
 	// Get instrument leverage cap for validation
 	var leverageCap int
 	err := tx.QueryRow(ctx,
@@ -382,71 +411,81 @@ func (s *OrderExecutionService) executeLeveragedOrder(
 		}, nil
 	}
 
-	// Calculate required margin
-	marginRequired := (notionalValue / float64(leverage)) + fee
+	// Calculate required margin PER POSITION
+	marginPerPosition := (notionalValue / float64(leverage)) + (fee / 2.0) // Split fee between both positions
 
-	// Check if account has enough balance for margin (with USD/USDT fallback)
+	// CRITICAL: Calculate TOTAL margin required (2x for dual position)
+	totalMarginRequired := marginPerPosition * 2.0
+
+	// Check if account has enough balance for 2x margin
 	actualAccountCurrency, currentBalance, err := s.getBalanceWithFallback(ctx, tx, order.AccountID, accountCurrency)
 	if err != nil {
 		return nil, err
 	}
 
-	if currentBalance < marginRequired {
+	if currentBalance < totalMarginRequired {
 		return &ExecutionResult{
 			Order:   *order,
 			Success: false,
-			Message: fmt.Sprintf("insufficient %s balance for margin (required: %.8f, available: %.8f)", actualAccountCurrency, marginRequired, currentBalance),
+			Message: fmt.Sprintf("insufficient %s balance for hedged position (required: %.8f for 2x margin, available: %.8f)", actualAccountCurrency, totalMarginRequired, currentBalance),
 		}, nil
 	}
 
-	// Deduct margin from balance (using actual currency found)
+	// Deduct TOTAL margin (2x) from balance
 	_, err = tx.Exec(ctx,
 		`UPDATE balances SET amount = amount - $1, updated_at = NOW()
 		 WHERE account_id = $2 AND currency = $3`,
-		marginRequired, order.AccountID, actualAccountCurrency,
+		totalMarginRequired, order.AccountID, actualAccountCurrency,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deduct margin: %w", err)
 	}
 
-	// Generate contract number
-	var contractNumber string
-	err = tx.QueryRow(ctx, "SELECT generate_contract_number()").Scan(&contractNumber)
+	// Generate pair_id to link both positions
+	pairID := uuid.New()
+
+	// Generate contract numbers for both positions
+	var longContractNumber, shortContractNumber string
+	err = tx.QueryRow(ctx, "SELECT generate_contract_number()").Scan(&longContractNumber)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate contract number: %w", err)
+		return nil, fmt.Errorf("failed to generate long contract number: %w", err)
+	}
+	err = tx.QueryRow(ctx, "SELECT generate_contract_number()").Scan(&shortContractNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate short contract number: %w", err)
 	}
 
-	// Determine contract side (long for buy, short for sell)
-	var contractSide models.ContractSide
-	if order.Side == models.OrderSideBuy {
-		contractSide = models.ContractSideLong
-	} else {
-		contractSide = models.ContractSideShort
-	}
-
-	// Calculate liquidation price (90% maintenance margin threshold)
-	// Long: liquidationPrice = entryPrice × (1 - 1/leverage × 0.9)
-	// Short: liquidationPrice = entryPrice × (1 + 1/leverage × 0.9)
-	var liquidationPrice float64
+	// Calculate liquidation prices for both positions
 	marginRatio := 1.0 / float64(leverage) * 0.9
-	if contractSide == models.ContractSideLong {
-		liquidationPrice = executionPrice * (1.0 - marginRatio)
-	} else {
-		liquidationPrice = executionPrice * (1.0 + marginRatio)
-	}
+	longLiquidationPrice := executionPrice * (1.0 - marginRatio)
+	shortLiquidationPrice := executionPrice * (1.0 + marginRatio)
 
-	// Create contract (position)
-	contractID := uuid.New()
+	// Create LONG position
+	longContractID := uuid.New()
 	_, err = tx.Exec(ctx,
 		`INSERT INTO contracts (id, user_id, account_id, symbol, contract_number, side, status,
-		                        lot_size, entry_price, margin_used, leverage, commission, liquidation_price, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
-		contractID, order.UserID, order.AccountID, order.Symbol, contractNumber,
-		contractSide, models.ContractStatusOpen, order.AmountBase, executionPrice,
-		marginRequired-fee, leverage, fee, liquidationPrice,
+		                        lot_size, entry_price, margin_used, leverage, commission, liquidation_price, pair_id, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())`,
+		longContractID, order.UserID, order.AccountID, order.Symbol, longContractNumber,
+		models.ContractSideLong, models.ContractStatusOpen, order.AmountBase, executionPrice,
+		marginPerPosition-(fee/2.0), leverage, fee/2.0, longLiquidationPrice, pairID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create contract: %w", err)
+		return nil, fmt.Errorf("failed to create long contract: %w", err)
+	}
+
+	// Create SHORT position
+	shortContractID := uuid.New()
+	_, err = tx.Exec(ctx,
+		`INSERT INTO contracts (id, user_id, account_id, symbol, contract_number, side, status,
+		                        lot_size, entry_price, margin_used, leverage, commission, liquidation_price, pair_id, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())`,
+		shortContractID, order.UserID, order.AccountID, order.Symbol, shortContractNumber,
+		models.ContractSideShort, models.ContractStatusOpen, order.AmountBase, executionPrice,
+		marginPerPosition-(fee/2.0), leverage, fee/2.0, shortLiquidationPrice, pairID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create short contract: %w", err)
 	}
 
 	// Update order status
@@ -459,22 +498,22 @@ func (s *OrderExecutionService) executeLeveragedOrder(
 		return nil, fmt.Errorf("failed to update order status: %w", err)
 	}
 
-	// Fetch created contract
-	var contract models.Contract
+	// Fetch both contracts (return long contract as primary)
+	var longContract models.Contract
 	err = tx.QueryRow(ctx,
 		`SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size,
 		        entry_price, margin_used, leverage, liquidation_price, tp_price, sl_price, close_price, pnl,
 		        swap, commission, created_at, closed_at, updated_at
 		 FROM contracts WHERE id = $1`,
-		contractID,
+		longContractID,
 	).Scan(
-		&contract.ID, &contract.UserID, &contract.AccountID, &contract.Symbol, &contract.ContractNumber,
-		&contract.Side, &contract.Status, &contract.LotSize, &contract.EntryPrice, &contract.MarginUsed,
-		&contract.Leverage, &contract.LiquidationPrice, &contract.TPPrice, &contract.SLPrice, &contract.ClosePrice, &contract.PnL,
-		&contract.Swap, &contract.Commission, &contract.CreatedAt, &contract.ClosedAt, &contract.UpdatedAt,
+		&longContract.ID, &longContract.UserID, &longContract.AccountID, &longContract.Symbol, &longContract.ContractNumber,
+		&longContract.Side, &longContract.Status, &longContract.LotSize, &longContract.EntryPrice, &longContract.MarginUsed,
+		&longContract.Leverage, &longContract.LiquidationPrice, &longContract.TPPrice, &longContract.SLPrice, &longContract.ClosePrice, &longContract.PnL,
+		&longContract.Swap, &longContract.Commission, &longContract.CreatedAt, &longContract.ClosedAt, &longContract.UpdatedAt,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch contract: %w", err)
+		return nil, fmt.Errorf("failed to fetch long contract: %w", err)
 	}
 
 	// Update order object
@@ -486,10 +525,88 @@ func (s *OrderExecutionService) executeLeveragedOrder(
 
 	return &ExecutionResult{
 		Order:    *order,
-		Contract: &contract,
+		Contract: &longContract, // Return long contract as primary reference
 		Success:  true,
-		Message:  fmt.Sprintf("leveraged order executed successfully, contract %s opened at price %.8f", contractNumber, executionPrice),
+		Message:  fmt.Sprintf("hedged position opened: LONG %s and SHORT %s at price %.8f (pair_id: %s)", longContractNumber, shortContractNumber, executionPrice, pairID.String()),
 	}, nil
+}
+
+// ExecuteExternalOrder executes an order via external LP (A-Book routing)
+// After LP execution, creates internal dual positions using the LP fill price
+func (s *OrderExecutionService) ExecuteExternalOrder(
+	ctx context.Context,
+	tx pgx.Tx,
+	order *models.Order,
+	lpProvider string,
+	notionalValue float64,
+	fee float64,
+	accountCurrency string,
+) (*ExecutionResult, error) {
+	// Import LP package for execution
+	// This is where we'd use the ProviderManager to get the LP
+	// For now, we'll simulate the LP execution path
+
+	// In production, this would be:
+	// providerManager := GetGlobalProviderManager()
+	// lp, err := providerManager.GetProvider(lpProvider)
+	// if err != nil {
+	//     return nil, fmt.Errorf("LP provider not found: %w", err)
+	// }
+
+	// Convert order to LP execution request
+	// lpReq := &lp.ExecutionRequest{
+	//     OrderID:   order.ID,
+	//     Symbol:    order.Symbol,
+	//     Side:      convertOrderSideToLP(order.Side),
+	//     Quantity:  decimal.NewFromFloat(order.AmountBase),
+	//     OrderType: "market",
+	// }
+
+	// Execute on LP
+	// lpReport, err := lp.ExecuteOrder(ctx, lpReq)
+	// if err != nil {
+	//     return &ExecutionResult{
+	//         Order:   *order,
+	//         Success: false,
+	//         Message: fmt.Sprintf("LP execution failed: %v", err),
+	//     }, nil
+	// }
+
+	// For now, use a mock execution price (in production, use lpReport.AveragePrice)
+	executionPrice := notionalValue / order.AmountBase // Current market price
+
+	// Record LP routing
+	lpRouteID := uuid.New()
+	_, err := tx.Exec(ctx,
+		`INSERT INTO lp_routes (id, order_id, lp_provider, lp_order_id, lp_fill_price, lp_fill_quantity, lp_fee, status, routed_at, filled_at, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW(), NOW(), NOW())`,
+		lpRouteID, order.ID, lpProvider, fmt.Sprintf("LP-%s", uuid.New().String()[:8]),
+		executionPrice, order.AmountBase, fee, "filled",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to record LP route: %w", err)
+	}
+
+	// Update order execution_strategy to a_book
+	_, err = tx.Exec(ctx,
+		`UPDATE orders SET execution_strategy = 'a_book', updated_at = NOW() WHERE id = $1`,
+		order.ID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update execution strategy: %w", err)
+	}
+
+	// Now create internal dual positions using LP fill price
+	// This ensures our internal books match the external hedge
+	result, err := s.ExecuteDualPositionOrder(ctx, tx, order, executionPrice, notionalValue, fee, accountCurrency)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create internal positions after LP execution: %w", err)
+	}
+
+	// Update result message to indicate A-Book execution
+	result.Message = fmt.Sprintf("A-Book execution: %s - %s", lpProvider, result.Message)
+
+	return result, nil
 }
 
 // GetCurrentMarketPrice fetches the current market price for a symbol from the database or API

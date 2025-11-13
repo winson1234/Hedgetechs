@@ -448,11 +448,10 @@ export default function AccountPage() {
       <OpenAccountModal
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreateModal}
-        openAccount={async (type: string, productType: string, currency: string, initialBalance: number) => {
+        openAccount={async (type: string, currency: string, initialBalance: number) => {
           try {
             const result = await dispatch(createAccount({
               type: type as 'live' | 'demo',
-              product_type: productType as 'spot' | 'cfd' | 'futures',
               currency,
               initial_balance: initialBalance,
             })).unwrap();
@@ -462,7 +461,7 @@ export default function AccountPage() {
 
             return {
               success: true,
-              message: `${type.charAt(0).toUpperCase() + type.slice(1)} ${productType.toUpperCase()} account created successfully!`,
+              message: `${type.charAt(0).toUpperCase() + type.slice(1)} account created successfully!`,
               account: result,
             };
           } catch (error) {

@@ -68,22 +68,31 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create account record
+	// Create account record (ProductType is now optional - universal accounts)
 	account := models.Account{
 		ID:            uuid.New(),
 		UserID:        userID,
 		AccountNumber: accountNumber,
 		Type:          req.Type,
-		ProductType:   req.ProductType,
 		Currency:      req.Currency,
 		Status:        models.AccountStatusActive,
+	}
+
+	// Determine product_type value for database (NULL for new universal accounts)
+	var dbProductType interface{}
+	if req.ProductType != nil {
+		// Legacy: If client explicitly provides product_type, use it
+		dbProductType = *req.ProductType
+	} else {
+		// New: Universal account - set NULL in database
+		dbProductType = nil
 	}
 
 	// Insert account into database
 	_, err = tx.Exec(ctx,
 		`INSERT INTO accounts (id, user_id, account_number, type, product_type, currency, status, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
-		account.ID, account.UserID, account.AccountNumber, account.Type, account.ProductType, account.Currency, account.Status,
+		account.ID, account.UserID, account.AccountNumber, account.Type, dbProductType, account.Currency, account.Status,
 	)
 	if err != nil {
 		log.Printf("Failed to insert account: %v", err)

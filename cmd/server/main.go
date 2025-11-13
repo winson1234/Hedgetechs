@@ -147,8 +147,8 @@ func main() {
 	// Create a wrapper that sends Binance messages to messageBroadcaster
 	// This allows both WebSocket clients AND the order processor to receive price updates
 	broadcastWrapper := &hub.Hub{
-		Broadcast: messageBroadcaster, // Messages go to broadcaster, which fans out to hub and order processor
-		Register:  make(chan *hub.Client), // Dummy channels (not used by Binance streams)
+		Broadcast:  messageBroadcaster,     // Messages go to broadcaster, which fans out to hub and order processor
+		Register:   make(chan *hub.Client), // Dummy channels (not used by Binance streams)
 		Unregister: make(chan *hub.Client),
 	}
 
@@ -410,8 +410,8 @@ func main() {
 
 	// Start the HTTP/HTTPS server on the configured port
 	// Check for mkcert-generated SSL certificates for local HTTPS development
-	certFile := filepath.Join("..", "..", "localhost+2.pem")     // From cmd/server, look at project root
-	keyFile := filepath.Join("..", "..", "localhost+2-key.pem")  // From cmd/server, look at project root
+	certFile := filepath.Join("..", "..", "localhost+2.pem")    // From cmd/server, look at project root
+	keyFile := filepath.Join("..", "..", "localhost+2-key.pem") // From cmd/server, look at project root
 
 	// Check if certificate files exist
 	if _, certErr := os.Stat(certFile); certErr == nil {

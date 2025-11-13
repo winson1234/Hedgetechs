@@ -22,8 +22,8 @@ const BinanceTicker24hURL = "https://api.binance.com/api/v3/ticker/24hr"
 // FMP (Financial Modeling Prep) settings for Forex/Commodities market data
 // Used for WTI Oil, Brent Oil, Natural Gas, and forex pairs (CADJPY, AUDNZD, EURGBP)
 var (
-	FMPAPIKey             = os.Getenv("FMP_API_KEY")
-	EnableFMPFetch        = os.Getenv("ENABLE_FMP_FETCH") == "true"
+	FMPAPIKey              = os.Getenv("FMP_API_KEY")
+	EnableFMPFetch         = os.Getenv("ENABLE_FMP_FETCH") == "true"
 	FMPPollIntervalSeconds = 360 // Default 6 minutes (can be overridden by env var)
 
 	// Static fallback prices for dev mode (when ENABLE_FMP_FETCH=false)
@@ -49,11 +49,11 @@ const InvestingComForexRSSURL = "https://www.investing.com/rss/news_285.rss"
 const YahooFinanceForexRSSURL = "https://finance.yahoo.com/rss/forex"
 
 // Local server settings
-const LocalServerAddress = ":8080"                           // Address for the backend server
-const LocalWebSocketPath = "/ws"                             // Path for frontend WebSocket connections
-const KlinesAPIPath = "/api/v1/klines"                       // Path for historical data REST endpoint
-const TickerAPIPath = "/api/v1/ticker"                       // Path for 24h ticker data endpoint
-const NewsAPIPath = "/api/v1/news"                           // Path for news feed endpoint
-const AnalyticsAPIPath = "/api/v1/analytics"                 // Path for forex rates analytics endpoint (powered by Frankfurter API)
+const LocalServerAddress = ":8080"                                   // Address for the backend server
+const LocalWebSocketPath = "/ws"                                     // Path for frontend WebSocket connections
+const KlinesAPIPath = "/api/v1/klines"                               // Path for historical data REST endpoint
+const TickerAPIPath = "/api/v1/ticker"                               // Path for 24h ticker data endpoint
+const NewsAPIPath = "/api/v1/news"                                   // Path for news feed endpoint
+const AnalyticsAPIPath = "/api/v1/analytics"                         // Path for forex rates analytics endpoint (powered by Frankfurter API)
 const PaymentIntentAPIPath = "/api/v1/deposit/create-payment-intent" // Path for Stripe payment intent creation
-const PaymentStatusAPIPath = "/api/v1/payment/status"        // Path for Stripe payment status check
+const PaymentStatusAPIPath = "/api/v1/payment/status"                // Path for Stripe payment status check

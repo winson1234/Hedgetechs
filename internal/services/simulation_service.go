@@ -41,9 +41,9 @@ type OrderBookLevel struct {
 // OrderBookUpdate represents the simulated order book update message
 // This matches the exact structure of Binance OrderBookUpdate for frontend compatibility
 type OrderBookUpdate struct {
-	Symbol string           `json:"symbol"`
-	Bids   [][]string       `json:"bids"` // [price, quantity] pairs
-	Asks   [][]string       `json:"asks"` // [price, quantity] pairs
+	Symbol string     `json:"symbol"`
+	Bids   [][]string `json:"bids"` // [price, quantity] pairs
+	Asks   [][]string `json:"asks"` // [price, quantity] pairs
 }
 
 // NewSimulationService creates a new simulation service instance

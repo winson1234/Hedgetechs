@@ -242,4 +242,3 @@ func (s *MarketDataService) broadcastOrderBook(orderBook OrderBookUpdate) {
 		// Channel full, drop message
 	}
 }
-

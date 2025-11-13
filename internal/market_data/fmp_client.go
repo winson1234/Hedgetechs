@@ -25,12 +25,12 @@ const (
 // Internal symbols are what we use in DB, UI, and order execution
 // FMP symbols are what we send to the Financial Modeling Prep API
 var internalToFMP = map[string]string{
-	"WTI":    "CLUSD",   // WTI Crude Oil
-	"BRENT":  "BZUSD",   // Brent Crude Oil
-	"NATGAS": "NGUSD",   // Natural Gas
-	"CADJPY": "CADJPY",  // Canadian Dollar / Japanese Yen
-	"AUDNZD": "AUDNZD",  // Australian Dollar / New Zealand Dollar
-	"EURGBP": "EURGBP",  // Euro / British Pound
+	"WTI":    "CLUSD",  // WTI Crude Oil
+	"BRENT":  "BZUSD",  // Brent Crude Oil
+	"NATGAS": "NGUSD",  // Natural Gas
+	"CADJPY": "CADJPY", // Canadian Dollar / Japanese Yen
+	"AUDNZD": "AUDNZD", // Australian Dollar / New Zealand Dollar
+	"EURGBP": "EURGBP", // Euro / British Pound
 }
 
 // Reverse mapping: FMP symbols → Internal symbols
@@ -45,17 +45,17 @@ var fmpToInternal = map[string]string{
 
 // FMPQuote represents a single quote from FMP API response
 type FMPQuote struct {
-	Symbol           string  `json:"symbol"`
-	Name             string  `json:"name"`
-	Price            float64 `json:"price"`
+	Symbol            string  `json:"symbol"`
+	Name              string  `json:"name"`
+	Price             float64 `json:"price"`
 	ChangesPercentage float64 `json:"changesPercentage"`
-	Change           float64 `json:"change"`
-	DayLow           float64 `json:"dayLow"`
-	DayHigh          float64 `json:"dayHigh"`
-	YearHigh         float64 `json:"yearHigh"`
-	YearLow          float64 `json:"yearLow"`
-	Volume           int64   `json:"volume"`
-	Timestamp        int64   `json:"timestamp"`
+	Change            float64 `json:"change"`
+	DayLow            float64 `json:"dayLow"`
+	DayHigh           float64 `json:"dayHigh"`
+	YearHigh          float64 `json:"yearHigh"`
+	YearLow           float64 `json:"yearLow"`
+	Volume            int64   `json:"volume"`
+	Timestamp         int64   `json:"timestamp"`
 }
 
 // FMPClient manages FMP API requests with rate limiting and persistence
@@ -154,7 +154,7 @@ func (c *FMPClient) FetchBatchQuotes() (map[string]FMPQuote, error) {
 	// Forex: CADJPY, AUDNZD, EURGBP
 	symbols := []string{"CLUSD", "BZUSD", "NGUSD", "CADJPY", "AUDNZD", "EURGBP"}
 	symbolsParam := strings.Join(symbols, ",")
-	
+
 	url := fmt.Sprintf(FMP_QUOTE_URL, symbolsParam, c.apiKey)
 	quotes, err := c.fetchQuotesFromURL(url)
 	if err != nil {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
@@ -6,6 +6,14 @@ import { WebSocketContext } from '../context/WebSocketContext';
 import MiniSparklineChart from '../components/MiniSparklineChart';
 import { getApiUrl } from '../config/api';
 import './dashboard.css';
+import '../styles/news.css';
+import '../styles/crypto.css';
+import '../styles/color.css';
+import '../styles/mobile.css';
+import '../styles/trust.css';
+import StatsBanner from "../components/StatsBanner";
+import '../styles/luxuryanimation.css';
+import MetricsCounter from "../components/MetrixCounter";
 
 interface CryptoData {
   symbol: string;
@@ -15,6 +23,12 @@ interface CryptoData {
   volume24h: number;  // 24h trading volume for "Popular Coins" sorting
   icon: string;
   gradient: string;
+}
+interface MetricsCounts {
+  volume: number;
+  traders: number;
+  countries: number;
+  pairs: number;
 }
 
 export default function DashboardPage() {
@@ -449,6 +463,47 @@ const cancelLogout = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [activeNewsTab]);
+// Add this useEffect hook to your DashboardPage component
+// Place it after your other useEffect hooks
+
+useEffect(() => {
+  // Header scroll effect
+  const header = document.querySelector('.header');
+  let lastScrollTop = 0;
+  let ticking = false;
+
+  const handleScroll = () => {
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        // Add 'scrolled' class when scrolled down more than 20px
+        if (scrollTop > 20) {
+          header?.classList.add('scrolled');
+        } else {
+          header?.classList.remove('scrolled');
+        }
+        
+        lastScrollTop = scrollTop;
+        ticking = false;
+      });
+      
+      ticking = true;
+    }
+  };
+
+  // Add scroll event listener with passive for better performance
+  window.addEventListener('scroll', handleScroll, { passive: true });
+  
+  // Initial check on mount
+  handleScroll();
+
+  // Cleanup
+  return () => {
+    window.removeEventListener('scroll', handleScroll);
+  };
+}, []);
+
 
   // Handler for crypto page changes
   const handleCryptoPageChange = (page: number) => {
@@ -702,64 +757,13 @@ const cancelLogout = () => {
 
           {/* Hero Image */}
           <div className="hero-image">
-            <img src="/assets/images/crypto-hero.png" alt="Cryptocurrency Illustration" className="hero-img" />
-
-            {/* Floating Crypto Cards */}
-            <div className="floating-cards">
-              <div className="floating-card card-1">
-                <div className="crypto-mini">
-                  <div className="crypto-icon-mini" style={{ background: 'linear-gradient(135deg, #f7931a, #ff9500)' }}>₿</div>
-                  <div className="crypto-info-mini">
-                    <div className="crypto-symbol-mini">BTC</div>
-                    <div className="crypto-price-mini positive">+2.4%</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="floating-card card-2">
-                <div className="crypto-mini">
-                  <div className="crypto-icon-mini" style={{ background: 'linear-gradient(135deg, #627eea, #8a9cff)' }}>Ξ</div>
-                  <div className="crypto-info-mini">
-                    <div className="crypto-symbol-mini">ETH</div>
-                    <div className="crypto-price-mini positive">+1.8%</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="floating-card card-3">
-                <div className="crypto-mini">
-                  <div className="crypto-icon-mini" style={{ background: 'linear-gradient(135deg, #f3ba2f, #ffd700)' }}>B</div>
-                  <div className="crypto-info-mini">
-                    <div className="crypto-symbol-mini">BNB</div>
-                    <div className="crypto-price-mini positive">+3.2%</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+              <div className="coin btc">₿</div>
+              <div className="coin eth">Ξ</div>
+              <div className="hero-img-box"></div>
+            <img src="/assets/images/upscalemedia-transformed.png" alt="Cryptocurrency Illustration" className="hero-img" />
           </div>
         </div>
-
-        {/* Stats Banner */}
-        <div className="container">
-          <div className="stats-banner">
-            <div className="stat-item">
-              <div className="stat-value">$2.5B+</div>
-              <div className="stat-label">24h Trading Volume</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-value">20M+</div>
-              <div className="stat-label">Active Traders</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-value">198+</div>
-              <div className="stat-label">Countries</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-value">350+</div>
-              <div className="stat-label">Trading Pairs</div>
-            </div>
-          </div>
-        </div>
+           <MetricsCounter />
       </section>
 
       {/* Market Overview */}
@@ -1409,7 +1413,7 @@ const cancelLogout = () => {
 
             {/* Right Side - Dashboard Image */}
             <div className="features-image">
-              <img src="/assets/images/Mobile-crypto-app-1024x682.webp" alt="Trading Dashboard" className="dashboard-img" />
+              <img src="assets/images/upscalemedia-transformed_11zon (1).webp" alt="Trading Dashboard" className="dashboard-img" />
             </div>
           </div>
         </div>

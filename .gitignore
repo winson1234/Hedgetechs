@@ -41,6 +41,7 @@ Thumbs.db
 server.exe
 build/
 dist/
+data/
 
 # Temp files
 *.tmp

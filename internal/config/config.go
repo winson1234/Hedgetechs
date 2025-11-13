@@ -1,5 +1,7 @@
 package config
 
+import "os"
+
 // --- Configuration ---
 
 // Binance settings
@@ -16,6 +18,25 @@ const BinanceWebSocketURL = "wss://stream.binance.com:9443/stream?streams=btcusd
 const BinanceDepthStreamURL = "wss://stream.binance.com:9443/stream?streams=btcusdt@depth20@100ms/ethusdt@depth20@100ms/bnbusdt@depth20@100ms/solusdt@depth20@100ms/xrpusdt@depth20@100ms/adausdt@depth20@100ms/avaxusdt@depth20@100ms/dogeusdt@depth20@100ms/maticusdt@depth20@100ms/linkusdt@depth20@100ms/uniusdt@depth20@100ms/atomusdt@depth20@100ms/dotusdt@depth20@100ms/arbusdt@depth20@100ms/opusdt@depth20@100ms/aptusdt@depth20@100ms/ltcusdt@depth20@100ms/shibusdt@depth20@100ms/nearusdt@depth20@100ms/icpusdt@depth20@100ms/filusdt@depth20@100ms/suiusdt@depth20@100ms/stxusdt@depth20@100ms/tonusdt@depth20@100ms/eurusdt@depth20@100ms/paxgusdt@depth20@100ms"
 const BinanceRestURL = "https://api.binance.com/api/v3/klines"
 const BinanceTicker24hURL = "https://api.binance.com/api/v3/ticker/24hr"
+
+// FMP (Financial Modeling Prep) settings for Forex/Commodities market data
+// Used for WTI Oil, Brent Oil, Natural Gas, and forex pairs (CADJPY, AUDNZD, EURGBP)
+var (
+	FMPAPIKey             = os.Getenv("FMP_API_KEY")
+	EnableFMPFetch        = os.Getenv("ENABLE_FMP_FETCH") == "true"
+	FMPPollIntervalSeconds = 360 // Default 6 minutes (can be overridden by env var)
+
+	// Static fallback prices for dev mode (when ENABLE_FMP_FETCH=false)
+	// These prices are used immediately on boot and provide instant UI responsiveness
+	StaticPrices = map[string]float64{
+		"WTI":    75.00,  // WTI Crude Oil (USD per barrel)
+		"BRENT":  79.00,  // Brent Crude Oil (USD per barrel)
+		"NATGAS": 2.50,   // Natural Gas (USD per MMBtu)
+		"CADJPY": 108.50, // Canadian Dollar / Japanese Yen
+		"AUDNZD": 1.08,   // Australian Dollar / New Zealand Dollar
+		"EURGBP": 0.86,   // Euro / British Pound
+	}
+)
 
 // Crypto sources
 const CoinDeskRSSURL = "https://www.coindesk.com/arc/outboundfeeds/rss/"

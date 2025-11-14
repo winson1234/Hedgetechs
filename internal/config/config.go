@@ -40,7 +40,7 @@ func InitMarketDataConfig() {
 	TwelveDataAPIKey = os.Getenv("TWELVE_DATA_API_KEY")
 	TwelveDataPollInterval = parsePollInterval(os.Getenv("TWELVE_DATA_POLL_INTERVAL"), 15*time.Minute)
 	EnableExternalFetch = parseBool(os.Getenv("ENABLE_EXTERNAL_FETCH"), true)
-	
+
 	StaticPrices = map[string]float64{
 		"CADJPY": 108.50, // Canadian Dollar / Japanese Yen
 		"AUDNZD": 1.08,   // Australian Dollar / New Zealand Dollar

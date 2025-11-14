@@ -449,7 +449,7 @@ func HandleTicker(w http.ResponseWriter, r *http.Request) {
 		if err == nil && price > 0 {
 			priceStr = fmt.Sprintf("%.5f", price)
 		}
-		
+
 		tickers = append(tickers, models.TickerResponse{
 			Symbol:             sym,
 			LastPrice:          priceStr,
@@ -459,7 +459,6 @@ func HandleTicker(w http.ResponseWriter, r *http.Request) {
 			Volume:             "0",
 		})
 	}
-
 
 	// Cache the result
 	tickerCache.Set(cacheKey, tickers, gocache.DefaultExpiration)
@@ -611,17 +610,17 @@ func HandleNews(w http.ResponseWriter, r *http.Request) {
 
 			// List of common RSS date formats
 			dateFormats := []string{
-				time.RFC1123Z,  // "Mon, 02 Jan 2006 15:04:05 -0700"
-				time.RFC1123,   // "Mon, 02 Jan 2006 15:04:05 MST"
-				"Mon, 02 Jan 2006 15:04:05 Z",       // RFC1123 with Z timezone and space
-				time.RFC3339,   // "2006-01-02T15:04:05Z07:00" (ISO8601)
-				"2006-01-02T15:04:05Z",     // ISO8601 with Z
-				"2006-01-02 15:04:05",      // Simple datetime format (YYYY-MM-DD HH:MM:SS)
-				"Mon, 2 Jan 2006 15:04:05 MST",      // RFC1123 with single-digit day
-				"Mon, 2 Jan 2006 15:04:05 Z",        // RFC1123 with single-digit day and Z timezone
-				"Mon, 2 Jan 2006 15:04:05 -0700",    // RFC1123Z with single-digit day
-				"2 Jan 2006 15:04:05 MST",           // Without weekday
-				"2 Jan 2006 15:04:05 -0700",         // Without weekday, with timezone offset
+				time.RFC1123Z,                    // "Mon, 02 Jan 2006 15:04:05 -0700"
+				time.RFC1123,                     // "Mon, 02 Jan 2006 15:04:05 MST"
+				"Mon, 02 Jan 2006 15:04:05 Z",    // RFC1123 with Z timezone and space
+				time.RFC3339,                     // "2006-01-02T15:04:05Z07:00" (ISO8601)
+				"2006-01-02T15:04:05Z",           // ISO8601 with Z
+				"2006-01-02 15:04:05",            // Simple datetime format (YYYY-MM-DD HH:MM:SS)
+				"Mon, 2 Jan 2006 15:04:05 MST",   // RFC1123 with single-digit day
+				"Mon, 2 Jan 2006 15:04:05 Z",     // RFC1123 with single-digit day and Z timezone
+				"Mon, 2 Jan 2006 15:04:05 -0700", // RFC1123Z with single-digit day
+				"2 Jan 2006 15:04:05 MST",        // Without weekday
+				"2 Jan 2006 15:04:05 -0700",      // Without weekday, with timezone offset
 			}
 
 			// Try each format
@@ -782,11 +781,11 @@ func HandleConfigProductTypes(w http.ResponseWriter, r *http.Request) {
 
 // Instrument represents a tradable instrument with metadata
 type Instrument struct {
-	Symbol      string `json:"symbol"`
-	DisplayName string `json:"displayName"`
+	Symbol       string `json:"symbol"`
+	DisplayName  string `json:"displayName"`
 	BaseCurrency string `json:"baseCurrency"`
-	Category    string `json:"category"` // "major", "defi", "altcoin"
-	IconUrl     string `json:"iconUrl"`  // CoinGecko image URL
+	Category     string `json:"category"` // "major", "defi", "altcoin"
+	IconUrl      string `json:"iconUrl"`  // CoinGecko image URL
 }
 
 // HandleInstruments returns the list of supported trading instruments

@@ -1,4 +1,19 @@
 services:
+  # Redis service (for MT5 forex data streaming)
+  redis:
+    image: redis:7-alpine
+    container_name: brokerage-redis
+    ports:
+      # Expose to host so external MT5 Python publisher can connect
+      - "6379:6379"
+    networks:
+      - brokerage-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      # Persist Redis data (optional - for durability)
+      - redis-data:/data
+
   # Backend service (Go with Air hot-reloading)
   backend:
     build:
@@ -19,8 +34,11 @@ services:
       - .env
     environment:
       - DOCKER_ENV=development
+      - REDIS_ADDR=redis:6379
     networks:
       - brokerage-network
+    depends_on:
+      - redis
     restart: unless-stopped
 
   # Frontend service (React + Vite with hot-reloading)
@@ -50,3 +68,7 @@ services:
 networks:
   brokerage-network:
     driver: bridge
+
+volumes:
+  redis-data:
+    driver: local

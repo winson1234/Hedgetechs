@@ -24,7 +24,7 @@ const BinanceRestURL = "https://api.binance.com/api/v3/klines"
 const BinanceTicker24hURL = "https://api.binance.com/api/v3/ticker/24hr"
 
 // Market Data Provider Configuration
-// Twelve Data Smart Polling for Forex (CADJPY, AUDNZD, EURGBP)
+// Redis Pub/Sub for Real-Time Forex from MT5 (7 pairs)
 var (
 	MarketDataProvider     string
 	TwelveDataAPIKey       string
@@ -42,9 +42,13 @@ func InitMarketDataConfig() {
 	EnableExternalFetch = parseBool(os.Getenv("ENABLE_EXTERNAL_FETCH"), true)
 
 	StaticPrices = map[string]float64{
-		"CADJPY": 108.50, // Canadian Dollar / Japanese Yen
-		"AUDNZD": 1.08,   // Australian Dollar / New Zealand Dollar
-		"EURGBP": 0.86,   // Euro / British Pound
+		// Forex pairs (used as fallback if Redis/MT5 is not available)
+		"EURUSD": 1.08,   // Euro / US Dollar
+		"GBPUSD": 1.27,   // British Pound / US Dollar
+		"USDJPY": 150.00, // US Dollar / Japanese Yen
+		"AUDUSD": 0.64,   // Australian Dollar / US Dollar
+		"NZDUSD": 0.59,   // New Zealand Dollar / US Dollar
+		"USDCHF": 0.88,   // US Dollar / Swiss Franc
 	}
 }
 

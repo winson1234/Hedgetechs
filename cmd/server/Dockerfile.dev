@@ -1,10 +1,9 @@
 # Development Dockerfile for Go backend with hot-reloading
-FROM golang:1.23-alpine
+FROM golang:alpine
 
 # Install git (required for some Go packages) and Air for hot-reloading
-# Pin Air to v1.52.3 for compatibility with Go 1.23
 RUN apk add --no-cache git && \
-    go install github.com/air-verse/air@v1.52.3
+    go install github.com/air-verse/air@latest
 
 # Set working directory
 WORKDIR /app

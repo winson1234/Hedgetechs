@@ -6,7 +6,7 @@ import (
 	"brokerageProject/internal/config"
 	"brokerageProject/internal/database"
 	"brokerageProject/internal/hub"
-	"brokerageProject/internal/market_data/twelvedata"
+	redisProvider "brokerageProject/internal/market_data/redis"
 	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/services"
 	"brokerageProject/internal/utils"
@@ -49,8 +49,7 @@ func main() {
 
 	// Initialize market data configuration after loading .env
 	config.InitMarketDataConfig()
-	log.Printf("Market data config initialized: Provider=%s, PollInterval=%v, FetchEnabled=%v",
-		config.MarketDataProvider, config.TwelveDataPollInterval, config.EnableExternalFetch)
+	log.Printf("Market data config initialized (Hybrid: Binance + Redis/MT5)")
 
 	// Log Stripe configuration status (without revealing the key)
 	if stripeKey := os.Getenv("STRIPE_SECRET_KEY"); stripeKey != "" {
@@ -169,7 +168,7 @@ func main() {
 	go binance.StreamTrades(broadcastWrapper)
 	log.Println("Binance Trades WebSocket stream started (legacy - for Market Trades display)")
 
-	// HYBRID MARKET DATA ENGINE: Real-Time Crypto + Smart-Polling Commodities
+	// HYBRID MARKET DATA ENGINE: Real-Time Crypto (Binance) + Real-Time Forex (MT5/Redis)
 	// Initialize market data service using the Provider interface pattern
 	marketDataService, err := services.NewMarketDataService(messageBroadcaster)
 	if err != nil {
@@ -184,24 +183,20 @@ func main() {
 	marketDataService.AddProvider(binanceProvider)
 	log.Println("Registered Binance Provider (real-time crypto WebSocket)")
 
-	// Provider 2: Twelve Data Smart Polling Adapter (Commodities/Forex)
-	if config.TwelveDataAPIKey != "" {
-		twelveDataProvider := twelvedata.NewAdapter(
-			config.TwelveDataAPIKey,
-			config.TwelveDataPollInterval,
-			config.EnableExternalFetch,
-		)
-		marketDataService.AddProvider(twelveDataProvider)
-		log.Printf("Registered Twelve Data Provider (smart polling: interval=%v, fetch=%v)",
-			config.TwelveDataPollInterval, config.EnableExternalFetch)
-	} else {
-		log.Println("WARNING: TWELVE_DATA_API_KEY not set. Commodities/Forex will use static prices only.")
+	// Provider 2: Redis Pub/Sub (Real-Time Forex from MT5)
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379" // Fallback for local development
 	}
+	redisForexProvider := redisProvider.NewProvider(redisAddr)
+	marketDataService.AddProvider(redisForexProvider)
+	log.Printf("Registered Redis Provider (real-time forex from MT5, addr=%s)", redisAddr)
 
 	// Start all providers
-	// Crypto symbols are handled by Binance provider (ignored by Twelve Data)
-	// Forex symbols are handled by Twelve Data provider (ignored by Binance)
-	allSymbols := []string{"CADJPY", "AUDNZD", "EURGBP"}
+	// Crypto symbols are handled by Binance provider (ignored by Redis)
+	// Forex symbols are handled by Redis provider (ignored by Binance)
+	// Forex list: 6 major pairs available in MetaQuotes demo
+	allSymbols := []string{"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCHF"}
 	if err := marketDataService.Start(allSymbols); err != nil {
 		log.Printf("WARNING: Market data service failed to start: %v", err)
 	} else {

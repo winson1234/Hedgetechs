@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { setActiveAccount, fetchAccounts } from '../store/slices/accountSlice';
-import { createPendingOrder, executeMarketOrder, fetchOrders } from '../store/slices/orderSlice';
-import { addToast, setSelectedProductType } from '../store/slices/uiSlice';
+import { createPendingOrder, executeMarketOrder, fetchOrders, fetchPendingOrders } from '../store/slices/orderSlice';
+import { addToast, setSelectedProductType, triggerPositionsRefresh } from '../store/slices/uiSlice';
 import { formatPrice } from '../utils/priceUtils';
 import { ProductType } from '../types';
 
@@ -49,6 +49,7 @@ export default function TradingPanel() {
   useEffect(() => {
     if (activeAccountId) {
       dispatch(fetchOrders(activeAccountId));
+      dispatch(fetchPendingOrders(activeAccountId));
     }
   }, [activeAccountId, dispatch]);
 
@@ -392,6 +393,9 @@ export default function TradingPanel() {
           if (activeAccountId) {
             dispatch(fetchOrders(activeAccountId));
           }
+
+          // Trigger positions refresh (for CFD orders)
+          dispatch(triggerPositionsRefresh());
         })
         .catch((error) => {
           // Show error toast

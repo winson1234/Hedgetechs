@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { cancelPendingOrder } from '../../store/slices/orderSlice';
+import { addToast } from '../../store/slices/uiSlice';
 import { formatCurrency } from '../../utils/formatters';
 import { ProductType } from '../../types';
 
@@ -13,20 +14,36 @@ export default function PendingOrdersTab({ filterByProductType, selectedProductT
   const dispatch = useAppDispatch();
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
   const allPendingOrders = useAppSelector(state => state.order.pendingOrders);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
 
   // Memoize filtered orders to prevent unnecessary rerenders
   const pendingOrders = useMemo(() =>
     allPendingOrders.filter(order => {
       const matchesInstrument = order.symbol === activeInstrument;
       const matchesProductType = !filterByProductType || order.product_type === selectedProductType;
+      const isPending = order.status === 'pending';
 
-      return matchesInstrument && matchesProductType;
+      return matchesInstrument && matchesProductType && isPending;
     }),
     [allPendingOrders, activeInstrument, filterByProductType, selectedProductType]
   );
 
-  const handleCancel = (orderId: string) => {
-    dispatch(cancelPendingOrder(orderId));
+  const handleCancel = async (orderId: string) => {
+    setCancellingOrderId(orderId);
+    try {
+      await dispatch(cancelPendingOrder(orderId)).unwrap();
+      dispatch(addToast({
+        type: 'success',
+        message: 'Order cancelled successfully'
+      }));
+    } catch (error) {
+      dispatch(addToast({
+        type: 'error',
+        message: error as string || 'Failed to cancel order'
+      }));
+    } finally {
+      setCancellingOrderId(null);
+    }
   };
 
   // Format timestamp to readable date
@@ -98,10 +115,11 @@ export default function PendingOrdersTab({ filterByProductType, selectedProductT
                 </div>
                 <button
                   onClick={() => handleCancel(order.id)}
-                  className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium transition"
+                  disabled={cancellingOrderId === order.id}
+                  className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Cancel order"
                 >
-                  Cancel
+                  {cancellingOrderId === order.id ? 'Cancelling...' : 'Cancel'}
                 </button>
               </div>
 

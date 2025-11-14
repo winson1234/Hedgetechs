@@ -21,6 +21,7 @@ interface UIState {
   activeWalletTab: WalletTab; // Currently active wallet tab
   showAnalyticsPanel: boolean; // Analytics panel visibility
   isSidebarExpanded: boolean; // Sidebar expansion state
+  positionsRefreshTrigger: number; // Trigger to refresh positions
   toasts: Toast[];
   modals: {
     openAccountModal: boolean;
@@ -38,6 +39,7 @@ const initialState: UIState = {
   activeWalletTab: 'overview',
   showAnalyticsPanel: false,
   isSidebarExpanded: false, // Default to collapsed
+  positionsRefreshTrigger: 0,
   toasts: [],
   modals: {
     openAccountModal: false,
@@ -131,6 +133,11 @@ const uiSlice = createSlice({
         withdrawModal: false,
       };
     },
+
+    // Positions refresh trigger
+    triggerPositionsRefresh: (state) => {
+      state.positionsRefreshTrigger += 1;
+    },
   },
 });
 
@@ -151,6 +158,7 @@ export const {
   openModal,
   closeModal,
   closeAllModals,
+  triggerPositionsRefresh,
 } = uiSlice.actions;
 
 // Selectors for computed values

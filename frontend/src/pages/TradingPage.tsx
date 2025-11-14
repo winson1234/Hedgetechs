@@ -8,10 +8,6 @@ import { useAppSelector } from '../store';
 
 export default function TradingPage() {
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
-  const selectedProductType = useAppSelector(state => state.ui.selectedProductType);
-
-  // Helper to determine product type mode
-  const isSpot = selectedProductType === 'spot';
 
   return (
     <div className="px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8">

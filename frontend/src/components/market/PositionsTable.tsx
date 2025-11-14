@@ -38,6 +38,7 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
   const { currentPrices } = useAppSelector(state => state.price);
   const session = useAppSelector(state => state.auth.session);
 
+  const positionsRefreshTrigger = useAppSelector(state => state.ui.positionsRefreshTrigger);
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,10 +71,10 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
     }
   }, [activeAccountId, session?.access_token]);
 
-  // Fetch positions on mount and when account changes
+  // Fetch positions on mount, when account changes, or when triggered
   useEffect(() => {
     fetchPositions();
-  }, [fetchPositions]);
+  }, [fetchPositions, positionsRefreshTrigger]);
 
   // Filter positions by product type
   const filteredPositions = useMemo(() =>

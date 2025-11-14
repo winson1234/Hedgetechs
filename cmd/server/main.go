@@ -162,10 +162,12 @@ func main() {
 		Unregister: make(chan *hub.Client),
 	}
 
-	// LEGACY: Start old Binance WebSocket streams (still working for orderbook)
+	// LEGACY: Start old Binance WebSocket streams (still working for orderbook and market trades)
 	// TODO: Remove these once fully migrated to Provider interface
 	go binance.StreamDepth(broadcastWrapper)
 	log.Println("Binance Depth WebSocket stream started (legacy)")
+	go binance.StreamTrades(broadcastWrapper)
+	log.Println("Binance Trades WebSocket stream started (legacy - for Market Trades display)")
 
 	// HYBRID MARKET DATA ENGINE: Real-Time Crypto + Smart-Polling Commodities
 	// Initialize market data service using the Provider interface pattern

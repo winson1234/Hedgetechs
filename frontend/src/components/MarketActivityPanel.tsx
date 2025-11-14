@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppSelector } from '../store';
 import PendingOrdersTab from './market/PendingOrdersTab';
 import TradeHistoryTab from './market/TradeHistoryTab';
@@ -9,16 +9,26 @@ type TabType = 'orderbook' | 'trades' | 'pending' | 'history' | 'positions';
 
 export default function MarketActivityPanel() {
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
+  const selectedProductType = useAppSelector(state => state.ui.selectedProductType);
   // Get order book and trades from Redux store (updated by WebSocket middleware)
   const orderBook = useAppSelector(state => state.price.orderBooks[activeInstrument]);
   const trades = useAppSelector(state => state.price.trades[activeInstrument]) || [];
 
-  // Get active account to check product type
-  const { accounts, activeAccountId } = useAppSelector(state => state.account);
-  const activeAccount = accounts.find(acc => acc.id === activeAccountId);
-  const isCFD = activeAccount?.product_type === 'cfd';
+  // Determine if CFD mode based on global product type selection
+  const isCFD = selectedProductType === 'cfd' || selectedProductType === 'futures';
+  const isSpot = selectedProductType === 'spot';
 
-  const [activeTab, setActiveTab] = useState<TabType>('orderbook');
+  const [activeTab, setActiveTab] = useState<TabType>(isSpot ? 'orderbook' : 'positions');
+  const [filterByProductType, setFilterByProductType] = useState<boolean>(false);
+
+  // Switch to appropriate tab when product type changes
+  useEffect(() => {
+    if (isSpot && (activeTab === 'positions')) {
+      setActiveTab('orderbook'); // Switch to orderbook when going from CFD to SPOT
+    } else if (isCFD && (activeTab === 'orderbook' || activeTab === 'trades')) {
+      setActiveTab('positions'); // Switch to positions when going from SPOT to CFD
+    }
+  }, [selectedProductType, isSpot, isCFD, activeTab]);
 
   // Convert Redux order book format to component format
   const bids: [string, string][] = orderBook?.bids.map(bid => [
@@ -42,28 +52,50 @@ export default function MarketActivityPanel() {
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 h-full flex flex-col">
-      {/* Tab Header */}
-      <div className="flex gap-1 mb-4 border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('orderbook')}
-          className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-            activeTab === 'orderbook'
-              ? 'text-blue-500 border-b-2 border-blue-500'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
-          }`}
-        >
-          Order Book
-        </button>
-        <button
-          onClick={() => setActiveTab('trades')}
-          className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-            activeTab === 'trades'
-              ? 'text-blue-500 border-b-2 border-blue-500'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
-          }`}
-        >
-          Market Trades
-        </button>
+      {/* Tab Header - Dynamic tabs based on product type */}
+      <div className="flex items-center justify-between gap-4 mb-4 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex gap-1 overflow-x-auto">
+        {/* SPOT mode tabs: Order Book, Market Trades */}
+        {isSpot && (
+          <>
+            <button
+              onClick={() => setActiveTab('orderbook')}
+              className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === 'orderbook'
+                  ? 'text-blue-500 border-b-2 border-blue-500'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
+              }`}
+            >
+              Order Book
+            </button>
+            <button
+              onClick={() => setActiveTab('trades')}
+              className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === 'trades'
+                  ? 'text-blue-500 border-b-2 border-blue-500'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
+              }`}
+            >
+              Market Trades
+            </button>
+          </>
+        )}
+
+        {/* CFD mode tabs: Positions */}
+        {isCFD && (
+          <button
+            onClick={() => setActiveTab('positions')}
+            className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+              activeTab === 'positions'
+                ? 'text-blue-500 border-b-2 border-blue-500'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
+            }`}
+          >
+            Positions
+          </button>
+        )}
+
+        {/* Common tabs for all modes: Pending Orders, Trade History */}
         <button
           onClick={() => setActiveTab('pending')}
           className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
@@ -84,16 +116,20 @@ export default function MarketActivityPanel() {
         >
           Trade History
         </button>
-        {isCFD && (
+        </div>
+
+        {/* Filter Toggle - only show for history and pending tabs */}
+        {(activeTab === 'history' || activeTab === 'pending' || activeTab === 'positions') && (
           <button
-            onClick={() => setActiveTab('positions')}
-            className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-              activeTab === 'positions'
-                ? 'text-blue-500 border-b-2 border-blue-500'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
+            onClick={() => setFilterByProductType(!filterByProductType)}
+            className={`px-2 py-1 text-xs font-medium rounded transition-colors whitespace-nowrap ${
+              filterByProductType
+                ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
+            title={filterByProductType ? 'Showing current product type only' : 'Showing all orders'}
           >
-            Positions
+            {filterByProductType ? `${selectedProductType.toUpperCase()} Only` : 'All'}
           </button>
         )}
       </div>
@@ -168,42 +204,66 @@ export default function MarketActivityPanel() {
 
             {/* Market Trades List */}
             <div className="flex-1 overflow-y-auto space-y-1">
-              {trades.length > 0 ? (
-                trades.map((trade, index) => {
-                  const tradeTime = new Date(trade.time);
-                  const timeStr = tradeTime.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false,
-                  });
-                  const isBuy = !trade.isBuyerMaker; // If buyer is maker, it's a sell; otherwise buy
+              {(() => {
+                // Filter out invalid trades first
+                const validTrades = trades.filter(t => t.quantity > 0 && t.price > 0);
 
-                  return (
-                    <div
-                      key={`trade-${trade.time}-${index}`}
-                      className="grid grid-cols-3 gap-2 text-sm px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
-                    >
-                      <div className={`font-medium ${isBuy ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
-                        {formatPrice(trade.price)}
+                if (validTrades.length > 0) {
+                  return validTrades.map((trade, index) => {
+                    const tradeTime = new Date(trade.time);
+                    const timeStr = tradeTime.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: false,
+                    });
+                    const isBuy = !trade.isBuyerMaker; // If buyer is maker, it's a sell; otherwise buy
+
+                    return (
+                      <div
+                        key={`trade-${trade.time}-${index}`}
+                        className="grid grid-cols-3 gap-2 text-sm px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                      >
+                        <div className={`font-medium ${isBuy ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
+                          {formatPrice(trade.price)}
+                        </div>
+                        <div className="text-slate-700 dark:text-slate-300 text-right">{formatQuantity(trade.quantity)}</div>
+                        <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{timeStr}</div>
                       </div>
-                      <div className="text-slate-700 dark:text-slate-300 text-right">{formatQuantity(trade.quantity)}</div>
-                      <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{timeStr}</div>
+                    );
+                  });
+                } else {
+                  return (
+                    <div className="text-slate-400 dark:text-slate-500 text-sm text-center mt-4">
+                      {trades.length > 0 ? 'Trade data not available for this instrument' : 'No recent trades'}
                     </div>
                   );
-                })
-              ) : (
-                <div className="text-slate-400 dark:text-slate-500 text-sm text-center mt-4">No recent trades</div>
-              )}
+                }
+              })()}
             </div>
           </div>
         )}
 
-        {activeTab === 'pending' && <PendingOrdersTab />}
+        {activeTab === 'pending' && (
+          <PendingOrdersTab
+            filterByProductType={filterByProductType}
+            selectedProductType={selectedProductType}
+          />
+        )}
 
-        {activeTab === 'history' && <TradeHistoryTab />}
+        {activeTab === 'history' && (
+          <TradeHistoryTab
+            filterByProductType={filterByProductType}
+            selectedProductType={selectedProductType}
+          />
+        )}
 
-        {activeTab === 'positions' && isCFD && <PositionsTable />}
+        {activeTab === 'positions' && isCFD && (
+          <PositionsTable
+            filterByProductType={filterByProductType}
+            selectedProductType={selectedProductType}
+          />
+        )}
       </div>
     </div>
   );

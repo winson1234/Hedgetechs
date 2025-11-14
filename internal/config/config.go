@@ -24,29 +24,29 @@ const BinanceRestURL = "https://api.binance.com/api/v3/klines"
 const BinanceTicker24hURL = "https://api.binance.com/api/v3/ticker/24hr"
 
 // Market Data Provider Configuration
-// Twelve Data Smart Polling for Forex/Commodities (WTI, Brent, Natural Gas, CADJPY, AUDNZD, EURGBP)
+// Twelve Data Smart Polling for Forex (CADJPY, AUDNZD, EURGBP)
 var (
+	MarketDataProvider     string
+	TwelveDataAPIKey       string
+	TwelveDataPollInterval time.Duration
+	EnableExternalFetch    bool
+	StaticPrices           map[string]float64
+)
+
+// InitMarketDataConfig initializes market data configuration from environment variables
+// This must be called after loading .env file
+func InitMarketDataConfig() {
 	MarketDataProvider = os.Getenv("MARKET_DATA_PROVIDER") // "twelvedata"
-	TwelveDataAPIKey   = os.Getenv("TWELVE_DATA_API_KEY")
-
-	// Polling interval for Twelve Data REST API (default: 9 minutes = ~160 calls/day)
-	// This is parsed from TWELVE_DATA_POLL_INTERVAL env var (e.g., "9m", "10m", "1m")
-	TwelveDataPollInterval = parsePollInterval(os.Getenv("TWELVE_DATA_POLL_INTERVAL"), 9*time.Minute)
-
-	// Safety switch: disable API calls during development to save credits
-	// Set to "false" to use simulation only (useful for testing UI without burning API credits)
+	TwelveDataAPIKey = os.Getenv("TWELVE_DATA_API_KEY")
+	TwelveDataPollInterval = parsePollInterval(os.Getenv("TWELVE_DATA_POLL_INTERVAL"), 15*time.Minute)
 	EnableExternalFetch = parseBool(os.Getenv("ENABLE_EXTERNAL_FETCH"), true)
-
-	// Static fallback prices for instant boot (used before first API snapshot arrives)
+	
 	StaticPrices = map[string]float64{
-		"WTI":    75.00,  // WTI Crude Oil (USD per barrel)
-		"BRENT":  79.00,  // Brent Crude Oil (USD per barrel)
-		"NATGAS": 2.50,   // Natural Gas (USD per MMBtu)
 		"CADJPY": 108.50, // Canadian Dollar / Japanese Yen
 		"AUDNZD": 1.08,   // Australian Dollar / New Zealand Dollar
 		"EURGBP": 0.86,   // Euro / British Pound
 	}
-)
+}
 
 // parsePollInterval parses a duration string (e.g., "9m", "10m") or returns default
 func parsePollInterval(value string, defaultValue time.Duration) time.Duration {

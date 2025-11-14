@@ -29,11 +29,11 @@ const authPersistConfig = {
   whitelist: ['user', 'session'], // Only persist user and session data
 };
 
-// Persist UI configuration - persist theme and sidebar state
+// Persist UI configuration - persist theme, sidebar state, and product type
 const uiPersistConfig = {
   key: 'ui',
   storage,
-  whitelist: ['theme', 'isSidebarExpanded'], // Only persist theme and sidebar state
+  whitelist: ['theme', 'isSidebarExpanded', 'selectedProductType'], // Only persist theme, sidebar state, and product type
 };
 
 // Create persisted reducers

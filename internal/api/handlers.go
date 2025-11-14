@@ -4,6 +4,7 @@ import (
 	"brokerageProject/internal/config"
 	"brokerageProject/internal/hub" // Import local hub package
 	"brokerageProject/internal/models"
+	"brokerageProject/internal/services"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -187,14 +188,11 @@ func HandleKlines(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Check if symbol is not available on Binance (new forex/commodity instruments)
+	// Check if symbol is not available on Binance (forex instruments from TwelveData)
 	nonBinanceSymbols := map[string]bool{
-		"BRENTUSDT":  true,
-		"WTIUSDT":    true,
-		"NATGASUSDT": true,
-		"CADJPYUSDT": true,
-		"AUDNZDUSDT": true,
-		"EURGBPUSDT": true,
+		"CADJPY": true,
+		"AUDNZD": true,
+		"EURGBP": true,
 	}
 
 	// For non-Binance symbols, return empty array (no historical data available yet)
@@ -370,13 +368,11 @@ func HandleTicker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Separate symbols into Binance-supported and non-Binance symbols
+	// Forex instruments from TwelveData (no ticker/volume data available)
 	nonBinanceSymbols := map[string]bool{
-		"BRENTUSDT":  true,
-		"WTIUSDT":    true,
-		"NATGASUSDT": true,
-		"CADJPYUSDT": true,
-		"AUDNZDUSDT": true,
-		"EURGBPUSDT": true,
+		"CADJPY": true,
+		"AUDNZD": true,
+		"EURGBP": true,
 	}
 
 	requestedSymbols := strings.Split(symbolsParam, ",")
@@ -424,19 +420,40 @@ func HandleTicker(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if err := json.Unmarshal(bodyBytes, &tickers); err != nil {
+		// Unmarshal into Binance24hTicker format first
+		var binanceTickers []models.Binance24hTicker
+		if err := json.Unmarshal(bodyBytes, &binanceTickers); err != nil {
 			log.Printf("Error unmarshalling Binance tickers response: %v", err)
 			http.Error(w, "Failed to parse upstream response", http.StatusBadGateway)
 			return
 		}
+
+		// Transform to TickerResponse format
+		for _, bt := range binanceTickers {
+			tickers = append(tickers, models.TickerResponse{
+				Symbol:             bt.Symbol,
+				LastPrice:          bt.LastPrice,
+				PriceChangePercent: bt.PriceChangePercent,
+				HighPrice:          bt.HighPrice,
+				LowPrice:           bt.LowPrice,
+				Volume:             bt.QuoteVolume, // Use quoteVolume (USDT volume)
+			})
+		}
 	}
 
-	// Add placeholder tickers for non-Binance symbols (zero values for now)
+	// Add tickers for non-Binance symbols using price cache
+	priceCache := services.GetGlobalPriceCache()
 	for _, sym := range nonBinanceList {
+		price, err := priceCache.GetPrice(sym)
+		priceStr := "0"
+		if err == nil && price > 0 {
+			priceStr = fmt.Sprintf("%.5f", price)
+		}
+		
 		tickers = append(tickers, models.TickerResponse{
 			Symbol:             sym,
-			LastPrice:          "0",
-			PriceChangePercent: "0.00",
+			LastPrice:          priceStr,
+			PriceChangePercent: "0.00", // TwelveData free tier doesn't provide 24h stats
 			HighPrice:          "0",
 			LowPrice:           "0",
 			Volume:             "0",

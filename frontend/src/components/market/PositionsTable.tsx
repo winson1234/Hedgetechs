@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppSelector } from '../../store';
 import { formatCurrency } from '../../utils/formatters';
+import { ProductType } from '../../types';
 
 interface Position {
   id: string;
@@ -14,6 +15,7 @@ interface Position {
   entry_price: number;
   margin_used: number;
   leverage: number;
+  product_type?: 'spot' | 'cfd' | 'futures'; // Product type for the position
   tp_price?: number | null;
   sl_price?: number | null;
   close_price?: number | null;
@@ -26,7 +28,12 @@ interface Position {
   updated_at: string;
 }
 
-export default function PositionsTable() {
+interface PositionsTableProps {
+  filterByProductType: boolean;
+  selectedProductType: ProductType;
+}
+
+export default function PositionsTable({ filterByProductType, selectedProductType }: PositionsTableProps) {
   const { activeAccountId } = useAppSelector(state => state.account);
   const { currentPrices } = useAppSelector(state => state.price);
   const session = useAppSelector(state => state.auth.session);
@@ -68,6 +75,15 @@ export default function PositionsTable() {
     fetchPositions();
   }, [fetchPositions]);
 
+  // Filter positions by product type
+  const filteredPositions = useMemo(() =>
+    positions.filter(position => {
+      const matchesProductType = !filterByProductType || position.product_type === selectedProductType;
+      return matchesProductType;
+    }),
+    [positions, filterByProductType, selectedProductType]
+  );
+
   // Close position handler
   const handleClosePosition = async (contractId: string, symbol: string) => {
     if (!session?.access_token) return;
@@ -108,7 +124,7 @@ export default function PositionsTable() {
 
   // Calculate real-time P&L for each position
   const positionsWithPnL = useMemo(() => {
-    return positions.map(position => {
+    return filteredPositions.map(position => {
       const priceData = currentPrices[position.symbol];
       const currentPrice = priceData?.price || position.entry_price;
 
@@ -130,7 +146,7 @@ export default function PositionsTable() {
         roe,
       };
     });
-  }, [positions, currentPrices]);
+  }, [filteredPositions, currentPrices]);
 
   // Format timestamp to readable date
   const formatTimestamp = (timestamp: string) => {

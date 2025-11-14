@@ -2,11 +2,13 @@
 
 export type AccountStatus = 'active' | 'deactivated' | 'suspended'
 
+export type ProductType = 'spot' | 'cfd' | 'futures'
+
 export type Account = {
   id: string
   accountNumber?: string
   type: 'live' | 'demo'
-  productType?: 'spot' | 'cfd' | 'futures'
+  productType?: ProductType
   currency: string
   balances: Record<string, number>
   createdAt: number
@@ -22,7 +24,7 @@ export type BackendAccount = {
   user_id: string
   account_number: string
   type: 'live' | 'demo'
-  product_type: 'spot' | 'cfd' | 'futures'
+  product_type: ProductType
   currency: string
   status: AccountStatus
   created_at: string

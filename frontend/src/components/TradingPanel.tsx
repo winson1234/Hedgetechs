@@ -2,24 +2,22 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { setActiveAccount, fetchAccounts } from '../store/slices/accountSlice';
 import { createPendingOrder, executeMarketOrder, fetchOrders } from '../store/slices/orderSlice';
-import { addToast } from '../store/slices/uiSlice';
+import { addToast, setSelectedProductType } from '../store/slices/uiSlice';
 import { formatPrice } from '../utils/priceUtils';
+import { ProductType } from '../types';
 
 type OrderType = 'limit' | 'market' | 'stop-limit';
-type ProductType = 'spot' | 'cfd' | 'futures';
 
 export default function TradingPanel() {
   // Access Redux store
   const dispatch = useAppDispatch();
   const activeInstrument = useAppSelector((state) => state.ui.activeInstrument);
+  const selectedProductType = useAppSelector((state) => state.ui.selectedProductType);
   const { accounts, activeAccountId } = useAppSelector((state) => state.account);
   const { currentPrices } = useAppSelector((state) => state.price);
 
   // Get active account
   const activeAccount = accounts.find((acc) => acc.id === activeAccountId);
-
-  // NEW: Product Type Selection (at order level, not account level)
-  const [selectedProductType, setSelectedProductType] = useState<ProductType>('spot');
 
   // Get combined USD + USDT balance (treated as equivalent 1:1)
   const accountBalance = useMemo(() => {
@@ -501,7 +499,7 @@ export default function TradingPanel() {
           {(['spot', 'cfd', 'futures'] as ProductType[]).map((product) => (
             <button
               key={product}
-              onClick={() => setSelectedProductType(product)}
+              onClick={() => dispatch(setSelectedProductType(product))}
               disabled={product === 'futures'}
               className={`flex-1 px-2 py-2 text-xs sm:text-sm font-semibold rounded-md transition uppercase ${
                 selectedProductType === product
@@ -593,22 +591,34 @@ export default function TradingPanel() {
               </span>
             </div>
           )}
-          <div className="flex justify-between">
-            <span className="text-slate-600 dark:text-slate-400">{baseCurrency} Holdings:</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100">
-              {currentHolding.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} {baseCurrency}
-            </span>
-          </div>
-          <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
-            <span className="text-slate-600 dark:text-slate-400">Approx Value:</span>
-            <span className="font-bold text-blue-600 dark:text-blue-400">
-              {(usdBalance + currentHolding * (currentPrice > 0 ? currentPrice : 0)).toLocaleString('en-US', { // Use 0 if currentPrice is not yet set
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}{' '}
-              USD
-            </span>
-          </div>
+          {isSpot && (
+            <>
+              <div className="flex justify-between">
+                <span className="text-slate-600 dark:text-slate-400">{baseCurrency} Holdings:</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">
+                  {currentHolding.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} {baseCurrency}
+                </span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+                <span className="text-slate-600 dark:text-slate-400">Approx Value:</span>
+                <span className="font-bold text-blue-600 dark:text-blue-400">
+                  {(usdBalance + currentHolding * (currentPrice > 0 ? currentPrice : 0)).toLocaleString('en-US', { // Use 0 if currentPrice is not yet set
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{' '}
+                  USD
+                </span>
+              </div>
+            </>
+          )}
+          {isCFD && (
+            <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+              <span className="text-slate-600 dark:text-slate-400">Available Margin:</span>
+              <span className="font-bold text-green-600 dark:text-green-400">
+                {accountBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {accountCurrency}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -802,28 +812,45 @@ export default function TradingPanel() {
           </div>
         </div>
 
-        {/* Trading Info Block - Lots, Margin, Pip Value */}
+        {/* Trading Info Block - Conditional Layout for SPOT vs CFD */}
         <div className="p-3.5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 rounded-lg border border-blue-200 dark:border-slate-700">
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div className="text-center">
-              <div className="text-slate-600 dark:text-slate-400 mb-1.5 font-medium">Lots</div>
-              <div className="font-bold text-slate-900 dark:text-slate-100 text-base">
-                {lots.toFixed(isSpot ? 6 : 2)} {/* More precision for spot */}
+          {isSpot ? (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="text-center">
+                <div className="text-slate-600 dark:text-slate-400 mb-1.5 font-medium">Lots</div>
+                <div className="font-bold text-slate-900 dark:text-slate-100 text-base">
+                  {lots.toFixed(6)}
+                </div>
+              </div>
+              <div className="text-center border-l border-blue-200 dark:border-slate-700">
+                <div className="text-slate-600 dark:text-slate-400 mb-1.5 font-medium">Total Value</div>
+                <div className="font-bold text-slate-900 dark:text-slate-100 text-base">
+                  ${getTotal()}
+                </div>
               </div>
             </div>
-            <div className="text-center border-x border-blue-200 dark:border-slate-700">
-              <div className="text-slate-600 dark:text-slate-400 mb-1.5 font-medium">Margin</div>
-              <div className="font-bold text-slate-900 dark:text-slate-100 text-base">
-                 {isSpot ? 'N/A' : `$${margin.toFixed(2)}`}
+          ) : (
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="text-center">
+                <div className="text-slate-600 dark:text-slate-400 mb-1.5 font-medium">Lots</div>
+                <div className="font-bold text-slate-900 dark:text-slate-100 text-base">
+                  {lots.toFixed(2)}
+                </div>
+              </div>
+              <div className="text-center border-x border-blue-200 dark:border-slate-700">
+                <div className="text-slate-600 dark:text-slate-400 mb-1.5 font-medium">Margin</div>
+                <div className="font-bold text-slate-900 dark:text-slate-100 text-base">
+                  ${margin.toFixed(2)}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-slate-600 dark:text-slate-400 mb-1.5 font-medium">Pip Value</div>
+                <div className="font-bold text-slate-900 dark:text-slate-100 text-base">
+                  ${pipValue.toFixed(4)}
+                </div>
               </div>
             </div>
-            <div className="text-center">
-              <div className="text-slate-600 dark:text-slate-400 mb-1.5 font-medium">Pip Value</div>
-              <div className="font-bold text-slate-900 dark:text-slate-100 text-base">
-                 {isSpot ? 'N/A' : `$${pipValue.toFixed(4)}`}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
 

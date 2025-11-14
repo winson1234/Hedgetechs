@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { ProductType } from '../../types';
 
 // Types
 type Theme = 'light' | 'dark';
@@ -16,6 +17,7 @@ interface UIState {
   theme: Theme;
   currentPage: Page;
   activeInstrument: string; // Currently selected trading instrument (e.g., 'BTCUSDT')
+  selectedProductType: ProductType; // Currently selected product type for trading
   activeWalletTab: WalletTab; // Currently active wallet tab
   showAnalyticsPanel: boolean; // Analytics panel visibility
   isSidebarExpanded: boolean; // Sidebar expansion state
@@ -32,6 +34,7 @@ const initialState: UIState = {
   theme: 'light', // Default theme
   currentPage: 'trading',
   activeInstrument: 'BTCUSDT', // Default to Bitcoin
+  selectedProductType: 'spot', // Default to SPOT trading
   activeWalletTab: 'overview',
   showAnalyticsPanel: false,
   isSidebarExpanded: false, // Default to collapsed
@@ -65,6 +68,11 @@ const uiSlice = createSlice({
     // Active instrument (trading symbol)
     setActiveInstrument: (state, action: PayloadAction<string>) => {
       state.activeInstrument = action.payload;
+    },
+
+    // Product type selection
+    setSelectedProductType: (state, action: PayloadAction<ProductType>) => {
+      state.selectedProductType = action.payload;
     },
 
     // Active wallet tab
@@ -131,6 +139,7 @@ export const {
   toggleTheme,
   setCurrentPage,
   setActiveInstrument,
+  setSelectedProductType,
   setActiveWalletTab,
   setShowAnalyticsPanel,
   toggleAnalyticsPanel,

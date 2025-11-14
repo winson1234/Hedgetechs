@@ -47,6 +47,11 @@ func main() {
 		log.Println("Using system environment variables")
 	}
 
+	// Initialize market data configuration after loading .env
+	config.InitMarketDataConfig()
+	log.Printf("Market data config initialized: Provider=%s, PollInterval=%v, FetchEnabled=%v",
+		config.MarketDataProvider, config.TwelveDataPollInterval, config.EnableExternalFetch)
+
 	// Log Stripe configuration status (without revealing the key)
 	if stripeKey := os.Getenv("STRIPE_SECRET_KEY"); stripeKey != "" {
 		log.Printf("STRIPE_SECRET_KEY loaded successfully (length: %d)", len(stripeKey))
@@ -188,12 +193,12 @@ func main() {
 
 	// Start all providers
 	// Crypto symbols are handled by Binance provider (ignored by Twelve Data)
-	// Forex/Commodity symbols are handled by Twelve Data provider (ignored by Binance)
-	allSymbols := []string{"WTI", "BRENT", "NATGAS", "CADJPY", "AUDNZD", "EURGBP"}
+	// Forex symbols are handled by Twelve Data provider (ignored by Binance)
+	allSymbols := []string{"CADJPY", "AUDNZD", "EURGBP"}
 	if err := marketDataService.Start(allSymbols); err != nil {
 		log.Printf("WARNING: Market data service failed to start: %v", err)
 	} else {
-		log.Println("Market data service started successfully (Hybrid Engine: Crypto + Commodities)")
+		log.Println("Market data service started successfully (Hybrid Engine: Crypto + Forex)")
 	}
 
 	// Initialize forex service using Frankfurter API (free, no API key required)

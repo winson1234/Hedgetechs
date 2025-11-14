@@ -16,6 +16,7 @@ export interface Order {
   stop_price?: number | null;
   filled_amount: number;
   average_fill_price?: number | null;
+  product_type?: 'spot' | 'cfd' | 'futures'; // Product type for the order
   created_at: string;
   updated_at: string;
 }
@@ -31,6 +32,7 @@ export interface PendingOrder {
   quantity: number;
   trigger_price: number;
   limit_price?: number | null;
+  product_type?: 'spot' | 'cfd' | 'futures'; // Product type for the order
   status: 'pending' | 'executed' | 'cancelled' | 'expired' | 'failed';
   executed_at?: string | null;
   executed_price?: number | null;

@@ -90,7 +90,7 @@ func (c *Client) connect() {
 			continue
 		}
 
-		log.Println("[TwelveData] Subscribed to WTI/USD, BZ/USD, NG/USD, CAD/JPY, AUD/NZD, EUR/GBP")
+		log.Println("[TwelveData] Subscribed to CAD/JPY, AUD/NZD, EUR/GBP")
 
 		// Start reading messages (blocks until connection drops)
 		c.readLoop()
@@ -101,12 +101,12 @@ func (c *Client) connect() {
 	}
 }
 
-// subscribe sends the subscription message for all 6 symbols
+// subscribe sends the subscription message for 3 forex pairs
 func (c *Client) subscribe() error {
 	msg := SubscribeMsg{
 		Action: "subscribe",
 		Params: Params{
-			Symbols: "WTI/USD,BZ/USD,NG/USD,CAD/JPY,AUD/NZD,EUR/GBP",
+			Symbols: "CAD/JPY,AUD/NZD,EUR/GBP",
 		},
 	}
 
@@ -167,22 +167,10 @@ func (c *Client) readLoop() {
 }
 
 // mapSymbolToInternal converts Twelve Data symbols to internal format
-// WTI/USD -> WTI
-// BZ/USD -> BRENT
-// NG/USD -> NATGAS
 // CAD/JPY -> CADJPY
 // AUD/NZD -> AUDNZD
 // EUR/GBP -> EURGBP
 func mapSymbolToInternal(tdSymbol string) string {
-	switch tdSymbol {
-	case "WTI/USD":
-		return "WTI"
-	case "BZ/USD":
-		return "BRENT"
-	case "NG/USD":
-		return "NATGAS"
-	default:
-		// For forex pairs, just remove the slash
-		return strings.ReplaceAll(tdSymbol, "/", "")
-	}
+	// For forex pairs, just remove the slash
+	return strings.ReplaceAll(tdSymbol, "/", "")
 }

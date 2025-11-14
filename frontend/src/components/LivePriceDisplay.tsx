@@ -13,15 +13,19 @@ export default function LivePriceDisplay({ symbol }: LivePriceDisplayProps) {
 
   // Create a lookup map for icon info
   const symbolIcons = useMemo(() => {
-    const map: Record<string, { iconUrl: string; baseCurrency: string }> = {}
+    const map: Record<string, { iconUrl: string; baseCurrency: string; isForexPair: boolean; forexPair?: { base: string; quote: string } }> = {}
     instruments.forEach(inst => {
       // Support both legacy and new API format
       const baseCurrency = inst.baseCurrency || inst.base_currency || inst.symbol.replace('USDT', '')
 
+      // Check if this is a forex pair (has quote_currency and not USDT)
+      const isForexPair = !!(inst.quote_currency && inst.quote_currency !== 'USDT')
+      const forexPair = isForexPair ? { base: inst.base_currency!, quote: inst.quote_currency! } : undefined
+
       // Use icon URL if available, otherwise map ALL currencies to icons
       let iconUrl = inst.iconUrl || ''
-      if (!iconUrl && inst.base_currency) {
-        // Complete icon mapping for ALL 26 instruments in database
+      if (!iconUrl && inst.base_currency && !isForexPair) {
+        // Complete icon mapping for ALL instruments in database (except forex pairs)
         const iconMap: Record<string, string> = {
           // Major Cryptocurrencies
           'BTC': 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png',
@@ -33,7 +37,6 @@ export default function LivePriceDisplay({ symbol }: LivePriceDisplayProps) {
           'AVAX': 'https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png',
 
           // DeFi / Layer 2
-          'MATIC': 'https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png',
           'LINK': 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png',
           'UNI': 'https://assets.coingecko.com/coins/images/12504/small/uni.jpg',
           'ATOM': 'https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png',
@@ -62,7 +65,9 @@ export default function LivePriceDisplay({ symbol }: LivePriceDisplayProps) {
 
       map[inst.symbol] = {
         iconUrl: iconUrl,
-        baseCurrency: baseCurrency
+        baseCurrency: baseCurrency,
+        isForexPair: isForexPair,
+        forexPair: forexPair
       }
     })
     return map
@@ -87,21 +92,59 @@ export default function LivePriceDisplay({ symbol }: LivePriceDisplayProps) {
   }, [currentPrice])
 
   const color = price == null || prev == null ? 'text-slate-200 dark:text-slate-300' : price >= prev ? 'text-green-500' : 'text-red-500'
-  
-  // Format symbol for display (e.g., BTCUSDT -> BTC/USDT)
-  const displaySymbol = symbol.replace(/USDT?$/, match => `/${match}`)
-  
+
   // Get icon info for current symbol
-  const iconInfo = symbolIcons[symbol] || { iconUrl: '', baseCurrency: symbol.substring(0, 3) }
+  const iconInfo = symbolIcons[symbol] || { iconUrl: '', baseCurrency: symbol.substring(0, 3), isForexPair: false }
+
+  // Format symbol for display
+  let displaySymbol = symbol
+  if (iconInfo.isForexPair && iconInfo.forexPair) {
+    displaySymbol = `${iconInfo.forexPair.base}/${iconInfo.forexPair.quote}`
+  } else {
+    displaySymbol = symbol.replace(/USDT?$/, match => `/${match}`)
+  }
 
   return (
     <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-slate-50 dark:bg-slate-800/50">
       <div className="flex items-center gap-2 mb-3">
         {/* Icon */}
         <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-          {iconInfo.iconUrl ? (
-            <img 
-              src={iconInfo.iconUrl} 
+          {iconInfo.isForexPair && iconInfo.forexPair ? (
+            (() => {
+              // Currency code to country code mapping
+              const currencyToCountry: Record<string, string> = {
+                'CAD': 'ca', 'AUD': 'au', 'JPY': 'jp', 'NZD': 'nz',
+                'EUR': 'eu', 'GBP': 'gb', 'USD': 'us', 'CHF': 'ch'
+              };
+              const baseCountry = currencyToCountry[iconInfo.forexPair.base] || iconInfo.forexPair.base.toLowerCase();
+              const quoteCountry = currencyToCountry[iconInfo.forexPair.quote] || iconInfo.forexPair.quote.toLowerCase();
+
+              return (
+                <div className="flex -space-x-2">
+                  <img
+                    src={`https://hatscripts.github.io/circle-flags/flags/${baseCountry}.svg`}
+                    alt={iconInfo.forexPair.base}
+                    className="w-5 h-5 rounded-full border border-white dark:border-slate-900"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                    }}
+                  />
+                  <img
+                    src={`https://hatscripts.github.io/circle-flags/flags/${quoteCountry}.svg`}
+                    alt={iconInfo.forexPair.quote}
+                    className="w-5 h-5 rounded-full border border-white dark:border-slate-900"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                    }}
+                  />
+                </div>
+              );
+            })()
+          ) : iconInfo.iconUrl ? (
+            <img
+              src={iconInfo.iconUrl}
               alt={iconInfo.baseCurrency}
               className="w-6 h-6 object-cover"
               onError={(e) => {

@@ -50,11 +50,8 @@ type PriceResponse map[string]struct {
 //   - pollInterval: How often to fetch real prices (e.g., 9 * time.Minute)
 //   - enableFetch: Set to false to disable API calls (for testing simulation only)
 func NewAdapter(apiKey string, pollInterval time.Duration, enableFetch bool) *Adapter {
-	// Symbol mapping: Internal format -> Twelve Data API format
+	// Symbol mapping: Internal format -> Twelve Data API format (Forex only)
 	symbolMapping := map[string]string{
-		"WTI":    "WTI/USD",
-		"BRENT":  "BZ/USD",
-		"NATGAS": "NG/USD",
 		"CADJPY": "CAD/JPY",
 		"AUDNZD": "AUD/NZD",
 		"EURGBP": "EUR/GBP",
@@ -86,9 +83,6 @@ func (a *Adapter) Subscribe(symbols []string, onTick func(string, float64)) erro
 	// Initialize base prices with static fallbacks
 	// These are used until the first API snapshot arrives
 	staticFallbacks := map[string]float64{
-		"WTI":    75.00,
-		"BRENT":  79.00,
-		"NATGAS": 2.50,
 		"CADJPY": 108.50,
 		"AUDNZD": 1.08,
 		"EURGBP": 0.86,

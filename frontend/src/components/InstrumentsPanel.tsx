@@ -87,7 +87,19 @@ export default function InstrumentsPanel() {
 
       // Use icon URL if available, otherwise map ALL currencies to icons
       let iconUrl = inst.iconUrl || ''
+      let isForexPair = false
+      let forexPair = { base: '', quote: '' }
+      
       if (!iconUrl && inst.base_currency) {
+        // Check if this is a forex pair (has quote_currency and not USDT)
+        if (inst.quote_currency && inst.quote_currency !== 'USDT') {
+          isForexPair = true
+          forexPair = {
+            base: inst.base_currency,
+            quote: inst.quote_currency
+          }
+        }
+        
         // Complete icon mapping for ALL 26 instruments in database
         const iconMap: Record<string, string> = {
           // Major Cryptocurrencies
@@ -124,25 +136,31 @@ export default function InstrumentsPanel() {
           'EUR': 'https://hatscripts.github.io/circle-flags/flags/eu.svg',
           'PAXG': 'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/paxg.png',
           
-          // Commodities (using simple SVG data URIs with emoji)
-          'WTI': 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNiIgZmlsbD0iIzM0NDk1ZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE2IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiPvCfm6I8L3RleHQ+PC9zdmc+',
-          'BRENT': 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNiIgZmlsbD0iIzFhYmM5YyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE2IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiPvCfm6I8L3RleHQ+PC9zdmc+',
-          'NATGAS': 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNiIgZmlsbD0iI2YzOWMxMiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE2IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiPvCflKU8L3RleHQ+PC9zdmc+',
-          
-          // Forex pairs
+          // Forex pairs (dual-flag SVGs for pair representation)
           'CAD': 'https://hatscripts.github.io/circle-flags/flags/ca.svg',
           'AUD': 'https://hatscripts.github.io/circle-flags/flags/au.svg',
+          'JPY': 'https://hatscripts.github.io/circle-flags/flags/jp.svg',
+          'NZD': 'https://hatscripts.github.io/circle-flags/flags/nz.svg',
+          'GBP': 'https://hatscripts.github.io/circle-flags/flags/gb.svg',
         }
         iconUrl = iconMap[inst.base_currency] || ''
       }
 
       const category = inst.category || 'altcoin'
+      
+      // Format display name for forex pairs
+      let displayName = baseCurrency
+      if (isForexPair && forexPair.base && forexPair.quote) {
+        displayName = `${forexPair.base}/${forexPair.quote}`
+      }
 
       return {
         symbol: inst.symbol,
-        displayName: baseCurrency, // Show BTC instead of Bitcoin
+        displayName: displayName,
         baseCurrency: baseCurrency,
         iconUrl: iconUrl,
+        isForexPair: isForexPair,
+        forexPair: forexPair,
         category: category,
         price: price,
         change: changePercent,
@@ -351,6 +369,39 @@ export default function InstrumentsPanel() {
                   <div className="relative flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                     {item.isLoading ? (
                       <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 border-t-slate-600 dark:border-t-slate-300 rounded-full animate-spin"></div>
+                    ) : item.isForexPair && item.forexPair?.base && item.forexPair?.quote ? (
+                      (() => {
+                        // Currency code to country code mapping
+                        const currencyToCountry: Record<string, string> = {
+                          'CAD': 'ca', 'AUD': 'au', 'JPY': 'jp', 'NZD': 'nz',
+                          'EUR': 'eu', 'GBP': 'gb', 'USD': 'us', 'CHF': 'ch'
+                        };
+                        const baseCountry = currencyToCountry[item.forexPair.base] || item.forexPair.base.toLowerCase();
+                        const quoteCountry = currencyToCountry[item.forexPair.quote] || item.forexPair.quote.toLowerCase();
+
+                        return (
+                          <div className="flex -space-x-2">
+                            <img
+                              src={`https://hatscripts.github.io/circle-flags/flags/${baseCountry}.svg`}
+                              alt={item.forexPair.base}
+                              className="w-5 h-5 rounded-full border border-white dark:border-slate-900"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.style.display = 'none'
+                              }}
+                            />
+                            <img
+                              src={`https://hatscripts.github.io/circle-flags/flags/${quoteCountry}.svg`}
+                              alt={item.forexPair.quote}
+                              className="w-5 h-5 rounded-full border border-white dark:border-slate-900"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.style.display = 'none'
+                              }}
+                            />
+                          </div>
+                        );
+                      })()
                     ) : item.iconUrl ? (
                       <img
                         src={item.iconUrl}

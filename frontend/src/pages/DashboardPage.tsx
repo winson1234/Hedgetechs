@@ -16,6 +16,8 @@ interface CryptoData {
   volume24h: number;  // 24h trading volume for "Popular Coins" sorting
   icon: string;
   gradient: string;
+  isForexPair?: boolean;
+  forexPair?: { base: string; quote: string };
 }
 
 // UI-specific properties for each crypto (emoji icons and gradient backgrounds)
@@ -44,16 +46,6 @@ const cryptoUIProperties: Record<string, { icon: string; gradient: string }> = {
   'SUIUSDT': { icon: 'S', gradient: 'linear-gradient(135deg, #4da2ff, #7ec8ff)' },
   'STXUSDT': { icon: '⬢', gradient: 'linear-gradient(135deg, #5546ff, #7e72ff)' },
   'TONUSDT': { icon: '◇', gradient: 'linear-gradient(135deg, #0088cc, #229ed9)' },
-  
-  // Commodities
-  'WTI': { icon: '🛢', gradient: 'linear-gradient(135deg, #2c3e50, #34495e)' },
-  'BRENT': { icon: '🛢', gradient: 'linear-gradient(135deg, #16a085, #1abc9c)' },
-  'NATGAS': { icon: '🔥', gradient: 'linear-gradient(135deg, #e67e22, #f39c12)' },
-  
-  // Forex pairs
-  'CADJPY': { icon: '🍁', gradient: 'linear-gradient(135deg, #c0392b, #e74c3c)' },
-  'AUDNZD': { icon: '🦘', gradient: 'linear-gradient(135deg, #27ae60, #2ecc71)' },
-  'EURGBP': { icon: '💶', gradient: 'linear-gradient(135deg, #2980b9, #3498db)' },
 };
 
 export default function DashboardPage() {
@@ -126,13 +118,26 @@ const cancelLogout = () => {
   // Real-time cryptocurrency data from WebSocket (all instruments from API)
   // Computed directly from instruments + Redux price/ticker data
   const cryptoData = useMemo<CryptoData[]>(() => {
-    return instruments.map(inst => {
+    return instruments
+      .map(inst => {
       // Support both legacy (displayName, baseCurrency) and new API format (name, base_currency)
       const baseCurr = inst.baseCurrency || inst.base_currency || inst.symbol.replace('USDT', '');
 
       // Use icon URL if available (from legacy API), otherwise use CoinGecko-style URLs
       let iconUrl = inst.iconUrl || '';
+      let isForexPair = false;
+      let forexPair = { base: '', quote: '' };
+      
       if (!iconUrl && inst.base_currency) {
+        // Check if this is a forex pair (has quote_currency and not USDT)
+        if (inst.quote_currency && inst.quote_currency !== 'USDT') {
+          isForexPair = true;
+          forexPair = {
+            base: inst.base_currency,
+            quote: inst.quote_currency
+          };
+        }
+        
         // Complete icon mapping for ALL 26 instruments in database
         const iconMap: Record<string, string> = {
           // Major Cryptocurrencies
@@ -174,9 +179,12 @@ const cancelLogout = () => {
           'BRENT': 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNiIgZmlsbD0iIzFhYmM5YyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE2IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiPvCfm6I8L3RleHQ+PC9zdmc+',
           'NATGAS': 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNiIgZmlsbD0iI2YzOWMxMiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE2IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiPvCflKU8L3RleHQ+PC9zdmc+',
           
-          // Forex pairs
+          // Forex pairs (dual-flag SVGs)
           'CAD': 'https://hatscripts.github.io/circle-flags/flags/ca.svg',
           'AUD': 'https://hatscripts.github.io/circle-flags/flags/au.svg',
+          'JPY': 'https://hatscripts.github.io/circle-flags/flags/jp.svg',
+          'NZD': 'https://hatscripts.github.io/circle-flags/flags/nz.svg',
+          'GBP': 'https://hatscripts.github.io/circle-flags/flags/gb.svg',
         };
         iconUrl = iconMap[inst.base_currency] || '';
       }
@@ -190,12 +198,14 @@ const cancelLogout = () => {
 
       return {
         symbol: inst.symbol,
-        name: baseCurr, // Show symbol (BTC) instead of full name (Bitcoin)
+        name: inst.name || baseCurr, // Use full name from database (e.g., "Bitcoin")
         price: priceData ? priceData.price : 0,
         change: ticker ? ticker.priceChangePercent : 0,
         volume24h: ticker ? ticker.volume24h : 0,
         icon: uiProps.icon,
-        gradient: uiProps.gradient
+        gradient: uiProps.gradient,
+        isForexPair: isForexPair,
+        forexPair: isForexPair ? forexPair : undefined
       };
     });
   }, [instruments, currentPrices, tickerData]);
@@ -833,12 +843,40 @@ const cancelLogout = () => {
               <div className="crypto-col" style={{ textAlign: 'center' }}>Trade</div>
             </div>
 
-            {displayedCrypto.map(crypto => (
+            {displayedCrypto.map(crypto => {
+              // Currency code to country code mapping for forex pairs
+              const currencyToCountry: Record<string, string> = {
+                'CAD': 'ca', 'AUD': 'au', 'JPY': 'jp', 'NZD': 'nz',
+                'EUR': 'eu', 'GBP': 'gb', 'USD': 'us', 'CHF': 'ch'
+              };
+
+              return (
               <div key={crypto.symbol} className="crypto-row">
                 <div className="crypto-col" style={{ textAlign: 'left' }}>
                   <div className="crypto-info">
                     <div className="crypto-icon" style={{ background: crypto.gradient }}>
-                      {crypto.icon.startsWith('http') ? (
+                      {crypto.isForexPair && crypto.forexPair ? (
+                        <div style={{ display: 'flex', gap: '-8px', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                          <img
+                            src={`https://hatscripts.github.io/circle-flags/flags/${currencyToCountry[crypto.forexPair.base] || crypto.forexPair.base.toLowerCase()}.svg`}
+                            alt={crypto.forexPair.base}
+                            style={{ width: '50%', height: '50%', objectFit: 'cover', borderRadius: '50%' }}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
+                          />
+                          <img
+                            src={`https://hatscripts.github.io/circle-flags/flags/${currencyToCountry[crypto.forexPair.quote] || crypto.forexPair.quote.toLowerCase()}.svg`}
+                            alt={crypto.forexPair.quote}
+                            style={{ width: '50%', height: '50%', objectFit: 'cover', borderRadius: '50%', marginLeft: '-10px' }}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : crypto.icon.startsWith('http') ? (
                         <img
                           src={crypto.icon}
                           alt={crypto.name}
@@ -857,7 +895,7 @@ const cancelLogout = () => {
                       )}
                     </div>
                     <div>
-                      <div className="crypto-symbol">{crypto.symbol.replace('USDT', '')}</div>
+                      <div className="crypto-symbol">{crypto.symbol.replace('USDT', '').replace(/([A-Z]{3})([A-Z]{3})/, '$1/$2')}</div>
                       <div className="crypto-name">{crypto.name}</div>
                     </div>
                   </div>
@@ -883,7 +921,8 @@ const cancelLogout = () => {
                   <button className="btn-trade" onClick={() => handleBuyClick(crypto.symbol)}>Buy</button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Crypto Pagination Controls */}

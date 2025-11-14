@@ -1,18 +1,27 @@
 import { useMemo } from 'react';
 import { useAppSelector } from '../../store';
 import { formatCurrency } from '../../utils/formatters';
+import { ProductType } from '../../types';
 
-export default function TradeHistoryTab() {
+interface TradeHistoryTabProps {
+  filterByProductType: boolean;
+  selectedProductType: ProductType;
+}
+
+export default function TradeHistoryTab({ filterByProductType, selectedProductType }: TradeHistoryTabProps) {
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
   const allOrders = useAppSelector(state => state.order.orders);
 
   // Memoize filtered orders to prevent unnecessary rerenders
   const orderHistory = useMemo(() =>
-    allOrders.filter(order =>
-      order.symbol === activeInstrument &&
-      (order.status === 'filled' || order.status === 'partially_filled')
-    ),
-    [allOrders, activeInstrument]
+    allOrders.filter(order => {
+      const matchesInstrument = order.symbol === activeInstrument;
+      const matchesStatus = order.status === 'filled' || order.status === 'partially_filled';
+      const matchesProductType = !filterByProductType || order.product_type === selectedProductType;
+
+      return matchesInstrument && matchesStatus && matchesProductType;
+    }),
+    [allOrders, activeInstrument, filterByProductType, selectedProductType]
   );
 
   // Format timestamp to readable date

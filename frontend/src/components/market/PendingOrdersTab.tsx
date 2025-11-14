@@ -2,16 +2,27 @@ import { useMemo } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { cancelPendingOrder } from '../../store/slices/orderSlice';
 import { formatCurrency } from '../../utils/formatters';
+import { ProductType } from '../../types';
 
-export default function PendingOrdersTab() {
+interface PendingOrdersTabProps {
+  filterByProductType: boolean;
+  selectedProductType: ProductType;
+}
+
+export default function PendingOrdersTab({ filterByProductType, selectedProductType }: PendingOrdersTabProps) {
   const dispatch = useAppDispatch();
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
   const allPendingOrders = useAppSelector(state => state.order.pendingOrders);
 
   // Memoize filtered orders to prevent unnecessary rerenders
   const pendingOrders = useMemo(() =>
-    allPendingOrders.filter(order => order.symbol === activeInstrument),
-    [allPendingOrders, activeInstrument]
+    allPendingOrders.filter(order => {
+      const matchesInstrument = order.symbol === activeInstrument;
+      const matchesProductType = !filterByProductType || order.product_type === selectedProductType;
+
+      return matchesInstrument && matchesProductType;
+    }),
+    [allPendingOrders, activeInstrument, filterByProductType, selectedProductType]
   );
 
   const handleCancel = (orderId: string) => {

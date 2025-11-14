@@ -88,6 +88,11 @@ func main() {
 	}
 	utils.InitGlobalAuditLogger(dbPool)
 
+	// Initialize margin service (requires database)
+	marginService := services.GetGlobalMarginService()
+	marginService.InitMarginService(dbPool)
+	log.Println("Margin service initialized successfully")
+
 	// Initialize rate limiter (100 requests per minute per user, burst of 20)
 	middleware.InitRateLimiter(100, 20)
 

@@ -208,6 +208,9 @@ func GetContracts(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
+	// Get price cache for real-time unrealized PnL calculation
+	priceCache := services.GetGlobalPriceCache()
+
 	var contracts []models.Contract
 	for rows.Next() {
 		var contract models.Contract
@@ -221,6 +224,23 @@ func GetContracts(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Failed to scan contract: %v", err)
 			continue
 		}
+
+		// Calculate real-time unrealized PnL for open positions
+		if contract.Status == models.ContractStatusOpen && priceCache != nil {
+			currentPrice, err := priceCache.GetPrice(contract.Symbol)
+			if err == nil && currentPrice > 0 {
+				var unrealizedPnL float64
+				if contract.Side == models.ContractSideLong {
+					// Long position: profit when price goes up
+					unrealizedPnL = (currentPrice - contract.EntryPrice) * contract.LotSize
+				} else if contract.Side == models.ContractSideShort {
+					// Short position: profit when price goes down
+					unrealizedPnL = (contract.EntryPrice - currentPrice) * contract.LotSize
+				}
+				contract.UnrealizedPnL = &unrealizedPnL
+			}
+		}
+
 		contracts = append(contracts, contract)
 	}
 

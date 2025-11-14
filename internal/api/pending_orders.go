@@ -182,6 +182,9 @@ func GetPendingOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Optional product_type filter
+	productTypeFilter := r.URL.Query().Get("product_type") // "spot", "cfd", or "futures"
+
 	// Get database pool
 	pool, err := database.GetPool()
 	if err != nil {
@@ -211,15 +214,23 @@ func GetPendingOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Build query with optional product_type filter
+	query := `SELECT id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price,
+	                 leverage, product_type, status, executed_at, executed_price, failure_reason, created_at, updated_at, order_number
+	          FROM pending_orders
+	          WHERE account_id = $1`
+
+	args := []interface{}{accountID}
+
+	if productTypeFilter != "" {
+		query += " AND product_type = $2"
+		args = append(args, productTypeFilter)
+	}
+
+	query += " ORDER BY created_at DESC"
+
 	// Fetch pending orders
-	rows, err := pool.Query(ctx,
-		`SELECT id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price,
-		        status, executed_at, executed_price, failure_reason, created_at, updated_at, order_number
-		 FROM pending_orders
-		 WHERE account_id = $1
-		 ORDER BY created_at DESC`,
-		accountID,
-	)
+	rows, err := pool.Query(ctx, query, args...)
 	if err != nil {
 		log.Printf("Failed to query pending orders: %v", err)
 		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to fetch pending orders")
@@ -233,7 +244,7 @@ func GetPendingOrders(w http.ResponseWriter, r *http.Request) {
 		var order models.PendingOrder
 		err := rows.Scan(
 			&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.Type, &order.Side,
-			&order.Quantity, &order.TriggerPrice, &order.LimitPrice, &order.Status,
+			&order.Quantity, &order.TriggerPrice, &order.LimitPrice, &order.Leverage, &order.ProductType, &order.Status,
 			&order.ExecutedAt, &order.ExecutedPrice, &order.FailureReason,
 			&order.CreatedAt, &order.UpdatedAt, &order.OrderNumber,
 		)

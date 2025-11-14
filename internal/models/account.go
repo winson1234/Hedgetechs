@@ -81,6 +81,13 @@ type Account struct {
 
 	// Balances will be populated when fetching account details
 	Balances []Balance `json:"balances,omitempty"`
+
+	// Transient margin fields (calculated, not stored in DB)
+	Equity        *float64 `json:"equity,omitempty"`
+	UsedMargin    *float64 `json:"used_margin,omitempty"`
+	FreeMargin    *float64 `json:"free_margin,omitempty"`
+	MarginLevel   *float64 `json:"margin_level,omitempty"`
+	UnrealizedPnL *float64 `json:"unrealized_pnl,omitempty"`
 }
 
 // Balance represents a currency balance for an account
@@ -411,6 +418,9 @@ type Contract struct {
 	CreatedAt        time.Time      `json:"created_at"`
 	ClosedAt         *time.Time     `json:"closed_at,omitempty"`
 	UpdatedAt        time.Time      `json:"updated_at"`
+
+	// Transient field (calculated, not stored in DB)
+	UnrealizedPnL *float64 `json:"unrealized_pnl,omitempty"`
 }
 
 // CreateContractRequest represents the request to create a contract

@@ -11,6 +11,7 @@ import (
 	"brokerageProject/internal/database"
 	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/models"
+	"brokerageProject/internal/services"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -203,6 +204,23 @@ func GetAccounts(w http.ResponseWriter, r *http.Request) {
 			account.Balances = []models.Balance{}
 		} else {
 			account.Balances = balances
+		}
+
+		// Calculate margin metrics for this account
+		marginService := services.GetGlobalMarginService()
+		if marginService != nil {
+			metrics, err := marginService.CalculateMargin(account.ID)
+			if err != nil {
+				log.Printf("Failed to calculate margin for account %s: %v", account.ID, err)
+				// Continue without margin data rather than failing the request
+			} else {
+				// Populate transient margin fields
+				account.Equity = &metrics.Equity
+				account.UsedMargin = &metrics.UsedMargin
+				account.FreeMargin = &metrics.FreeMargin
+				account.MarginLevel = &metrics.MarginLevel
+				account.UnrealizedPnL = &metrics.UnrealizedPnL
+			}
 		}
 
 		accounts = append(accounts, account)

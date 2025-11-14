@@ -38,6 +38,7 @@ type PendingOrder struct {
 	TriggerPrice   float64            `json:"trigger_price"`  // Price at which order triggers
 	LimitPrice     *float64           `json:"limit_price,omitempty"` // Limit price (optional)
 	Leverage       int                `json:"leverage"`       // Leverage multiplier (1 for spot, >1 for CFD/Futures)
+	ProductType    ProductType        `json:"product_type"`   // "spot", "cfd", or "futures"
 	Status         PendingOrderStatus `json:"status"`         // Current status
 	ExecutedAt     *time.Time         `json:"executed_at,omitempty"` // When executed
 	ExecutedPrice  *float64           `json:"executed_price,omitempty"` // Actual execution price
@@ -56,6 +57,7 @@ type CreatePendingOrderRequest struct {
 	TriggerPrice float64            `json:"trigger_price"` // Price at which order triggers
 	LimitPrice   *float64           `json:"limit_price,omitempty"` // Optional limit price
 	Leverage     int                `json:"leverage"`     // Leverage multiplier (default: 1)
+	ProductType  ProductType        `json:"product_type"` // "spot", "cfd", or "futures"
 }
 
 // CreatePendingOrderResponse represents the response after creating a pending order

@@ -205,6 +205,9 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Optional product_type filter
+	productTypeFilter := r.URL.Query().Get("product_type") // "spot", "cfd", or "futures"
+
 	pool, err := database.GetPool()
 	if err != nil {
 		log.Printf("Database pool error: %v", err)
@@ -223,15 +226,22 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Build query with optional product_type filter
+	query := `SELECT id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, product_type, filled_amount, average_fill_price, created_at, updated_at
+	          FROM orders
+	          WHERE account_id = $1`
+
+	args := []interface{}{accountID}
+
+	if productTypeFilter != "" {
+		query += " AND product_type = $2"
+		args = append(args, productTypeFilter)
+	}
+
+	query += " ORDER BY created_at DESC LIMIT 100"
+
 	// Fetch orders
-	rows, err := pool.Query(ctx,
-		`SELECT id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, filled_amount, average_fill_price, created_at, updated_at
-		 FROM orders
-		 WHERE account_id = $1
-		 ORDER BY created_at DESC
-		 LIMIT 100`,
-		accountID,
-	)
+	rows, err := pool.Query(ctx, query, args...)
 	if err != nil {
 		log.Printf("Failed to query orders: %v", err)
 		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to fetch orders")
@@ -244,7 +254,7 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 		var order models.Order
 		err := rows.Scan(
 			&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.OrderNumber, &order.Side, &order.Type, &order.Status,
-			&order.AmountBase, &order.LimitPrice, &order.StopPrice, &order.FilledAmount, &order.AverageFillPrice,
+			&order.AmountBase, &order.LimitPrice, &order.StopPrice, &order.Leverage, &order.ProductType, &order.FilledAmount, &order.AverageFillPrice,
 			&order.CreatedAt, &order.UpdatedAt,
 		)
 		if err != nil {

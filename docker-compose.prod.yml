@@ -1,4 +1,50 @@
 services:
+  # Redis service (for MT5 forex data streaming)
+  redis:
+    image: redis:7-alpine
+    container_name: brokerage-redis-prod
+    ports:
+      - "6379:6379"
+    networks:
+      - brokerage-network
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # MT5 Bridge service (Linux - polls Windows API and publishes to Redis)
+  mt5-bridge:
+    build:
+      context: ./mt5-publisher
+      dockerfile: Dockerfile.bridge
+    container_name: mt5-bridge-prod
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - brokerage-network
+    environment:
+      # Windows API Server (running on Windows VPS)
+      - WINDOWS_API_URL=${WINDOWS_API_URL}
+      # Redis Configuration
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=0
+      - REDIS_CHANNEL=fx_price_updates
+      - REDIS_HASH_KEY=fx_latest_prices
+      # Polling interval
+      - POLL_INTERVAL_MS=100
+
   # Backend service (Go - production build)
   backend:
     build:
@@ -11,8 +57,13 @@ services:
       - .env
     environment:
       - DOCKER_ENV=production
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     networks:
       - brokerage-network
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: always
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v1/ticker?symbol=BTCUSDT"]
@@ -50,3 +101,7 @@ services:
 networks:
   brokerage-network:
     driver: bridge
+
+volumes:
+  redis-data:
+    driver: local

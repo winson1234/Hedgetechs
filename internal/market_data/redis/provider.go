@@ -23,7 +23,7 @@ const (
 	initialBackoff = 1 * time.Second
 )
 
-// PriceUpdate represents the JSON message published by MT5 Python script
+// PriceUpdate represents the JSON message published by the MT5 publisher service
 type PriceUpdate struct {
 	Symbol    string  `json:"symbol"`
 	Bid       float64 `json:"bid"`
@@ -32,11 +32,12 @@ type PriceUpdate struct {
 }
 
 // Provider implements the market_data.Provider interface for Redis Pub/Sub.
-// It receives real-time forex prices from the MT5 Python publisher.
+// It receives real-time forex prices from the MT5 publisher service.
 type Provider struct {
-	redisAddr string
-	client    *redis.Client
-	pubsub    *redis.PubSub
+	redisAddr     string
+	redisPassword string
+	client        *redis.Client
+	pubsub        *redis.PubSub
 
 	onTick    func(string, float64)
 	stopChan  chan struct{}
@@ -49,14 +50,16 @@ type Provider struct {
 }
 
 // NewProvider creates a new Redis provider
-func NewProvider(redisAddr string) *Provider {
+// password can be empty string if Redis doesn't require authentication
+func NewProvider(redisAddr string, redisPassword string) *Provider {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Provider{
-		redisAddr: redisAddr,
-		stopChan:  make(chan struct{}),
-		ctx:       ctx,
-		cancel:    cancel,
+		redisAddr:     redisAddr,
+		redisPassword: redisPassword,
+		stopChan:      make(chan struct{}),
+		ctx:           ctx,
+		cancel:        cancel,
 	}
 }
 
@@ -70,6 +73,7 @@ func (p *Provider) Subscribe(symbols []string, onTick func(string, float64)) err
 	// Initialize Redis client
 	p.client = redis.NewClient(&redis.Options{
 		Addr:         p.redisAddr,
+		Password:     p.redisPassword, // Empty string if no password
 		DB:           0,
 		DialTimeout:  5 * time.Second,
 		ReadTimeout:  3 * time.Second,

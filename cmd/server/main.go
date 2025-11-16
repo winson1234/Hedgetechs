@@ -188,7 +188,8 @@ func main() {
 	if redisAddr == "" {
 		redisAddr = "localhost:6379" // Fallback for local development
 	}
-	redisForexProvider := redisProvider.NewProvider(redisAddr)
+	redisPassword := os.Getenv("REDIS_PASSWORD") // Empty string if not set (no auth)
+	redisForexProvider := redisProvider.NewProvider(redisAddr, redisPassword)
 	marketDataService.AddProvider(redisForexProvider)
 	log.Printf("Registered Redis Provider (real-time forex from MT5, addr=%s)", redisAddr)
 

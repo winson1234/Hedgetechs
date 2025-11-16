@@ -4,12 +4,22 @@ services:
     image: redis:7-alpine
     container_name: brokerage-redis
     ports:
-      # Expose to host so external MT5 Python publisher can connect
+      # Expose to host so external MT5 publisher (Docker) can connect
       - "6379:6379"
     networks:
       - brokerage-network
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    # Enable password authentication if REDIS_PASSWORD is set in .env
+    command: >
+      sh -c "
+      if [ -n \"$REDIS_PASSWORD\" ]; then
+        redis-server --requirepass \"$REDIS_PASSWORD\" --appendonly yes
+      else
+        redis-server --appendonly yes
+      fi
+      "
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       # Persist Redis data (optional - for durability)
       - redis-data:/data
@@ -35,6 +45,7 @@ services:
     environment:
       - DOCKER_ENV=development
       - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     networks:
       - brokerage-network
     depends_on:

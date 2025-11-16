@@ -3,6 +3,7 @@ import { updateCurrentPrice, updateOrderBook, addTrade } from '../slices/priceSl
 import { createDeposit } from '../slices/transactionSlice';
 import { fetchAccounts } from '../slices/accountSlice';
 import { addToast } from '../slices/uiSlice';
+import { updateForexQuote } from '../slices/forexSlice';
 
 // WebSocket connection instance
 let ws: WebSocket | null = null;
@@ -92,7 +93,22 @@ export const websocketMiddleware: Middleware = (store) => {
         }
 
         // Handle different message types based on our backend format
-        if (data.symbol && data.bids && data.asks) {
+        if (data.type === 'forex_quote') {
+          // Forex quote message: { type: "forex_quote", symbol, bid, ask, timestamp }
+          const symbol = data.symbol;
+          const bid = typeof data.bid === 'string' ? parseFloat(data.bid) : data.bid;
+          const ask = typeof data.ask === 'string' ? parseFloat(data.ask) : data.ask;
+          const timestamp = data.timestamp;
+
+          store.dispatch(
+            updateForexQuote({
+              symbol,
+              bid,
+              ask,
+              timestamp,
+            })
+          );
+        } else if (data.symbol && data.bids && data.asks) {
           // Order book message: { symbol, bids: [[price, qty], ...], asks: [[price, qty], ...] }
           const symbol = data.symbol;
           const bids = data.bids.slice(0, 10).map(([price, quantity]: [string, string]) => ({

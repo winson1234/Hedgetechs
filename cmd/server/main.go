@@ -11,6 +11,7 @@ import (
 	"brokerageProject/internal/services"
 	"brokerageProject/internal/utils"
 	"brokerageProject/internal/worker"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -92,6 +94,48 @@ func main() {
 	marginService.InitMarginService(dbPool)
 	log.Println("Margin service initialized successfully")
 
+	// Initialize Redis client for forex services
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     redisAddr,
+		Password: redisPassword,
+		DB:       0,
+	})
+	// Test Redis connection
+	if err := redisClient.Ping(context.Background()).Err(); err != nil {
+		log.Printf("WARNING: Redis connection failed: %v (forex services will be disabled)", err)
+		redisClient = nil
+	} else {
+		log.Printf("Redis client initialized successfully (addr=%s)", redisAddr)
+	}
+
+	// Initialize forex services (if Redis is available)
+	var forexAggregator *services.ForexAggregatorService
+	var forexAnalytics *services.ForexAnalyticsService
+	var forexKlines *services.ForexKlinesService
+
+	if redisClient != nil {
+		// Initialize forex aggregator (tick → 1-minute bars)
+		forexAggregator = services.NewForexAggregatorService(dbPool, redisClient)
+		go forexAggregator.StartAggregator(context.Background())
+		log.Println("Forex aggregator service started (subscribing to fx_price_updates)")
+
+		// Initialize forex analytics (24h stats calculator)
+		forexAnalytics = services.NewForexAnalyticsService(dbPool, redisClient)
+		go forexAnalytics.StartAnalyticsWorker(context.Background())
+		log.Println("Forex analytics worker started (calculating 24h stats every 1 minute)")
+
+		// Initialize forex klines service (historical data provider)
+		forexKlines = services.NewForexKlinesService(dbPool)
+		log.Println("Forex klines service initialized")
+	} else {
+		log.Println("WARNING: Forex services disabled (Redis unavailable)")
+	}
+
 	// Initialize rate limiter (100 requests per minute per user, burst of 20)
 	middleware.InitRateLimiter(100, 20)
 
@@ -120,6 +164,11 @@ func main() {
 	// Create and run the central hub
 	h := hub.NewHub()
 	go h.Run()
+
+	// Subscribe hub to Redis forex price updates (if Redis available)
+	if redisClient != nil {
+		go h.SubscribeToRedisForex(context.Background(), redisClient)
+	}
 
 	// Initialize event-driven order processor (requires database)
 	var orderProcessor *worker.OrderProcessor
@@ -184,11 +233,7 @@ func main() {
 	log.Println("Registered Binance Provider (real-time crypto WebSocket)")
 
 	// Provider 2: Redis Pub/Sub (Real-Time Forex from MT5)
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379" // Fallback for local development
-	}
-	redisPassword := os.Getenv("REDIS_PASSWORD") // Empty string if not set (no auth)
+	// Reuse redisAddr and redisPassword already declared above
 	redisForexProvider := redisProvider.NewProvider(redisAddr, redisPassword)
 	marketDataService.AddProvider(redisForexProvider)
 	log.Printf("Registered Redis Provider (real-time forex from MT5, addr=%s)", redisAddr)
@@ -313,6 +358,15 @@ func main() {
 	http.HandleFunc("/api/v1/instruments", api.CORSMiddleware(allowHEAD(api.GetInstruments)))
 	// GET /api/v1/instruments/symbol?symbol=BTCUSDT - Get instrument by symbol
 	http.HandleFunc("/api/v1/instruments/symbol", api.CORSMiddleware(allowHEAD(api.GetInstrumentBySymbol)))
+
+	// Forex endpoints (public - no auth required, cache-first design)
+	if redisClient != nil && forexKlines != nil {
+		// GET /api/v1/forex/quotes - All forex pair quotes with 24h stats
+		http.HandleFunc("/api/v1/forex/quotes", api.CORSMiddleware(allowHEAD(api.HandleForexQuotes(redisClient))))
+		// GET /api/v1/forex/klines?symbol=EURUSD&interval=1h&limit=100 - Historical klines
+		http.HandleFunc("/api/v1/forex/klines", api.CORSMiddleware(allowHEAD(api.HandleForexKlines(forexKlines))))
+		log.Println("Forex API endpoints registered: /api/v1/forex/quotes, /api/v1/forex/klines")
+	}
 
 	// Transactions endpoints (protected with JWT authentication)
 	// POST /api/v1/transactions - Create transaction (deposit/withdrawal/transfer)

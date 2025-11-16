@@ -1,10 +1,14 @@
 package hub
 
 import (
+	"context"
+	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
 )
 
 // Hub manages the set of active clients and broadcasts messages to them.
@@ -74,6 +78,87 @@ func (h *Hub) Run() {
 				}
 			}
 			h.mu.Unlock() // Unlock before potentially lengthy unregister operations
+		}
+	}
+}
+
+// SubscribeToRedisForex subscribes to Redis forex price updates and broadcasts to WebSocket clients
+// Rate-limited to max 2 broadcasts per second per symbol to prevent flooding
+func (h *Hub) SubscribeToRedisForex(ctx context.Context, redisClient *redis.Client) {
+	log.Println("[Hub] Starting Redis forex price subscription...")
+
+	// Subscribe to Redis Pub/Sub channel
+	pubsub := redisClient.Subscribe(ctx, "fx_price_updates")
+	defer pubsub.Close()
+
+	// Verify subscription
+	_, err := pubsub.Receive(ctx)
+	if err != nil {
+		log.Printf("[Hub] ERROR: Failed to subscribe to Redis channel: %v", err)
+		return
+	}
+	log.Println("[Hub] Successfully subscribed to fx_price_updates channel")
+
+	// Rate limiter: Track last broadcast time per symbol (max 2/sec = 500ms interval)
+	lastBroadcast := make(map[string]time.Time)
+	var rateMu sync.Mutex
+	const minInterval = 500 * time.Millisecond
+
+	// Listen for messages
+	ch := pubsub.Channel()
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("[Hub] Redis subscription shutting down...")
+			return
+		case msg := <-ch:
+			// Parse incoming message
+			var tick struct {
+				Symbol    string  `json:"symbol"`
+				Bid       float64 `json:"bid"`
+				Ask       float64 `json:"ask"`
+				Timestamp int64   `json:"timestamp"`
+			}
+
+			if err := json.Unmarshal([]byte(msg.Payload), &tick); err != nil {
+				log.Printf("[Hub] ERROR parsing Redis message: %v", err)
+				continue
+			}
+
+			// Rate limiting check
+			rateMu.Lock()
+			lastTime, exists := lastBroadcast[tick.Symbol]
+			now := time.Now()
+			if exists && now.Sub(lastTime) < minInterval {
+				rateMu.Unlock()
+				// Skip this update (too soon since last broadcast)
+				continue
+			}
+			lastBroadcast[tick.Symbol] = now
+			rateMu.Unlock()
+
+			// Build WebSocket message
+			wsMessage := map[string]interface{}{
+				"type":      "forex_quote",
+				"symbol":    tick.Symbol,
+				"bid":       tick.Bid,
+				"ask":       tick.Ask,
+				"timestamp": tick.Timestamp,
+			}
+
+			wsJSON, err := json.Marshal(wsMessage)
+			if err != nil {
+				log.Printf("[Hub] ERROR marshalling WebSocket message: %v", err)
+				continue
+			}
+
+			// Broadcast to all connected WebSocket clients (non-blocking)
+			select {
+			case h.Broadcast <- wsJSON:
+				// Successfully queued for broadcast
+			default:
+				log.Printf("[Hub] WARNING: Broadcast channel full, dropping forex quote for %s", tick.Symbol)
+			}
 		}
 	}
 }

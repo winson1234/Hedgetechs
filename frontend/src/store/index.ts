@@ -18,6 +18,7 @@ import orderReducer from './slices/orderSlice';
 import priceReducer from './slices/priceSlice';
 import uiReducer from './slices/uiSlice';
 import transactionReducer from './slices/transactionSlice';
+import forexReducer from './slices/forexSlice';
 
 // WebSocket middleware
 import { websocketMiddleware } from './middleware/websocket';
@@ -49,6 +50,7 @@ export const store = configureStore({
     price: priceReducer,
     ui: persistedUiReducer,
     transaction: transactionReducer,
+    forex: forexReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

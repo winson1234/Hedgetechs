@@ -24,6 +24,7 @@ import WalletPage from './pages/WalletPage'
 import HistoryPage from './pages/HistoryPage'
 import ProfilePage from './pages/ProfilePage'
 import SecuritySettingsPage from './pages/SecuritySettingsPage'
+import ForexPage from './pages/ForexPage'
 
 export default function App() {
   const dispatch = useAppDispatch()
@@ -74,6 +75,7 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/trading" element={<TradingPage />} />
+          <Route path="/forex" element={<ForexPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/history" element={<HistoryPage />} />

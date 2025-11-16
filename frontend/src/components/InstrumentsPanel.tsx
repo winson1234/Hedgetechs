@@ -3,7 +3,9 @@ import { useAssetPrices } from '../hooks/useAssetPrices'
 import { useInstruments, type InstrumentCategory } from '../hooks/useInstruments'
 import { useAppDispatch, useAppSelector } from '../store'
 import { setActiveInstrument } from '../store/slices/uiSlice'
+import { fetchForexQuotes } from '../store/slices/forexSlice'
 import { formatPrice, formatPercentChange } from '../utils/priceUtils'
+import ForexPairIcon from './ForexPairIcon'
 
 type CategoryFilter = 'all' | InstrumentCategory
 
@@ -13,6 +15,7 @@ export default function InstrumentsPanel() {
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
   const priceData = useAppSelector(state => state.price.currentPrices);
   const tickerData = useAppSelector(state => state.price.tickers);
+  const forexQuotes = useAppSelector(state => state.forex.quotes);
 
   // Get instruments from backend API and asset prices
   const { instruments: instrumentSymbols, loading: instrumentsLoading } = useInstruments();
@@ -56,6 +59,18 @@ export default function InstrumentsPanel() {
     }
   }, [categoryFilter])
 
+  // Fetch forex quotes on mount
+  useEffect(() => {
+    dispatch(fetchForexQuotes())
+
+    // Refresh forex quotes every 60 seconds
+    const intervalId = setInterval(() => {
+      dispatch(fetchForexQuotes())
+    }, 60000)
+
+    return () => clearInterval(intervalId)
+  }, [dispatch])
+
   const toggleFavorite = (symbol: string) => {
     setFavorites(prev => {
       const newFavorites = new Set(prev)
@@ -71,10 +86,17 @@ export default function InstrumentsPanel() {
   // Build instruments from shared assetPrices prop
   const instruments = useMemo(() => {
     return instrumentSymbols.map(inst => {
-      const price = assetPrices[inst.symbol] || 0
+      // Check if this is a forex instrument
+      const isForex = inst.category === 'forex'
+      const forexQuote = isForex ? forexQuotes[inst.symbol] : null
+
+      // Use forex bid price for forex instruments, crypto price for others
+      const price = isForex && forexQuote ? forexQuote.bid : (assetPrices[inst.symbol] || 0)
       const priceInfo = priceData[inst.symbol]
       const ticker = tickerData[inst.symbol]
-      const changePercent = ticker?.priceChangePercent || 0 // Real 24h change from ticker data
+
+      // Use forex 24h change if available, otherwise use ticker data
+      const changePercent = isForex && forexQuote ? forexQuote.change24h : (ticker?.priceChangePercent || 0)
 
       // Check if instrument has received data (within last 10 seconds)
       const lastUpdate = priceInfo?.timestamp || 0
@@ -142,6 +164,8 @@ export default function InstrumentsPanel() {
           'JPY': 'https://hatscripts.github.io/circle-flags/flags/jp.svg',
           'NZD': 'https://hatscripts.github.io/circle-flags/flags/nz.svg',
           'GBP': 'https://hatscripts.github.io/circle-flags/flags/gb.svg',
+          'USD': 'https://hatscripts.github.io/circle-flags/flags/us.svg',
+          'CHF': 'https://hatscripts.github.io/circle-flags/flags/ch.svg',
         }
         iconUrl = iconMap[inst.base_currency] || ''
       }
@@ -168,7 +192,7 @@ export default function InstrumentsPanel() {
         isLoading,
       }
     })
-  }, [assetPrices, priceData, tickerData, instrumentSymbols])
+  }, [assetPrices, priceData, tickerData, instrumentSymbols, forexQuotes])
 
   // Filter instruments based on search, favorites, and category
   const filteredInstruments = instruments.filter(item => {
@@ -370,38 +394,7 @@ export default function InstrumentsPanel() {
                     {item.isLoading ? (
                       <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 border-t-slate-600 dark:border-t-slate-300 rounded-full animate-spin"></div>
                     ) : item.isForexPair && item.forexPair?.base && item.forexPair?.quote ? (
-                      (() => {
-                        // Currency code to country code mapping
-                        const currencyToCountry: Record<string, string> = {
-                          'CAD': 'ca', 'AUD': 'au', 'JPY': 'jp', 'NZD': 'nz',
-                          'EUR': 'eu', 'GBP': 'gb', 'USD': 'us', 'CHF': 'ch'
-                        };
-                        const baseCountry = currencyToCountry[item.forexPair.base] || item.forexPair.base.toLowerCase();
-                        const quoteCountry = currencyToCountry[item.forexPair.quote] || item.forexPair.quote.toLowerCase();
-
-                        return (
-                          <div className="flex -space-x-2">
-                            <img
-                              src={`https://hatscripts.github.io/circle-flags/flags/${baseCountry}.svg`}
-                              alt={item.forexPair.base}
-                              className="w-5 h-5 rounded-full border border-white dark:border-slate-900"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement
-                                target.style.display = 'none'
-                              }}
-                            />
-                            <img
-                              src={`https://hatscripts.github.io/circle-flags/flags/${quoteCountry}.svg`}
-                              alt={item.forexPair.quote}
-                              className="w-5 h-5 rounded-full border border-white dark:border-slate-900"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement
-                                target.style.display = 'none'
-                              }}
-                            />
-                          </div>
-                        );
-                      })()
+                      <ForexPairIcon base={item.forexPair.base} quote={item.forexPair.quote} />
                     ) : item.iconUrl ? (
                       <img
                         src={item.iconUrl}

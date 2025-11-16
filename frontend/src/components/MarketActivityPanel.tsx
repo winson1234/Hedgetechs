@@ -3,9 +3,10 @@ import { useAppSelector } from '../store';
 import PendingOrdersTab from './market/PendingOrdersTab';
 import TradeHistoryTab from './market/TradeHistoryTab';
 import PositionsTable from './market/PositionsTable';
+import SessionIndicator from './SessionIndicator';
 import { formatPrice, formatQuantity } from '../utils/priceUtils';
 
-type TabType = 'orderbook' | 'trades' | 'pending' | 'history' | 'positions';
+type TabType = 'orderbook' | 'trades' | 'pending' | 'history' | 'positions' | 'forex';
 
 export default function MarketActivityPanel() {
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
@@ -13,22 +14,39 @@ export default function MarketActivityPanel() {
   // Get order book and trades from Redux store (updated by WebSocket middleware)
   const orderBook = useAppSelector(state => state.price.orderBooks[activeInstrument]);
   const trades = useAppSelector(state => state.price.trades[activeInstrument]) || [];
+  // Get forex quotes from Redux store
+  const forexQuotes = useAppSelector(state => state.forex.quotes);
+
+  // Detect if active instrument is forex
+  const isForex = activeInstrument && forexQuotes[activeInstrument];
+  const forexQuote = isForex ? forexQuotes[activeInstrument] : null;
 
   // Determine if CFD mode based on global product type selection
   const isCFD = selectedProductType === 'cfd' || selectedProductType === 'futures';
   const isSpot = selectedProductType === 'spot';
 
-  const [activeTab, setActiveTab] = useState<TabType>(isSpot ? 'orderbook' : 'positions');
+  // Set default tab based on forex/spot/cfd
+  const getDefaultTab = (): TabType => {
+    if (isForex) return 'forex';
+    if (isSpot) return 'orderbook';
+    if (isCFD) return 'positions';
+    return 'orderbook';
+  };
+
+  const [activeTab, setActiveTab] = useState<TabType>(getDefaultTab());
   const [filterByProductType, setFilterByProductType] = useState<boolean>(false);
 
-  // Switch to appropriate tab when product type changes
+  // Switch to appropriate tab when product type or forex status changes
   useEffect(() => {
-    if (isSpot && (activeTab === 'positions')) {
-      setActiveTab('orderbook'); // Switch to orderbook when going from CFD to SPOT
-    } else if (isCFD && (activeTab === 'orderbook' || activeTab === 'trades')) {
-      setActiveTab('positions'); // Switch to positions when going from SPOT to CFD
+    if (isForex && activeTab !== 'forex' && activeTab !== 'pending' && activeTab !== 'history' && activeTab !== 'positions') {
+      setActiveTab('forex');
+    } else if (!isForex && isSpot && (activeTab === 'positions' || activeTab === 'forex')) {
+      setActiveTab('orderbook'); // Switch to orderbook when going from CFD/Forex to SPOT
+    } else if (!isForex && isCFD && (activeTab === 'orderbook' || activeTab === 'trades' || activeTab === 'forex')) {
+      setActiveTab('positions'); // Switch to positions when going from SPOT/Forex to CFD
     }
-  }, [selectedProductType, isSpot, isCFD, activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProductType, isForex]);
 
   // Convert Redux order book format to component format
   const bids: [string, string][] = orderBook?.bids.map(bid => [
@@ -55,8 +73,22 @@ export default function MarketActivityPanel() {
       {/* Tab Header - Dynamic tabs based on product type */}
       <div className="flex items-center justify-between gap-4 mb-4 border-b border-slate-200 dark:border-slate-700">
         <div className="flex gap-1 overflow-x-auto">
-        {/* SPOT mode tabs: Order Book, Market Trades */}
-        {isSpot && (
+        {/* Forex mode tab: Forex Info */}
+        {isForex && (
+          <button
+            onClick={() => setActiveTab('forex')}
+            className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+              activeTab === 'forex'
+                ? 'text-blue-500 border-b-2 border-blue-500'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
+            }`}
+          >
+            Forex Info
+          </button>
+        )}
+
+        {/* SPOT mode tabs: Order Book, Market Trades (hide for forex) */}
+        {isSpot && !isForex && (
           <>
             <button
               onClick={() => setActiveTab('orderbook')}
@@ -81,7 +113,7 @@ export default function MarketActivityPanel() {
           </>
         )}
 
-        {/* CFD mode tabs: Positions */}
+        {/* CFD mode tabs: Positions (show for both CFD crypto and forex) */}
         {isCFD && (
           <button
             onClick={() => setActiveTab('positions')}
@@ -263,6 +295,91 @@ export default function MarketActivityPanel() {
             filterByProductType={filterByProductType}
             selectedProductType={selectedProductType}
           />
+        )}
+
+        {/* Forex Info Tab - Compact grid layout */}
+        {activeTab === 'forex' && isForex && forexQuote && (
+          <div className="h-full p-2">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded h-full flex flex-col">
+              {/* Header */}
+              <div className="bg-slate-100 dark:bg-slate-800 px-3 py-2 border-b border-slate-200 dark:border-slate-700">
+                <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 text-center">{activeInstrument}</h2>
+              </div>
+
+              {/* Grid Layout - 2x2 */}
+              <div className="flex-1 grid grid-cols-2 divide-x divide-y divide-slate-200 dark:divide-slate-700">
+                {/* Top Left - Price & Spread */}
+                <div className="p-3 flex flex-col justify-center">
+                  <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-3">Price & Spread</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Bid</span>
+                      <span className="text-sm font-bold text-green-600 dark:text-green-500 font-mono">{forexQuote.bid.toFixed(5)}</span>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Ask</span>
+                      <span className="text-sm font-bold text-red-600 dark:text-red-500 font-mono">{forexQuote.ask.toFixed(5)}</span>
+                    </div>
+                    <div className="flex items-baseline justify-between pt-1 border-t border-slate-200 dark:border-slate-700">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Spread</span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-sm font-bold text-blue-600 dark:text-blue-400 font-mono">{forexQuote.spread.toFixed(1)}</span>
+                        <span className="text-xs text-slate-400">pips</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top Right - 24h Statistics */}
+                <div className="p-3 flex flex-col justify-center">
+                  <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-3">24h Statistics</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Change</span>
+                      <div className={`px-1.5 py-0.5 rounded text-xs font-bold ${
+                        forexQuote.change24h >= 0 
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' 
+                          : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                      }`}>
+                        {forexQuote.change24h >= 0 ? '▲' : '▼'} {Math.abs(forexQuote.change24h).toFixed(2)}%
+                      </div>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">High</span>
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 font-mono">{forexQuote.high24h.toFixed(5)}</span>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Low</span>
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 font-mono">{forexQuote.low24h.toFixed(5)}</span>
+                    </div>
+                    <div className="flex items-baseline justify-between pt-1 border-t border-slate-200 dark:border-slate-700">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Range</span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-xs font-bold text-purple-600 dark:text-purple-400 font-mono">{forexQuote.rangePips.toFixed(1)}</span>
+                        <span className="text-xs text-slate-400">pips</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Left - Active Sessions */}
+                <div className="p-3 flex flex-col justify-center col-span-2">
+                  <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Active Sessions</h3>
+                  <SessionIndicator sessions={forexQuote.sessions} />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-3 py-1.5 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="flex items-center justify-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Updated {new Date(forexQuote.lastUpdated).toLocaleTimeString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

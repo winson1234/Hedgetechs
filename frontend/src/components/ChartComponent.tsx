@@ -17,6 +17,15 @@ type Kline = {
   volume: string
 }
 
+type ForexKline = {
+  timestamp: string
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
 type OHLCVData = {
   open: number
   high: number
@@ -29,6 +38,10 @@ export default function ChartComponent() {
   const dispatch = useAppDispatch();
   // Access Redux state
   const symbol = useAppSelector(state => state.ui.activeInstrument);
+  const forexQuotes = useAppSelector(state => state.forex.quotes);
+  
+  // Detect if active instrument is forex
+  const isForex = symbol && forexQuotes[symbol];
   
   // Local state for chart-specific features
   const [timeframe, setTimeframe] = useState('1h');
@@ -108,19 +121,6 @@ export default function ChartComponent() {
   useEffect(() => {
     if (!ref.current) return
     
-    // Trigger loading effect when symbol or timeframe changes
-    setIsLoading(true)
-    
-    // Clear any existing timeout
-    if (loadingTimeoutRef.current) {
-      clearTimeout(loadingTimeoutRef.current)
-    }
-    
-    // Auto-hide after 500ms maximum
-    loadingTimeoutRef.current = window.setTimeout(() => {
-      setIsLoading(false)
-    }, 500)
-    
     const isDark = document.documentElement.classList.contains('dark')
     
     chartRef.current = createChart(ref.current, {
@@ -167,25 +167,73 @@ export default function ChartComponent() {
     }
     window.addEventListener('resize', onResize)
 
+    // Trigger loading effect before fetching data
+    setIsLoading(true)
+    
+    // Clear any existing timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current)
+      loadingTimeoutRef.current = null
+    }
+
     // Fetch klines with dynamic timeframe and symbol
-    fetch(getApiUrl(`/api/v1/klines?symbol=${symbol}&interval=${timeframe}&limit=200`))
+    // Use different endpoint based on asset type
+    const endpoint = isForex
+      ? `/api/v1/forex/klines?symbol=${symbol}&interval=${timeframe}&limit=200`
+      : `/api/v1/klines?symbol=${symbol}&interval=${timeframe}&limit=200`;
+
+    fetch(getApiUrl(endpoint))
       .then((r) => r.json())
-      .then((data: Kline[]) => {
-        // Store volume data
-        volumeDataRef.current.clear()
-        data.forEach((k) => {
-          const time = Math.floor(k.openTime / 1000)
-          volumeDataRef.current.set(time, parseFloat(k.volume))
-        })
-        
-        const formatted: CandlestickData<UTCTimestamp>[] = data.map((k) => ({
-          time: Math.floor(k.openTime / 1000) as UTCTimestamp,
-          open: parseFloat(k.open),
-          high: parseFloat(k.high),
-          low: parseFloat(k.low),
-          close: parseFloat(k.close)
-        }))
-        seriesRef.current?.setData(formatted)
+      .then((data) => {
+        // For forex, data is already an array of klines
+        // For crypto, extract from data array
+        const klines: (Kline | ForexKline)[] = isForex ? data : (data || []);
+
+        if (!Array.isArray(klines) || klines.length === 0) {
+          console.warn('No klines data received');
+          return;
+        }
+
+        // Store volume data and format for chart
+        volumeDataRef.current.clear();
+        let formatted: CandlestickData<UTCTimestamp>[] = [];
+
+        if (isForex) {
+          // Handle forex klines (ISO timestamp string -> Unix seconds)
+          const forexKlines = klines as ForexKline[];
+          
+          formatted = forexKlines.map((k) => {
+            const time = Math.floor(new Date(k.timestamp).getTime() / 1000) as UTCTimestamp;
+            volumeDataRef.current.set(time, k.volume);
+            return {
+              time,
+              open: k.open,
+              high: k.high,
+              low: k.low,
+              close: k.close
+            };
+          });
+
+          // CRITICAL: Sort forex klines in ascending order (oldest first)
+          formatted.sort((a, b) => (a.time as number) - (b.time as number));
+        } else {
+          // Handle crypto klines (Unix milliseconds -> Unix seconds)
+          const cryptoKlines = klines as Kline[];
+          
+          formatted = cryptoKlines.map((k) => {
+            const time = Math.floor(k.openTime / 1000) as UTCTimestamp;
+            volumeDataRef.current.set(time, parseFloat(k.volume));
+            return {
+              time,
+              open: parseFloat(k.open),
+              high: parseFloat(k.high),
+              low: parseFloat(k.low),
+              close: parseFloat(k.close)
+            };
+          });
+        }
+
+        seriesRef.current?.setData(formatted);
         // remember last bar and set initial OHLCV
         if (formatted.length > 0) {
           const lb = formatted[formatted.length - 1]
@@ -200,8 +248,22 @@ export default function ChartComponent() {
             volume: volume
           })
         }
+        
+        // Clear loading state after data is loaded
+        setIsLoading(false);
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
       })
-      .catch((err) => console.error('Failed to fetch klines:', err))
+      .catch((err) => {
+        console.error('Failed to fetch klines:', err);
+        setIsLoading(false);
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
+      })
 
     return () => {
       window.removeEventListener('resize', onResize)
@@ -221,7 +283,7 @@ export default function ChartComponent() {
       priceLineRef.current = null
       lastBarRef.current = null
     }
-  }, [timeframe, symbol])
+  }, [timeframe, symbol, isForex])
 
   // live update handler: append/update candles based on Redux price updates
   useEffect(() => {

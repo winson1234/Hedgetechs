@@ -24,7 +24,6 @@ import WalletPage from './pages/WalletPage'
 import HistoryPage from './pages/HistoryPage'
 import ProfilePage from './pages/ProfilePage'
 import SecuritySettingsPage from './pages/SecuritySettingsPage'
-import ForexPage from './pages/ForexPage'
 
 export default function App() {
   const dispatch = useAppDispatch()
@@ -41,8 +40,11 @@ export default function App() {
 
     const hydratePrices = async () => {
       try {
-        // Build symbols list from instruments API
-        const symbols = instruments.map(inst => inst.symbol).join(',')
+        // Build symbols list from instruments API (only crypto instruments for ticker)
+        const cryptoInstruments = instruments.filter(inst => inst.category !== 'forex')
+        if (cryptoInstruments.length === 0) return
+        
+        const symbols = cryptoInstruments.map(inst => inst.symbol).join(',')
         const response = await fetch(getApiUrl(`/api/v1/ticker?symbols=${symbols}`))
         if (!response.ok) throw new Error('Failed to fetch 24h ticker data')
         const data = await response.json()
@@ -53,7 +55,8 @@ export default function App() {
       }
     }
     hydratePrices()
-  }, [dispatch, instruments])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instruments.length])
 
   // Fetch accounts when user is logged in
   useEffect(() => {
@@ -75,7 +78,6 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/trading" element={<TradingPage />} />
-          <Route path="/forex" element={<ForexPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/history" element={<HistoryPage />} />

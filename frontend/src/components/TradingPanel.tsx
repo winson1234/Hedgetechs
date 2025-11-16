@@ -870,7 +870,7 @@ export default function TradingPanel() {
                 (orderType !== 'market' && (parseFloat(getTotal() || 'Infinity') > usdBalance)) // Check total against balance for limit/stop
             }
           >
-            {isCFD ? `Hedge Buy (Long+Short)` : `Buy ${baseCurrency}`}
+            {isCFD ? 'Hedge Buy' : `Buy ${baseCurrency}`}
           </button>
           <button
             onClick={() => handleOrder('sell')}
@@ -884,7 +884,7 @@ export default function TradingPanel() {
                 ((orderType === 'limit' || orderType === 'stop-limit') && (isNaN(parseFloat(limitPrice)) || parseFloat(limitPrice) <= 0)) // Need valid limit price
             }
           >
-            {isCFD ? `Hedge Sell (Short+Long)` : `Sell ${baseCurrency}`}
+            {isCFD ? 'Hedge Sell' : `Sell ${baseCurrency}`}
           </button>
         </div>
       </div>

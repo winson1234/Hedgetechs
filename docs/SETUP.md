@@ -10,7 +10,34 @@ Create `.env` file in project root:
 cp env.example .env
 ```
 
+See `env.example` for complete template. Key variables:
+
 ```env
+# Database (Supabase)
+DATABASE_URL=postgresql://postgres:password@host.pooler.supabase.com:5432/postgres
+SUPABASE_URL=https://project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+SUPABASE_JWT_SECRET=your_jwt_secret_here
+
+# Frontend Supabase
+VITE_SUPABASE_URL=https://project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_anon_key_here
+
+# Redis Configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=your_redis_password_here
+
+# Market Data - TwelveData WebSocket for Forex/Commodities
+MARKET_DATA_PROVIDER=twelvedata
+TWELVE_DATA_API_KEY=your_twelve_data_api_key_here
+TWELVE_DATA_POLL_INTERVAL=15m
+ENABLE_EXTERNAL_FETCH=true
+
+# MT5 Windows Bridge (URL of Windows API server)
+WINDOWS_API_URL=http://localhost:5000
+
 # Stripe API Keys (from https://dashboard.stripe.com/test/apikeys)
 STRIPE_SECRET_KEY=sk_test_your_key_here
 VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_key_here
@@ -42,6 +69,115 @@ fly secrets list
 Frontend environment variables are set in Cloudflare Pages dashboard:
 - Go to Settings → Environment Variables
 - Add `VITE_STRIPE_PUBLISHABLE_KEY=pk_live_your_live_key`
+
+---
+
+## Supabase Setup
+
+1. **Create Supabase Project:**
+   - Go to [Supabase Dashboard](https://app.supabase.com/)
+   - Click "New Project"
+   - Choose organization and region
+   - Set database password
+
+2. **Get API Keys:**
+   - Go to Project Settings → API
+   - Copy:
+     - `Project URL` → `SUPABASE_URL`
+     - `anon public` key → `SUPABASE_ANON_KEY`
+     - `service_role` key (keep secret) → `SUPABASE_SERVICE_ROLE_KEY`
+   - Go to Project Settings → JWT Settings
+   - Copy `JWT Secret` → `SUPABASE_JWT_SECRET`
+
+3. **Get Database URL:**
+   - Go to Project Settings → Database
+   - Scroll to "Connection pooling" (Session mode)
+   - Copy connection string → `DATABASE_URL`
+   - **Important:** Use Session Pooler (port 5432) for IPv4 compatibility
+   - Format: `postgresql://postgres.project:password@host.pooler.supabase.com:5432/postgres`
+
+4. **Run Migrations:**
+   ```bash
+   migrate -path internal/database/migrations -database $DATABASE_URL up
+   ```
+
+---
+
+## Docker Compose Setup
+
+The project uses Docker Compose to run Redis and MT5 bridge services locally.
+
+1. **Start Services:**
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Verify Services Running:**
+   ```bash
+   docker ps
+   # Should show:
+   # - brokerage-redis (port 6379)
+   # - mt5-bridge (if configured)
+   ```
+
+3. **View Logs:**
+   ```bash
+   docker-compose logs -f          # All services
+   docker-compose logs -f redis    # Redis only
+   docker-compose logs -f mt5-bridge  # MT5 bridge only
+   ```
+
+4. **Stop Services:**
+   ```bash
+   docker-compose down
+   ```
+
+**MT5 Publisher Setup:**
+
+The MT5 bridge publishes real-time forex prices to Redis. See `mt5-publisher/README.md` for detailed setup instructions.
+
+For local development:
+1. Run Windows API server on Windows machine: `python windows-api-server.py`
+2. Update `.env` with `WINDOWS_API_URL=http://localhost:5000`
+3. Start bridge: `docker-compose up -d mt5-bridge`
+
+---
+
+## Database Migrations
+
+The project uses [golang-migrate](https://github.com/golang-migrate/migrate) for schema management.
+
+**Install golang-migrate:**
+```powershell
+# Windows
+choco install golang-migrate
+
+# Or download binary from GitHub releases
+```
+
+**Run Migrations:**
+```bash
+# Apply all migrations
+migrate -path internal/database/migrations -database $DATABASE_URL up
+
+# Rollback last migration
+migrate -path internal/database/migrations -database $DATABASE_URL down 1
+
+# Check current version
+migrate -path internal/database/migrations -database $DATABASE_URL version
+
+# Force version (if dirty state)
+migrate -path internal/database/migrations -database $DATABASE_URL force VERSION
+```
+
+**Create New Migration:**
+```bash
+migrate create -ext sql -dir internal/database/migrations -seq description_here
+```
+
+This creates two files:
+- `NNNN_description_here.up.sql` - Apply changes
+- `NNNN_description_here.down.sql` - Rollback changes
 
 ---
 

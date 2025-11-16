@@ -2,9 +2,9 @@
 
 ## Overview
 
-React-based multi-page application providing comprehensive trading platform with authentication, real-time price updates, interactive charts, multi-account management, wallet operations with Stripe payments, transaction history, and analytics.
+React-based multi-page application providing comprehensive CFD and forex trading platform with cryptocurrency support, Supabase authentication, real-time price updates from multiple sources (Binance + MT5), interactive charts, multi-account management with margin trading, wallet operations with Stripe payments, database-backed transaction history, and analytics.
 
-**Tech:** React 18, TypeScript 5, Vite 5, React Router, Tailwind CSS, lightweight-charts, Zustand, Stripe
+**Tech:** React 18, TypeScript 5, Vite 5, React Router, Tailwind CSS, lightweight-charts, Redux Toolkit, Supabase.js, Stripe
 
 ---
 
@@ -28,13 +28,14 @@ React-based multi-page application providing comprehensive trading platform with
 - **Public Pages**
   - `/` and `/dashboard` - Public landing page with market overview
 
-**State Management (Zustand stores):**
-- `authStore` - Authentication state, login/register/logout with localStorage
-- `uiStore` - Theme, navigation, active instrument, timeframe, toast notifications
-- `priceStore` - Real-time price data hydration from WebSocket
-- `accountStore` - Multi-account management, balances, currency conversion
-- `orderStore` - Pending orders, order history, auto-execution logic
-- `transactionStore` - Transaction history tracking
+**State Management (Redux Toolkit slices):**
+- `authSlice` - Supabase authentication state, login/register/logout, user session
+- `uiSlice` - Theme, navigation, active instrument, timeframe, toast notifications
+- `priceSlice` - Real-time price data hydration from WebSocket (crypto + forex)
+- `accountSlice` - Multi-account management, balances, currency conversion
+- `orderSlice` - Pending orders fetched from database, order history
+- `positionSlice` - Open CFD positions with margin tracking
+- `transactionSlice` - Transaction history from database
 
 **Features:**
 - React Router with protected and public routes
@@ -81,31 +82,36 @@ React-based multi-page application providing comprehensive trading platform with
 ---
 
 ### TradingPanel.tsx
-**Purpose:** Comprehensive order execution interface
+**Purpose:** Comprehensive order execution interface with CFD and margin trading support
 
 **Features:**
-- Live price display with WebSocket updates
+- Live price display with WebSocket updates (crypto + forex)
+- Product type selection: Spot vs CFD
 - Order types: Market, Limit, Stop-Limit
+- Leverage selector for CFD positions (1x to 500x)
 - Buy/Sell tabs with balance display
+- Dual-position hedging support (open both buy and sell simultaneously)
 - Quick percentage buttons (25%, 50%, 75%, 100%)
 - Fee calculation (0.1% trading fee)
+- Margin requirement calculation for CFD orders
 - Real-time total calculation
 - Account-specific balance tracking
 - Order validation and execution
-- Integration with accountStore for balance updates
-- Integration with orderStore for pending orders
+- Database-backed order submission
+- Integration with Redux store for balance and position updates
 
 ---
 
 ### InstrumentsPanel.tsx
-**Purpose:** Tradable instruments list with live market data
+**Purpose:** Tradable instruments list with live market data for crypto and forex
 
 **Features:**
-- Displays BTCUSDT, ETHUSDT, SOLUSDT, EURUSDT
-- Real-time price from priceStore (WebSocket-powered)
+- Displays crypto (BTCUSDT, ETHUSDT, SOLUSDT) and forex pairs (EURUSD, GBPUSD, etc.)
+- Real-time price from priceSlice (WebSocket-powered, hybrid sources: Binance + MT5)
 - 24h change percentage with color indicators
 - High/Low 24h prices
-- 24h volume display
+- 24h volume display (crypto only)
+- Product type indicators (Spot, CFD)
 - Click to switch active instrument
 - Active instrument highlighting
 - Auto-updates without API polling
@@ -139,7 +145,7 @@ React-based multi-page application providing comprehensive trading platform with
 - MACD - Moving Average Convergence Divergence
 
 **Features:**
-- Fetches from `/api/v1/analytics` (powered by Frankfurter API)
+- Fetches from `/api/v1/analytics` (powered by TwelveData API)
 - Symbol and period selection
 - Real-time rate calculations
 - Slide-out panel with close functionality
@@ -163,25 +169,27 @@ React-based multi-page application providing comprehensive trading platform with
 - Navigation to login/register or trading pages
 
 ### LoginPage.tsx
-**Purpose:** User authentication page
+**Purpose:** User authentication page with Supabase
 
 **Features:**
 - Email and password input with validation
+- Supabase authentication integration
 - "Remember me" checkbox
 - Forgot password link
-- Error message display
+- Error message display from Supabase
 - Redirect to dashboard after successful login
 - Link to registration page
 - Theme-aware styling
 
 ### RegisterPage.tsx
-**Purpose:** New user registration page
+**Purpose:** New user registration page with Supabase
 
 **Features:**
 - Email, password, name, and country input fields
+- Supabase user creation and metadata storage
 - Password strength validation
 - Terms and conditions checkbox
-- Error message display
+- Error message display from Supabase
 - Redirect to trading page after registration
 - Link to login page
 - Theme-aware styling
@@ -302,14 +310,15 @@ React-based multi-page application providing comprehensive trading platform with
 ---
 
 ### WebSocketContext.tsx
-**Purpose:** Global WebSocket connection manager
+**Purpose:** Global WebSocket connection manager for hybrid market data
 
 **Features:**
 - Dynamic protocol detection (uses `wss://` for HTTPS, `ws://` for HTTP)
 - Automatic environment-based connection (localhost dev, production URL)
-- Price message broadcasting to priceStore
+- Price message broadcasting to priceSlice (crypto from Binance + forex from MT5/Redis)
 - Deposit completion notifications from webhooks
-- Order execution triggering via orderStore
+- Order and position updates from database
+- Redux dispatch for all state updates
 - Auto-reconnect with exponential backoff (1s → 60s max) with jitter
 - Connection state management
 - Message parsing and distribution
@@ -319,43 +328,57 @@ React-based multi-page application providing comprehensive trading platform with
 
 ## State Management
 
-### Zustand Stores
+### Redux Toolkit Slices
 
-**authStore:**
-- Authentication state management
-- Login/register/logout functionality
-- User data persistence with localStorage
-- Session management
+**authSlice:**
+- Supabase authentication state management
+- Login/register/logout functionality via Supabase
+- User session persistence
+- User metadata (name, country, email)
 - Auth status checking
+- Protected route guards
 
-**priceStore:**
-- Real-time price data for all instruments
+**priceSlice:**
+- Real-time price data for all instruments (crypto + forex)
 - 24h statistics (high, low, open, volume, change)
-- WebSocket-driven updates
+- WebSocket-driven updates from hybrid sources (Binance + MT5/Redis)
 - Initial hydration from REST API
+- Price history for charting
 
-**accountStore:**
+**accountSlice:**
 - Multi-account management (Live/Demo/External)
 - Multi-currency balances (USD, EUR, MYR, JPY, BTC, ETH, SOL)
+- Database-backed account data
 - Deposit/withdraw/transfer operations
 - FX rate fetching from backend
 - Balance calculations with currency conversion
 - Account status tracking
+- Margin level monitoring
 
-**orderStore:**
-- Pending order management (limit, stop-limit)
-- Order execution logic with price matching
+**orderSlice:**
+- Pending orders fetched from PostgreSQL database
 - Order history tracking
 - Account-specific order filtering
-- Real-time order processing via WebSocket
+- Database synchronization via API
+- Real-time order updates via WebSocket
 
-**transactionStore:**
-- Transaction history (Deposit/Withdraw/Transfer/Trade)
+**positionSlice:**
+- Open CFD positions from database
+- Position management (open, close, modify)
+- Leverage tracking
+- Margin requirements calculation
+- Profit/loss tracking
+- Dual-position hedging support
+- Real-time position updates
+
+**transactionSlice:**
+- Transaction history from database (Deposit/Withdraw/Transfer/Trade)
 - Filtering and search functionality
 - Summary statistics
+- Database synchronization
 
-**uiStore:**
-- Dark/light theme with persistence
+**uiSlice:**
+- Dark/light theme with localStorage persistence
 - Page navigation state
 - Active instrument and timeframe
 - Analytics panel visibility
@@ -363,40 +386,50 @@ React-based multi-page application providing comprehensive trading platform with
 - Toast notifications
 - Wallet tab state
 
+**Store Configuration:**
+- Redux Toolkit `configureStore` with Redux DevTools
+- Immer for immutable state updates
+- Thunks for async API calls
+- Middleware for logging (development only)
+
 ---
 
 ## Data Flow
 
 ### WebSocket
 ```
-Binance → Backend Hub → /ws → WebSocketContext → priceStore/orderStore → Components
+Crypto: Binance → Backend → Hub → /ws → WebSocketContext → Redux dispatch (priceSlice) → Components
+Forex: MT5 → Redis → Backend → Hub → /ws → WebSocketContext → Redux dispatch (priceSlice) → Components
 ```
 
 **Real-time Updates:**
 - ChartComponent - Live candle updates with timestamp validation
-- TradingPanel - Current price display
-- MarketActivityPanel - Order book depth (20 levels)
+- TradingPanel - Current price display (crypto + forex)
+- MarketActivityPanel - Order book depth (20 levels for crypto)
 - LivePriceDisplay - Price ticker
-- InstrumentsPanel - All instrument prices
-- orderStore - Automatic pending order execution
+- InstrumentsPanel - All instrument prices (hybrid sources)
+- Order processor - Backend-driven pending order execution
 
 ### REST API
 ```
-Component → getApiUrl() → API Request → Backend Handler → Response → Store Update
+Component → getApiUrl() → API Request → Backend Handler → Database → Response → Redux dispatch
 ```
 
 **API Configuration:**
 - Development: Relative paths with Vite proxy
-- Production: Direct to `https://brokerageproject.fly.dev`
+- Production: Direct to deployment URL
 - CORS-enabled for Cloudflare Pages (`*.pages.dev`)
 
 **Key Endpoints:**
 - `/api/v1/ticker` - Initial price hydration
 - `/api/v1/klines` - Historical chart data
 - `/api/v1/news` - News articles
-- `/api/v1/analytics` - Forex rates and indicators
+- `/api/v1/analytics` - Forex rates and indicators (TwelveData)
 - `/api/v1/deposit/create-payment-intent` - Stripe payments
 - `/api/v1/payment/status` - Payment verification
+- `/api/v1/orders` - Pending orders from database
+- `/api/v1/positions` - Open CFD positions
+- `/api/v1/accounts` - Trading accounts
 
 ---
 

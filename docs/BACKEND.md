@@ -2,20 +2,36 @@
 
 ## Overview
 
-Go-based HTTP and WebSocket server providing real-time market data streaming, historical data, ticker information, order book updates, multi-source news aggregation, forex analytics, and Stripe payment processing.
+Go-based HTTP and WebSocket server providing real-time market data streaming from multiple sources (Binance WebSocket + MT5 via Redis), database-backed trading operations with PostgreSQL, CFD and margin trading support, order processing, historical data, multi-source news aggregation, forex analytics, and Stripe payment processing.
 
-**Tech:** Go 1.25.3, gorilla/websocket, go-cache, net/http, Stripe API, Frankfurter API
+**Tech:** Go 1.23, gorilla/websocket, pgx (PostgreSQL), go-redis, go-cache, golang-migrate, net/http, Stripe API, TwelveData API
 
 ---
 
 ## Architecture
 
 ```
-Binance WS Streams → Hub → WebSocket Clients
-                           ↓
-HTTP Handlers → CORS Middleware → Cache → External APIs
-                           ↓
-                    Stripe/Frankfurter
+Market Data Layer (Hybrid Provider Pattern):
+├─ Binance Provider → Binance WebSocket → Hub → WebSocket Clients
+└─ Redis Provider → Redis Pub/Sub (MT5 Publisher) → Hub → WebSocket Clients
+
+Database Layer (PostgreSQL):
+├─ Trading accounts, balances, positions
+├─ Orders (pending + executed)
+├─ Contracts (CFD positions)
+├─ Audit logs & reconciliation queue
+└─ LP routing configuration
+
+Services Layer:
+├─ Market Data Service (manages providers)
+├─ Margin Service (leverage calculations)
+├─ Order Processor (event-driven execution)
+└─ Audit Logger (database-backed)
+
+HTTP/WebSocket Layer:
+HTTP Handlers → CORS Middleware → Database/Cache → External APIs
+                                                   ↓
+                                        Stripe/TwelveData/RSS
 ```
 
 ---
@@ -23,12 +39,18 @@ HTTP Handlers → CORS Middleware → Cache → External APIs
 ## Core Components
 
 ### main.go
-- Entry point
-- Loads environment variables from `.env` (Stripe keys)
-- Initializes Stripe with secret key
+- Entry point for the application
+- Loads environment variables from `.env`
+- Initializes PostgreSQL connection pool (pgx, 25 max connections)
+- Runs database migrations (golang-migrate)
+- Initializes Redis client with password authentication
 - Creates Hub and starts it in goroutine
-- Starts Binance trade and depth streams
-- Initializes Frankfurter forex service
+- Initializes market data providers:
+  - Binance Provider (crypto: BTCUSDT, ETHUSDT, SOLUSDT)
+  - Redis Provider (forex: 9 pairs from MT5)
+- Starts Market Data Service with both providers
+- Initializes services (margin, order processor, audit logger)
+- Initializes Stripe with secret key
 - Registers HTTP/WebSocket handlers with CORS middleware
 - HEAD request support for health checks
 - Starts server on port from `PORT` env var (fallback: `8080`)
@@ -41,13 +63,96 @@ HTTP Handlers → CORS Middleware → Cache → External APIs
 - `Run()` - Handles client registration/unregistration and broadcasting
 - `Broadcast(message)` - Sends message to all connected clients
 
-### binance/client.go
-**Purpose:** Binance WebSocket client
+### database/database.go
+**Purpose:** PostgreSQL connection management
 
-**Functions:**
-- `StreamTrades(h *hub.Hub)` - Connects to Binance trade stream (BTCUSDT, ETHUSDT, SOLUSDT, EURUSDT)
-- `StreamDepth(h *hub.Hub)` - Connects to Binance depth stream for order book updates
+**Key Functions:**
+- `NewDatabase(databaseURL)` - Creates pgx connection pool
+- Connection pooling (25 max connections, 5 min idle timeout)
+- Health check ping
+- Graceful shutdown with context cancellation
+
+**Migrations:**
+- Located in `internal/database/migrations/`
+- Uses golang-migrate for schema management
+- Run migrations: `migrate -path internal/database/migrations -database $DATABASE_URL up`
+- Migration files follow `NNNN_description.up.sql` naming convention
+
+### market_data/provider.go
+**Purpose:** Provider interface for extensible market data sources
+
+**Interface:**
+```go
+type Provider interface {
+    Subscribe(symbols []string, onTick func(symbol string, price float64)) error
+    Close() error
+}
+```
+
+**Implementations:**
+- Binance Provider (`market_data/binance/provider.go`) - WebSocket streams for crypto
+- Redis Provider (`market_data/redis/provider.go`) - Pub/Sub for forex from MT5
+
+### market_data/binance/provider.go
+**Purpose:** Binance WebSocket provider implementation
+
+**Features:**
+- Implements Provider interface
+- Subscribes to Binance trade stream for crypto symbols
 - Auto-reconnect with exponential backoff (1s → 60s max)
+- Broadcasts price updates via callback function
+- Thread-safe operation
+
+### market_data/redis/provider.go
+**Purpose:** Redis Pub/Sub provider for MT5 forex data
+
+**Features:**
+- Implements Provider interface
+- Subscribes to Redis channel: `fx_price_updates`
+- Seeds initial prices from Redis hash: `fx_latest_prices`
+- Password authentication support
+- Supports 9 forex pairs (EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, NZDUSD, EURJPY, GBPJPY, AUDNZD)
+- Parses bid/ask prices and calculates mid-price
+- Auto-reconnect on connection failures
+
+### services/market_data_service.go
+**Purpose:** Central market data service managing multiple providers
+
+**Key Functions:**
+- `AddProvider(p Provider)` - Registers new provider
+- `Subscribe(symbols []string)` - Subscribes to symbols across all providers
+- `onPriceTick(symbol, price)` - Callback for price updates, broadcasts to Hub
+- Manages provider lifecycle
+
+### services/margin_service.go
+**Purpose:** Margin and leverage calculations for CFD trading
+
+**Key Functions:**
+- Calculate margin requirement for position
+- Calculate margin level (equity / margin * 100)
+- Validate leverage limits (1x to 500x)
+- Monitor margin calls (typically < 100% margin level)
+- Liquidation threshold checking
+
+### services/order_processor.go
+**Purpose:** Event-driven order execution processor
+
+**Key Functions:**
+- Monitors pending orders in database
+- Checks trigger conditions (price >= limit, price <= stop)
+- Executes orders when conditions met
+- Updates database (moves to `orders` table, removes from `pending_orders`)
+- Creates contracts for CFD positions
+- Sends WebSocket notifications to frontend
+
+### services/audit_logger.go
+**Purpose:** Database-backed audit logging for compliance
+
+**Key Functions:**
+- Logs all trading operations to `audit_logs` table
+- Records user actions, timestamps, IP addresses
+- Immutable append-only log
+- Used for compliance and debugging
 
 ### api/handlers.go
 **Main Handlers:**
@@ -77,9 +182,9 @@ HTTP Handlers → CORS Middleware → Cache → External APIs
 **Returns:** Aggregated news articles with titles, links, descriptions, timestamps
 
 #### HandleAnalytics(w, r) - analytics_handler.go
-**Query:** `type` (fx_rate, rsi, sma, ema, macd), `from`, `to`, `symbol`, `period`  
-**Cache:** 60 seconds  
-**Source:** Frankfurter API (free forex rates)  
+**Query:** `type` (fx_rate, rsi, sma, ema, macd), `from`, `to`, `symbol`, `period`
+**Cache:** 15 minutes
+**Source:** TwelveData API (forex market data with API key)
 **Returns:** Technical indicators or forex conversion rates
 
 #### HandleCreatePaymentIntent(w, r) - payment_handler.go
@@ -104,11 +209,12 @@ HTTP Handlers → CORS Middleware → Cache → External APIs
 - Handles OPTIONS preflight requests
 - Origin validation with suffix checking
 
-### services/massive_service.go
-**Frankfurter Forex Service:**
-- Free forex rate API (no API key required)
-- Currency conversion (EUR, GBP, JPY, MYR to USD)
-- 5-minute caching
+### services/twelvedata_service.go
+**TwelveData Forex Service:**
+- Forex market data API with API key (`TWELVE_DATA_API_KEY`)
+- Currency conversion and historical data
+- Technical indicators support
+- 15-minute caching
 - HTTP client with 10s timeout
 
 ### config/config.go
@@ -124,13 +230,21 @@ HTTP Handlers → CORS Middleware → Cache → External APIs
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/ws` | WebSocket | Real-time price and order book updates |
+| `/ws` | WebSocket | Real-time price and order book updates (crypto + forex) |
 | `/api/v1/klines` | GET | Historical candlestick data (OHLCV) |
 | `/api/v1/ticker` | GET | 24h ticker statistics |
 | `/api/v1/news` | GET | Aggregated news from 6 RSS sources |
-| `/api/v1/analytics` | GET | Forex rates and technical indicators |
+| `/api/v1/analytics` | GET | Forex rates and technical indicators (TwelveData) |
 | `/api/v1/deposit/create-payment-intent` | POST | Stripe payment intent creation |
 | `/api/v1/payment/status` | GET | Stripe payment status verification |
+| `/api/v1/accounts` | GET | User trading accounts from database |
+| `/api/v1/accounts` | POST | Create new trading account |
+| `/api/v1/orders` | GET | Pending orders from database |
+| `/api/v1/orders` | POST | Create new order (market, limit, stop-limit) |
+| `/api/v1/orders/:id` | DELETE | Cancel pending order |
+| `/api/v1/positions` | GET | Open CFD positions from database |
+| `/api/v1/positions/:id` | PUT | Modify position (add margin, set stop loss) |
+| `/api/v1/positions/:id` | DELETE | Close CFD position |
 
 ---
 
@@ -141,13 +255,31 @@ HTTP Handlers → CORS Middleware → Cache → External APIs
 | Klines | 5 min | `kline-{symbol}-{interval}-{limit}` |
 | Ticker | 10 sec | `{symbol1},{symbol2},...` |
 | News | 2 min | `all_news` |
-| Analytics | 60 sec | Varies by request type |
-| Forex Rates | 5 min | `fx_rate_{from}_{to}` |
+| Analytics | 15 min | Varies by request type |
+| TwelveData Forex | 15 min | `fx_rate_{from}_{to}` |
+
+**Database Queries:**
+- Accounts, orders, and positions are NOT cached
+- Queried directly from PostgreSQL for data consistency
+- Real-time updates via WebSocket when data changes
 
 ---
 
 ## Development
 
+### Prerequisites
+```bash
+# Start Docker services (Redis + MT5 bridge)
+docker-compose up -d
+
+# Run database migrations
+migrate -path internal/database/migrations -database $DATABASE_URL up
+
+# Check migration version
+migrate -path internal/database/migrations -database $DATABASE_URL version
+```
+
+### Backend Commands
 ```bash
 go mod tidy                     # Install dependencies
 go build ./cmd/server           # Build binary
@@ -157,7 +289,24 @@ go test -v ./internal/api       # Test handlers with verbose output
 go test -cover ./...            # Run with coverage report
 ```
 
-**HTTPS Setup:** Server automatically detects `localhost+2.pem` and `localhost+2-key.pem` in project root and starts HTTPS server. See [../SETUP.md](SETUP.md) for certificate generation.
+### Database Migrations
+```bash
+# Create new migration
+migrate create -ext sql -dir internal/database/migrations -seq description_here
+
+# Run migrations up
+migrate -path internal/database/migrations -database $DATABASE_URL up
+
+# Rollback last migration
+migrate -path internal/database/migrations -database $DATABASE_URL down 1
+
+# Force version (if dirty)
+migrate -path internal/database/migrations -database $DATABASE_URL force VERSION
+```
+
+**HTTPS Setup:** Server automatically detects `localhost+2.pem` and `localhost+2-key.pem` in project root and starts HTTPS server. See [SETUP.md](../SETUP.md) for certificate generation.
+
+**Environment Variables:** See [SETUP.md](../SETUP.md) for complete list. Required: `DATABASE_URL`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `STRIPE_SECRET_KEY`, `TWELVE_DATA_API_KEY`
 
 ---
 

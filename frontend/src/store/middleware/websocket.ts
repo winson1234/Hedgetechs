@@ -21,9 +21,25 @@ const pendingTrades: Record<string, { price: number; quantity: number; time: num
 export const websocketMiddleware: Middleware = (store) => {
   // Function to connect to WebSocket
   const connect = () => {
-    // Determine WebSocket URL based on current location
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    // Smart WebSocket URL detection for all deployment methods
+    const apiUrl = import.meta.env.VITE_API_URL;
+
+    let wsUrl: string;
+    if (apiUrl) {
+      // Use configured API URL (deployments with explicit env var)
+      const protocol = apiUrl.startsWith('https') ? 'wss:' : 'ws:';
+      const host = apiUrl.replace(/^https?:\/\//, '');
+      wsUrl = `${protocol}//${host}/ws`;
+    } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // Local development (pnpm run dev, Docker Compose)
+      // Frontend runs on :5173, backend on :8080
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${protocol}//localhost:8080/ws`;
+    } else {
+      // Fallback: same host (for unexpected cases)
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${protocol}//${window.location.host}/ws`;
+    }
 
     console.log(`[WebSocket] Connecting to ${wsUrl}...`);
 

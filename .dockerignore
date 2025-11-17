@@ -56,5 +56,11 @@ Thumbs.db
 # Cloudflare
 .wrangler/
 
-# Fly.io
-fly.toml
+# MT5 Publisher (Python scripts, not needed in Go backend)
+mt5-publisher/
+
+# Frontend (React app, deployed separately to Cloudflare Pages)
+frontend/
+
+# SQL scripts (migrations are in internal/database/migrations)
+sql-scripts/

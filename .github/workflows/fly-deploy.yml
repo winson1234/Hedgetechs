@@ -16,13 +16,13 @@ jobs:
       # Deploy to production app (main branch)
       - name: Deploy to Production
         if: github.ref == 'refs/heads/main'
-        run: flyctl deploy --remote-only --app brokerageproject
+        run: flyctl deploy --remote-only --app brokerageproject --dockerfile cmd/server/Dockerfile.prod
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       # Deploy to dev app (dev branch)
       - name: Deploy to Dev
         if: github.ref == 'refs/heads/dev'
-        run: flyctl deploy --remote-only --app brokerageproject-dev
+        run: flyctl deploy --remote-only --app brokerageproject-dev --dockerfile cmd/server/Dockerfile.prod
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

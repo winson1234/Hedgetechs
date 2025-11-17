@@ -39,10 +39,21 @@ export default function ChartComponent() {
   // Access Redux state
   const symbol = useAppSelector(state => state.ui.activeInstrument);
   const forexQuotes = useAppSelector(state => state.forex.quotes);
-  
+
+  // Track forex symbols using refs to prevent infinite re-renders
+  // Only updates when the list of forex symbols actually changes (not on price updates)
+  const forexSymbolsRef = useRef<string[]>([]);
+  const prevForexKeysRef = useRef<string>('');
+
+  const currentForexKeys = Object.keys(forexQuotes).sort().join(',');
+  if (currentForexKeys !== prevForexKeysRef.current) {
+    forexSymbolsRef.current = Object.keys(forexQuotes);
+    prevForexKeysRef.current = currentForexKeys;
+  }
+
   // Detect if active instrument is forex
-  const isForex = symbol && forexQuotes[symbol];
-  
+  const isForex = Boolean(symbol && forexSymbolsRef.current.includes(symbol));
+
   // Local state for chart-specific features
   const [timeframe, setTimeframe] = useState('1h');
   const [activeDrawingTool, setActiveDrawingTool] = useState<Drawing['type'] | null>(null);
@@ -191,6 +202,7 @@ export default function ChartComponent() {
 
         if (!Array.isArray(klines) || klines.length === 0) {
           console.warn('No klines data received');
+          setIsLoading(false);
           return;
         }
 

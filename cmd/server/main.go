@@ -241,8 +241,8 @@ func main() {
 	// Start all providers
 	// Crypto symbols are handled by Binance provider (ignored by Redis)
 	// Forex symbols are handled by Redis provider (ignored by Binance)
-	// Forex list: 6 major pairs available in MetaQuotes demo
-	allSymbols := []string{"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCHF"}
+	// Forex list: All forex pairs supported by MT5 Publisher
+	allSymbols := []string{"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCHF", "CADJPY", "AUDNZD", "EURGBP", "USDCAD", "EURJPY", "GBPJPY"}
 	if err := marketDataService.Start(allSymbols); err != nil {
 		log.Printf("WARNING: Market data service failed to start: %v", err)
 	} else {

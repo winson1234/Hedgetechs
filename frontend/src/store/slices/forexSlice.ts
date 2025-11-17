@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/api';
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 
 // Types
@@ -47,7 +48,7 @@ export const fetchForexQuotes = createAsyncThunk(
   'forex/fetchQuotes',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch('/api/v1/forex/quotes');
+      const response = await apiFetch('api/v1/forex/quotes');
       if (!response.ok) throw new Error('Failed to fetch forex quotes');
       const data = await response.json();
       return data.quotes as ForexQuote[];

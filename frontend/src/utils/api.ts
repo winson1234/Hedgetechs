@@ -1,0 +1,40 @@
+/**
+ * API Utility
+ * Handles API base URL configuration for different environments
+ */
+
+// Get API base URL from environment variable
+// Falls back to relative path for local development
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+/**
+ * Constructs full API URL
+ * @param path - API endpoint path (e.g., '/api/v1/accounts')
+ * @returns Full URL to API endpoint
+ */
+export function getApiUrl(path: string): string {
+  // Remove leading slash if present to avoid double slashes
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+
+  if (API_BASE_URL) {
+    // Use configured API URL (production/dev deployments)
+    return `${API_BASE_URL}/${cleanPath}`;
+  } else {
+    // Use relative URL (local development)
+    return `/${cleanPath}`;
+  }
+}
+
+/**
+ * Enhanced fetch with automatic API URL resolution
+ * @param path - API endpoint path
+ * @param options - Fetch options
+ * @returns Fetch promise
+ */
+export async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
+  const url = getApiUrl(path);
+  return fetch(url, options);
+}
+
+// Export API_BASE_URL for debugging
+export { API_BASE_URL };

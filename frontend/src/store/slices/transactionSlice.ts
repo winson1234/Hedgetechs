@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/api';
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '../index';
 import type {
@@ -121,7 +122,7 @@ export const createDeposit = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch('/api/v1/transactions', {
+      const response = await apiFetch('api/v1/transactions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -168,7 +169,7 @@ export const createWithdrawal = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch('/api/v1/transactions', {
+      const response = await apiFetch('api/v1/transactions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -214,7 +215,7 @@ export const createTransfer = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch('/api/v1/transactions', {
+      const response = await apiFetch('api/v1/transactions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/api';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { RootState } from '../index';
 
@@ -133,7 +134,7 @@ export const createPendingOrder = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch('/api/v1/pending-orders', {
+      const response = await apiFetch('api/v1/pending-orders', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -196,7 +197,7 @@ export const executeMarketOrder = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch('/api/v1/orders', {
+      const response = await apiFetch('api/v1/orders', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

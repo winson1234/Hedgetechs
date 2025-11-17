@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '../index';
 import type { BackendAccount, BackendBalance } from '../../types';
+import { apiFetch } from '../../utils/api';
 
 // Re-export centralized types for backward compatibility
 export type Balance = BackendBalance;
@@ -53,7 +54,7 @@ export const fetchAccounts = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch('/api/v1/accounts', {
+      const response = await apiFetch('api/v1/accounts', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -84,7 +85,7 @@ export const createAccount = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch('/api/v1/accounts', {
+      const response = await apiFetch('api/v1/accounts', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

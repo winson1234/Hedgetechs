@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '../utils/api';
 
 export type InstrumentCategory = 'major' | 'defi' | 'altcoin' | 'forex' | 'commodity';
 
@@ -46,7 +47,7 @@ export function useInstruments(): InstrumentsData {
         setLoading(true);
         setError(null);
 
-        const response = await fetch('/api/v1/instruments');
+        const response = await apiFetch('api/v1/instruments');
 
         if (!response.ok) {
           throw new Error('Failed to fetch instruments');

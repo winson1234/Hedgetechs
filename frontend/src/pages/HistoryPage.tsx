@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useAppSelector } from '../store';
 import { formatCurrency } from '../utils/formatters';
@@ -164,7 +165,7 @@ export default function HistoryPage() {
       isFetchingRef.current = true;
 
       try {
-        const response = await fetch('/api/v1/history', {
+        const response = await apiFetch('api/v1/history', {
           headers: {
             'Authorization': `Bearer ${authToken}`,
           },

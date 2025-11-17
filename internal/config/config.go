@@ -26,11 +26,12 @@ const InvestingComForexRSSURL = "https://www.investing.com/rss/news_285.rss"
 const YahooFinanceForexRSSURL = "https://finance.yahoo.com/rss/forex"
 
 // Local server settings
-const LocalServerAddress = ":8080"                           // Address for the backend server
-const LocalWebSocketPath = "/ws"                             // Path for frontend WebSocket connections
-const KlinesAPIPath = "/api/v1/klines"                       // Path for historical data REST endpoint
-const TickerAPIPath = "/api/v1/ticker"                       // Path for 24h ticker data endpoint
-const NewsAPIPath = "/api/v1/news"                           // Path for news feed endpoint
-const AnalyticsAPIPath = "/api/v1/analytics"                 // Path for forex rates analytics endpoint (powered by Frankfurter API)
+const LocalServerAddress = ":8080"                                   // Address for the backend server
+const LocalWebSocketPath = "/ws"                                     // Path for frontend WebSocket connections
+const KlinesAPIPath = "/api/v1/klines"                               // Path for historical data REST endpoint
+const TickerAPIPath = "/api/v1/ticker"                               // Path for 24h ticker data endpoint
+const NewsAPIPath = "/api/v1/news"                                   // Path for news feed endpoint
+const AnalyticsAPIPath = "/api/v1/analytics"                         // Path for forex rates analytics endpoint (powered by Frankfurter API)
 const PaymentIntentAPIPath = "/api/v1/deposit/create-payment-intent" // Path for Stripe payment intent creation
-const PaymentStatusAPIPath = "/api/v1/payment/status"        // Path for Stripe payment status check
+const PaymentStatusAPIPath = "/api/v1/payment/status"                // Path for Stripe payment status check
+const ExchangeRateAPIPath = "/api/v1/exchange-rate"                  // Path for cached crypto exchange rates

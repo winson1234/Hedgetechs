@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import '../styles/keystatistics.css';
 
 interface MetricsCounts {
@@ -7,6 +7,13 @@ interface MetricsCounts {
   countries: number;
   pairs: number;
 }
+
+const TARGET_VALUES: MetricsCounts = {
+  volume: 2.5,
+  traders: 20,
+  countries: 198,
+  pairs: 350
+};
 
 const MetricsCounter: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -19,63 +26,96 @@ const MetricsCounter: React.FC = () => {
   
   const sectionRef = useRef<HTMLElement>(null);
   const hasAnimated = useRef(false);
+  const animationRef = useRef<number | null>(null);
 
-  const targetValues = {
-    volume: 2.5,
-    traders: 20,
-    countries: 198,
-    pairs: 350
-  };
+  const startCountAnimation = useCallback(() => {
+    // Cancel any existing animation
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+
+    // Reset counts to 0 to ensure animation starts from beginning
+    setCounts({
+      volume: 0,
+      traders: 0,
+      countries: 0,
+      pairs: 0
+    });
+
+    const duration = 5000; // 5 seconds for fast slot machine effect
+    const startTime = performance.now();
+
+    // Fast slot machine easing - starts fast, slows down at the end
+    const easeOutCubic = (t: number): number => {
+      return 1 - Math.pow(1 - t, 3);
+    };
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Fast start, slow end for slot machine effect
+      const eased = easeOutCubic(progress);
+
+      // Calculate current values with fast animation
+      const currentVolume = TARGET_VALUES.volume * eased;
+      const currentTraders = TARGET_VALUES.traders * eased;
+      const currentCountries = TARGET_VALUES.countries * eased;
+      const currentPairs = TARGET_VALUES.pairs * eased;
+
+      setCounts({
+        volume: Number(currentVolume.toFixed(1)),
+        traders: Math.floor(currentTraders),
+        countries: Math.floor(currentCountries),
+        pairs: Math.floor(currentPairs)
+      });
+
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        // Ensure final values are exact
+        setCounts(TARGET_VALUES);
+        animationRef.current = null;
+      }
+    };
+
+    // Small delay to ensure visibility is set first
+    setTimeout(() => {
+      animationRef.current = requestAnimationFrame(animate);
+    }, 200);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting && !hasAnimated.current) {
-            setIsVisible(true);
-            hasAnimated.current = true;
-            startCountAnimation();
+            // Small delay to ensure element is fully visible
+            setTimeout(() => {
+              setIsVisible(true);
+              hasAnimated.current = true;
+              startCountAnimation();
+            }, 100);
           }
         });
       },
-      { threshold: 0.2 }
+      { 
+        threshold: 0.1, // Trigger earlier when 10% visible
+        rootMargin: '0px 0px -50px 0px' // Trigger 50px before entering viewport
+      }
     );
 
     if (sectionRef.current) {
       observer.observe(sectionRef.current);
     }
 
-    return () => observer.disconnect();
-  }, []);
-
-  const startCountAnimation = () => {
-    const duration = 3000; // 3 seconds - slower animation
-    const fps = 60; // 60 frames per second
-    const totalFrames = (duration / 1000) * fps;
-    const frameDuration = 1000 / fps;
-
-    let currentFrame = 0;
-
-    const timer = setInterval(() => {
-      currentFrame++;
-      const progress = currentFrame / totalFrames;
-      
-      // Smooth easing function
-      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-
-      setCounts({
-        volume: Number((targetValues.volume * easeOutQuart).toFixed(1)),
-        traders: Math.floor(targetValues.traders * easeOutQuart),
-        countries: Math.floor(targetValues.countries * easeOutQuart),
-        pairs: Math.floor(targetValues.pairs * easeOutQuart)
-      });
-
-      if (currentFrame >= totalFrames) {
-        clearInterval(timer);
-        setCounts(targetValues);
+    return () => {
+      observer.disconnect();
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
       }
-    }, frameDuration);
-  };
+    };
+  }, [startCountAnimation]);
 
   return (
     <section 
@@ -83,10 +123,12 @@ const MetricsCounter: React.FC = () => {
       className={`metrics-section ${isVisible ? 'visible' : ''}`}
     >
       <div className="metrics-container">
+        <div className="bubble bubble-1"></div>
+        <div className="bubble bubble-2"></div>
         {/* Metric 1 - Trading Volume */}
         <div className="metric-item">
-          <div className="metric-value">
-            ${counts.volume.toFixed(1)}B+
+          <div className="metric-value slot-machine">
+            <span className="slot-digit">${counts.volume.toFixed(1)}</span>B+
           </div>
           <div className="metric-label">
             24h Trading Volume
@@ -95,8 +137,8 @@ const MetricsCounter: React.FC = () => {
 
         {/* Metric 2 - Active Traders */}
         <div className="metric-item">
-          <div className="metric-value">
-            {counts.traders}M+
+          <div className="metric-value slot-machine">
+            <span className="slot-digit">{counts.traders}</span>M+
           </div>
           <div className="metric-label">
             Active Traders
@@ -105,8 +147,8 @@ const MetricsCounter: React.FC = () => {
 
         {/* Metric 3 - Countries */}
         <div className="metric-item">
-          <div className="metric-value">
-            {counts.countries}+
+          <div className="metric-value slot-machine">
+            <span className="slot-digit">{counts.countries}</span>+
           </div>
           <div className="metric-label">
             Countries
@@ -115,8 +157,8 @@ const MetricsCounter: React.FC = () => {
 
         {/* Metric 4 - Trading Pairs */}
         <div className="metric-item">
-          <div className="metric-value">
-            {counts.pairs}+
+          <div className="metric-value slot-machine">
+            <span className="slot-digit">{counts.pairs}</span>+
           </div>
           <div className="metric-label">
             Trading Pairs

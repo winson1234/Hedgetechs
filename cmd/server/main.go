@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -84,6 +85,17 @@ func main() {
 	forexService := services.NewMassiveService("")
 	analyticsHandler := api.NewAnalyticsHandler(forexService)
 
+	// Initialize crypto exchange rate service with regular refresh
+	// Supports 40+ cryptocurrencies with updates every 30 seconds
+	defaultCryptoSymbols := []string{
+		"BTC", "ETH", "BNB", "SOL", "ADA", "XRP", "AVAX", "MATIC", "LINK", "UNI", "ATOM", "DOT",
+		"ARB", "OP", "APT", "DOGE", "LTC", "SHIB", "NEAR", "ICP", "FIL", "SUI", "STX", "TON",
+		"USDT", "USDC", "DAI", "TRX", "ETC", "XLM", "ALGO", "VET", "THETA", "EOS", "AAVE", "GRT",
+		"AXS", "MANA", "SAND", "ENJ", "CHZ", "HBAR", "FLOW", "EGLD", "ZIL", "WAVES", "XTZ", "BAT",
+	}
+	exchangeRateService := services.NewExchangeRateService(defaultCryptoSymbols, 30*time.Second)
+	exchangeRateHandler := api.NewExchangeRateHandler(exchangeRateService)
+
 	// Configure the HTTP server
 	// WebSocket handler uses the hub instance (with CORS)
 	http.HandleFunc(config.LocalWebSocketPath, api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
@@ -107,6 +119,8 @@ func main() {
 	http.HandleFunc("/api/v1/crypto/webhook", func(w http.ResponseWriter, r *http.Request) {
 		api.HandleCryptoWebhook(h, w, r)
 	})
+	// REST handler for crypto exchange rates (with CORS and HEAD support)
+	http.HandleFunc(config.ExchangeRateAPIPath, api.CORSMiddleware(allowHEAD(exchangeRateHandler.HandleGetRates)))
 
 	// Log NOWPayments configuration status
 	if nowPaymentsKey := os.Getenv("NOWPAYMENTS_API_KEY"); nowPaymentsKey != "" {
@@ -117,8 +131,8 @@ func main() {
 
 	// Start the HTTP/HTTPS server on the configured port
 	// Check for mkcert-generated SSL certificates for local HTTPS development
-	certFile := filepath.Join("..", "..", "localhost+2.pem")     // From cmd/server, look at project root
-	keyFile := filepath.Join("..", "..", "localhost+2-key.pem")  // From cmd/server, look at project root
+	certFile := filepath.Join("..", "..", "localhost+2.pem")    // From cmd/server, look at project root
+	keyFile := filepath.Join("..", "..", "localhost+2-key.pem") // From cmd/server, look at project root
 
 	// Check if certificate files exist
 	if _, certErr := os.Stat(certFile); certErr == nil {

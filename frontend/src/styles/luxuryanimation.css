@@ -2,14 +2,15 @@
    HERO IMAGE LUXURY ANIMATIONS
    =========================== */
 
-/* 1. Base Hero Image */
+/* 1. Base Hero Image - Premium 2026 Style */
 .hero-image {
   position: relative;
   transform-style: preserve-3d;
   perspective: 1200px;
-  animation: imageFloat 1.2s ease-out;
   cursor: pointer;
-  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .hero-img {
@@ -19,8 +20,26 @@
   position: relative;
   z-index: 1;
   filter: drop-shadow(0 20px 60px rgba(0, 0, 0, 0.3));
-  transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
   transform-style: preserve-3d;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Glow Pulse Overlay */
+.hero-glow-overlay {
+  position: absolute;
+  inset: -10px;
+  background: radial-gradient(
+    circle at center,
+    rgba(253, 219, 146, 0.2) 0%,
+    rgba(98, 126, 234, 0.15) 30%,
+    transparent 70%
+  );
+  border-radius: 20px;
+  pointer-events: none;
+  z-index: 2;
+  mix-blend-mode: overlay;
 }
 
 @keyframes imageFloat {
@@ -39,6 +58,16 @@
   transform: translateZ(20px) scale(1.02);
   filter: drop-shadow(0 25px 80px rgba(0, 0, 0, 0.5))
           drop-shadow(0 0 40px rgba(253, 219, 146, 0.3));
+}
+
+/* Hero Image Box - Stacked Cards Container */
+.hero-img-box {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* ===========================

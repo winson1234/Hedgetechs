@@ -1,18 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import './register.css';
 //import { motion, AnimatePresence } from 'framer-motion';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const register = useAuthStore(state => state.register);
+
+  // Get email from URL parameter
+  const emailFromUrl = searchParams.get('email') || '';
 
   const [formData, setFormData] = useState({
     country: '',
     firstName: '',
     lastName: '',
-    email: '',
+    email: emailFromUrl,
     password: '',
     retypePassword: ''
   });
@@ -25,6 +29,13 @@ export default function RegisterPage() {
 
   const passwordRef = useRef<HTMLInputElement>(null);
   const retypePasswordRef = useRef<HTMLInputElement>(null);
+
+  // Update email when URL parameter changes
+  useEffect(() => {
+    if (emailFromUrl) {
+      setFormData(prev => ({ ...prev, email: emailFromUrl }));
+    }
+  }, [emailFromUrl]);
 
   // Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

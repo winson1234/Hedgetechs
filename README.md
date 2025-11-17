@@ -16,7 +16,15 @@ Comprehensive cryptocurrency trading platform with authentication, real-time mar
 ```bash
 go mod tidy                     # Install dependencies
 go build                        # Build binary
-cd cmd/server; go run main.go   # Run server
+cd cmd/server; go run main.go   # Run server (stops when terminal closes)
+
+# Auto-start on Windows (BEST - starts automatically when Windows boots):
+.\scripts\install-auto-start.bat        # Install auto-start (run once)
+
+# Run in background (manual):
+.\scripts\start-server-background.bat   # Windows: Runs hidden (no window)
+.\scripts\start-server.bat              # Windows: Runs in minimized window
+.\scripts\stop-server.bat               # Stop the background server
 go test ./...                   # Run tests
 ```
 
@@ -214,6 +222,7 @@ frontend/src/
 | `/api/v1/ticker` | GET | 24h ticker statistics |
 | `/api/v1/news` | GET | Multi-source news aggregation |
 | `/api/v1/analytics` | GET | Forex rates and technical indicators |
+| `/api/v1/exchange-rate` | GET | Crypto-to-USD exchange rates (40+ cryptocurrencies) |
 | `/api/v1/deposit/create-payment-intent` | POST | Stripe payment intent creation |
 | `/api/v1/payment/status` | GET | Payment status verification |
 

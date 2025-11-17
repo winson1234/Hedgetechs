@@ -4,7 +4,7 @@
    =========================== */
 .trust-section {
   padding: 100px 0;
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
 }
 
 .trust-section .section-header {
@@ -64,9 +64,11 @@
 .faq-container {
   max-width: 900px;
   margin: 0 auto;
-  display: flex;
+  display: flex !important;
   flex-direction: column;
   gap: 16px;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 /* Rest of FAQ styles remain the same */
@@ -113,15 +115,17 @@
    =========================== */
 .faq-section {
   padding: 100px 0;
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
 }
 
 .faq-container {
   max-width: 900px;
   margin: 0 auto;
-  display: flex;
+  display: flex !important;
   flex-direction: column;
   gap: 16px;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .faq-item {
@@ -129,7 +133,81 @@
   border: 1px solid var(--border-color);
   border-radius: 16px;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  /* Prevent text blur */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  will-change: auto;
+  /* Start visible by default, will be animated by scroll system */
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  visibility: visible;
+}
+
+/* Prevent any transitions on opacity/transform for FAQ items - they should stay visible once animated */
+.faq-item.animate-in {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
+  /* Opacity and transform should not transition - they're controlled by !important rules */
+}
+
+/* FAQ items animate from alternate sides */
+.faq-item[data-scroll-animate="slide-right"] {
+  transform: translateX(-80px);
+}
+
+.faq-item[data-scroll-animate="slide-left"] {
+  transform: translateX(80px);
+}
+
+/* Ensure FAQ items stay visible once animated in, regardless of active state */
+/* These selectors need to override scroll-animations.css with higher specificity */
+.faq-item.animate-in,
+.faq-item.animate-in:hover,
+.faq-item.animate-in:not(.active),
+.faq-item[data-scroll-animate].animate-in,
+.faq-item[data-scroll-animate].animate-in:not(.active),
+.faq-item[data-scroll-animate].animate-in:hover {
+  opacity: 1 !important;
+  transform: translate3d(0, 0, 0) scale(1) !important; /* Force GPU rendering for crisp text */
+  visibility: visible !important;
+  display: block !important;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
+  animation: none !important; /* Stop any scroll animations from interfering */
+  will-change: auto !important; /* Remove will-change to prevent text blur */
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+  backface-visibility: hidden; /* Prevent text blur during animations */
+}
+
+.faq-item.animate-in.active,
+.faq-item[data-scroll-animate].animate-in.active {
+  opacity: 1 !important;
+  transform: translate3d(0, 0, 0) scale(1) !important;
+  visibility: visible !important;
+  will-change: auto !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* Override scroll animation styles specifically for FAQ items - highest specificity */
+.faq-item[data-scroll-animate="slide-right"].animate-in,
+.faq-item[data-scroll-animate="slide-right"].animate-in:not(.active),
+.faq-item[data-scroll-animate="slide-left"].animate-in,
+.faq-item[data-scroll-animate="slide-left"].animate-in:not(.active) {
+  opacity: 1 !important;
+  transform: translate3d(0, 0, 0) scale(1) !important;
+  visibility: visible !important;
+  display: block !important;
+  animation: none !important;
+  will-change: auto !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  backface-visibility: hidden;
 }
 
 .faq-item:hover {
@@ -139,6 +217,76 @@
 
 .faq-item.active {
   border-color: var(--primary-color);
+  opacity: 1 !important;
+  transform: translate3d(0, 0, 0) scale(1) !important;
+  visibility: visible !important;
+}
+
+/* CRITICAL: Ensure FAQ items with animate-in class NEVER disappear, even when not active */
+.faq-item.animate-in:not(.active),
+.faq-item.animate-in:not(.active):hover {
+  opacity: 1 !important;
+  transform: translate3d(0, 0, 0) scale(1) !important; /* Force GPU rendering */
+  visibility: visible !important;
+  display: block !important;
+  will-change: auto !important;
+}
+
+/* Even more specific - ensure FAQ items never disappear when they have animate-in */
+div.faq-item.animate-in,
+div.faq-item[data-scroll-animate].animate-in {
+  opacity: 1 !important;
+  transform: translate3d(0, 0, 0) scale(1) !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+.faq-container .faq-item[data-scroll-animate] {
+  /* Ensure minimum visibility - items should always be visible once in DOM */
+  min-height: 60px;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+  transform: translate3d(0, 0, 0) scale(1) !important;
+}
+
+/* Force visibility for FAQ items that have been animated in or interacted with */
+.faq-container .faq-item[data-scroll-animate].animate-in,
+.faq-container .faq-item[data-scroll-animate].active,
+.faq-container .faq-item[data-scroll-animate]:hover {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+  transform: translate3d(0, 0, 0) scale(1) !important;
+}
+
+/* ULTIMATE FALLBACK: Ensure FAQ items stay visible - highest specificity override */
+/* This overrides the base [data-scroll-animate] opacity: 0 rule from scroll-animations.css */
+/* This ensures FAQ items are ALWAYS visible once rendered, regardless of animate-in class */
+section.faq-section .faq-container .faq-item[data-scroll-animate] {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+  transform: translate3d(0, 0, 0) scale(1) !important;
+}
+
+/* Additional states for extra safety */
+section.faq-section .faq-container .faq-item[data-scroll-animate].animate-in,
+section.faq-section .faq-container .faq-item[data-scroll-animate].active,
+section.faq-section .faq-container .faq-item[data-scroll-animate]:hover,
+section.faq-section .faq-container .faq-item[data-scroll-animate]:focus-within {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+  transform: translate3d(0, 0, 0) scale(1) !important;
+}
+
+.faq-item.active .faq-answer,
+.faq-item.active .answer-content,
+.faq-item.active .answer-content p {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
 }
 
 .faq-question {
@@ -164,6 +312,13 @@
   font-weight: 600;
   line-height: 1.4;
   padding-right: 24px;
+  /* Prevent text blur */
+  transform: translateZ(0);
+  will-change: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  backface-visibility: hidden;
 }
 
 .faq-icon {
@@ -194,22 +349,62 @@
 .faq-answer {
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.4s ease, padding 0.4s ease;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), padding 0.4s ease, opacity 0.3s ease;
+  opacity: 0;
+  transform: none !important;
+  visibility: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .faq-item.active .faq-answer {
   max-height: 500px;
-  padding: 0 28px 24px 28px;
+  padding: 20px 28px 24px 28px;
+  opacity: 1 !important;
+  transform: none !important;
+  visibility: visible !important;
+  display: block !important;
 }
 
 .answer-content {
-  padding-top: 8px;
+  padding-top: 0;
+  opacity: 1 !important;
+  transform: none !important;
+  transform: translate3d(0, 0, 0) !important; /* Force GPU rendering for crisp text */
+  visibility: visible !important;
+  display: block !important;
+  position: relative !important;
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  /* Prevent text blur */
+  will-change: auto !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+  backface-visibility: hidden;
 }
 
 .answer-content p {
   font-size: 16px;
   line-height: 1.7;
-  color: var(--text-secondary);
+  color: var(--text-secondary, rgba(255, 255, 255, 0.8)) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  z-index: 1;
+  text-align: left;
+  /* Prevent text blur */
+  transform: translateZ(0); /* Force GPU rendering */
+  will-change: auto !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+  backface-visibility: hidden;
 }
 
 .faq-footer {
@@ -248,9 +443,11 @@
    FOOTER
    =========================== */
 .footer {
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
   padding: 64px 0 24px;
   border-top: 1px solid var(--border-color);
+  margin-bottom: 0;
+  position: relative;
 }
 
 .footer-content {
@@ -315,14 +512,19 @@
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10000;
   backdrop-filter: blur(4px);
+  overflow: hidden;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .logout-confirmation-modal {
@@ -409,7 +611,7 @@
   }
   
   .news-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
   
   .news-item.featured {

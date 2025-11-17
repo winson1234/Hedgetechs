@@ -63,6 +63,7 @@ interface StatItemProps {
 
 const easeOutQuad = (t: number) => t * (2 - t); // easing function
 
+/* eslint-disable react/prop-types */
 const StatItem: React.FC<StatItemProps> = ({
   targetValue,
   label,

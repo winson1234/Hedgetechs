@@ -126,7 +126,7 @@ export default function MainSidebar() {
     <nav
       onMouseEnter={() => !isSidebarExpanded && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`fixed left-0 top-[60px] z-40 hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 h-[calc(100vh-60px)] transition-all duration-150 ease-in-out ${
+      className={`fixed left-0 top-[60px] bottom-0 z-40 hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-150 ease-in-out ${
         showExpanded ? 'w-44' : 'w-14'
       } ${!isSidebarExpanded && isHovered ? 'shadow-lg' : 'shadow-sm'}`}
     >

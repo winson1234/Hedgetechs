@@ -38,12 +38,21 @@ export default function MarketActivityPanel() {
 
   // Switch to appropriate tab when product type or forex status changes
   useEffect(() => {
+    // If forex instrument is selected, default to forex tab (unless on pending/history/positions)
     if (isForex && activeTab !== 'forex' && activeTab !== 'pending' && activeTab !== 'history' && activeTab !== 'positions') {
       setActiveTab('forex');
-    } else if (!isForex && isSpot && (activeTab === 'positions' || activeTab === 'forex')) {
-      setActiveTab('orderbook'); // Switch to orderbook when going from CFD/Forex to SPOT
-    } else if (!isForex && isCFD && (activeTab === 'orderbook' || activeTab === 'trades' || activeTab === 'forex')) {
-      setActiveTab('positions'); // Switch to positions when going from SPOT/Forex to CFD
+    }
+    // If non-forex crypto SPOT and currently on positions or forex tab, switch to orderbook
+    else if (!isForex && isSpot && (activeTab === 'positions' || activeTab === 'forex')) {
+      setActiveTab('orderbook');
+    }
+    // If non-forex CFD and currently on orderbook/trades, switch to positions
+    else if (!isForex && isCFD && (activeTab === 'orderbook' || activeTab === 'trades')) {
+      setActiveTab('positions');
+    }
+    // If forex CFD and on orderbook/trades, switch to positions (keep forex tab available)
+    else if (isForex && isCFD && (activeTab === 'orderbook' || activeTab === 'trades')) {
+      setActiveTab('positions');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProductType, isForex]);
@@ -73,8 +82,8 @@ export default function MarketActivityPanel() {
       {/* Tab Header - Dynamic tabs based on product type */}
       <div className="flex items-center justify-between gap-4 mb-4 border-b border-slate-200 dark:border-slate-700">
         <div className="flex gap-1 overflow-x-auto">
-        {/* Forex mode tab: Forex Info */}
-        {isForex && (
+        {/* Forex mode tab: Forex Info (show for both SPOT and CFD when forex instrument selected) */}
+        {isForex && (isSpot || isCFD) && (
           <button
             onClick={() => setActiveTab('forex')}
             className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${

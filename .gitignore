@@ -1,5 +1,6 @@
 # Environment
 .env
+.env.dev
 
 # SSL Certificates (mkcert-generated for local HTTPS development)
 *.pem

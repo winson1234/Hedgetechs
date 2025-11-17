@@ -201,6 +201,16 @@ type Provider interface {
 **Source:** Stripe API  
 **Returns:** Payment status and metadata for balance updates
 
+#### HandleGetRates(w, r) - exchange_rate_handler.go
+**Query:** `symbols` (optional, comma-separated, e.g., `BTC,ETH,SOL`)  
+**Cache:** 30 seconds  
+**Source:** CoinGecko API  
+**Returns:** JSON object with crypto-to-USD rates: `{ "BTC": 53260.20, "ETH": 2850.50, "USD": 1 }`  
+**Headers:** 
+- `X-Rates-Timestamp`: ISO 8601 timestamp of data fetch
+- `X-Rate-Source`: `live` or `cache` (indicates if using cached/stale data)
+- `Cache-Control`: `public, max-age=30`
+
 ### api/middleware.go
 **CORS Middleware:**
 - Allows requests from `*.pages.dev` (Cloudflare Pages)
@@ -216,6 +226,17 @@ type Provider interface {
 - Technical indicators support
 - 15-minute caching
 - HTTP client with 10s timeout
+
+### services/exchange_rate_service.go
+**CoinGecko Crypto Exchange Rate Service:**
+- Fetches live crypto-to-USD exchange rates from CoinGecko API
+- Supports 40+ cryptocurrencies (BTC, ETH, SOL, ADA, XRP, USDT, USDC, and more)
+- Background refresh every 30 seconds
+- In-memory caching with 30-second expiration
+- Fallback to last known rates if API fails
+- Query parameter support: `?symbols=BTC,ETH,SOL` (comma-separated)
+- Returns JSON: `{ "BTC": 53260.20, "ETH": 2850.50, "USD": 1 }`
+- Always includes USD base rate (1.0)
 
 ### config/config.go
 **Constants:**
@@ -235,6 +256,7 @@ type Provider interface {
 | `/api/v1/ticker` | GET | 24h ticker statistics |
 | `/api/v1/news` | GET | Aggregated news from 6 RSS sources |
 | `/api/v1/analytics` | GET | Forex rates and technical indicators (TwelveData) |
+| `/api/v1/exchange-rate` | GET | Crypto-to-USD exchange rates (40+ cryptocurrencies) |
 | `/api/v1/deposit/create-payment-intent` | POST | Stripe payment intent creation |
 | `/api/v1/payment/status` | GET | Stripe payment status verification |
 | `/api/v1/accounts` | GET | User trading accounts from database |
@@ -257,6 +279,7 @@ type Provider interface {
 | News | 2 min | `all_news` |
 | Analytics | 15 min | Varies by request type |
 | TwelveData Forex | 15 min | `fx_rate_{from}_{to}` |
+| Crypto Exchange Rates | 30 sec | `exchange_rate_{symbol1}_{symbol2}_...` |
 
 **Database Queries:**
 - Accounts, orders, and positions are NOT cached

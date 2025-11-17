@@ -5,17 +5,21 @@
 /* Metrics Section Container */
 .metrics-section {
   position: relative;
-  padding: 80px 20px;
-  opacity: 0;
-  transform: translateY(60px);
+  padding: 100px 20px 60px 20px;
+  margin: 0;
+  opacity: 1;
+  transform: translateY(0);
   transition: all 1.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
+  visibility: visible;
 }
 
 .metrics-section.visible {
   opacity: 1;
   transform: translateY(0);
 }
-
 /* Radial Glow Background */
 .metrics-section::before {
   content: '';
@@ -33,22 +37,90 @@
   opacity: 1;
 }
 
-/* Metrics Container - Glass Morphism Box */
+/* Metrics Container - Fun Bubbly Box */
 .metrics-container {
-  max-width: 1400px;
+  max-width: 1100px;
   margin: 0 auto;
   display: grid;
-  margin-bottom: -300px;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 60px;
-  padding: 60px 40px;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 24px;
-  border: 1px solid rgba(253, 219, 146, 0.1);
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  padding: 28px 24px;
+  background: linear-gradient(135deg, rgba(253, 219, 146, 0.12) 0%, rgba(255, 217, 61, 0.08) 100%);
+  border-radius: 25px;
+  border: 2px solid rgba(253, 219, 146, 0.25);
   backdrop-filter: blur(20px);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   z-index: 1;
+  box-shadow: 
+    0 8px 30px rgba(253, 219, 146, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 0 1px rgba(253, 219, 146, 0.15);
+  transform: scale(0.95);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  box-sizing: border-box;
+  align-items: stretch;
+}
+
+/* Ensure all 4 columns are visible and equal width */
+@media (min-width: 769px) {
+  .metrics-container {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    align-items: stretch;
+  }
+  
+  .metric-item {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+}
+
+/* Force all 4 items to show on desktop */
+@media (min-width: 1025px) {
+  .metrics-container {
+    grid-template-columns: repeat(4, 1fr) !important;
+    align-items: stretch;
+  }
+  
+  .metric-item {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+}
+
+.metrics-section.visible .metrics-container {
+  transform: scale(1);
+  animation: bubblePop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes bubblePop {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Fun bubbly background circles */
+.metrics-container {
+  position: relative;
 }
 
 /* Shimmer Effect on Top Border */
@@ -58,10 +130,55 @@
   top: 0;
   left: -100%;
   width: 100%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(253, 219, 146, 0.6), transparent);
-  animation: shimmer 3s ease-in-out infinite;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(253, 219, 146, 0.8), transparent);
+  animation: shimmer 4s ease-in-out infinite;
   z-index: 2;
+  border-radius: 30px 30px 0 0;
+  pointer-events: none;
+}
+
+/* Floating bubble elements */
+.bubble {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+.metrics-section.visible .bubble {
+  opacity: 1;
+}
+
+.bubble-1 {
+  top: -50px;
+  right: -50px;
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(253, 219, 146, 0.2) 0%, transparent 70%);
+  animation: floatBubble 6s ease-in-out infinite;
+}
+
+.bubble-2 {
+  bottom: -30px;
+  left: -30px;
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, rgba(255, 217, 61, 0.15) 0%, transparent 70%);
+  animation: floatBubble 8s ease-in-out infinite reverse;
+}
+
+@keyframes floatBubble {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate(20px, -20px) scale(1.2);
+    opacity: 1;
+  }
 }
 
 @keyframes shimmer {
@@ -69,16 +186,92 @@
   100% { left: 200%; }
 }
 
-/* Individual Metric Item */
+/* Individual Metric Item - Bubbly Style */
 .metric-item {
   text-align: center;
   position: relative;
-  opacity: 0;
-  transform: translateY(30px) scale(0.95);
-  transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  padding: 18px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(253, 219, 146, 0.2);
+  backdrop-filter: blur(10px);
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              border-color 0.3s ease,
+              box-shadow 0.3s ease,
+              transform 0.3s ease;
+  z-index: 1;
+  overflow: visible;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  min-height: 120px;
+  visibility: visible;
 }
 
-/* Staggered Animation for Each Metric */
+/* Hover bubble effect inside metric item */
+.metric-item::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(253, 219, 146, 0.15) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+  border-radius: 50%;
+}
+
+.metrics-section.visible .metric-item {
+  border-color: rgba(253, 219, 146, 0.35);
+  box-shadow: 
+    0 6px 25px rgba(253, 219, 146, 0.15),
+    inset 0 2px 10px rgba(255, 255, 255, 0.1),
+    0 0 20px rgba(253, 219, 146, 0.1);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.metrics-section.visible .metric-item:hover {
+  border-color: rgba(253, 219, 146, 0.5);
+  box-shadow: 
+    0 10px 35px rgba(253, 219, 146, 0.25),
+    inset 0 2px 15px rgba(255, 255, 255, 0.2),
+    0 0 30px rgba(253, 219, 146, 0.2);
+  transform: translateY(-8px) scale(1.05) rotate(1deg);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.metrics-section.visible .metric-item:hover::after {
+  opacity: 1;
+  animation: bubbleFloat 3s ease-in-out infinite;
+}
+
+@keyframes bubbleFloat {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(10px, -10px) scale(1.1);
+  }
+}
+
+/* Staggered Animation for Each Metric - Ensure always visible */
+.metrics-section .metric-item {
+  opacity: 1 !important;
+  transform: translateY(0) scale(1) !important;
+  visibility: visible !important;
+}
+
 .metrics-section.visible .metric-item:nth-child(1) {
   opacity: 1;
   transform: translateY(0) scale(1);
@@ -103,19 +296,186 @@
   transition-delay: 0.8s;
 }
 
-/* Metric Value (Number) */
+/* Metric Value (Number) - Fun Bubbly Style */
 .metric-value {
-  font-size: 30px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #FDB912 0%, #FFD93D 100%);
+  font-size: 1.75rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #FDB912 0%, #FFD93D 50%, #FFA500 100%);
+  background-size: 200% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 12px;
+  color: transparent;
+  margin-bottom: 0;
   position: relative;
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   letter-spacing: -0.02em;
   line-height: 1.2;
+  animation: gradientShift 3s ease-in-out infinite;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform, background-position;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  filter: drop-shadow(0 2px 4px rgba(253, 219, 146, 0.3));
+  overflow: visible;
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Slot Machine Effect */
+.metric-value.slot-machine {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+  min-height: 1.2em;
+  overflow: visible;
+  width: 100%;
+  text-align: center;
+  flex-wrap: nowrap;
+}
+
+.slot-digit {
+  display: inline-block;
+  position: relative;
+  transform-origin: center;
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+  background: linear-gradient(135deg, #FDB912 0%, #FFD93D 50%, #FFA500 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  filter: drop-shadow(0 2px 4px rgba(253, 219, 146, 0.3));
+}
+
+/* Only animate when visible */
+.metrics-section.visible .slot-digit {
+  animation: slotMachine 5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Different animation delays and directions for each digit to create staggered slot machine effect */
+.metric-item:nth-child(1) .slot-digit {
+  animation-delay: 0s;
+  animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.metric-item:nth-child(2) .slot-digit {
+  animation-delay: 0.15s;
+  animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.metric-item:nth-child(3) .slot-digit {
+  animation-delay: 0.3s;
+  animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.metric-item:nth-child(4) .slot-digit {
+  animation-delay: 0.45s;
+  animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Ensure numbers are visible even before animation */
+.metrics-section:not(.visible) .slot-digit {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+  visibility: visible !important;
+}
+
+/* Make sure slot-digit is always visible */
+.slot-digit {
+  visibility: visible !important;
+  display: inline-block !important;
+}
+
+@keyframes slotMachine {
+  0% {
+    transform: translateY(50%) scale(0.95);
+    opacity: 0.8;
+  }
+  10% {
+    transform: translateY(-30%) scale(1.05);
+    opacity: 0.9;
+  }
+  20% {
+    transform: translateY(20%) scale(0.98);
+    opacity: 0.95;
+  }
+  30% {
+    transform: translateY(-15%) scale(1.02);
+    opacity: 0.97;
+  }
+  40% {
+    transform: translateY(10%) scale(0.99);
+    opacity: 0.98;
+  }
+  50% {
+    transform: translateY(-8%) scale(1.01);
+    opacity: 0.99;
+  }
+  60% {
+    transform: translateY(5%) scale(0.998);
+    opacity: 0.995;
+  }
+  70% {
+    transform: translateY(-3%) scale(1.002);
+    opacity: 0.997;
+  }
+  80% {
+    transform: translateY(2%) scale(0.999);
+    opacity: 0.998;
+  }
+  90% {
+    transform: translateY(-1%) scale(1.001);
+    opacity: 0.999;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.metric-item:hover .metric-value {
+  transform: scale(1.1);
+  filter: drop-shadow(0 4px 8px rgba(253, 219, 146, 0.5));
+}
+
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Pulse effect during animation */
+.metrics-section.visible .metric-value {
+  animation: 
+    gradientShift 3s ease-in-out infinite,
+    numberPulse 2.5s ease-out;
+}
+
+@keyframes numberPulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* Animated Underline */
@@ -152,61 +512,229 @@
   transition-delay: 1.6s;
 }
 
-/* Metric Label */
+/* Metric Label - Fun Style */
 .metric-label {
-  font-size: 16px;
-  color: rgba(255, 255, 255, 0.6);
-  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-weight: 500;
+  font-weight: 600;
+  margin-top: 4px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-/* Glow Effect Behind Metric */
+/* Glow Effect Behind Metric - using a wrapper div instead */
+.metric-item {
+  position: relative;
+}
+
 .metric-item::before {
   content: '';
   position: absolute;
-  top: -30px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  width: 80px;
-  height: 80px;
-  background: radial-gradient(circle, rgba(253, 219, 146, 0.15) 0%, transparent 70%);
+  transform: translate(-50%, -50%);
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, rgba(253, 219, 146, 0.12) 0%, transparent 70%);
   border-radius: 50%;
   opacity: 0;
   transition: opacity 0.8s ease, transform 0.8s ease;
-  z-index: -1;
+  z-index: -2;
+  pointer-events: none;
 }
 
 .metrics-section.visible .metric-item::before {
   opacity: 1;
-  transform: translateX(-50%) scale(1.5);
+  transform: translate(-50%, -50%) scale(1.3);
   transition-delay: 1.2s;
 }
 
 /* Responsive Design */
+@media (max-width: 1024px) {
+  .metrics-container {
+    max-width: 900px;
+    gap: 14px;
+    padding: 24px 20px;
+  }
+}
+
 @media (max-width: 768px) {
+  .metrics-section {
+    padding: 30px 15px 40px 15px;
+  }
+
   .metrics-container {
     grid-template-columns: repeat(2, 1fr);
-    gap: 40px;
-    padding: 40px 20px;
+    gap: 12px;
+    padding: 20px 16px;
+    max-width: 600px;
   }
 
   .metric-value {
-    font-size: 42px;
+    font-size: 1.5rem;
   }
 
   .metric-label {
-    font-size: 14px;
+    font-size: 0.65rem;
+  }
+
+  .metric-item {
+    padding: 14px 10px;
   }
 }
 
 @media (max-width: 480px) {
   .metrics-container {
     grid-template-columns: 1fr;
-    gap: 30px;
+    gap: 12px;
+    padding: 20px 15px;
   }
 
   .metric-value {
-    font-size: 48px;
+    font-size: 1.5rem;
   }
+
+  .metric-item {
+    padding: 15px 10px;
+  }
+}
+
+/* ===========================
+   LIGHT MODE STYLES - CLEAN & READABLE
+   =========================== */
+
+/* Metrics Container - Light Mode - Clean Style */
+body.light-mode .metrics-container {
+  background: linear-gradient(135deg, 
+    rgba(255, 250, 240, 0.98) 0%, 
+    rgba(255, 248, 235, 0.95) 100%);
+  border: 2px solid rgba(153, 85, 0, 0.5);
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  backdrop-filter: blur(10px);
+}
+
+/* Metric Item - Light Mode - Clean Cards */
+body.light-mode .metric-item {
+  background: rgba(255, 255, 255, 1);
+  border: 2px solid rgba(153, 85, 0, 0.4);
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+}
+
+body.light-mode .metrics-section.visible .metric-item {
+  border-color: rgba(153, 85, 0, 0.6);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 1);
+}
+
+body.light-mode .metrics-section.visible .metric-item:hover {
+  border-color: rgba(153, 85, 0, 0.8);
+  box-shadow: 
+    0 6px 20px rgba(0, 0, 0, 0.1),
+    0 3px 10px rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-4px) scale(1.02);
+}
+
+/* Metric Label - Light Mode - High Contrast */
+body.light-mode .metric-label {
+  color: #495057 !important;
+  font-weight: 700 !important;
+  text-shadow: none;
+  letter-spacing: 0.1em;
+  opacity: 1;
+}
+
+body.light-mode .metrics-section.visible .metric-item:hover .metric-label {
+  color: #212529 !important;
+}
+
+/* Metric Value - Light Mode - Darker Gold Gradient */
+body.light-mode .metric-value {
+  filter: none;
+  background: linear-gradient(135deg, #996500 0%, #B8860B 40%, #DAA520 70%, #996500 100%) !important;
+  background-size: 200% 100% !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+body.light-mode .metric-item:hover .metric-value {
+  filter: none;
+}
+
+body.light-mode .slot-digit {
+  filter: none;
+  background: linear-gradient(135deg, #996500 0%, #B8860B 40%, #DAA520 70%, #996500 100%) !important;
+  background-size: 200% 100% !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+/* Shimmer Effect - Light Mode - Subtle */
+body.light-mode .metrics-container::before {
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(153, 85, 0, 0.3), 
+    rgba(184, 134, 11, 0.4), 
+    rgba(153, 85, 0, 0.3), 
+    transparent);
+  height: 3px;
+}
+
+/* Bubbles - Light Mode - Removed/Reduced */
+body.light-mode .bubble-1,
+body.light-mode .bubble-2 {
+  opacity: 0.3;
+  background: radial-gradient(circle, 
+    rgba(153, 85, 0, 0.1) 0%, 
+    transparent 60%);
+}
+
+/* Radial Glow - Light Mode - Removed */
+body.light-mode .metrics-section::before {
+  opacity: 0;
+}
+
+/* Metric Item Glow - Light Mode - Removed */
+body.light-mode .metric-item::before {
+  opacity: 0;
+}
+
+/* Hover Bubble Effect - Light Mode - Removed */
+body.light-mode .metric-item::after {
+  opacity: 0;
+}
+
+/* Animated Underline - Light Mode - Clean */
+body.light-mode .metric-value::after {
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(153, 85, 0, 0.5), 
+    #996500, 
+    rgba(184, 134, 11, 0.6), 
+    #996500, 
+    rgba(153, 85, 0, 0.5), 
+    transparent);
+  box-shadow: none;
+  height: 2px;
+}
+
+/* Additional Light Mode Enhancements */
+body.light-mode .metrics-section {
+  background: transparent;
+}
+
+/* Simple gradient animation for light mode - no glow */
+body.light-mode .metric-value {
+  animation: gradientShift 3s ease-in-out infinite;
 }

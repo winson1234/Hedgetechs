@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -254,6 +255,17 @@ func main() {
 	analyticsHandler := api.NewAnalyticsHandler(forexService)
 	fxRatesHandler := api.NewFXRatesHandler(forexService)
 
+	// Initialize crypto exchange rate service with regular refresh
+	// Supports 40+ cryptocurrencies with updates every 30 seconds
+	defaultCryptoSymbols := []string{
+		"BTC", "ETH", "BNB", "SOL", "ADA", "XRP", "AVAX", "MATIC", "LINK", "UNI", "ATOM", "DOT",
+		"ARB", "OP", "APT", "DOGE", "LTC", "SHIB", "NEAR", "ICP", "FIL", "SUI", "STX", "TON",
+		"USDT", "USDC", "DAI", "TRX", "ETC", "XLM", "ALGO", "VET", "THETA", "EOS", "AAVE", "GRT",
+		"AXS", "MANA", "SAND", "ENJ", "CHZ", "HBAR", "FLOW", "EGLD", "ZIL", "WAVES", "XTZ", "BAT",
+	}
+	exchangeRateService := services.NewExchangeRateService(defaultCryptoSymbols, 30*time.Second)
+	exchangeRateHandler := api.NewExchangeRateHandler(exchangeRateService)
+
 	// Configure the HTTP server
 	// WebSocket handler uses the hub instance (with CORS)
 	http.HandleFunc(config.LocalWebSocketPath, api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
@@ -283,6 +295,8 @@ func main() {
 	http.HandleFunc("/api/v1/crypto/webhook", func(w http.ResponseWriter, r *http.Request) {
 		api.HandleCryptoWebhook(h, w, r)
 	})
+	// REST handler for crypto exchange rates (with CORS and HEAD support)
+	http.HandleFunc(config.ExchangeRateAPIPath, api.CORSMiddleware(allowHEAD(exchangeRateHandler.HandleGetRates)))
 
 	// Account management endpoints (protected with JWT authentication)
 	// POST /api/v1/accounts - Create a new trading account

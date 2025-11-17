@@ -1,12 +1,28 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store';
 import { signOut } from '../store/slices/authSlice';
-import { setTheme, setActiveInstrument, selectIsDarkMode } from '../store/slices/uiSlice';
-import { useInstruments } from '../hooks/useInstruments';
+import { setTheme, selectIsDarkMode, setActiveInstrument } from '../store/slices/uiSlice';
 import MiniSparklineChart from '../components/MiniSparklineChart';
 import { getApiUrl } from '../config/api';
+import { useScrollAnimations } from '../hooks/useScrollAnimations';
+import { useLenisScroll } from '../hooks/useLenisScroll';
+import { useGSAPScrollAnimations } from '../hooks/useGSAPScrollAnimations';
+import { useMicroParallax } from '../hooks/useMicroParallax';
+import { useCursorParallax } from '../hooks/useCursorParallax';
+import { useFloatingAnimation } from '../hooks/useFloatingAnimation';
+import { useGlowPulse } from '../hooks/useGlowPulse';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import 'lenis/dist/lenis.css';
+
+if (typeof window !== 'undefined') {
+  gsap.registerPlugin(ScrollTrigger);
+}
 import './dashboard.css';
+import '../styles/scroll-animations.css';
+import '../styles/premium-scroll.css';
+import '../styles/advanced-animations.css';
 import '../styles/news.css';
 import '../styles/crypto.css';
 import '../styles/color.css';
@@ -23,50 +39,118 @@ interface CryptoData {
   volume24h: number;  // 24h trading volume for "Popular Coins" sorting
   icon: string;
   gradient: string;
-  isForexPair?: boolean;
-  forexPair?: { base: string; quote: string };
 }
 
-// UI-specific properties for each crypto (emoji icons and gradient backgrounds)
-const cryptoUIProperties: Record<string, { icon: string; gradient: string }> = {
-  'BTCUSDT': { icon: '₿', gradient: 'linear-gradient(135deg, #f7931a, #ff9500)' },
-  'ETHUSDT': { icon: 'Ξ', gradient: 'linear-gradient(135deg, #627eea, #8a9cff)' },
-  'BNBUSDT': { icon: 'B', gradient: 'linear-gradient(135deg, #f3ba2f, #ffd700)' },
-  'SOLUSDT': { icon: '◎', gradient: 'linear-gradient(135deg, #9945ff, #14f195)' },
-  'XRPUSDT': { icon: '✕', gradient: 'linear-gradient(135deg, #23292f, #3d4853)' },
-  'ADAUSDT': { icon: '₳', gradient: 'linear-gradient(135deg, #0033ad, #3468d6)' },
-  'AVAXUSDT': { icon: '▲', gradient: 'linear-gradient(135deg, #e84142, #ff6b6b)' },
-  'MATICUSDT': { icon: '⬡', gradient: 'linear-gradient(135deg, #8247e5, #a77bf3)' },
-  'LINKUSDT': { icon: '⬡', gradient: 'linear-gradient(135deg, #2a5ada, #5c8bf5)' },
-  'UNIUSDT': { icon: '🦄', gradient: 'linear-gradient(135deg, #ff007a, #ff6bae)' },
-  'ATOMUSDT': { icon: '⚛', gradient: 'linear-gradient(135deg, #2e3148, #5064fb)' },
-  'DOTUSDT': { icon: '●', gradient: 'linear-gradient(135deg, #e6007a, #ff4d9e)' },
-  'ARBUSDT': { icon: '◆', gradient: 'linear-gradient(135deg, #2d374b, #4a90e2)' },
-  'OPUSDT': { icon: '○', gradient: 'linear-gradient(135deg, #ff0420, #ff6b8a)' },
-  'APTUSDT': { icon: 'A', gradient: 'linear-gradient(135deg, #00d4aa, #40e5cc)' },
-  'DOGEUSDT': { icon: 'Ð', gradient: 'linear-gradient(135deg, #c2a633, #f0d068)' },
-  'LTCUSDT': { icon: 'Ł', gradient: 'linear-gradient(135deg, #345d9d, #5c8bd6)' },
-  'SHIBUSDT': { icon: '🐕', gradient: 'linear-gradient(135deg, #ffa409, #ffcd5d)' },
-  'NEARUSDT': { icon: 'N', gradient: 'linear-gradient(135deg, #00c08b, #00f395)' },
-  'ICPUSDT': { icon: '∞', gradient: 'linear-gradient(135deg, #29abe2, #6dd5f5)' },
-  'FILUSDT': { icon: 'F', gradient: 'linear-gradient(135deg, #0090ff, #42b4ff)' },
-  'SUIUSDT': { icon: 'S', gradient: 'linear-gradient(135deg, #4da2ff, #7ec8ff)' },
-  'STXUSDT': { icon: '⬢', gradient: 'linear-gradient(135deg, #5546ff, #7e72ff)' },
-  'TONUSDT': { icon: '◇', gradient: 'linear-gradient(135deg, #0088cc, #229ed9)' },
-};
+const PAYOUT_CRYPTOS = [
+  { symbol: 'BTC', label: 'Bitcoin', icon: '₿' },
+  { symbol: 'ETH', label: 'Ethereum', icon: 'Ξ' },
+  { symbol: 'SOL', label: 'Solana', icon: '◎' },
+  { symbol: 'ADA', label: 'Cardano', icon: '₳' },
+  { symbol: 'XRP', label: 'XRP', icon: '✕' },
+  { symbol: 'LTC', label: 'Litecoin', icon: 'Ł' },
+  { symbol: 'DOGE', label: 'Dogecoin', icon: 'Ð' },
+] as const;
+
+const USD_FORMATTER = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const CRYPTO_FORMATTER = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 8,
+});
 
 export default function DashboardPage() {
   const dispatch = useAppDispatch();
   const isLoggedIn = useAppSelector(state => !!state.auth.session);
   const user = useAppSelector(state => state.auth.user);
   const isDarkMode = useAppSelector(selectIsDarkMode);
-
-  // Get instruments from backend API
-  const { instruments } = useInstruments();
-
-  // Get current prices and ticker data from Redux store (updated by WebSocket middleware)
   const currentPrices = useAppSelector(state => state.price.currentPrices);
-  const tickerData = useAppSelector(state => state.price.tickers);
+  
+  // Initialize premium scroll system
+  const lenisInstance = useLenisScroll();
+  useGSAPScrollAnimations();
+  useMicroParallax();
+
+  // Keep existing scroll animations for compatibility
+  useScrollAnimations({
+    threshold: 0.1,
+    rootMargin: '0px',
+    parallaxSpeed: 0, // Parallax handled by useMicroParallax
+  });
+
+  // Hero image animations
+  const heroImageParallaxRef = useCursorParallax<HTMLDivElement>({
+    rotation: 2, // 1-3 degrees
+    movement: 3, // 1-3px movement
+    smoothness: 0.1,
+  });
+
+  const heroCardsFloatRef = useFloatingAnimation<HTMLDivElement>({
+    distance: 4, // 2-6px
+    duration: 3,
+    randomize: false,
+  });
+
+  const heroGlowRef = useGlowPulse<HTMLDivElement>({
+    minOpacity: 0.5,
+    maxOpacity: 0.9,
+    duration: 2,
+  });
+
+  // Floating animations for crypto icons
+  const btcFloatRef = useFloatingAnimation<HTMLDivElement>({
+    distance: 5,
+    duration: 4,
+    randomize: true,
+  });
+
+  const ethFloatRef = useFloatingAnimation<HTMLDivElement>({
+    distance: 6,
+    duration: 5,
+    randomize: true,
+  });
+
+  // Entrance animation for hero image (no scroll parallax)
+  const heroImgRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const heroImg = heroImgRef.current;
+    if (!heroImg) return;
+
+    // Entrance fade + scale animation
+    gsap.set(heroImg, {
+      opacity: 0,
+      scale: 0.95,
+    });
+
+    const entranceTl = gsap.timeline({
+      scrollTrigger: {
+        trigger: heroImg.closest('.hero-image'),
+        start: 'top 80%',
+        toggleActions: 'play none none none',
+      },
+    });
+
+    entranceTl.to(heroImg, {
+      opacity: 1,
+      scale: 1,
+      duration: 1.2,
+      ease: 'power3.out',
+    });
+
+    return () => {
+      ScrollTrigger.getAll().forEach((trigger) => {
+        if (trigger.vars.trigger === heroImg.closest('.hero-image')) {
+          trigger.kill();
+        }
+      });
+    };
+  }, []);
+  
   const navigate = useNavigate();
   const [activeMarketTab, setActiveMarketTab] = useState('all');
   const [activeNewsTab, setActiveNewsTab] = useState('all');
@@ -109,7 +193,7 @@ const confirmLogout = async () => {
   await new Promise(resolve => setTimeout(resolve, 400));
 
   // Step 4: actually log out
-  dispatch(signOut());
+  await dispatch(signOut());
 
   // Step 5: hide modal and navigate
   setShowLogoutModal(false);
@@ -122,132 +206,195 @@ const cancelLogout = () => {
   setFadeOut(false);
 };
 
-  // Real-time cryptocurrency data from WebSocket (all instruments from API)
-  // Computed directly from instruments + Redux price/ticker data
-  const cryptoData = useMemo<CryptoData[]>(() => {
-    return instruments
-      .map(inst => {
-      // Support both legacy (displayName, baseCurrency) and new API format (name, base_currency)
-      const baseCurr = inst.baseCurrency || inst.base_currency || inst.symbol.replace('USDT', '');
+  const [selectedCrypto, setSelectedCrypto] = useState<string>(PAYOUT_CRYPTOS[0].symbol);
+  const [fiatInput, setFiatInput] = useState('5000');
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ USD: 1 });
+  const [heroEmail, setHeroEmail] = useState('');
+  const [heroEmailError, setHeroEmailError] = useState('');
+  const [cryptoMenuOpen, setCryptoMenuOpen] = useState(false);
+  const cryptoMenuRef = useRef<HTMLDivElement>(null);
+  const cryptoMenuListRef = useRef<HTMLUListElement>(null);
+  const cryptoSelectorBtnRef = useRef<HTMLButtonElement>(null);
+  const [rateLastUpdated, setRateLastUpdated] = useState<string | null>(null);
+  const [rateSource, setRateSource] = useState<'live' | 'cache'>('live');
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [rateError, setRateError] = useState<string | null>(null);
 
-      // Use icon URL if available (from legacy API), otherwise use CoinGecko-style URLs
-      let iconUrl = inst.iconUrl || '';
-      let isForexPair = false;
-      let forexPair = { base: '', quote: '' };
-      
-      if (!iconUrl && inst.base_currency) {
-        // Check if this is a forex pair (has quote_currency and not USDT)
-        if (inst.quote_currency && inst.quote_currency !== 'USDT') {
-          isForexPair = true;
-          forexPair = {
-            base: inst.base_currency,
-            quote: inst.quote_currency
-          };
+  const fiatAmount = Number(fiatInput.replace(/[^0-9.]/g, '')) || 0;
+  const selectedRate = exchangeRates[selectedCrypto] ?? 0;
+  const cryptoAmount = selectedRate > 0 ? fiatAmount / selectedRate : 0;
+  const selectedCryptoMeta = PAYOUT_CRYPTOS.find(item => item.symbol === selectedCrypto) ?? PAYOUT_CRYPTOS[0];
+  const formattedRate = selectedRate > 0 ? USD_FORMATTER.format(selectedRate) : '—';
+  const formattedCryptoAmount = cryptoAmount > 0 ? CRYPTO_FORMATTER.format(cryptoAmount) : '0.0000';
+  const lastUpdatedLabel = rateLastUpdated
+    ? new Date(rateLastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : null;
+
+  const handleFiatInputChange = (value: string) => {
+    const numericOnly = value.replace(/[^0-9.]/g, '');
+    const parts = numericOnly.split('.');
+    const normalized = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : numericOnly;
+    setFiatInput(normalized);
+  };
+
+  // Fetch exchange rates for cryptocurrencies
+  useEffect(() => {
+    const fetchExchangeRates = async () => {
+      try {
+        setRatesLoading(true);
+        setRateError(null);
+
+        // Get list of crypto symbols to fetch
+        const symbols = PAYOUT_CRYPTOS.map(c => c.symbol).join(',');
+        const response = await fetch(getApiUrl(`/api/v1/exchange-rate?symbols=${symbols}`));
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: Failed to fetch exchange rates`);
         }
+
+        const rates = await response.json() as Record<string, number>;
         
-        // Complete icon mapping for ALL 26 instruments in database
-        const iconMap: Record<string, string> = {
-          // Major Cryptocurrencies
-          'BTC': 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png',
-          'ETH': 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
-          'BNB': 'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png',
-          'SOL': 'https://assets.coingecko.com/coins/images/4128/small/solana.png',
-          'XRP': 'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png',
-          'ADA': 'https://assets.coingecko.com/coins/images/975/small/cardano.png',
-          'AVAX': 'https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png',
+        // Extract timestamp and source from headers
+        const timestamp = response.headers.get('X-Rates-Timestamp');
+        const source = response.headers.get('X-Rate-Source') as 'live' | 'cache' | null;
 
-          // DeFi / Layer 2
-          'MATIC': 'https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png',
-          'LINK': 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png',
-          'UNI': 'https://assets.coingecko.com/coins/images/12504/small/uni.jpg',
-          'ATOM': 'https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png',
-          'DOT': 'https://assets.coingecko.com/coins/images/12171/small/polkadot.png',
-          'ARB': 'https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg',
-          'OP': 'https://assets.coingecko.com/coins/images/25244/small/Optimism.png',
-          'APT': 'https://assets.coingecko.com/coins/images/26455/small/aptos_round.png',
-
-          // Altcoins
-          'DOGE': 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png',
-          'LTC': 'https://assets.coingecko.com/coins/images/2/small/litecoin.png',
-          'SHIB': 'https://assets.coingecko.com/coins/images/11939/small/shiba.png',
-          'NEAR': 'https://assets.coingecko.com/coins/images/10365/small/near.jpg',
-          'ICP': 'https://assets.coingecko.com/coins/images/14495/small/Internet_Computer_logo.png',
-          'FIL': 'https://assets.coingecko.com/coins/images/12817/small/filecoin.png',
-          'SUI': 'https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg',
-          'STX': 'https://assets.coingecko.com/coins/images/2069/small/Stacks_logo_full.png',
-          'TON': 'https://assets.coingecko.com/coins/images/17980/small/ton_symbol.png',
-
-          // Forex & Commodities (CFD instruments)
-          'EUR': 'https://hatscripts.github.io/circle-flags/flags/eu.svg',
-          'PAXG': 'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/paxg.png',
-          
-          // Commodities (using cryptocurrency-icons CDN or simple data URIs)
-          'WTI': 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNiIgZmlsbD0iIzM0NDk1ZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE2IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiPvCfm6I8L3RleHQ+PC9zdmc+',
-          'BRENT': 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNiIgZmlsbD0iIzFhYmM5YyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE2IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiPvCfm6I8L3RleHQ+PC9zdmc+',
-          'NATGAS': 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNiIgZmlsbD0iI2YzOWMxMiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE2IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiPvCflKU8L3RleHQ+PC9zdmc+',
-          
-          // Forex pairs (dual-flag SVGs)
-          'CAD': 'https://hatscripts.github.io/circle-flags/flags/ca.svg',
-          'AUD': 'https://hatscripts.github.io/circle-flags/flags/au.svg',
-          'JPY': 'https://hatscripts.github.io/circle-flags/flags/jp.svg',
-          'NZD': 'https://hatscripts.github.io/circle-flags/flags/nz.svg',
-          'GBP': 'https://hatscripts.github.io/circle-flags/flags/gb.svg',
-        };
-        iconUrl = iconMap[inst.base_currency] || '';
+        setExchangeRates(rates);
+        if (timestamp) {
+          setRateLastUpdated(timestamp);
+        }
+        if (source) {
+          setRateSource(source);
+        }
+      } catch (err) {
+        console.error('Error fetching exchange rates:', err);
+        setRateError(err instanceof Error ? err.message : 'Failed to fetch rates');
+        // Keep existing rates if available
+      } finally {
+        setRatesLoading(false);
       }
+    };
 
-      const uiProps = cryptoUIProperties[inst.symbol] || {
-        icon: iconUrl || baseCurr,
-        gradient: 'linear-gradient(135deg, #6366f1, #8b5cf6)'
-      };
-      const priceData = currentPrices[inst.symbol];
-      const ticker = tickerData[inst.symbol];
+    fetchExchangeRates();
+    
+    // Refresh rates every 30 seconds
+    const interval = setInterval(fetchExchangeRates, 30000);
+    return () => clearInterval(interval);
+  }, []);
+  // Real-time cryptocurrency data from WebSocket (all 24 instruments)
+  const [cryptoData, setCryptoData] = useState<CryptoData[]>([
+    // Major (7)
+    { symbol: 'BTCUSDT', name: 'Bitcoin', price: 0, change: 0, volume24h: 0, icon: '₿', gradient: 'linear-gradient(135deg, #f7931a, #ff9500)' },
+    { symbol: 'ETHUSDT', name: 'Ethereum', price: 0, change: 0, volume24h: 0, icon: 'Ξ', gradient: 'linear-gradient(135deg, #627eea, #8a9cff)' },
+    { symbol: 'BNBUSDT', name: 'Binance Coin', price: 0, change: 0, volume24h: 0, icon: 'B', gradient: 'linear-gradient(135deg, #f3ba2f, #ffd700)' },
+    { symbol: 'SOLUSDT', name: 'Solana', price: 0, change: 0, volume24h: 0, icon: '◎', gradient: 'linear-gradient(135deg, #9945ff, #14f195)' },
+    { symbol: 'XRPUSDT', name: 'Ripple', price: 0, change: 0, volume24h: 0, icon: '✕', gradient: 'linear-gradient(135deg, #23292f, #3d4853)' },
+    { symbol: 'ADAUSDT', name: 'Cardano', price: 0, change: 0, volume24h: 0, icon: '₳', gradient: 'linear-gradient(135deg, #0033ad, #3468d6)' },
+    { symbol: 'AVAXUSDT', name: 'Avalanche', price: 0, change: 0, volume24h: 0, icon: '▲', gradient: 'linear-gradient(135deg, #e84142, #ff6b6b)' },
 
-      return {
-        symbol: inst.symbol,
-        name: inst.name || baseCurr, // Use full name from database (e.g., "Bitcoin")
-        price: priceData ? priceData.price : 0,
-        change: ticker ? ticker.priceChangePercent : 0,
-        volume24h: ticker ? ticker.volume24h : 0,
-        icon: uiProps.icon,
-        gradient: uiProps.gradient,
-        isForexPair: isForexPair,
-        forexPair: isForexPair ? forexPair : undefined
-      };
-    });
-  }, [instruments, currentPrices, tickerData]);
+    // DeFi/Layer2 (8)
+    { symbol: 'MATICUSDT', name: 'Polygon', price: 0, change: 0, volume24h: 0, icon: '⬡', gradient: 'linear-gradient(135deg, #8247e5, #a77bf3)' },
+    { symbol: 'LINKUSDT', name: 'Chainlink', price: 0, change: 0, volume24h: 0, icon: '⬡', gradient: 'linear-gradient(135deg, #2a5ada, #5c8bf5)' },
+    { symbol: 'UNIUSDT', name: 'Uniswap', price: 0, change: 0, volume24h: 0, icon: '🦄', gradient: 'linear-gradient(135deg, #ff007a, #ff6bae)' },
+    { symbol: 'ATOMUSDT', name: 'Cosmos', price: 0, change: 0, volume24h: 0, icon: '⚛', gradient: 'linear-gradient(135deg, #2e3148, #5064fb)' },
+    { symbol: 'DOTUSDT', name: 'Polkadot', price: 0, change: 0, volume24h: 0, icon: '●', gradient: 'linear-gradient(135deg, #e6007a, #ff4d9e)' },
+    { symbol: 'ARBUSDT', name: 'Arbitrum', price: 0, change: 0, volume24h: 0, icon: '◆', gradient: 'linear-gradient(135deg, #2d374b, #4a90e2)' },
+    { symbol: 'OPUSDT', name: 'Optimism', price: 0, change: 0, volume24h: 0, icon: '○', gradient: 'linear-gradient(135deg, #ff0420, #ff6b8a)' },
+    { symbol: 'APTUSDT', name: 'Aptos', price: 0, change: 0, volume24h: 0, icon: 'A', gradient: 'linear-gradient(135deg, #00d4aa, #40e5cc)' },
+
+    // Altcoin (9)
+    { symbol: 'DOGEUSDT', name: 'Dogecoin', price: 0, change: 0, volume24h: 0, icon: 'Ð', gradient: 'linear-gradient(135deg, #c2a633, #f0d068)' },
+    { symbol: 'LTCUSDT', name: 'Litecoin', price: 0, change: 0, volume24h: 0, icon: 'Ł', gradient: 'linear-gradient(135deg, #345d9d, #5c8bd6)' },
+    { symbol: 'SHIBUSDT', name: 'Shiba Inu', price: 0, change: 0, volume24h: 0, icon: '🐕', gradient: 'linear-gradient(135deg, #ffa409, #ffcd5d)' },
+    { symbol: 'NEARUSDT', name: 'Near Protocol', price: 0, change: 0, volume24h: 0, icon: 'N', gradient: 'linear-gradient(135deg, #00c08b, #00f395)' },
+    { symbol: 'ICPUSDT', name: 'Internet Computer', price: 0, change: 0, volume24h: 0, icon: '∞', gradient: 'linear-gradient(135deg, #29abe2, #6dd5f5)' },
+    { symbol: 'FILUSDT', name: 'Filecoin', price: 0, change: 0, volume24h: 0, icon: 'F', gradient: 'linear-gradient(135deg, #0090ff, #42b4ff)' },
+    { symbol: 'SUIUSDT', name: 'Sui', price: 0, change: 0, volume24h: 0, icon: 'S', gradient: 'linear-gradient(135deg, #4da2ff, #7ec8ff)' },
+    { symbol: 'STXUSDT', name: 'Stacks', price: 0, change: 0, volume24h: 0, icon: '⬢', gradient: 'linear-gradient(135deg, #5546ff, #7e72ff)' },
+    { symbol: 'TONUSDT', name: 'Toncoin', price: 0, change: 0, volume24h: 0, icon: '◇', gradient: 'linear-gradient(135deg, #0088cc, #229ed9)' },
+  ]);
 
   const handleLogout = () => {
     setShowLogoutModal(true);
     setProfileDropdownOpen(false);
   };
 
-  const toggleThemeMode = () => {
-    const newTheme = isDarkMode ? 'light' : 'dark';
-    dispatch(setTheme(newTheme));
-    // Apply theme to both document.documentElement (for Tailwind) and body (for dashboard.css)
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.body.classList.remove('light-mode');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.body.classList.add('light-mode');
-    }
+  const toggleTheme = () => {
+    dispatch(setTheme(isDarkMode ? 'light' : 'dark'));
   };
 
-  // Sync theme on mount and when isDarkMode changes
+  // Update crypto data when prices change in Redux store (updated by WebSocket middleware)
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      document.body.classList.remove('light-mode');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.body.classList.add('light-mode');
-    }
-  }, [isDarkMode]);
+    setCryptoData(prevData =>
+      prevData.map(crypto => {
+        const priceData = currentPrices[crypto.symbol];
+        if (priceData !== undefined) {
+          // Extract price from PriceData or use directly if it's a number
+          const price = typeof priceData === 'number' ? priceData : priceData.price;
+          return {
+            ...crypto,
+            price,
+            // change and volume24h preserved from ticker API
+          };
+        }
+        return crypto;
+      })
+    );
+  }, [currentPrices]);
 
-  // No need for separate ticker fetch - AppLayout already hydrates Redux with ticker data
-  // cryptoData is now computed directly from Redux state via useMemo above
+  // Fetch initial 24h ticker data with retry logic
+  useEffect(() => {
+    const fetchInitialData = async (retries = 3): Promise<void> => {
+      try {
+        const symbols = cryptoData.map(c => c.symbol).join(',');
+        const response = await fetch(getApiUrl(`/api/v1/ticker?symbols=${symbols}`));
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: Failed to fetch ticker data`);
+        }
+
+        const tickerData = await response.json() as Array<{
+          symbol: string;
+          lastPrice: string;
+          priceChangePercent: string;
+          volume: string;  // 24h trading volume
+        }>;
+
+        // Update crypto data with 24h statistics including volume
+        setCryptoData(prevData =>
+          prevData.map(crypto => {
+            const ticker = tickerData.find((t) => t.symbol === crypto.symbol);
+            if (ticker) {
+              const price = parseFloat(ticker.lastPrice);
+              const change = parseFloat(ticker.priceChangePercent);
+              const volume24h = parseFloat(ticker.volume);
+
+              return {
+                ...crypto,
+                price,
+                change,
+                volume24h,
+              };
+            }
+            return crypto;
+          })
+        );
+      } catch (err) {
+        console.error(`Error fetching initial ticker data (${4 - retries}/3):`, err);
+
+        // Retry with exponential backoff
+        if (retries > 1) {
+          const delay = (4 - retries) * 2000; // 2s, 4s
+          console.log(`Retrying in ${delay / 1000}s...`);
+          setTimeout(() => fetchInitialData(retries - 1), delay);
+        } else {
+          console.error('All retries failed. Prices may not be displayed correctly.');
+        }
+      }
+    };
+
+    fetchInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   interface NewsItem {
     id: number;
@@ -463,7 +610,7 @@ const cancelLogout = () => {
 
   // Dynamic filtering and sorting based on active tab
   const filteredCrypto = activeMarketTab === 'all'
-    ? [...cryptoData].sort((a, b) => b.price - a.price) // All coins sorted by price (highest first)
+    ? [...cryptoData].sort((a, b) => b.volume24h - a.volume24h) // All coins sorted by volume
     : activeMarketTab === 'popular'
     ? [...cryptoData].sort((a, b) => b.volume24h - a.volume24h).slice(0, 10) // Top 10 by volume
     : activeMarketTab === 'gainers'
@@ -499,25 +646,63 @@ const cancelLogout = () => {
 // Place it after your other useEffect hooks
 
 useEffect(() => {
-  // Header scroll effect
-  const header = document.querySelector('.header');
+  // Header scroll effect - Force relative positioning
+  const header = document.querySelector('.header') as HTMLElement;
+  
+  if (!header) return;
+  
+  // Force relative positioning immediately and continuously
+  const forceRelativePosition = () => {
+    if (header) {
+      // Remove any fixed positioning first
+      header.style.removeProperty('position');
+      header.style.removeProperty('top');
+      header.style.removeProperty('left');
+      header.style.removeProperty('right');
+      header.style.removeProperty('bottom');
+      header.style.removeProperty('transform');
+      
+      // Set relative positioning with important
+      header.style.setProperty('position', 'relative', 'important');
+      header.style.setProperty('top', 'auto', 'important');
+      header.style.setProperty('left', 'auto', 'important');
+      header.style.setProperty('right', 'auto', 'important');
+      header.style.setProperty('transform', 'none', 'important');
+      header.style.setProperty('will-change', 'auto', 'important');
+    }
+  };
+  
+  // Force immediately
+  forceRelativePosition();
+  
+  // Force on every animation frame to override any other code
+  let rafId: number | null = null;
+  const forceLoop = () => {
+    forceRelativePosition();
+    rafId = requestAnimationFrame(forceLoop);
+  };
+  rafId = requestAnimationFrame(forceLoop);
+  
   let ticking = false;
 
   const handleScroll = () => {
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-
+    
     if (!ticking) {
       window.requestAnimationFrame(() => {
+        // Force position again
+        forceRelativePosition();
+        
         // Add 'scrolled' class when scrolled down more than 20px
         if (scrollTop > 20) {
           header?.classList.add('scrolled');
         } else {
           header?.classList.remove('scrolled');
         }
-
+        
         ticking = false;
       });
-
+      
       ticking = true;
     }
   };
@@ -530,9 +715,115 @@ useEffect(() => {
 
   // Cleanup
   return () => {
+    if (rafId !== null && typeof rafId === 'number') {
+      cancelAnimationFrame(rafId);
+    }
     window.removeEventListener('scroll', handleScroll);
   };
-}, []);
+  }, []);
+
+  // Position crypto menu dynamically and close when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (cryptoMenuRef.current && !cryptoMenuRef.current.contains(event.target as Node)) {
+        setCryptoMenuOpen(false);
+      }
+    };
+
+    const positionMenu = () => {
+      if (cryptoMenuOpen && cryptoSelectorBtnRef.current && cryptoMenuListRef.current) {
+        const buttonRect = cryptoSelectorBtnRef.current.getBoundingClientRect();
+        const menu = cryptoMenuListRef.current;
+        
+        // For position: fixed, use viewport coordinates (no scrollY/scrollX)
+        const top = buttonRect.bottom + 8;
+        const left = buttonRect.left;
+        const width = buttonRect.width;
+        
+        // Set position
+        menu.style.top = `${top}px`;
+        menu.style.left = `${left}px`;
+        menu.style.width = `${width}px`;
+        
+        // Check if menu would go off screen and adjust
+        // Use actual height or max-height (250px) as fallback
+        const menuHeight = Math.min(menu.scrollHeight, 250);
+        const viewportHeight = window.innerHeight;
+        const spaceBelow = viewportHeight - buttonRect.bottom;
+        
+        // If not enough space below, show above
+        if (spaceBelow < menuHeight && buttonRect.top > menuHeight) {
+          menu.style.top = `${buttonRect.top - menuHeight - 8}px`;
+        }
+      }
+    };
+
+    if (cryptoMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      
+      // Position menu after a small delay to ensure it's rendered
+      // Use requestAnimationFrame for better timing
+      requestAnimationFrame(() => {
+        positionMenu();
+        // Also position again after a short delay to ensure DOM is ready
+        setTimeout(() => {
+          positionMenu();
+        }, 10);
+      });
+      
+      // Reposition on scroll and resize
+      window.addEventListener('scroll', positionMenu, true);
+      window.addEventListener('resize', positionMenu);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', positionMenu, true);
+      window.removeEventListener('resize', positionMenu);
+    };
+  }, [cryptoMenuOpen]);
+
+  // Prevent body scroll when logout modal is open
+  useEffect(() => {
+    if (showLogoutModal) {
+      // Disable Lenis smooth scroll if available
+      if (lenisInstance) {
+        lenisInstance.stop();
+      }
+      
+      // Save current scroll position
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
+      
+      // Prevent scrolling on body and html
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      // Also prevent touch scrolling on mobile
+      document.body.style.touchAction = 'none';
+    } else {
+      // Re-enable Lenis smooth scroll if available
+      if (lenisInstance) {
+        lenisInstance.start();
+      }
+      
+      // Restore scroll position
+      const scrollY = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+      document.documentElement.style.overflow = '';
+      
+      if (scrollY) {
+        const savedScrollY = parseInt(scrollY.replace('px', '') || '0') * -1;
+        window.scrollTo(0, savedScrollY);
+      }
+    }
+  }, [showLogoutModal, lenisInstance]);
 
 
   // Handler for crypto page changes
@@ -561,10 +852,44 @@ useEffect(() => {
     }
   };
 
+  // Handler for hero email submission
+  const handleHeroEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate email
+    const email = heroEmail.trim();
+    if (!email) {
+      setHeroEmailError('Please enter your email address');
+      return;
+    }
+    
+    if (!email.includes('@') || !email.includes('.')) {
+      setHeroEmailError('Please enter a valid email address');
+      return;
+    }
+    
+    // Clear error
+    setHeroEmailError('');
+    
+    // Navigate to register page with email as query parameter
+    navigate(`/register?email=${encodeURIComponent(email)}`);
+  };
+
   return (
     <div className="dashboard-page">
       {/* Header */}
-      <header className="header">
+      <header 
+        className="header"
+        data-lenis-prevent
+        data-scroll
+        style={{
+          position: 'relative',
+          top: 'auto',
+          left: 'auto',
+          right: 'auto',
+          transform: 'none',
+        }}
+      >
         <div className="container">
           <div className="nav-wrapper">
             <div className="logo">
@@ -585,7 +910,7 @@ useEffect(() => {
             {/* Right Side Actions */}
             <div className="nav-actions">
               {/* Theme Toggle */}
-              <button className="icon-btn" id="themeToggle" onClick={toggleThemeMode} title="Toggle Theme">
+              <button className="icon-btn" id="themeToggle" onClick={toggleTheme} title="Toggle Theme">
                 {isDarkMode ? (
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="5"></circle>
@@ -722,28 +1047,42 @@ useEffect(() => {
         <div className="container hero-container">
           <div className="hero-content">
             {/* Trust Badge */}
-            <div className="hero-badge">
+            <div className="hero-badge" data-scroll-animate="fade-down" data-scroll-delay="0">
               <span className="badge-icon">✓</span>
               Trusted by 20M+ traders worldwide
             </div>
 
             {/* Main Heading */}
-            <h1 className="hero-title">A trusted and secure<br />cryptocurrency exchange.</h1>
+            <h1 className="hero-title" data-scroll-animate="fade-up" data-scroll-delay="100">A trusted and secure<br />cryptocurrency exchange.</h1>
 
             {/* Subtitle */}
-            <p className="hero-subtitle">
+            <p className="hero-subtitle" data-scroll-animate="fade-up" data-scroll-delay="200">
               Your guide to the world of an open financial system. Get started with the easiest and most secure platform to buy and trade cryptocurrency.
             </p>
 
-            {/* CTA Section */}
-            <div className="hero-cta">
-              <input type="email" className="email-input" placeholder="Enter your email address" />
-              <button className="btn btn-gradient btn-large">Get Started</button>
-            </div>
+            {/* CTA Section - Only show for unlogged users */}
+            {!isLoggedIn && (
+              <form className="hero-cta" data-scroll-animate="fade-up" data-scroll-delay="300" onSubmit={handleHeroEmailSubmit}>
+                <div className="email-input-wrapper">
+                  <input 
+                    type="email" 
+                    className={`email-input ${heroEmailError ? 'error' : ''}`}
+                    placeholder="Enter your email address" 
+                    value={heroEmail}
+                    onChange={(e) => {
+                      setHeroEmail(e.target.value);
+                      if (heroEmailError) setHeroEmailError('');
+                    }}
+                  />
+                  {heroEmailError && <span className="email-error-message">{heroEmailError}</span>}
+                </div>
+                <button type="submit" className="btn btn-gradient btn-large">Get Started</button>
+              </form>
+            )}
 
             {/* Trust Badges */}
-            <div className="trust-badges">
-              <div className="trust-item">
+            <div className="trust-badges" data-scroll-animate="fade-up" data-scroll-delay="400">
+              <div className="trust-item" data-scroll-animate="scale-in" data-scroll-delay="500">
                 <div className="trust-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
@@ -755,7 +1094,7 @@ useEffect(() => {
                 </div>
               </div>
 
-              <div className="trust-item">
+              <div className="trust-item" data-scroll-animate="scale-in" data-scroll-delay="600">
                 <div className="trust-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="12" cy="12" r="10"></circle>
@@ -768,7 +1107,7 @@ useEffect(() => {
                 </div>
               </div>
 
-              <div className="trust-item">
+              <div className="trust-item" data-scroll-animate="scale-in" data-scroll-delay="700">
                 <div className="trust-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -786,11 +1125,58 @@ useEffect(() => {
           </div>
 
           {/* Hero Image */}
-          <div className="hero-image">
-              <div className="coin btc">₿</div>
-              <div className="coin eth">Ξ</div>
-              <div className="hero-img-box"></div>
-            <img src="/assets/images/upscalemedia-transformed.png" alt="Cryptocurrency Illustration" className="hero-img" />
+          <div 
+            className="hero-image" 
+            ref={heroImageParallaxRef}
+          >
+            {/* Floating Crypto Icons */}
+            <div 
+              className="coin btc" 
+              data-parallax 
+              data-parallax-speed="0.03" 
+              data-parallax-rotation="0.3" 
+              data-gsap-animate="fade-up" 
+              data-gsap-delay="0.4"
+              ref={btcFloatRef}
+            >
+              ₿
+            </div>
+            <div 
+              className="coin eth" 
+              data-parallax 
+              data-parallax-speed="0.02" 
+              data-parallax-rotation="-0.2" 
+              data-gsap-animate="fade-up" 
+              data-gsap-delay="0.5"
+              ref={ethFloatRef}
+            >
+              Ξ
+            </div>
+            
+            {/* Stacked Cards Container - Floating Animation */}
+            <div 
+              className="hero-img-box" 
+              data-gsap-animate="scale-in" 
+              data-gsap-delay="0.3"
+              ref={heroCardsFloatRef}
+            ></div>
+            
+            {/* Glow Pulse Overlay */}
+            <div 
+              className="hero-glow-overlay"
+              ref={heroGlowRef}
+              data-glow
+            ></div>
+            
+            {/* Main Hero Image */}
+            <img 
+              src="/assets/images/upscalemedia-transformed.png" 
+              alt="Cryptocurrency Illustration" 
+              className="hero-img" 
+              data-gsap-animate="fade-up" 
+              data-gsap-delay="0.2"
+              ref={heroImgRef}
+            />
           </div>
         </div>
            <MetricsCounter />
@@ -799,11 +1185,11 @@ useEffect(() => {
       {/* Market Overview */}
       <section className="market-section" id="market">
         <div className="container">
-          <div className="section-header" style={{ textAlign: 'center' }}>
-            <h2 className="section-title" style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>
+          <div className="section-header" style={{ textAlign: 'center' }} data-gsap-animate="fade-up" data-gsap-duration="1.2">
+            <h2 className="section-title" style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }} data-gsap-animate="fade-up" data-gsap-delay="0.1">
               Today&apos;s Cryptocurrency Prices
             </h2>
-            <p className="section-subtitle" style={{ fontSize: '1rem' }}>
+            <p className="section-subtitle" style={{ fontSize: '0.9rem' }}>
               Track real-time prices and 24-hour trading volume across major cryptocurrencies
             </p>
           </div>
@@ -838,59 +1224,13 @@ useEffect(() => {
               <div className="crypto-col" style={{ textAlign: 'center' }}>Trade</div>
             </div>
 
-            {displayedCrypto.map(crypto => {
-              // Currency code to country code mapping for forex pairs
-              const currencyToCountry: Record<string, string> = {
-                'CAD': 'ca', 'AUD': 'au', 'JPY': 'jp', 'NZD': 'nz',
-                'EUR': 'eu', 'GBP': 'gb', 'USD': 'us', 'CHF': 'ch'
-              };
-
-              return (
+            {displayedCrypto.map(crypto => (
               <div key={crypto.symbol} className="crypto-row">
                 <div className="crypto-col" style={{ textAlign: 'left' }}>
                   <div className="crypto-info">
-                    <div className="crypto-icon" style={{ background: crypto.gradient }}>
-                      {crypto.isForexPair && crypto.forexPair ? (
-                        <div style={{ display: 'flex', gap: '-8px', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-                          <img
-                            src={`https://hatscripts.github.io/circle-flags/flags/${currencyToCountry[crypto.forexPair.base] || crypto.forexPair.base.toLowerCase()}.svg`}
-                            alt={crypto.forexPair.base}
-                            style={{ width: '50%', height: '50%', objectFit: 'cover', borderRadius: '50%' }}
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                            }}
-                          />
-                          <img
-                            src={`https://hatscripts.github.io/circle-flags/flags/${currencyToCountry[crypto.forexPair.quote] || crypto.forexPair.quote.toLowerCase()}.svg`}
-                            alt={crypto.forexPair.quote}
-                            style={{ width: '50%', height: '50%', objectFit: 'cover', borderRadius: '50%', marginLeft: '-10px' }}
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      ) : crypto.icon.startsWith('http') ? (
-                        <img
-                          src={crypto.icon}
-                          alt={crypto.name}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const parent = target.parentElement;
-                            if (parent) {
-                              parent.innerHTML = crypto.name.charAt(0);
-                            }
-                          }}
-                        />
-                      ) : (
-                        crypto.icon
-                      )}
-                    </div>
+                    <div className="crypto-icon" style={{ background: crypto.gradient }}>{crypto.icon}</div>
                     <div>
-                      <div className="crypto-symbol">{crypto.symbol.replace('USDT', '').replace(/([A-Z]{3})([A-Z]{3})/, '$1/$2')}</div>
+                      <div className="crypto-symbol">{crypto.symbol.replace('USDT', '')}</div>
                       <div className="crypto-name">{crypto.name}</div>
                     </div>
                   </div>
@@ -916,8 +1256,7 @@ useEffect(() => {
                   <button className="btn-trade" onClick={() => handleBuyClick(crypto.symbol)}>Buy</button>
                 </div>
               </div>
-              );
-            })}
+            ))}
           </div>
 
           {/* Crypto Pagination Controls */}
@@ -982,11 +1321,21 @@ useEffect(() => {
         padding: '0.75rem 1rem',
         fontSize: '0.9rem',
         fontWeight: '600',
-        color: page === cryptoCurrentPage ? '#ffffff' : '#1a1f3a', // dark text for other pages
+        color: page === cryptoCurrentPage 
+          ? '#ffffff' 
+          : isDarkMode 
+            ? '#ffffff' 
+            : '#1a1f3a',
         background: page === cryptoCurrentPage
           ? 'linear-gradient(135deg, #C76D00, #FDDB92)'
-          : 'rgba(255, 255, 255, 0.2)', // subtle background for other pages
-        border: page === cryptoCurrentPage ? 'none' : '1px solid rgba(0,0,0,0.1)',
+          : isDarkMode
+            ? 'rgba(255, 255, 255, 0.1)'
+            : 'rgba(255, 255, 255, 0.2)',
+        border: page === cryptoCurrentPage 
+          ? 'none' 
+          : isDarkMode
+            ? '1px solid rgba(255, 255, 255, 0.3)'
+            : '1px solid rgba(0,0,0,0.1)',
         borderRadius: '8px',
         cursor: 'pointer',
         transition: 'all 0.3s ease',
@@ -994,12 +1343,16 @@ useEffect(() => {
       }}
       onMouseEnter={(e) => {
         if (page !== cryptoCurrentPage) {
-          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+          e.currentTarget.style.background = isDarkMode 
+            ? 'rgba(255, 255, 255, 0.15)' 
+            : 'rgba(0, 0, 0, 0.05)';
         }
       }}
       onMouseLeave={(e) => {
         if (page !== cryptoCurrentPage) {
-          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+          e.currentTarget.style.background = isDarkMode
+            ? 'rgba(255, 255, 255, 0.1)'
+            : 'rgba(255, 255, 255, 0.2)';
         }
       }}
     >
@@ -1043,11 +1396,11 @@ useEffect(() => {
       <section className="news-section" id="news">
         <div className="container">
           {/* Section Header */}
-          <div className="section-header" style={{ textAlign: 'center' }}>
-            <h2 className="section-title" style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>
+          <div className="section-header" style={{ textAlign: 'center' }} data-gsap-animate="fade-up" data-gsap-duration="1.2">
+            <h2 className="section-title" style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }} data-gsap-animate="fade-up" data-gsap-delay="0.1">
               Latest Market News
             </h2>
-            <p className="section-subtitle" style={{ fontSize: '1rem' }}>
+            <p className="section-subtitle" style={{ fontSize: '0.9rem' }}>
               Stay updated with real-time crypto and financial headlines
             </p>
           </div>
@@ -1087,29 +1440,22 @@ useEffect(() => {
             </div>
           ) : (
             <>
-              <div className="news-grid" style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-                gap: '2rem',
-                marginTop: '2rem'
-              }}>
-                {displayedNews.map(news => (
-                <div key={news.id} className="news-item" style={{
+              <div className="news-grid">
+                {displayedNews.map((news, index) => (
+                <div 
+                  key={news.id} 
+                  className="news-item card-3d" 
+                  data-gsap-animate="fade-up"
+                  data-gsap-stagger={index * 0.1}
+                  style={{
                   background: 'var(--card-bg, #1a1f3a)',
                   borderRadius: '16px',
                   overflow: 'hidden',
-                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
                   cursor: 'pointer',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
                   display: 'flex',
                   flexDirection: 'column',
                   height: '100%'
-                }} onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.3)';
-                }} onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
                 }}>
                   <div className="news-badge" style={{
                     position: 'absolute',
@@ -1136,7 +1482,7 @@ useEffect(() => {
                   </div>
                   <div style={{
                     position: 'relative',
-                    height: '200px',
+                    height: '100px',
                     overflow: 'hidden'
                   }}>
                     <img
@@ -1166,7 +1512,7 @@ useEffect(() => {
                     }}></div>
                   </div>
                   <div style={{
-                    padding: '1.5rem',
+                    padding: '10px',
                     flex: 1,
                     display: 'flex',
                     flexDirection: 'column'
@@ -1175,8 +1521,8 @@ useEffect(() => {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      marginBottom: '1rem',
-                      fontSize: '0.85rem',
+                      marginBottom: '4px',
+                      fontSize: '9px',
                       color: 'var(--text-secondary, #8892b0)'
                     }}>
                       <span style={{ fontWeight: '600', color: '#FDDB92' }}>{news.source}</span>
@@ -1189,24 +1535,24 @@ useEffect(() => {
                       </span>
                     </div>
                     <h3 style={{
-                      fontSize: '1.1rem',
+                      fontSize: '12px',
                       fontWeight: '700',
-                      marginBottom: '0.75rem',
+                      marginBottom: '4px',
                       color: 'var(--text-primary, #ffffff)',
-                      lineHeight: '1.4',
+                      lineHeight: '1.3',
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden'
                     }}>{news.title}</h3>
                     <p style={{
-                      fontSize: '0.9rem',
+                      fontSize: '10px',
                       color: 'var(--text-secondary, #8892b0)',
-                      lineHeight: '1.6',
-                      marginBottom: '1rem',
+                      lineHeight: '1.4',
+                      marginBottom: '6px',
                       flex: 1,
                       display: '-webkit-box',
-                      WebkitLineClamp: 3,
+                      WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden'
                     }}>{news.excerpt}</p>
@@ -1216,7 +1562,7 @@ useEffect(() => {
                       rel="noopener noreferrer"
                       style={{
                         color: '#FDDB92',
-                        fontSize: '0.9rem',
+                        fontSize: '10px',
                         fontWeight: '600',
                         textDecoration: 'none',
                         display: 'inline-flex',
@@ -1302,11 +1648,21 @@ useEffect(() => {
         padding: '0.75rem 1rem',
         fontSize: '0.9rem',
         fontWeight: '600',
-        color: page === currentPage ? '#ffffff' : '#1a1f3a', // dark text for other pages
+        color: page === currentPage 
+          ? '#ffffff' 
+          : isDarkMode 
+            ? '#ffffff' 
+            : '#1a1f3a',
         background: page === currentPage
-          ? 'linear-gradient(135deg, #C76D00, #FDDB92)' // active page gradient
-          : 'rgba(255, 255, 255, 0.2)', // subtle light background for other pages
-        border: page === currentPage ? 'none' : '1px solid rgba(0,0,0,0.1)',
+          ? 'linear-gradient(135deg, #C76D00, #FDDB92)'
+          : isDarkMode
+            ? 'rgba(255, 255, 255, 0.1)'
+            : 'rgba(255, 255, 255, 0.2)',
+        border: page === currentPage 
+          ? 'none' 
+          : isDarkMode
+            ? '1px solid rgba(255, 255, 255, 0.3)'
+            : '1px solid rgba(0,0,0,0.1)',
         borderRadius: '8px',
         cursor: 'pointer',
         transition: 'all 0.3s ease',
@@ -1314,12 +1670,16 @@ useEffect(() => {
       }}
       onMouseEnter={(e) => {
         if (page !== currentPage) {
-          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'; // slightly darker on hover
+          e.currentTarget.style.background = isDarkMode 
+            ? 'rgba(255, 255, 255, 0.15)' 
+            : 'rgba(0, 0, 0, 0.05)';
         }
       }}
       onMouseLeave={(e) => {
         if (page !== currentPage) {
-          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; // revert background
+          e.currentTarget.style.background = isDarkMode
+            ? 'rgba(255, 255, 255, 0.1)'
+            : 'rgba(255, 255, 255, 0.2)';
         }
       }}
     >
@@ -1386,26 +1746,101 @@ useEffect(() => {
                 </div>
                 <div className="card-content">
                   <div className="btc-price">
-                    <p className="price-label">1 BTC is roughly</p>
-                    <h3 className="price-value">53,260.20 <span>USD</span></h3>
+                    <p className="price-label">1 {selectedCrypto} is roughly</p>
+                    <h3 className="price-value">
+                      {ratesLoading && !lastUpdatedLabel ? 'Loading...' : formattedRate}
+                      <span>USD</span>
+                    </h3>
+                    <p className="price-meta">
+                      {rateError
+                        ? `Using last known rate • ${rateError}`
+                        : `${rateSource === 'live' ? 'Live rate' : 'Cached rate'}${lastUpdatedLabel ? ` • Updated ${lastUpdatedLabel} UTC` : ''}`}
+                    </p>
                   </div>
                   <div className="input-field">
-                    <input type="text" defaultValue="5000" readOnly />
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={fiatInput}
+                      onChange={(event) => handleFiatInputChange(event.target.value)}
+                      aria-label="Amount in USD"
+                    />
                     <div className="currency-selector">
                       <span className="currency-icon">💵</span>
                       <span>USD</span>
-                      <span className="dropdown-arrow">▼</span>
                     </div>
                   </div>
                   <div className="input-field">
-                    <input type="text" defaultValue="0.8511" readOnly />
-                    <div className="currency-selector">
-                      <span className="currency-icon">₿</span>
-                      <span>BTC</span>
-                      <span className="dropdown-arrow">▼</span>
+                    <input
+                      type="text"
+                      value={formattedCryptoAmount}
+                      readOnly
+                      aria-label={`Estimated ${selectedCrypto} amount`}
+                    />
+                    <div className="crypto-selector" ref={cryptoMenuRef}>
+                      <button
+                        ref={cryptoSelectorBtnRef}
+                        type="button"
+                        className="crypto-selector-btn"
+                        onClick={() => setCryptoMenuOpen(!cryptoMenuOpen)}
+                        title="Select Cryptocurrency"
+                      >
+                        <span className="crypto-icon">{selectedCryptoMeta.icon}</span>
+                        <span className="crypto-label">{selectedCryptoMeta.label}</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                      </button>
+
+                      {cryptoMenuOpen && (
+                        <ul 
+                          ref={cryptoMenuListRef}
+                          className="crypto-menu show"
+                          data-lenis-prevent
+                          onWheel={(e) => {
+                            e.stopPropagation();
+                            const target = e.currentTarget;
+                            const scrollAmount = e.deltaY;
+                            target.scrollTop += scrollAmount;
+                          }}
+                        >
+                          {PAYOUT_CRYPTOS.map(crypto => (
+                            <li
+                              key={crypto.symbol}
+                              className={selectedCrypto === crypto.symbol ? 'selected' : ''}
+                              onClick={() => {
+                                setSelectedCrypto(crypto.symbol);
+                                setCryptoMenuOpen(false);
+                              }}
+                            >
+                              <span className="crypto-icon">{crypto.icon}</span>
+                              <span>{crypto.label} ({crypto.symbol})</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   </div>
-                  <button className="buy-now-btn">Buy Now</button>
+                  <button 
+                    className="buy-now-btn" 
+                    disabled={selectedRate === 0}
+                    onClick={() => {
+                      if (isLoggedIn) {
+                        navigate('/trading');
+                      } else {
+                        // Scroll to top before navigating
+                        window.scrollTo({ top: 0, behavior: 'instant' });
+                        navigate('/login');
+                      }
+                    }}
+                  >
+                    Buy Now
+                  </button>
+                  {rateError && (
+                    <p className="rate-error" role="status">
+                      Showing cached values while we reconnect.
+                    </p>
+                  )}
                 </div>
                 <div className="visa-card"></div>
               </div>
@@ -1499,13 +1934,13 @@ useEffect(() => {
       {/* Trust Section */}
       <section className="trust-section" id="about">
         <div className="container">
-          <div className="section-header">
-            <h2 className="section-title">We are the most trusted<br />cryptocurrency platform.</h2>
+          <div className="section-header" data-gsap-animate="luxe-fade-up" data-gsap-duration="0.4">
+            <h2 className="section-title" data-gsap-animate="luxe-fade-up" data-gsap-delay="0.05" data-gsap-duration="0.4">We are the most trusted<br />cryptocurrency platform.</h2>
             <p className="section-subtitle">There are a few reasons why you should choose FPMarkets as your cryptocurrency platform</p>
           </div>
 
           <div className="trust-grid">
-            <div className="trust-card">
+            <div className="trust-card card-3d" data-gsap-animate="luxe-fade-up" data-gsap-duration="0.2" data-gsap-stagger="0.03">
               <div className="trust-card-icon" style={{ background: 'linear-gradient(135deg, #ff6b00, #ff9500)' }}>
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"></circle>
@@ -1516,7 +1951,7 @@ useEffect(() => {
               <p className="trust-card-desc">We help you make sense of the coins, the terms, the dense charts and market changes.</p>
             </div>
 
-            <div className="trust-card">
+            <div className="trust-card card-3d" data-gsap-animate="luxe-fade-up" data-gsap-duration="0.2" data-gsap-stagger="0.03">
               <div className="trust-card-icon" style={{ background: 'linear-gradient(135deg, #00d4aa, #00f5cc)' }}>
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
@@ -1527,7 +1962,7 @@ useEffect(() => {
               <p className="trust-card-desc">Our markets are always up to date, sparking curiosity with real words from real traders.</p>
             </div>
 
-            <div className="trust-card">
+            <div className="trust-card card-3d" data-gsap-animate="luxe-fade-up" data-gsap-duration="0.2" data-gsap-stagger="0.03">
               <div className="trust-card-icon" style={{ background: 'linear-gradient(135deg, #a855f7, #c084fc)' }}>
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -1546,14 +1981,20 @@ useEffect(() => {
       {/* FAQ Section */}
       <section className="faq-section" id="faq">
         <div className="container">
-          <div className="section-header">
-            <h2 className="section-title">Frequently Asked Questions</h2>
+          <div className="section-header" data-gsap-animate="fade-up" data-gsap-duration="1.2">
+            <h2 className="section-title" data-gsap-animate="fade-up" data-gsap-delay="0.1">Frequently Asked Questions</h2>
             <p className="section-subtitle">Find answers to common questions about trading, accounts, and support</p>
           </div>
 
-          <div className="faq-container">
+          <div className="faq-container" data-gsap-stagger-container="0.08">
             {faqItems.map((faq, index) => (
-              <div key={index} className={`faq-item ${expandedFAQ === index ? 'active' : ''}`}>
+              <div 
+                key={index} 
+                className={`faq-item ${expandedFAQ === index ? 'active' : ''}`}
+                data-gsap-animate="fade-up"
+                data-gsap-duration="0.35"
+                data-gsap-stagger={index}
+              >
                 <button
                   className="faq-question"
                   onClick={() => setExpandedFAQ(expandedFAQ === index ? null : index)}
@@ -1630,6 +2071,15 @@ useEffect(() => {
   <div
     className={`logout-confirmation-overlay ${fadeOut ? 'fade-out' : ''}`}
     onClick={cancelLogout}
+    style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: '100vw',
+      height: '100vh',
+    }}
   >
     <div
       className={`logout-confirmation-modal ${fadeOut ? 'fade-out' : ''}`}

@@ -13,20 +13,45 @@ import { supabase } from './lib/supabase'
 
 // Suppress Stripe telemetry errors (blocked by ad blockers)
 const originalError = console.error
+const originalWarn = console.warn
+
 console.error = (...args) => {
   if (
     typeof args[0] === 'string' &&
     (args[0].includes('r.stripe.com/b') ||
      args[0].includes('ERR_BLOCKED_BY_CLIENT') ||
-     (args[0].includes('FetchError') && args[0].includes('stripe.com')))
+     (args[0].includes('FetchError') && args[0].includes('stripe.com')) ||
+     args[0].includes('IntegrationError') ||
+     args[0].includes('Please call Stripe() with your publishable key'))
   ) {
-    return // Suppress Stripe telemetry errors
+    return // Suppress Stripe telemetry and integration errors
   }
   originalError.apply(console, args)
 }
 
+console.warn = (...args) => {
+  if (
+    typeof args[0] === 'string' &&
+    (args[0].includes('IntegrationError') ||
+     args[0].includes('Please call Stripe() with your publishable key') ||
+     args[0].includes('Stripe publishable key is missing'))
+  ) {
+    return // Suppress Stripe warnings
+  }
+  originalWarn.apply(console, args)
+}
+
 // Load Stripe publishable key from environment
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '')
+// Only load Stripe if key is provided, otherwise pass null
+const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+const stripePromise = stripeKey && stripeKey.trim() !== '' 
+  ? loadStripe(stripeKey) 
+  : null
+
+// Log warning only once if key is missing
+if (!stripeKey || stripeKey.trim() === '') {
+  // Suppress the warning - it's expected in development without Stripe configured
+}
 
 // Auth wrapper component to initialize auth state and listen to Supabase auth changes
 function AuthWrapper({ children }: { children: React.ReactNode }) {

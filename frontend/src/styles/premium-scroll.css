@@ -1,0 +1,151 @@
+/* ===========================
+   Premium 2026 Scroll System
+   Lenis + GSAP + Micro-Parallax
+   =========================== */
+
+/* Lenis Smooth Scroll */
+html.lenis {
+  height: auto;
+}
+
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+/* Prevent extra scroll space */
+html,
+body {
+  overflow-x: hidden;
+}
+
+body {
+  position: relative;
+  min-height: 100vh;
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+/* Prevent Lenis from intercepting wheel events on dropdowns */
+[data-lenis-prevent] {
+  pointer-events: auto;
+}
+
+[data-lenis-prevent] * {
+  pointer-events: auto;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+/* Premium Easing Curves */
+:root {
+  --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-luxury: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-cinematic: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* GPU-Friendly Transforms */
+[data-gsap-animate],
+[data-parallax] {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Horizontal Scroll Section */
+.horizontal-scroll-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.horizontal-scroll-content {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+
+.horizontal-scroll-content > * {
+  flex-shrink: 0;
+}
+
+/* Smooth Scroll Performance */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prevent Layout Shift */
+[data-gsap-animate] {
+  opacity: 0;
+}
+
+/* Premium Scrollbar (Optional) */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, 
+    rgba(253, 219, 146, 0.4), 
+    rgba(253, 219, 146, 0.2)
+  );
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, 
+    rgba(253, 219, 146, 0.6), 
+    rgba(253, 219, 146, 0.4)
+  );
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  [data-parallax] {
+    transform: none !important;
+  }
+  
+  .horizontal-scroll-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .horizontal-scroll-content {
+    display: flex;
+    flex-direction: row;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  [data-gsap-animate],
+  [data-parallax] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  
+  .horizontal-scroll-container {
+    overflow-x: auto;
+  }
+}
+

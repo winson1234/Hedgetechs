@@ -214,8 +214,6 @@ frontend/src/
 - Withdrawal processing
 - Transaction history
 
-**Note:** Express Checkout requires HTTPS. See [SETUP.md](docs/SETUP.md) for local HTTPS configuration.
-
 ### Market Data
 - Hybrid market data architecture:
   - Binance WebSocket for crypto real-time prices

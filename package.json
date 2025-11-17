@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "@fullpage/react-fullpage": "^0.1.49",
-    "fullpage.js": "^4.0.37",
-    "locomotive-scroll": "^4.1.4"
-  }
-}

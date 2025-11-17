@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store';
 import { signOut } from '../store/slices/authSlice';
@@ -12,7 +12,6 @@ import '../styles/crypto.css';
 import '../styles/color.css';
 import '../styles/mobile.css';
 import '../styles/trust.css';
-import StatsBanner from "../components/StatsBanner";
 import '../styles/luxuryanimation.css';
 import MetricsCounter from "../components/MetrixCounter";
 
@@ -26,12 +25,6 @@ interface CryptoData {
   gradient: string;
   isForexPair?: boolean;
   forexPair?: { base: string; quote: string };
-}
-interface MetricsCounts {
-  volume: number;
-  traders: number;
-  countries: number;
-  pairs: number;
 }
 
 // UI-specific properties for each crypto (emoji icons and gradient backgrounds)
@@ -508,12 +501,11 @@ const cancelLogout = () => {
 useEffect(() => {
   // Header scroll effect
   const header = document.querySelector('.header');
-  let lastScrollTop = 0;
   let ticking = false;
 
   const handleScroll = () => {
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    
+
     if (!ticking) {
       window.requestAnimationFrame(() => {
         // Add 'scrolled' class when scrolled down more than 20px
@@ -522,11 +514,10 @@ useEffect(() => {
         } else {
           header?.classList.remove('scrolled');
         }
-        
-        lastScrollTop = scrollTop;
+
         ticking = false;
       });
-      
+
       ticking = true;
     }
   };

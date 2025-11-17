@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import '../styles/keystatistics.css';
 
 interface MetricsCounts {
@@ -8,6 +8,13 @@ interface MetricsCounts {
   pairs: number;
 }
 
+const targetValues = {
+  volume: 2.5,
+  traders: 20,
+  countries: 198,
+  pairs: 350
+};
+
 const MetricsCounter: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [counts, setCounts] = useState<MetricsCounts>({
@@ -16,16 +23,38 @@ const MetricsCounter: React.FC = () => {
     countries: 0,
     pairs: 0
   });
-  
+
   const sectionRef = useRef<HTMLElement>(null);
   const hasAnimated = useRef(false);
 
-  const targetValues = {
-    volume: 2.5,
-    traders: 20,
-    countries: 198,
-    pairs: 350
-  };
+  const startCountAnimation = useCallback(() => {
+    const duration = 3000; // 3 seconds - slower animation
+    const fps = 60; // 60 frames per second
+    const totalFrames = (duration / 1000) * fps;
+    const frameDuration = 1000 / fps;
+
+    let currentFrame = 0;
+
+    const timer = setInterval(() => {
+      currentFrame++;
+      const progress = currentFrame / totalFrames;
+
+      // Smooth easing function
+      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+
+      setCounts({
+        volume: Number((targetValues.volume * easeOutQuart).toFixed(1)),
+        traders: Math.floor(targetValues.traders * easeOutQuart),
+        countries: Math.floor(targetValues.countries * easeOutQuart),
+        pairs: Math.floor(targetValues.pairs * easeOutQuart)
+      });
+
+      if (currentFrame >= totalFrames) {
+        clearInterval(timer);
+        setCounts(targetValues);
+      }
+    }, frameDuration);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -46,36 +75,7 @@ const MetricsCounter: React.FC = () => {
     }
 
     return () => observer.disconnect();
-  }, []);
-
-  const startCountAnimation = () => {
-    const duration = 3000; // 3 seconds - slower animation
-    const fps = 60; // 60 frames per second
-    const totalFrames = (duration / 1000) * fps;
-    const frameDuration = 1000 / fps;
-
-    let currentFrame = 0;
-
-    const timer = setInterval(() => {
-      currentFrame++;
-      const progress = currentFrame / totalFrames;
-      
-      // Smooth easing function
-      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-
-      setCounts({
-        volume: Number((targetValues.volume * easeOutQuart).toFixed(1)),
-        traders: Math.floor(targetValues.traders * easeOutQuart),
-        countries: Math.floor(targetValues.countries * easeOutQuart),
-        pairs: Math.floor(targetValues.pairs * easeOutQuart)
-      });
-
-      if (currentFrame >= totalFrames) {
-        clearInterval(timer);
-        setCounts(targetValues);
-      }
-    }, frameDuration);
-  };
+  }, [startCountAnimation]);
 
   return (
     <section 

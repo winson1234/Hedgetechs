@@ -162,7 +162,7 @@ header.header,
   100% { left: 100%; }
 }
 
-body.light-mode .header::before {
+html:not(.dark) .header::before {
   background: linear-gradient(180deg, 
     rgba(255, 255, 255, 0.8) 0%,
     rgba(255, 255, 255, 0.4) 50%, 
@@ -170,7 +170,7 @@ body.light-mode .header::before {
   );
 }
 
-body.light-mode .header::after {
+html:not(.dark) .header::after {
   background: linear-gradient(90deg, 
     transparent 0%, 
     rgba(253, 219, 146, 0.15) 50%, 
@@ -200,13 +200,13 @@ header.header.scrolled,
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(253, 219, 146, 0.1) !important;
 }
 
-body.light-mode .header {
+html:not(.dark) .header {
   background: transparent !important;
   border-bottom: none !important;
   box-shadow: none !important;
 }
 
-body.light-mode .header.scrolled {
+html:not(.dark) .header.scrolled {
   background: rgba(255, 255, 255, 0.85) !important;
   backdrop-filter: blur(20px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
@@ -281,7 +281,7 @@ body.light-mode .header.scrolled {
   background-clip: text;
 }
 
-body.light-mode .logo-text {
+html:not(.dark) .logo-text {
   background: linear-gradient(135deg, #1a1f3a 0%, #C76D00 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -343,7 +343,7 @@ body.light-mode .logo-text {
   50% { transform: scale(1.05); }
 }
 
-body.light-mode .nav-link {
+html:not(.dark) .nav-link {
   color: rgba(26, 31, 58, 0.9);
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
 }
@@ -365,10 +365,11 @@ body.light-mode .nav-link {
 .nav-link::after {
   content: '';
   position: absolute;
-  bottom: -2px;
-  left: 50%;
-  
-  transform: translateX(-50%) scaleX(0);
+  bottom: 0px;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  transform: scaleX(0);
   width: 100%;
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
@@ -378,7 +379,7 @@ body.light-mode .nav-link {
 }
 
 .nav-link:hover::after {
-  transform: translateX(-50%) scaleX(1);
+  transform: scaleX(1);
 }
 
 /* Nav Actions */
@@ -439,13 +440,13 @@ body.light-mode .nav-link {
   backdrop-filter: none;
 }
 
-body.light-mode .icon-btn {
+html:not(.dark) .icon-btn {
   background: rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(0, 0, 0, 0.1);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
-body.light-mode .header.scrolled .icon-btn {
+html:not(.dark) .header.scrolled .icon-btn {
   background: transparent;
   border: 1px solid var(--border-color);
   box-shadow: none;
@@ -473,13 +474,13 @@ body.light-mode .header.scrolled .icon-btn {
 }
 
 /* Light / dark mode SVG colors */
-body.light-mode .icon-btn svg {
+html:not(.dark) .icon-btn svg {
   color: #1a1f3a !important;
   stroke: #1a1f3a !important;
   transition: all 0.4s ease;
 }
 
-body.dark-mode .icon-btn svg {
+html.dark .icon-btn svg {
   color: #ffffff !important;
   stroke: #ffffff !important;
   transition: all 0.4s ease;
@@ -874,11 +875,11 @@ body.dark-mode .icon-btn svg {
   animation: shimmer 3s ease-in-out infinite;
 }
 
-body.light-mode .dropdown-header {
+html:not(.dark) .dropdown-header {
   background: linear-gradient(135deg, #f8f9fa, #ffffff);
 }
 
-body.dark-mode .dropdown-header {
+html.dark .dropdown-header {
   background: var(--bg-secondary);
 }
 
@@ -992,7 +993,7 @@ body.dark-mode .dropdown-header {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
-body.light-mode .btn-secondary {
+html:not(.dark) .btn-secondary {
   background: rgba(255, 255, 255, 0.7);
   color: rgba(26, 31, 58, 0.95);
   border: 1.5px solid rgba(0, 0, 0, 0.12);
@@ -1107,17 +1108,17 @@ body.light-mode .btn-secondary {
   left: 0;
   right: 0;
   height: 300px;
-  background: linear-gradient(180deg, 
-    rgba(10, 14, 39, 0) 0%,
+  background: linear-gradient(180deg,
+    transparent 0%,
     var(--bg-primary) 100%
   );
   pointer-events: none;
   z-index: 0;
 }
 
-body.light-mode .hero::before {
-  background: linear-gradient(180deg, 
-    rgba(255, 255, 255, 0) 0%,
+html:not(.dark) .hero::before {
+  background: linear-gradient(180deg,
+    transparent 0%,
     var(--bg-primary) 100%
   );
 }
@@ -1388,7 +1389,7 @@ body.light-mode .hero::before {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
-body.light-mode .hero-title {
+html:not(.dark) .hero-title {
   background: linear-gradient(135deg, #1a1f3a 0%, #1a1f3a 50%, #8B5A00 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

@@ -19,13 +19,13 @@ import 'lenis/dist/lenis.css';
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
+import '../styles/color.css';
 import './dashboard.css';
 import '../styles/scroll-animations.css';
 import '../styles/premium-scroll.css';
 import '../styles/advanced-animations.css';
 import '../styles/news.css';
 import '../styles/crypto.css';
-import '../styles/color.css';
 import '../styles/mobile.css';
 import '../styles/trust.css';
 import '../styles/luxuryanimation.css';
@@ -323,22 +323,34 @@ const cancelLogout = () => {
   };
 
   // Update crypto data when prices change in Redux store (updated by WebSocket middleware)
+  // Use a ref to track previous prices to prevent infinite loops
+  const lastPricesUpdateRef = useRef(0);
+
   useEffect(() => {
+    // Debounce updates - only update every 500ms max
+    const now = Date.now();
+    if (now - lastPricesUpdateRef.current < 500) return;
+    lastPricesUpdateRef.current = now;
+
     setCryptoData(prevData =>
       prevData.map(crypto => {
         const priceData = currentPrices[crypto.symbol];
         if (priceData !== undefined) {
           // Extract price from PriceData or use directly if it's a number
           const price = typeof priceData === 'number' ? priceData : priceData.price;
-          return {
-            ...crypto,
-            price,
-            // change and volume24h preserved from ticker API
-          };
+          // Only update if price actually changed
+          if (crypto.price !== price) {
+            return {
+              ...crypto,
+              price,
+              // change and volume24h preserved from ticker API
+            };
+          }
         }
         return crypto;
       })
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPrices]);
 
   // Fetch initial 24h ticker data with retry logic

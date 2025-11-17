@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useContext, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store';
 import { signOut } from '../store/slices/authSlice';
@@ -7,6 +7,14 @@ import { useInstruments } from '../hooks/useInstruments';
 import MiniSparklineChart from '../components/MiniSparklineChart';
 import { getApiUrl } from '../config/api';
 import './dashboard.css';
+import '../styles/news.css';
+import '../styles/crypto.css';
+import '../styles/color.css';
+import '../styles/mobile.css';
+import '../styles/trust.css';
+import StatsBanner from "../components/StatsBanner";
+import '../styles/luxuryanimation.css';
+import MetricsCounter from "../components/MetrixCounter";
 
 interface CryptoData {
   symbol: string;
@@ -18,6 +26,12 @@ interface CryptoData {
   gradient: string;
   isForexPair?: boolean;
   forexPair?: { base: string; quote: string };
+}
+interface MetricsCounts {
+  volume: number;
+  traders: number;
+  countries: number;
+  pairs: number;
 }
 
 // UI-specific properties for each crypto (emoji icons and gradient backgrounds)
@@ -488,6 +502,47 @@ const cancelLogout = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [activeNewsTab]);
+// Add this useEffect hook to your DashboardPage component
+// Place it after your other useEffect hooks
+
+useEffect(() => {
+  // Header scroll effect
+  const header = document.querySelector('.header');
+  let lastScrollTop = 0;
+  let ticking = false;
+
+  const handleScroll = () => {
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        // Add 'scrolled' class when scrolled down more than 20px
+        if (scrollTop > 20) {
+          header?.classList.add('scrolled');
+        } else {
+          header?.classList.remove('scrolled');
+        }
+        
+        lastScrollTop = scrollTop;
+        ticking = false;
+      });
+      
+      ticking = true;
+    }
+  };
+
+  // Add scroll event listener with passive for better performance
+  window.addEventListener('scroll', handleScroll, { passive: true });
+  
+  // Initial check on mount
+  handleScroll();
+
+  // Cleanup
+  return () => {
+    window.removeEventListener('scroll', handleScroll);
+  };
+}, []);
+
 
   // Handler for crypto page changes
   const handleCryptoPageChange = (page: number) => {
@@ -741,64 +796,13 @@ const cancelLogout = () => {
 
           {/* Hero Image */}
           <div className="hero-image">
-            <img src="/assets/images/crypto-hero.png" alt="Cryptocurrency Illustration" className="hero-img" />
-
-            {/* Floating Crypto Cards */}
-            <div className="floating-cards">
-              <div className="floating-card card-1">
-                <div className="crypto-mini">
-                  <div className="crypto-icon-mini" style={{ background: 'linear-gradient(135deg, #f7931a, #ff9500)' }}>₿</div>
-                  <div className="crypto-info-mini">
-                    <div className="crypto-symbol-mini">BTC</div>
-                    <div className="crypto-price-mini positive">+2.4%</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="floating-card card-2">
-                <div className="crypto-mini">
-                  <div className="crypto-icon-mini" style={{ background: 'linear-gradient(135deg, #627eea, #8a9cff)' }}>Ξ</div>
-                  <div className="crypto-info-mini">
-                    <div className="crypto-symbol-mini">ETH</div>
-                    <div className="crypto-price-mini positive">+1.8%</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="floating-card card-3">
-                <div className="crypto-mini">
-                  <div className="crypto-icon-mini" style={{ background: 'linear-gradient(135deg, #f3ba2f, #ffd700)' }}>B</div>
-                  <div className="crypto-info-mini">
-                    <div className="crypto-symbol-mini">BNB</div>
-                    <div className="crypto-price-mini positive">+3.2%</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+              <div className="coin btc">₿</div>
+              <div className="coin eth">Ξ</div>
+              <div className="hero-img-box"></div>
+            <img src="/assets/images/upscalemedia-transformed.png" alt="Cryptocurrency Illustration" className="hero-img" />
           </div>
         </div>
-
-        {/* Stats Banner */}
-        <div className="container">
-          <div className="stats-banner">
-            <div className="stat-item">
-              <div className="stat-value">$2.5B+</div>
-              <div className="stat-label">24h Trading Volume</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-value">20M+</div>
-              <div className="stat-label">Active Traders</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-value">198+</div>
-              <div className="stat-label">Countries</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-value">350+</div>
-              <div className="stat-label">Trading Pairs</div>
-            </div>
-          </div>
-        </div>
+           <MetricsCounter />
       </section>
 
       {/* Market Overview */}
@@ -963,56 +967,55 @@ const cancelLogout = () => {
                 Previous
               </button>
 
-              {/* Page Numbers */}
-              {Array.from({ length: cryptoTotalPages }, (_, i) => i + 1).map(page => {
-                const showPage = page === 1 ||
-                                page === cryptoTotalPages ||
-                                (page >= cryptoCurrentPage - 1 && page <= cryptoCurrentPage + 1);
+            {Array.from({ length: cryptoTotalPages }, (_, i) => i + 1).map(page => {
+  const showPage = page === 1 ||
+                  page === cryptoTotalPages ||
+                  (page >= cryptoCurrentPage - 1 && page <= cryptoCurrentPage + 1);
 
-                const showEllipsis = (page === cryptoCurrentPage - 2 && cryptoCurrentPage > 3) ||
-                                    (page === cryptoCurrentPage + 2 && cryptoCurrentPage < cryptoTotalPages - 2);
+  const showEllipsis = (page === cryptoCurrentPage - 2 && cryptoCurrentPage > 3) ||
+                      (page === cryptoCurrentPage + 2 && cryptoCurrentPage < cryptoTotalPages - 2);
 
-                if (showEllipsis) {
-                  return (
-                    <span key={page} style={{ color: '#64748b', padding: '0 0.5rem' }}>...</span>
-                  );
-                }
+  if (showEllipsis) {
+    return (
+      <span key={page} style={{ color: '#64748b', padding: '0 0.5rem' }}>...</span>
+    );
+  }
 
-                if (!showPage) return null;
+  if (!showPage) return null;
 
-                return (
-                  <button
-                    key={page}
-                    onClick={() => handleCryptoPageChange(page)}
-                    style={{
-                      padding: '0.75rem 1rem',
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
-                      color: '#ffffff',
-                      background: page === cryptoCurrentPage
-                        ? 'linear-gradient(135deg, #C76D00, #FDDB92)'
-                        : 'rgba(255, 255, 255, 0.1)',
-                      border: page === cryptoCurrentPage ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      minWidth: '45px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (page !== cryptoCurrentPage) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (page !== cryptoCurrentPage) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                      }
-                    }}
-                  >
-                    {page}
-                  </button>
-                );
-              })}
+  return (
+    <button
+      key={page}
+      onClick={() => handleCryptoPageChange(page)}
+      style={{
+        padding: '0.75rem 1rem',
+        fontSize: '0.9rem',
+        fontWeight: '600',
+        color: page === cryptoCurrentPage ? '#ffffff' : '#1a1f3a', // dark text for other pages
+        background: page === cryptoCurrentPage
+          ? 'linear-gradient(135deg, #C76D00, #FDDB92)'
+          : 'rgba(255, 255, 255, 0.2)', // subtle background for other pages
+        border: page === cryptoCurrentPage ? 'none' : '1px solid rgba(0,0,0,0.1)',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        minWidth: '45px'
+      }}
+      onMouseEnter={(e) => {
+        if (page !== cryptoCurrentPage) {
+          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (page !== cryptoCurrentPage) {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+        }
+      }}
+    >
+      {page}
+    </button>
+  );
+})}
 
               {/* Next Button */}
               <button
@@ -1283,58 +1286,57 @@ const cancelLogout = () => {
                             Previous
                           </button>
 
-                  {/* Page Numbers */}
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
-                    // Show first page, last page, current page, and pages around current
-                    const showPage = page === 1 ||
-                                    page === totalPages ||
-                                    (page >= currentPage - 1 && page <= currentPage + 1);
+            {/* Page Numbers */}
+{Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+  const showPage = page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1);
 
-                    const showEllipsis = (page === currentPage - 2 && currentPage > 3) ||
-                                        (page === currentPage + 2 && currentPage < totalPages - 2);
+  const showEllipsis = (page === currentPage - 2 && currentPage > 3) ||
+                      (page === currentPage + 2 && currentPage < totalPages - 2);
 
-                    if (showEllipsis) {
-                      return (
-                        <span key={page} style={{ color: '#64748b', padding: '0 0.5rem' }}>...</span>
-                      );
-                    }
+  if (showEllipsis) {
+    return (
+      <span key={page} style={{ color: '#64748b', padding: '0 0.5rem' }}>...</span>
+    );
+  }
 
-                    if (!showPage) return null;
+  if (!showPage) return null;
 
-                    return (
-                    <button
-                            key={page}
-                            onClick={() => handlePageChange(page)}
-                            style={{
-                              padding: '0.75rem 1rem',
-                              fontSize: '0.9rem',
-                              fontWeight: '600',
-                              color: '#ffffff',
-                              background: page === currentPage
-                                ? 'linear-gradient(135deg, #C76D00, #FDDB92)' // <- updated gradient
-                                : 'rgba(255, 255, 255, 0.1)',
-                              border: page === currentPage ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              transition: 'all 0.3s ease',
-                              minWidth: '45px'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (page !== currentPage) {
-                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (page !== currentPage) {
-                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                              }
-                            }}
-                          >
-                            {page}
-                          </button>
+  return (
+    <button
+      key={page}
+      onClick={() => handlePageChange(page)}
+      style={{
+        padding: '0.75rem 1rem',
+        fontSize: '0.9rem',
+        fontWeight: '600',
+        color: page === currentPage ? '#ffffff' : '#1a1f3a', // dark text for other pages
+        background: page === currentPage
+          ? 'linear-gradient(135deg, #C76D00, #FDDB92)' // active page gradient
+          : 'rgba(255, 255, 255, 0.2)', // subtle light background for other pages
+        border: page === currentPage ? 'none' : '1px solid rgba(0,0,0,0.1)',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        minWidth: '45px'
+      }}
+      onMouseEnter={(e) => {
+        if (page !== currentPage) {
+          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'; // slightly darker on hover
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (page !== currentPage) {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; // revert background
+        }
+      }}
+    >
+      {page}
+    </button>
+  );
+})}
 
-                    );
-                  })}
 
                                   {/* Next Button */}
                         <button
@@ -1497,7 +1499,7 @@ const cancelLogout = () => {
 
             {/* Right Side - Dashboard Image */}
             <div className="features-image">
-              <img src="/assets/images/Mobile-crypto-app-1024x682.webp" alt="Trading Dashboard" className="dashboard-img" />
+              <img src="assets/images/upscalemedia-transformed_11zon (1).webp" alt="Trading Dashboard" className="dashboard-img" />
             </div>
           </div>
         </div>

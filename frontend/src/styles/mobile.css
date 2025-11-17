@@ -1,0 +1,225 @@
+/* ===========================
+   RESPONSIVE - MOBILE
+   =========================== */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+  }
+  
+  .hero {
+    margin-top: 70px;
+    padding: 80px 0 60px;
+  }
+  
+  .hero-title {
+    font-size: 36px;
+  }
+  
+  .hero-subtitle {
+    font-size: 16px;
+  }
+  
+  .hero-cta {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .email-input {
+    width: 100%;
+    min-width: 100%;
+  }
+  
+  .btn-large {
+    width: 100%;
+  }
+  
+  .trust-badges {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .stats-banner {
+    grid-template-columns: 1fr;
+    padding: 24px;
+  }
+  
+  .stat-value {
+    font-size: 28px;
+  }
+  
+  .section-title {
+    font-size: 32px !important;
+  }
+  
+  .section-subtitle {
+    font-size: 14px;
+  }
+  
+  .market-section,
+  .news-section,
+  .payout-section,
+  .features-section,
+  .trust-section,
+  .faq-section {
+    padding: 60px 0;
+  }
+  
+  .payout-title,
+  .features-main-title {
+    font-size: 32px;
+  }
+  
+  .payout-desc,
+  .features-main-desc {
+    font-size: 16px;
+  }
+  
+  .visa-card {
+    width: 150px;
+    height: 90px;
+    left: -20px;
+    bottom: -20px;
+  }
+  
+  .visa-card::after {
+    font-size: 18px;
+    bottom: 12px;
+    left: 12px;
+  }
+  
+  .payment-icons {
+    gap: 12px;
+  }
+  
+  .feature-item {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .feature-item-icon {
+    margin: 0 auto;
+  }
+  
+  .crypto-table {
+    overflow-x: auto;
+  }
+  
+  .crypto-row {
+    grid-template-columns: 1.5fr 1fr 0.8fr 0.8fr;
+    min-width: 600px;
+    gap: 12px;
+    padding: 16px;
+    font-size: 13px;
+  }
+  
+  .crypto-name,
+  .mini-chart {
+    display: none;
+  }
+  
+  .news-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .news-item.featured .news-image {
+    height: 200px;
+  }
+  
+  .news-item.featured .news-title {
+    font-size: 20px;
+  }
+  
+  .news-item.featured .news-excerpt {
+    font-size: 14px;
+  }
+  
+  .news-section .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .faq-question {
+    padding: 20px;
+  }
+  
+  .question-text {
+    font-size: 16px;
+  }
+  
+  .faq-item.active .faq-answer {
+    padding: 0 20px 20px 20px;
+  }
+  
+  .faq-footer {
+    margin-top: 60px;
+    padding: 32px 24px;
+  }
+  
+  .faq-footer-title {
+    font-size: 24px;
+  }
+  
+  .faq-cta-buttons {
+    flex-direction: column;
+  }
+  
+  .faq-cta-buttons .btn {
+    width: 100%;
+  }
+  
+  .footer-links {
+    grid-template-columns: 1fr;
+  }
+  
+  
+  .floating-card {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo-text {
+    font-size: 20px;
+  }
+  
+  .hero-title {
+    font-size: 28px;
+  }
+  
+  .section-title {
+    font-size: 28px !important;
+  }
+  
+  .stat-value {
+    font-size: 24px;
+  }
+  
+  .payout-title,
+  .features-main-title {
+    font-size: 28px;
+  }
+  
+  .trust-card,
+  .feature-card {
+    padding: 32px 24px;
+  }
+  
+  .news-title {
+    font-size: 16px;
+  }
+  
+  .news-excerpt {
+    font-size: 13px;
+  }
+  
+  .question-text {
+    font-size: 15px;
+  }
+  
+  .faq-icon {
+    width: 28px;
+    height: 28px;
+  }
+}

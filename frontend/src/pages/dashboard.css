@@ -92,14 +92,15 @@
 }
 
 /*HEADER & NAVIGATION*/
-/*HEADER & NAVIGATION - Relative positioning (scrolls with page) */
+/*HEADER & NAVIGATION - Sticky positioning (follows user on scroll) */
 header.header,
 .dashboard-page header.header,
 .dashboard-page .header,
 .header,
 .dashboard-page > header.header,
 .dashboard-page > header.header.header {
-  position: relative !important;
+  position: sticky !important;
+  top: 0 !important;
   width: 100% !important;
   background-color: transparent;
   backdrop-filter: none !important;
@@ -107,8 +108,7 @@ header.header,
   z-index: 1000;
   transition: background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1),
               border-color 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-              position 0s;
+              box-shadow 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: none;
   transform: none !important;
   margin: 0 !important;
@@ -124,13 +124,14 @@ header.header,
   opacity: 0;
 }
 
-/* Header gets dark background when scrolled - but STAYS RELATIVE (scrolls with page) */
+/* Header gets dark background when scrolled - STAYS STICKY (follows user) */
 header.header.scrolled,
 .dashboard-page header.header.scrolled,
 .dashboard-page .header.scrolled,
 .header.scrolled,
 #main-header.scrolled {
-  position: relative !important;
+  position: sticky !important;
+  top: 0 !important;
   background: #050813 !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -149,7 +150,7 @@ body.light-mode .header {
   box-shadow: none !important;
 }
 
-/* Light mode header - background when scrolled - but STAYS RELATIVE (scrolls with page) */
+/* Light mode header - background when scrolled - STAYS STICKY (follows user) */
 html:not(.dark) header.header.scrolled,
 html:not(.dark) .dashboard-page header.header.scrolled,
 html:not(.dark) .dashboard-page .header.scrolled,
@@ -159,7 +160,8 @@ body.light-mode header.header.scrolled,
 body.light-mode .dashboard-page header.header.scrolled,
 body.light-mode .dashboard-page .header.scrolled,
 body.light-mode .header.scrolled {
-  position: relative !important;
+  position: sticky !important;
+  top: 0 !important;
   background: #1e293b !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -319,24 +321,32 @@ body.light-mode .header.scrolled .nav-link {
   
 }
 
-/* Animated underline with particles effect */
+/* Animated underline with particles effect - aligned with text */
 .nav-link::after {
   content: '';
   position: absolute;
-  bottom: -2px;
-  left: 50%;
-
-  transform: translateX(-50%) scaleX(0);
+  bottom: 0;
+  left: 0;
   width: 100%;
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+  transform: scaleX(0);
+  transform-origin: left center;
   transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 0 12px rgba(253, 219, 146, 0.8);
   border-radius: 2px;
 }
 
-.nav-link:hover::after {
-  transform: translateX(-50%) scaleX(1);
+.nav-link:hover::after,
+.nav-link.active::after {
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+
+/* Active nav link styling */
+.nav-link.active {
+  color: var(--secondary-color) !important;
+  text-shadow: 0 4px 12px rgba(253, 219, 146, 0.4);
 }
 
 /* Nav Actions */
@@ -1612,7 +1622,7 @@ body.light-mode .hero-title {
   animation-duration: 7s;
 }
 
-/* FINAL OVERRIDE - ALWAYS relative (scrolls with page, NEVER sticky) */
+/* FINAL OVERRIDE - ALWAYS sticky (follows user on scroll) */
 .dashboard-page > header.header,
 .dashboard-page header.header,
 .dashboard-page .header,
@@ -1624,8 +1634,8 @@ header.header.header.header,
 .dashboard-page .header.scrolled,
 header.header.header.scrolled,
 .header.header.scrolled {
-  position: relative !important;
-  top: auto !important;
+  position: sticky !important;
+  top: 0 !important;
   left: auto !important;
   right: auto !important;
   bottom: auto !important;

@@ -13,22 +13,7 @@
   --secondary-color: #00d4aa;
   --accent-color: #a855f7;
 
-  /* Light Mode (Default) */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-card: #ffffff;
-  --bg-tertiary: #e0e0e0;
-  --text-primary: #1a1f3a;
-  --text-secondary: #6c757d;
-  --border-color: #e9ecef;
-
-  /* Gradients */
-  --gradient-gold: linear-gradient(135deg, #C76D00, #FDDB92);
-  --gradient-green: linear-gradient(135deg, #00d4aa, #00f5cc);
-  --gradient-purple: linear-gradient(135deg, #a855f7, #c084fc);
-}
-
-html.dark {
+  /* Dark Mode (Default) */
   --bg-primary: #0a0e27;
   --bg-secondary: #141935;
   --bg-card: #1a1f3a;
@@ -36,6 +21,21 @@ html.dark {
   --text-primary: #ffffff;
   --text-secondary: #a0a0b8;
   --border-color: #2a2f4a;
+
+  /* Gradients */
+  --gradient-gold: linear-gradient(135deg, #C76D00, #FDDB92);
+  --gradient-green: linear-gradient(135deg, #00d4aa, #00f5cc);
+  --gradient-purple: linear-gradient(135deg, #a855f7, #c084fc);
+}
+
+body.light-mode {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-card: #ffffff;
+  --bg-tertiary: #e0e0e0;
+  --text-primary: #1a1f3a;
+  --text-secondary: #6c757d;
+  --border-color: #e9ecef;
 }
 
 html {

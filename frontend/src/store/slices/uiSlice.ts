@@ -32,7 +32,7 @@ interface UIState {
 
 // Initial state
 const initialState: UIState = {
-  theme: 'light', // Default theme
+  theme: 'dark', // Default theme
   currentPage: 'trading',
   activeInstrument: 'BTCUSDT', // Default to Bitcoin
   selectedProductType: 'spot', // Default to SPOT trading

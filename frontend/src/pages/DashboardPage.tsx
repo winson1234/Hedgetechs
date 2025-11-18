@@ -149,7 +149,16 @@ export default function DashboardPage() {
       });
     };
   }, []);
-  
+
+  // Apply theme class to body element when theme changes
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.remove('light-mode');
+    } else {
+      document.body.classList.add('light-mode');
+    }
+  }, [isDarkMode]);
+
   const navigate = useNavigate();
   const [activeMarketTab, setActiveMarketTab] = useState('all');
   const [activeNewsTab, setActiveNewsTab] = useState('all');

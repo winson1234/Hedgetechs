@@ -269,8 +269,11 @@ export default function HistoryPage() {
 
   // Combined and sorted history
   const allHistory = useMemo<HistoryItem[]>(() => {
+    // Filter out position_close transactions as they're already shown as closed positions
+    const filteredTransactions = transactions.filter(t => t.type !== 'position_close');
+    
     const items: HistoryItem[] = [
-      ...transactions.map((t) => ({ ...t, itemType: 'transaction' as const })),
+      ...filteredTransactions.map((t) => ({ ...t, itemType: 'transaction' as const })),
       ...executedOrders.map((o) => ({ ...o, itemType: 'executedOrder' as const })),
       ...pendingOrders.map((o) => ({ ...o, itemType: 'pendingOrder' as const })),
       ...closedPositions.map((p) => ({
@@ -515,6 +518,20 @@ export default function HistoryPage() {
       );
     }
 
+    if (item.itemType === 'closedPosition') {
+      const position = item as ClosedPosition;
+      const isLong = position.side === 'long';
+      const pnl = position.pnl || 0;
+      const isProfitable = pnl >= 0;
+      return (
+        <div className={`w-10 h-10 rounded-full ${isProfitable ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'} flex items-center justify-center`}>
+          <svg className={`w-5 h-5 ${isProfitable ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isLong ? "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" : "M13 17h8m0 0v-8m0 8l-8-8-4 4-6-6"} />
+          </svg>
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -592,6 +609,20 @@ export default function HistoryPage() {
       );
     }
 
+    if (item.itemType === 'closedPosition') {
+      const position = item as ClosedPosition;
+      return (
+        <div>
+          <p className="font-medium text-slate-900 dark:text-slate-100">
+            {position.side === 'long' ? 'Long' : 'Short'} {position.symbol}
+          </p>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            {position.lot_size.toFixed(6)} @ {formatCurrency(position.entry_price, 'USD')} → {formatCurrency(position.close_price || 0, 'USD')}
+          </p>
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -630,6 +661,22 @@ export default function HistoryPage() {
         <div className="text-right">
           <p className="font-semibold text-slate-700 dark:text-slate-300">
             ~{formatCurrency(estimatedTotal, 'USD')}
+          </p>
+        </div>
+      );
+    }
+
+    if (item.itemType === 'closedPosition') {
+      const position = item as ClosedPosition;
+      const pnl = position.pnl || 0;
+      const isPositive = pnl >= 0;
+      return (
+        <div className="text-right">
+          <p className={`font-semibold ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            {isPositive ? '+' : ''}{formatCurrency(pnl, 'USD')}
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            P&L
           </p>
         </div>
       );

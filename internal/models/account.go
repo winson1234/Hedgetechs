@@ -36,9 +36,10 @@ const (
 type TransactionType string
 
 const (
-	TransactionTypeDeposit    TransactionType = "deposit"
-	TransactionTypeWithdrawal TransactionType = "withdrawal"
-	TransactionTypeTransfer   TransactionType = "transfer"
+	TransactionTypeDeposit       TransactionType = "deposit"
+	TransactionTypeWithdrawal    TransactionType = "withdrawal"
+	TransactionTypeTransfer      TransactionType = "transfer"
+	TransactionTypePositionClose TransactionType = "position_close"
 )
 
 // TransactionStatus represents the status of a transaction

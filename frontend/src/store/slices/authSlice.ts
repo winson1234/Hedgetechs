@@ -1,11 +1,11 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { supabase } from '../../lib/supabase';
-import type { User, Session } from '@supabase/supabase-js';
+import * as authService from '../../services/auth';
+import type { User } from '../../services/auth';
 
 // State interface
 interface AuthState {
   user: User | null;
-  session: Session | null;
+  token: string | null;
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
@@ -14,7 +14,7 @@ interface AuthState {
 // Initial state
 const initialState: AuthState = {
   user: null,
-  session: null,
+  token: null,
   isAuthenticated: false,
   loading: false,
   error: null,
@@ -28,30 +28,28 @@ export const signUp = createAsyncThunk(
   async ({
     email,
     password,
-    fullName,
+    firstName,
+    lastName,
     country
   }: {
     email: string;
     password: string;
-    fullName?: string;
-    country?: string;
+    firstName: string;
+    lastName: string;
+    country: string;
   }, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const result = await authService.register({
         email,
         password,
-        options: {
-          data: {
-            full_name: fullName,
-            country: country,
-          }
-        }
+        first_name: firstName,
+        last_name: lastName,
+        country,
       });
 
-      if (error) throw error;
-      return { user: data.user, session: data.session };
+      return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Sign up failed';
+      const message = error instanceof Error ? error.message : 'Registration failed';
       return rejectWithValue(message);
     }
   }
@@ -62,15 +60,14 @@ export const signIn = createAsyncThunk(
   'auth/signIn',
   async ({ email, password }: { email: string; password: string }, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-      return { user: data.user, session: data.session };
+      const result = await authService.login({ email, password });
+      
+      // Store user data
+      authService.storeUser(result.user);
+      
+      return { user: result.user, token: result.token };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Sign in failed';
+      const message = error instanceof Error ? error.message : 'Login failed';
       return rejectWithValue(message);
     }
   }
@@ -81,8 +78,7 @@ export const signOut = createAsyncThunk(
   'auth/signOut',
   async (_, { rejectWithValue }) => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      await authService.logout();
       return null;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sign out failed';
@@ -91,16 +87,21 @@ export const signOut = createAsyncThunk(
   }
 );
 
-// Refresh session
-export const refreshSession = createAsyncThunk(
-  'auth/refreshSession',
+// Validate session
+export const validateSession = createAsyncThunk(
+  'auth/validateSession',
   async (_, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      return { user: data.session?.user || null, session: data.session };
+      const { user, isValid } = await authService.validateSession();
+      const token = authService.getToken();
+      
+      if (!isValid || !user || !token) {
+        return { user: null, token: null };
+      }
+      
+      return { user, token };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Session refresh failed';
+      const message = error instanceof Error ? error.message : 'Session validation failed';
       return rejectWithValue(message);
     }
   }
@@ -115,25 +116,23 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
-    // Set session (used by Supabase auth state change listener)
-    setSession: (state, action: PayloadAction<{ user: User | null; session: Session | null }>) => {
+    // Set auth state manually if needed
+    setAuth: (state, action: PayloadAction<{ user: User | null; token: string | null }>) => {
       state.user = action.payload.user;
-      state.session = action.payload.session;
-      state.isAuthenticated = !!action.payload.user;
+      state.token = action.payload.token;
+      state.isAuthenticated = !!action.payload.user && !!action.payload.token;
     },
   },
   extraReducers: (builder) => {
-    // Sign up
+    // Sign up (creates pending registration, no auth state change)
     builder
       .addCase(signUp.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(signUp.fulfilled, (state, action) => {
+      .addCase(signUp.fulfilled, (state) => {
         state.loading = false;
-        state.user = action.payload.user;
-        state.session = action.payload.session;
-        state.isAuthenticated = !!action.payload.user;
+        // Registration successful but pending approval - no auth state change
       })
       .addCase(signUp.rejected, (state, action) => {
         state.loading = false;
@@ -149,8 +148,8 @@ const authSlice = createSlice({
       .addCase(signIn.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.user;
-        state.session = action.payload.session;
-        state.isAuthenticated = !!action.payload.user;
+        state.token = action.payload.token;
+        state.isAuthenticated = true;
       })
       .addCase(signIn.rejected, (state, action) => {
         state.loading = false;
@@ -166,7 +165,7 @@ const authSlice = createSlice({
       .addCase(signOut.fulfilled, (state) => {
         state.loading = false;
         state.user = null;
-        state.session = null;
+        state.token = null;
         state.isAuthenticated = false;
       })
       .addCase(signOut.rejected, (state, action) => {
@@ -174,26 +173,26 @@ const authSlice = createSlice({
         state.error = action.payload as string;
       });
 
-    // Refresh session
+    // Validate session
     builder
-      .addCase(refreshSession.pending, (state) => {
+      .addCase(validateSession.pending, (state) => {
         state.loading = true;
       })
-      .addCase(refreshSession.fulfilled, (state, action) => {
+      .addCase(validateSession.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.user;
-        state.session = action.payload.session;
-        state.isAuthenticated = !!action.payload.user;
+        state.token = action.payload.token;
+        state.isAuthenticated = !!action.payload.user && !!action.payload.token;
       })
-      .addCase(refreshSession.rejected, (state, action) => {
+      .addCase(validateSession.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
         state.user = null;
-        state.session = null;
+        state.token = null;
         state.isAuthenticated = false;
       });
   },
 });
 
-export const { clearError, setSession } = authSlice.actions;
+export const { clearError, setAuth } = authSlice.actions;
 export default authSlice.reducer;

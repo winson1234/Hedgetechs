@@ -648,7 +648,7 @@ export default function TradingPanel() {
           )}
           {isCFD && (
             <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
-              <span className="text-slate-600 dark:text-slate-400">Available Margin:</span>
+              <span className="text-slate-600 dark:text-slate-400">Total Balance:</span>
               <span className="font-bold text-green-600 dark:text-green-400">
                 {accountBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {accountCurrency}
               </span>

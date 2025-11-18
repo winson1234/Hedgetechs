@@ -61,6 +61,16 @@ func main() {
 		log.Println("WARNING: STRIPE_SECRET_KEY is not set!")
 	}
 
+	// Validate JWT_SECRET for custom authentication
+	if jwtSecret := os.Getenv("JWT_SECRET"); jwtSecret != "" {
+		log.Printf("JWT_SECRET loaded successfully (length: %d)", len(jwtSecret))
+		if len(jwtSecret) < 32 {
+			log.Println("WARNING: JWT_SECRET should be at least 32 characters for security!")
+		}
+	} else {
+		log.Fatalf("CRITICAL: JWT_SECRET is not set! Custom authentication requires JWT_SECRET.")
+	}
+
 	// Initialize Stripe after loading environment variables
 	api.InitializeStripe()
 
@@ -299,6 +309,85 @@ func main() {
 	// REST handler for crypto exchange rates (with CORS and HEAD support)
 	http.HandleFunc(config.ExchangeRateAPIPath, api.CORSMiddleware(allowHEAD(exchangeRateHandler.HandleGetRates)))
 
+	// ========== AUTHENTICATION ENDPOINTS (Public - No Auth Required) ==========
+
+	// POST /api/v1/auth/register - User registration (creates pending_registrationss record)
+	http.HandleFunc("/api/v1/auth/register", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleRegister))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/auth/login - User login (verifies pending_registrationss status, creates user if approved)
+	http.HandleFunc("/api/v1/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleLogin))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/auth/check-status - Check registration approval status
+	http.HandleFunc("/api/v1/auth/check-status", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleCheckStatus))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// ========== ACCOUNT ACTIVATION ENDPOINTS (Protected - Auth Required) ==========
+
+	// POST /api/v1/accounts/{account_id}/activate - Activate/switch to specific account
+	http.HandleFunc("/api/v1/accounts/", func(w http.ResponseWriter, r *http.Request) {
+		// Check if the path ends with /activate
+		if r.Method == http.MethodPost && len(r.URL.Path) > len("/api/v1/accounts/") {
+			// This handles /api/v1/accounts/{account_id}/activate
+			if r.URL.Path[len(r.URL.Path)-9:] == "/activate" {
+				api.CORSMiddleware(middleware.AuthMiddleware(api.HandleActivateAccount))(w, r)
+				return
+			}
+		}
+		if r.Method == http.MethodOptions {
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	// POST /api/v1/accounts/deactivate-all - Deactivate all user accounts (logout)
+	http.HandleFunc("/api/v1/accounts/deactivate-all", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.AuthMiddleware(api.HandleDeactivateAllAccounts))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Account management endpoints (protected with JWT authentication)
 	// POST /api/v1/accounts - Create a new trading account
 	// GET /api/v1/accounts - List all user's accounts
@@ -470,7 +559,23 @@ func main() {
 	http.HandleFunc("/api/v1/contracts/close", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.CloseContract))(w, r)
+			api.CORSMiddleware(middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				api.CloseContract(h, w, r)
+			}))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// GET /api/v1/contracts/history?account_id={uuid} - Get closed/liquidated positions
+	http.HandleFunc("/api/v1/contracts/history", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			api.CORSMiddleware(middleware.AuthMiddleware(api.GetContractHistory))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)

@@ -27,7 +27,7 @@ const initialState: TransactionState = {
 // Helper to get auth token
 const getAuthToken = (getState: () => RootState) => {
   const state = getState();
-  return state.auth.session?.access_token || null;
+  return state.auth.token || null;
 };
 
 // Backend transaction type (snake_case with time.Time strings)

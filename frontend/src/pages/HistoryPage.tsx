@@ -2,7 +2,7 @@ import { apiFetch } from '../utils/api';
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useAppSelector } from '../store';
 import { formatCurrency } from '../utils/formatters';
-import type { Transaction, TransactionStatus, TransactionType } from '../types';
+import type { Transaction, TransactionStatus, TransactionType, Position } from '../types';
 import { transformTransaction, type BackendTransaction } from '../store/slices/transactionSlice';
 import { type Order as ReduxOrder, type PendingOrder as ReduxPendingOrder } from '../store/slices/orderSlice';
 import {
@@ -14,14 +14,19 @@ import {
 import TransactionDetailModal from '../components/TransactionDetailModal';
 import HistorySummaryCards from '../components/HistorySummaryCards';
 
-type HistoryTab = 'all' | 'trades' | 'transactions';
-type HistoryItem = (Transaction | ExecutedOrder | PendingOrder) & { itemType: 'transaction' | 'executedOrder' | 'pendingOrder' };
+type HistoryTab = 'all' | 'trades' | 'transactions' | 'positions';
+type ClosedPosition = Position & { timestamp: number; itemType: 'closedPosition' };
+type HistoryItem = 
+  | (Transaction & { itemType: 'transaction' })
+  | (ExecutedOrder & { itemType: 'executedOrder' })
+  | (PendingOrder & { itemType: 'pendingOrder' })
+  | ClosedPosition;
 type SortOption = 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc';
 type DateRangeOption = 'all' | 'today' | 'week' | 'month' | 'custom';
 
 // Helper to get timestamp from different item types
 const getItemTimestamp = (item: HistoryItem): number => {
-  // All item types (Transaction, ExecutedOrder, PendingOrder) now have timestamp
+  // All item types (Transaction, ExecutedOrder, PendingOrder, ClosedPosition) now have timestamp
   return item.timestamp;
 };
 
@@ -61,7 +66,7 @@ const getStatusColor = (status: string) => {
 
 // Export to CSV helper
 const exportToCSV = (items: HistoryItem[], filename: string) => {
-  const headers = ['Type', 'Number', 'Symbol', 'Amount', 'Status', 'Date'];
+  const headers = ['Type', 'Number', 'Symbol', 'Side', 'Entry Price', 'Close Price', 'Lot Size', 'P&L', 'Status', 'Date'];
   const rows = items.map(item => {
     if (item.itemType === 'transaction') {
       const txn = item as Transaction;
@@ -69,7 +74,11 @@ const exportToCSV = (items: HistoryItem[], filename: string) => {
         txn.type,
         txn.transactionNumber,
         '-',
+        '-',
+        '-',
+        '-',
         txn.amount.toString(),
+        '-',
         txn.status,
         new Date(txn.timestamp).toISOString(),
       ];
@@ -79,19 +88,41 @@ const exportToCSV = (items: HistoryItem[], filename: string) => {
         `${order.side} (executed)`,
         order.orderNumber || order.id,
         order.symbol,
+        order.side,
+        '-',
+        '-',
         order.amount.toString(),
+        '-',
         'completed',
         new Date(order.timestamp).toISOString(),
       ];
-    } else {
+    } else if (item.itemType === 'pendingOrder') {
       const order = item as PendingOrder;
       return [
         `${order.side} (pending)`,
         order.orderNumber || order.id,
         order.symbol,
+        order.side,
+        '-',
+        '-',
         order.amount.toString(),
+        '-',
         'pending',
         new Date(order.timestamp).toISOString(),
+      ];
+    } else {
+      const position = item as ClosedPosition;
+      return [
+        'CFD Position',
+        position.contract_number,
+        position.symbol,
+        position.side,
+        position.entry_price.toString(),
+        position.close_price?.toString() || '-',
+        position.lot_size.toString(),
+        position.pnl?.toString() || '0',
+        position.status,
+        new Date(position.timestamp).toISOString(),
       ];
     }
   });
@@ -133,11 +164,12 @@ export default function HistoryPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reduxExecutedOrders, setReduxExecutedOrders] = useState<ReduxOrder[]>([]);
   const [reduxPendingOrders, setReduxPendingOrders] = useState<ReduxPendingOrder[]>([]);
+  const [closedPositions, setClosedPositions] = useState<Position[]>([]);
   const isFetchingRef = useRef(false);
 
   // Get data from Redux stores
   const accounts = useAppSelector((state) => state.account.accounts);
-  const authToken = useAppSelector((state) => state.auth.session?.access_token);
+  const authToken = useAppSelector((state) => state.auth.token);
 
   // Transform Redux orders to legacy format using adapters
   const executedOrders = useMemo(() => {
@@ -198,16 +230,58 @@ export default function HistoryPage() {
     fetchBatchHistory();
   }, [liveAccounts.length, authToken]);
 
+  // Fetch closed positions history
+  useEffect(() => {
+    const fetchClosedPositions = async () => {
+      if (liveAccounts.length === 0 || !authToken) return;
+
+      try {
+        // Fetch closed positions for all live accounts
+        const positionsPromises = liveAccounts.map(async (account) => {
+          const response = await apiFetch(`api/v1/contracts/history?account_id=${account.id}`, {
+            headers: {
+              'Authorization': `Bearer ${authToken}`,
+            },
+          });
+
+          if (!response.ok) {
+            console.error(`Failed to fetch closed positions for account ${account.id}`);
+            return { contracts: [], total_pnl: 0 };
+          }
+
+          const data = await response.json();
+          return data;
+        });
+
+        const results = await Promise.all(positionsPromises);
+
+        // Combine all closed positions from all accounts
+        const allClosedPositions = results.flatMap(result => result.contracts || []);
+
+        setClosedPositions(allClosedPositions);
+      } catch (error) {
+        console.error('Error fetching closed positions:', error);
+      }
+    };
+
+    fetchClosedPositions();
+  }, [liveAccounts, authToken]);
+
   // Combined and sorted history
   const allHistory = useMemo<HistoryItem[]>(() => {
     const items: HistoryItem[] = [
       ...transactions.map((t) => ({ ...t, itemType: 'transaction' as const })),
       ...executedOrders.map((o) => ({ ...o, itemType: 'executedOrder' as const })),
       ...pendingOrders.map((o) => ({ ...o, itemType: 'pendingOrder' as const })),
+      ...closedPositions.map((p) => ({
+        ...p,
+        timestamp: p.closed_at ? new Date(p.closed_at).getTime() : new Date(p.created_at).getTime(),
+        itemType: 'closedPosition' as const
+      })),
     ];
 
     return items.sort((a, b) => b.timestamp - a.timestamp);
-  }, [transactions, executedOrders, pendingOrders]);
+  }, [transactions, executedOrders, pendingOrders, closedPositions]);
 
   // Filter by tab
   const tabFilteredHistory = useMemo(() => {
@@ -218,6 +292,8 @@ export default function HistoryPage() {
         );
       case 'transactions':
         return allHistory.filter(item => item.itemType === 'transaction');
+      case 'positions':
+        return allHistory.filter(item => item.itemType === 'closedPosition');
       default:
         return allHistory;
     }
@@ -242,11 +318,17 @@ export default function HistoryPage() {
           return (order.orderNumber && order.orderNumber.toLowerCase().includes(query)) ||
                  order.symbol.toLowerCase().includes(query) ||
                  order.amount.toString().includes(query);
-        } else {
+        } else if (item.itemType === 'pendingOrder') {
           const order = item as PendingOrder;
           return (order.orderNumber && order.orderNumber.toLowerCase().includes(query)) ||
                  order.symbol.toLowerCase().includes(query) ||
                  order.amount.toString().includes(query);
+        } else {
+          const position = item as ClosedPosition;
+          return position.contract_number.toLowerCase().includes(query) ||
+                 position.symbol.toLowerCase().includes(query) ||
+                 position.side.toLowerCase().includes(query) ||
+                 (position.pnl && position.pnl.toString().includes(query));
         }
       });
     }
@@ -814,6 +896,16 @@ export default function HistoryPage() {
               }`}
             >
               Transactions ({transactions.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('positions')}
+              className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'positions'
+                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
+              }`}
+            >
+              Positions ({closedPositions.length})
             </button>
           </nav>
         </div>

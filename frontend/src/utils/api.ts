@@ -26,14 +26,30 @@ export function getApiUrl(path: string): string {
 }
 
 /**
- * Enhanced fetch with automatic API URL resolution
+ * Enhanced fetch with automatic API URL resolution and JWT token injection
  * @param path - API endpoint path
  * @param options - Fetch options
  * @returns Fetch promise
  */
 export async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
   const url = getApiUrl(path);
-  return fetch(url, options);
+  
+  // Get JWT token from localStorage
+  const token = localStorage.getItem('auth_token');
+  
+  // Inject Authorization header if token exists
+  const headers = new Headers(options?.headers || {});
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  
+  // Merge headers back into options
+  const enhancedOptions: RequestInit = {
+    ...options,
+    headers,
+  };
+  
+  return fetch(url, enhancedOptions);
 }
 
 // Export API_BASE_URL for debugging

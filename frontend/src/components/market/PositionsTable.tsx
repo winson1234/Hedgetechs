@@ -1,32 +1,10 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useAppSelector } from '../../store';
+import { useEffect, useMemo } from 'react';
+import { useAppSelector, useAppDispatch } from '../../store';
 import { formatCurrency } from '../../utils/formatters';
 import { ProductType } from '../../types';
-
-interface Position {
-  id: string;
-  user_id: string;
-  account_id: string;
-  symbol: string;
-  contract_number: string;
-  side: 'long' | 'short';
-  status: 'open' | 'closed' | 'liquidated';
-  lot_size: number;
-  entry_price: number;
-  margin_used: number;
-  leverage: number;
-  product_type?: 'spot' | 'cfd' | 'futures'; // Product type for the position
-  tp_price?: number | null;
-  sl_price?: number | null;
-  close_price?: number | null;
-  pnl?: number | null;
-  liquidation_price?: number | null;
-  swap: number;
-  commission: number;
-  created_at: string;
-  closed_at?: string | null;
-  updated_at: string;
-}
+import { fetchPositions, closePosition, updateAllPositionsPnL } from '../../store/slices/positionSlice';
+import { fetchAccounts } from '../../store/slices/accountSlice';
+import { addToast } from '../../store/slices/uiSlice';
 
 interface PositionsTableProps {
   filterByProductType: boolean;
@@ -34,47 +12,25 @@ interface PositionsTableProps {
 }
 
 export default function PositionsTable({ filterByProductType, selectedProductType }: PositionsTableProps) {
+  const dispatch = useAppDispatch();
   const { activeAccountId } = useAppSelector(state => state.account);
   const { currentPrices } = useAppSelector(state => state.price);
-  const session = useAppSelector(state => state.auth.session);
-
+  const { positions, loading, error } = useAppSelector(state => state.position);
   const positionsRefreshTrigger = useAppSelector(state => state.ui.positionsRefreshTrigger);
-  const [positions, setPositions] = useState<Position[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Fetch open positions
-  const fetchPositions = useCallback(async () => {
-    if (!activeAccountId || !session?.access_token) return;
-
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `/api/v1/contracts?account_id=${activeAccountId}&status=open`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (!response.ok) throw new Error('Failed to fetch positions');
-
-      const data = await response.json();
-      setPositions(data.contracts || []);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching positions:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch positions');
-    } finally {
-      setLoading(false);
-    }
-  }, [activeAccountId, session?.access_token]);
-
-  // Fetch positions on mount, when account changes, or when triggered
+  // Fetch positions when account changes or when triggered
   useEffect(() => {
-    fetchPositions();
-  }, [fetchPositions, positionsRefreshTrigger]);
+    if (activeAccountId) {
+      dispatch(fetchPositions({ accountId: activeAccountId, status: 'open' }));
+    }
+  }, [dispatch, activeAccountId, positionsRefreshTrigger]);
+
+  // Update all positions' P&L when prices change
+  useEffect(() => {
+    if (currentPrices && Object.keys(currentPrices).length > 0) {
+      dispatch(updateAllPositionsPnL(currentPrices));
+    }
+  }, [dispatch, currentPrices]);
 
   // Filter positions by product type
   const filteredPositions = useMemo(() =>
@@ -85,69 +41,79 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
     [positions, filterByProductType, selectedProductType]
   );
 
-  // Close position handler
+  // Close position handler with confirmation and hedged pair warning
   const handleClosePosition = async (contractId: string, symbol: string) => {
-    if (!session?.access_token) return;
+    // Get current market price for this symbol
+    const priceData = currentPrices[symbol];
+    const currentPrice = priceData?.price;
+
+    if (!currentPrice) {
+      dispatch(addToast({ message: 'Unable to get current market price. Please try again.', type: 'error' }));
+      return;
+    }
+
+    // Find the position to show P&L in confirmation
+    const position = positions.find(p => p.id === contractId);
+    if (!position) return;
+
+    const unrealizedPnL = position.unrealized_pnl || 0;
+    const pnlText = unrealizedPnL >= 0 ? `+${formatCurrency(unrealizedPnL, 'USD')}` : formatCurrency(unrealizedPnL, 'USD');
+
+    // Check if this position is part of a hedged pair
+    const isHedgedPosition = position.pair_id !== null && position.pair_id !== undefined;
+    const pairedPosition = isHedgedPosition ? positions.find(p => p.pair_id === position.pair_id && p.id !== position.id) : null;
+
+    // Show hedged pair warning if applicable
+    if (isHedgedPosition && pairedPosition && pairedPosition.status === 'open') {
+      const pairedPnL = pairedPosition.unrealized_pnl || 0;
+      const pairedPnLText = pairedPnL >= 0 ? `+${formatCurrency(pairedPnL, 'USD')}` : formatCurrency(pairedPnL, 'USD');
+
+      const warningConfirmed = window.confirm(
+        `⚠️ HEDGED PAIR WARNING ⚠️\n\n` +
+        `This position is part of a hedged pair!\n\n` +
+        `Closing Position:\n` +
+        `${position.side.toUpperCase()} ${position.symbol} - P&L: ${pnlText}\n\n` +
+        `Paired Position (will remain open):\n` +
+        `${pairedPosition.side.toUpperCase()} ${pairedPosition.symbol} - P&L: ${pairedPnLText}\n\n` +
+        `Closing only one leg will break your hedge and expose you to market risk.\n\n` +
+        `Do you want to continue closing ONLY this position?`
+      );
+
+      if (!warningConfirmed) return;
+    } else {
+      // Standard confirmation dialog
+      const confirmed = window.confirm(
+        `Close ${position.side.toUpperCase()} ${position.symbol} position?\n\n` +
+        `Current P&L: ${pnlText}\n` +
+        `Close Price: ${formatCurrency(currentPrice, 'USD')}`
+      );
+
+      if (!confirmed) return;
+    }
 
     try {
-      // Get current market price for this symbol
-      const priceData = currentPrices[symbol];
-      const currentPrice = priceData?.price;
+      // Dispatch close position action
+      await dispatch(closePosition({ contractId, closePrice: currentPrice })).unwrap();
 
-      if (!currentPrice) {
-        alert('Unable to get current market price. Please try again.');
-        return;
-      }
+      // Show success toast with P&L
+      dispatch(addToast({
+        message: `Position closed: ${pnlText}`,
+        type: 'success'
+      }));
 
-      const response = await fetch(`/api/v1/contracts/close?contract_id=${contractId}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          close_price: currentPrice,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to close position');
-      }
-
-      // Refresh positions after closing
-      await fetchPositions();
+      // Refresh account balance
+      dispatch(fetchAccounts());
     } catch (err) {
-      console.error('Error closing position:', err);
-      alert(err instanceof Error ? err.message : 'Failed to close position');
+      // Error toast is handled by the thunk rejection
+      dispatch(addToast({
+        message: err instanceof Error ? err.message : 'Failed to close position',
+        type: 'error'
+      }));
     }
   };
 
-  // Calculate real-time P&L for each position
-  const positionsWithPnL = useMemo(() => {
-    return filteredPositions.map(position => {
-      const priceData = currentPrices[position.symbol];
-      const currentPrice = priceData?.price || position.entry_price;
-
-      // Calculate unrealized P&L
-      let unrealizedPnL: number;
-      if (position.side === 'long') {
-        unrealizedPnL = (currentPrice - position.entry_price) * position.lot_size;
-      } else {
-        unrealizedPnL = (position.entry_price - currentPrice) * position.lot_size;
-      }
-
-      // Calculate ROE (Return on Equity) as percentage of margin
-      const roe = (unrealizedPnL / position.margin_used) * 100;
-
-      return {
-        ...position,
-        currentPrice,
-        unrealizedPnL,
-        roe,
-      };
-    });
-  }, [filteredPositions, currentPrices]);
+  // Positions already have P&L calculated by Redux, just use filteredPositions
+  const positionsWithPnL = filteredPositions;
 
   // Format timestamp to readable date
   const formatTimestamp = (timestamp: string) => {
@@ -288,7 +254,7 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                   <div className="flex justify-between">
                     <span className="text-slate-600 dark:text-slate-400">Current:</span>
                     <span className="font-medium text-slate-900 dark:text-slate-100">
-                      {formatCurrency(position.currentPrice, 'USD')}
+                      {formatCurrency(position.current_price || position.entry_price, 'USD')}
                     </span>
                   </div>
 
@@ -316,26 +282,26 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                       <span className="text-xs text-slate-600 dark:text-slate-400">Unrealized P&L:</span>
                       <span
                         className={`ml-2 text-sm font-bold ${
-                          position.unrealizedPnL >= 0
+                          (position.unrealized_pnl || 0) >= 0
                             ? 'text-green-600 dark:text-green-400'
                             : 'text-red-600 dark:text-red-400'
                         }`}
                       >
-                        {position.unrealizedPnL >= 0 ? '+' : ''}
-                        {formatCurrency(position.unrealizedPnL, 'USD')}
+                        {(position.unrealized_pnl || 0) >= 0 ? '+' : ''}
+                        {formatCurrency(position.unrealized_pnl || 0, 'USD')}
                       </span>
                     </div>
                     <div>
                       <span className="text-xs text-slate-600 dark:text-slate-400">ROE:</span>
                       <span
                         className={`ml-2 text-sm font-bold ${
-                          position.roe >= 0
+                          (position.roe || 0) >= 0
                             ? 'text-green-600 dark:text-green-400'
                             : 'text-red-600 dark:text-red-400'
                         }`}
                       >
-                        {position.roe >= 0 ? '+' : ''}
-                        {position.roe.toFixed(2)}%
+                        {(position.roe || 0) >= 0 ? '+' : ''}
+                        {(position.roe || 0).toFixed(2)}%
                       </span>
                     </div>
                   </div>

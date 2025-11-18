@@ -13,6 +13,7 @@ require (
 	github.com/redis/go-redis/v9 v9.16.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/stripe/stripe-go/v78 v78.12.0
+	golang.org/x/crypto v0.31.0
 	golang.org/x/time v0.14.0
 )
 
@@ -26,7 +27,6 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 )

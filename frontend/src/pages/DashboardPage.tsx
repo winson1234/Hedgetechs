@@ -65,7 +65,7 @@ const CRYPTO_FORMATTER = new Intl.NumberFormat('en-US', {
 
 export default function DashboardPage() {
   const dispatch = useAppDispatch();
-  const isLoggedIn = useAppSelector(state => !!state.auth.session);
+  const isLoggedIn = useAppSelector(state => !!state.auth.token);
   const user = useAppSelector(state => state.auth.user);
   const isDarkMode = useAppSelector(selectIsDarkMode);
   const currentPrices = useAppSelector(state => state.price.currentPrices);

@@ -128,20 +128,22 @@ useEffect(() => {
   }
 
   try {
-    // Combine first and last name for full name
-    const fullName = `${formData.firstName} ${formData.lastName}`.trim();
-
-    await dispatch(signUp({
+    const result = await dispatch(signUp({
       email: formData.email,
       password: formData.password,
-      fullName: fullName,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
       country: formData.country
     })).unwrap();
 
-    navigate('/profile');
+    // Show pending approval message
+    alert(`Registration submitted successfully!\n\n${result.message || 'Your account is pending admin approval. You will be notified via email once approved.'}`);
+    
+    // Redirect to login page
+    navigate('/login');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Registration failed';
-    alert(message);
+    alert(`Registration failed: ${message}`);
   }
   };
 

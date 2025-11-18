@@ -4,6 +4,7 @@ import { createDeposit } from '../slices/transactionSlice';
 import { fetchAccounts } from '../slices/accountSlice';
 import { addToast } from '../slices/uiSlice';
 import { updateForexQuote } from '../slices/forexSlice';
+import { removePosition } from '../slices/positionSlice';
 
 // WebSocket connection instance
 let ws: WebSocket | null = null;
@@ -128,6 +129,26 @@ export const websocketMiddleware: Middleware = (store) => {
           }));
 
           console.log(`[WebSocket] Order executed: ${orderNumber} - ${message}`);
+          return; // Don't process as price message
+        }
+
+        // Handle position closed notifications
+        if (data.type === 'position_closed') {
+          const contract = data.contract;
+          const accountId = data.account_id;
+
+          // Remove position from Redux store
+          if (contract && contract.id) {
+            store.dispatch(removePosition(contract.id));
+          }
+
+          // Refresh account balance
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (store.dispatch as any)(fetchAccounts()).catch((err: unknown) => {
+            console.error('Failed to fetch accounts after position close:', err);
+          });
+
+          console.log(`[WebSocket] Position closed: ${contract?.contract_number} on account ${accountId}`);
           return; // Don't process as price message
         }
 

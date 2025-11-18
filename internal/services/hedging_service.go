@@ -154,6 +154,43 @@ func (s *HedgingService) ClosePositionWithMarginRelease(
 		return fmt.Errorf("failed to close contract: %w", err)
 	}
 
+	// Create transaction record for the position closure (audit trail)
+	var transactionNumber string
+	err = tx.QueryRow(ctx, "SELECT generate_transaction_number()").Scan(&transactionNumber)
+	if err != nil {
+		return fmt.Errorf("failed to generate transaction number: %w", err)
+	}
+
+	transactionID := uuid.New()
+	description := fmt.Sprintf("Position closed: %s %s (Contract %s)", contract.Side, contract.Symbol, contract.ContractNumber)
+
+	_, err = tx.Exec(ctx,
+		`INSERT INTO transactions (id, account_id, transaction_number, type, currency, amount, status, contract_id, description, metadata, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`,
+		transactionID,
+		contract.AccountID,
+		transactionNumber,
+		models.TransactionTypePositionClose,
+		accountCurrency,
+		pnl, // Realized P&L
+		models.TransactionStatusCompleted,
+		contractID,
+		description,
+		map[string]interface{}{
+			"entry_price":  contract.EntryPrice,
+			"close_price":  closePrice,
+			"lot_size":     contract.LotSize,
+			"leverage":     contract.Leverage,
+			"margin_used":  contract.MarginUsed,
+			"swap":         contract.Swap,
+			"commission":   contract.Commission,
+			"total_return": totalReturn,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create position close transaction: %w", err)
+	}
+
 	// If this contract is part of a hedged pair, log the partial closure
 	if pairID.Valid {
 		pairUUID, _ := uuid.Parse(pairID.String)
@@ -205,6 +242,13 @@ func (s *HedgingService) CloseEntirePair(
 	}
 	defer tx.Rollback(ctx)
 
+	// Fetch account currency
+	var accountCurrency string
+	err = tx.QueryRow(ctx, "SELECT currency FROM accounts WHERE id = $1", pair.LongContract.AccountID).Scan(&accountCurrency)
+	if err != nil {
+		return fmt.Errorf("failed to fetch account currency: %w", err)
+	}
+
 	// Close both positions
 	for _, contract := range []models.Contract{pair.LongContract, pair.ShortContract} {
 		pnl := s.calculatePnL(contract.Side, contract.LotSize, contract.EntryPrice, closePrice)
@@ -213,8 +257,8 @@ func (s *HedgingService) CloseEntirePair(
 		// Release margin
 		_, err = tx.Exec(ctx,
 			`UPDATE balances SET amount = amount + $1, updated_at = NOW()
-			 WHERE account_id = $2 AND currency = 'USDT'`, // Assuming USDT for now
-			totalReturn, contract.AccountID,
+			 WHERE account_id = $2 AND currency = $3`,
+			totalReturn, contract.AccountID, accountCurrency,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to release margin for contract %s: %w", contract.ContractNumber, err)
@@ -229,6 +273,45 @@ func (s *HedgingService) CloseEntirePair(
 		)
 		if err != nil {
 			return fmt.Errorf("failed to close contract %s: %w", contract.ContractNumber, err)
+		}
+
+		// Create transaction record for each position closure
+		var transactionNumber string
+		err = tx.QueryRow(ctx, "SELECT generate_transaction_number()").Scan(&transactionNumber)
+		if err != nil {
+			return fmt.Errorf("failed to generate transaction number: %w", err)
+		}
+
+		transactionID := uuid.New()
+		description := fmt.Sprintf("Position closed: %s %s (Contract %s) - Hedged pair closure", contract.Side, contract.Symbol, contract.ContractNumber)
+
+		_, err = tx.Exec(ctx,
+			`INSERT INTO transactions (id, account_id, transaction_number, type, currency, amount, status, contract_id, description, metadata, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`,
+			transactionID,
+			contract.AccountID,
+			transactionNumber,
+			models.TransactionTypePositionClose,
+			accountCurrency,
+			pnl,
+			models.TransactionStatusCompleted,
+			contract.ID,
+			description,
+			map[string]interface{}{
+				"entry_price":  contract.EntryPrice,
+				"close_price":  closePrice,
+				"lot_size":     contract.LotSize,
+				"leverage":     contract.Leverage,
+				"margin_used":  contract.MarginUsed,
+				"swap":         contract.Swap,
+				"commission":   contract.Commission,
+				"total_return": totalReturn,
+				"pair_id":      pairID.String(),
+				"pair_closure": true,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create position close transaction for contract %s: %w", contract.ContractNumber, err)
 		}
 	}
 

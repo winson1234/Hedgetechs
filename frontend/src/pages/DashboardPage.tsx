@@ -8,7 +8,6 @@ import { clearOrders } from '../store/slices/orderSlice';
 import MiniSparklineChart from '../components/MiniSparklineChart';
 import { getApiUrl } from '../config/api';
 import { useScrollAnimations } from '../hooks/useScrollAnimations';
-import { useLenisScroll } from '../hooks/useLenisScroll';
 import { useGSAPScrollAnimations } from '../hooks/useGSAPScrollAnimations';
 import { useMicroParallax } from '../hooks/useMicroParallax';
 import { useCursorParallax } from '../hooks/useCursorParallax';
@@ -16,7 +15,6 @@ import { useFloatingAnimation } from '../hooks/useFloatingAnimation';
 import { useGlowPulse } from '../hooks/useGlowPulse';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import 'lenis/dist/lenis.css';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -72,8 +70,7 @@ export default function DashboardPage() {
   const isDarkMode = useAppSelector(selectIsDarkMode);
   const currentPrices = useAppSelector(state => state.price.currentPrices);
   
-  // Initialize premium scroll system
-  const lenisInstance = useLenisScroll();
+  // Initialize scroll animations
   useGSAPScrollAnimations();
   useMicroParallax();
 
@@ -662,46 +659,11 @@ const cancelLogout = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [activeNewsTab]);
-// Add this useEffect hook to your DashboardPage component
-// Place it after your other useEffect hooks
-
+// Header scroll detection - add 'scrolled' class when scrolled
 useEffect(() => {
-  // Header scroll effect - Force relative positioning
   const header = document.querySelector('.header') as HTMLElement;
   
   if (!header) return;
-  
-  // Force relative positioning immediately and continuously
-  const forceRelativePosition = () => {
-    if (header) {
-      // Remove any fixed positioning first
-      header.style.removeProperty('position');
-      header.style.removeProperty('top');
-      header.style.removeProperty('left');
-      header.style.removeProperty('right');
-      header.style.removeProperty('bottom');
-      header.style.removeProperty('transform');
-      
-      // Set relative positioning with important
-      header.style.setProperty('position', 'relative', 'important');
-      header.style.setProperty('top', 'auto', 'important');
-      header.style.setProperty('left', 'auto', 'important');
-      header.style.setProperty('right', 'auto', 'important');
-      header.style.setProperty('transform', 'none', 'important');
-      header.style.setProperty('will-change', 'auto', 'important');
-    }
-  };
-  
-  // Force immediately
-  forceRelativePosition();
-  
-  // Force on every animation frame to override any other code
-  let rafId: number | null = null;
-  const forceLoop = () => {
-    forceRelativePosition();
-    rafId = requestAnimationFrame(forceLoop);
-  };
-  rafId = requestAnimationFrame(forceLoop);
   
   let ticking = false;
 
@@ -710,11 +672,9 @@ useEffect(() => {
     
     if (!ticking) {
       window.requestAnimationFrame(() => {
-        // Force position again
-        forceRelativePosition();
-        
-        // Add 'scrolled' class when scrolled down more than 20px
-        if (scrollTop > 20) {
+        // Add 'scrolled' class when scrolled down more than 150px
+        // This allows the header to scroll with the page first, then stick to top
+        if (scrollTop > 150) {
           header?.classList.add('scrolled');
         } else {
           header?.classList.remove('scrolled');
@@ -735,12 +695,9 @@ useEffect(() => {
 
   // Cleanup
   return () => {
-    if (rafId !== null && typeof rafId === 'number') {
-      cancelAnimationFrame(rafId);
-    }
     window.removeEventListener('scroll', handleScroll);
   };
-  }, []);
+}, []);
 
   // Position crypto menu dynamically and close when clicking outside
   useEffect(() => {
@@ -806,11 +763,6 @@ useEffect(() => {
   // Prevent body scroll when logout modal is open
   useEffect(() => {
     if (showLogoutModal) {
-      // Disable Lenis smooth scroll if available
-      if (lenisInstance) {
-        lenisInstance.stop();
-      }
-      
       // Save current scroll position
       const scrollY = window.scrollY || document.documentElement.scrollTop;
       
@@ -824,11 +776,6 @@ useEffect(() => {
       // Also prevent touch scrolling on mobile
       document.body.style.touchAction = 'none';
     } else {
-      // Re-enable Lenis smooth scroll if available
-      if (lenisInstance) {
-        lenisInstance.start();
-      }
-      
       // Restore scroll position
       const scrollY = document.body.style.top;
       document.body.style.position = '';
@@ -843,7 +790,7 @@ useEffect(() => {
         window.scrollTo(0, savedScrollY);
       }
     }
-  }, [showLogoutModal, lenisInstance]);
+  }, [showLogoutModal]);
 
 
   // Handler for crypto page changes
@@ -896,20 +843,13 @@ useEffect(() => {
   };
 
   return (
-    <div className="dashboard-page">
-      {/* Header */}
-      <header 
-        className="header"
-        data-lenis-prevent
-        data-scroll
-        style={{
-          position: 'relative',
-          top: 'auto',
-          left: 'auto',
-          right: 'auto',
-          transform: 'none',
-        }}
-      >
+    <>
+      <div className="dashboard-page">
+        {/* Header */}
+        <header 
+          className="header"
+          data-scroll
+        >
         <div className="container">
           <div className="nav-wrapper">
             <div className="logo">
@@ -1816,7 +1756,6 @@ useEffect(() => {
                         <ul 
                           ref={cryptoMenuListRef}
                           className="crypto-menu show"
-                          data-lenis-prevent
                           onWheel={(e) => {
                             e.stopPropagation();
                             const target = e.currentTarget;
@@ -2129,6 +2068,7 @@ useEffect(() => {
 )}
 
 
-    </div>
+      </div>
+    </>
   );
 }

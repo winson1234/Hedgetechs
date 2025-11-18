@@ -843,3 +843,133 @@
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   border: 1px solid var(--border-color);
 }
+
+/* ===========================
+   LIGHT MODE OVERRIDE - KEEP TRADING CARD DARK
+   =========================== */
+
+/* Keep trading card mockup exactly the same in light mode as dark mode */
+body.light-mode .trading-card-mockup {
+  background: linear-gradient(135deg, #1a1f3a, #0f1423) !important;
+  border: 1px solid #2a2f4a !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+}
+
+body.light-mode .trading-card-mockup .price-label {
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .price-value {
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .price-value span {
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .price-meta {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+body.light-mode .trading-card-mockup .input-field {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid #2a2f4a !important;
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .input-field input {
+  background: transparent !important;
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .input-field input::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+body.light-mode .trading-card-mockup .currency-selector {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .currency-selector select {
+  background: transparent !important;
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .currency-selector select option {
+  color: #0f1423 !important;
+  background: white !important;
+}
+
+body.light-mode .trading-card-mockup .crypto-selector {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+body.light-mode .trading-card-mockup .crypto-selector-btn {
+  background: transparent !important;
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .crypto-selector-btn .crypto-icon,
+body.light-mode .trading-card-mockup .crypto-selector-btn .crypto-label {
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .crypto-selector-btn svg {
+  stroke: white !important;
+}
+
+body.light-mode .trading-card-mockup .crypto-menu {
+  background: linear-gradient(135deg, #1a1f3a, #0f1423) !important;
+  border: 1px solid #2a2f4a !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+}
+
+body.light-mode .trading-card-mockup .crypto-menu li {
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .crypto-menu li:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+body.light-mode .trading-card-mockup .crypto-menu li.selected {
+  background: rgba(0, 102, 255, 0.2) !important;
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .crypto-menu li .crypto-icon {
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .card-tab {
+  color: #a0a0b8 !important;
+}
+
+body.light-mode .trading-card-mockup .card-tab.active {
+  background: #0066ff !important;
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .buy-now-btn {
+  background: #0066ff !important;
+  color: white !important;
+}
+
+body.light-mode .trading-card-mockup .buy-now-btn:hover {
+  background: #0052cc !important;
+  box-shadow: 0 8px 24px rgba(0, 102, 255, 0.4) !important;
+}
+
+body.light-mode .trading-card-mockup .buy-now-btn:disabled {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+body.light-mode .trading-card-mockup .rate-error {
+  color: #ffb86c !important;
+}
+
+body.light-mode .trading-card-mockup .currency-icon {
+  color: white !important;
+}

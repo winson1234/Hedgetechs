@@ -85,7 +85,7 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		initialBalance = 0 // Start with 0 balance
 	}
 
-	// Determine status: first account should be 'online', others 'offline'
+	// Determine status: first account should be 'active', others 'deactivated'
 	var accountStatus string
 	var existingCount int
 	err = tx.QueryRow(ctx, "SELECT COUNT(*) FROM accounts WHERE user_id = $1", userID).Scan(&existingCount)
@@ -96,9 +96,9 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if existingCount == 0 {
-		accountStatus = "online" // First account is online by default
+		accountStatus = "active" // First account is active by default
 	} else {
-		accountStatus = "offline" // Additional accounts start offline
+		accountStatus = "deactivated" // Additional accounts start deactivated
 	}
 
 	// Insert account into database (new schema: account_id, account_type, balance, status)
@@ -132,8 +132,8 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update user's is_active status if this is the first account and it's online
-	if accountStatus == "online" {
+	// Update user's is_active status if this is the first account and it's active
+	if accountStatus == "active" {
 		_, err = tx.Exec(ctx, "UPDATE users SET is_active = true WHERE id = $1", userID)
 		if err != nil {
 			log.Printf("Failed to update user is_active status: %v", err)
@@ -221,7 +221,8 @@ func GetAccounts(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Set account_number to account_id for backward compatibility
+		// Populate both account_id (new) and account_number (deprecated) fields
+		account.AccountID = accountIDStr
 		account.AccountNumber = accountIDStr
 
 		// Fetch balances for this account
@@ -288,7 +289,7 @@ func getAccountByID(ctx context.Context, pool DBQuerier, accountID, userID uuid.
 	var lastUpdated, lastLogin *time.Time
 
 	err := pool.QueryRow(ctx,
-		`SELECT id, user_id, account_id, account_type, currency, balance, status, 
+		`SELECT id, user_id, account_id, account_type, currency, balance, status,
 		        last_updated, last_login, created_at
 		 FROM accounts
 		 WHERE id = $1 AND user_id = $2`,
@@ -302,7 +303,8 @@ func getAccountByID(ctx context.Context, pool DBQuerier, accountID, userID uuid.
 		return account, fmt.Errorf("failed to fetch account: %w", err)
 	}
 
-	// Set account_number to account_id for backward compatibility
+	// Populate both account_id (new) and account_number (deprecated) fields
+	account.AccountID = accountIDStr
 	account.AccountNumber = accountIDStr
 
 	// Fetch balances (still used for multi-currency support)

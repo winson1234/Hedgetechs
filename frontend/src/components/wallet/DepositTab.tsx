@@ -850,7 +850,7 @@ function DepositTab() {
                 const balance = acc.balances.find(b => b.currency === acc.currency);
                 return (
                   <option key={acc.id} value={acc.id}>
-                    {acc.id} - {formatCurrency(balance?.amount || 0, acc.currency)}
+                    {acc.account_id} - {formatCurrency(balance?.amount || 0, acc.currency)}
                   </option>
                 );
               })}
@@ -990,7 +990,7 @@ function DepositTab() {
                 const balance = acc.balances.find(b => b.currency === acc.currency);
                 return (
                   <option key={acc.id} value={acc.id}>
-                    {acc.id} - {formatCurrency(balance?.amount || 0, acc.currency)}
+                    {acc.account_id} - {formatCurrency(balance?.amount || 0, acc.currency)}
                   </option>
                 );
               })}
@@ -1136,7 +1136,7 @@ function DepositTab() {
                 const balance = acc.balances.find(b => b.currency === acc.currency);
                 return (
                   <option key={acc.id} value={acc.id}>
-                    {acc.id} - {formatCurrency(balance?.amount || 0, acc.currency)}
+                    {acc.account_id} - {formatCurrency(balance?.amount || 0, acc.currency)}
                   </option>
                 );
               })}

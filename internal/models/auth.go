@@ -54,3 +54,42 @@ type RegisterResponse struct {
 	Message string `json:"message"`
 	Success bool   `json:"success"`
 }
+
+// ForgotPasswordRequest represents the forgot password request payload
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+// ForgotPasswordResponse represents the forgot password response
+type ForgotPasswordResponse struct {
+	Message string `json:"message"`
+	Status  string `json:"status"` // success, pending, rejected, not_found
+	Success bool   `json:"success"`
+	OTP     string `json:"otp,omitempty"` // Only included in development mode
+}
+
+// VerifyOTPRequest represents the OTP verification request payload
+type VerifyOTPRequest struct {
+	Email string `json:"email"`
+	OTP   string `json:"otp"`
+}
+
+// VerifyOTPResponse represents the OTP verification response
+type VerifyOTPResponse struct {
+	Message      string `json:"message"`
+	Success      bool   `json:"success"`
+	ResetToken   string `json:"reset_token,omitempty"`
+}
+
+// ResetPasswordRequest represents the reset password request payload
+type ResetPasswordRequest struct {
+	Email       string `json:"email"`
+	ResetToken  string `json:"reset_token"`
+	NewPassword string `json:"new_password"`
+}
+
+// ResetPasswordResponse represents the reset password response
+type ResetPasswordResponse struct {
+	Message string `json:"message"`
+	Success bool   `json:"success"`
+}

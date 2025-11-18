@@ -177,10 +177,10 @@ CREATE INDEX IF NOT EXISTS idx_accounts_account_id ON accounts(account_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_status ON accounts(status);
 
 -- ============================================================================
--- STEP 5: Create pending_registrationss Table
+-- STEP 5: Create pending_registrations Table
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS pending_registrationss (
+CREATE TABLE IF NOT EXISTS pending_registrations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
@@ -196,17 +196,17 @@ CREATE TABLE IF NOT EXISTS pending_registrationss (
 );
 
 -- Create indexes
-CREATE INDEX idx_pending_registrationss_email ON pending_registrationss(email);
-CREATE INDEX idx_pending_registrationss_status ON pending_registrationss(status);
-CREATE INDEX idx_pending_registrationss_created_at ON pending_registrationss(created_at DESC);
+CREATE INDEX idx_pending_registrations_email ON pending_registrations(email);
+CREATE INDEX idx_pending_registrations_status ON pending_registrations(status);
+CREATE INDEX idx_pending_registrations_created_at ON pending_registrations(created_at DESC);
 
 -- Add trigger for updated_at
-CREATE TRIGGER update_pending_registrationss_updated_at
-    BEFORE UPDATE ON pending_registrationss
+CREATE TRIGGER update_pending_registrations_updated_at
+    BEFORE UPDATE ON pending_registrations
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-COMMENT ON TABLE pending_registrationss IS 'User registrations awaiting admin approval';
+COMMENT ON TABLE pending_registrations IS 'User registrations awaiting admin approval';
 -- ============================================================================
 -- STEP 6: Create order_history Table
 -- ============================================================================
@@ -320,7 +320,7 @@ BEGIN
     RAISE NOTICE '  - Removed Supabase Auth integration';
     RAISE NOTICE '  - Restructured users table with custom auth fields';
     RAISE NOTICE '  - Restructured accounts table with balance reference';
-    RAISE NOTICE '  - Created pending_registrationss table';
+    RAISE NOTICE '  - Created pending_registrations table';
     RAISE NOTICE '  - Created order_history table';
     RAISE NOTICE '  - All existing data preserved';
 END $$;

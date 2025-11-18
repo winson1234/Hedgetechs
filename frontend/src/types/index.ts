@@ -22,7 +22,7 @@ export type Account = {
 export type BackendAccount = {
   id: string
   user_id: string
-  account_number: string
+  account_id: string
   type: 'live' | 'demo'
   product_type: ProductType
   currency: string

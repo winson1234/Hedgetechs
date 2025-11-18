@@ -168,6 +168,14 @@ export default function PendingOrdersTab({ filterByProductType, selectedProductT
                       {formatTimestamp(order.created_at)}
                     </span>
                   </div>
+                  {order.order_number && (
+                    <div className="flex justify-between text-xs mt-1">
+                      <span className="text-slate-400 dark:text-slate-500">Order ID:</span>
+                      <span className="text-slate-400 dark:text-slate-500 font-mono text-[11px]">
+                        {order.order_number}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

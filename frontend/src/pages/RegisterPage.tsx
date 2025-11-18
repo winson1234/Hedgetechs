@@ -14,6 +14,7 @@ export default function RegisterPage() {
     firstName: '',
     lastName: '',
     email: '',
+    phoneNumber: '',
     password: '',
     retypePassword: ''
   });
@@ -133,6 +134,7 @@ useEffect(() => {
       password: formData.password,
       firstName: formData.firstName,
       lastName: formData.lastName,
+      phoneNumber: formData.phoneNumber,
       country: formData.country
     })).unwrap();
 
@@ -200,6 +202,18 @@ useEffect(() => {
               <label className="form-label">Email Address <span className="required">*</span></label>
               <input type="email" id="email" value={formData.email} onChange={handleChange} required />
               {emailError && <div className="error-message show">Please enter a valid email address</div>}
+            </div>
+
+            {/* Phone Number */}
+            <div className="form-group">
+              <label className="form-label">Phone Number</label>
+              <input
+                type="tel"
+                id="phoneNumber"
+                placeholder="+60123456789"
+                value={formData.phoneNumber}
+                onChange={handleChange}
+              />
             </div>
 
             {/* Password */}

@@ -311,7 +311,7 @@ func main() {
 
 	// ========== AUTHENTICATION ENDPOINTS (Public - No Auth Required) ==========
 
-	// POST /api/v1/auth/register - User registration (creates pending_registrationss record)
+	// POST /api/v1/auth/register - User registration (creates pending_registrations record)
 	http.HandleFunc("/api/v1/auth/register", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
@@ -325,7 +325,7 @@ func main() {
 		}
 	})
 
-	// POST /api/v1/auth/login - User login (verifies pending_registrationss status, creates user if approved)
+	// POST /api/v1/auth/login - User login (verifies pending_registrations status, creates user if approved)
 	http.HandleFunc("/api/v1/auth/login", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
@@ -344,6 +344,48 @@ func main() {
 		switch r.Method {
 		case http.MethodPost:
 			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleCheckStatus))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/auth/forgot-password - Request password reset OTP
+	http.HandleFunc("/api/v1/auth/forgot-password", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleForgotPassword))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/auth/verify-otp - Verify OTP and get reset token
+	http.HandleFunc("/api/v1/auth/verify-otp", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleVerifyOTP))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/auth/reset-password - Reset password with token
+	http.HandleFunc("/api/v1/auth/reset-password", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleResetPassword))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)

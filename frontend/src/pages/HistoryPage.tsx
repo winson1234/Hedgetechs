@@ -86,7 +86,7 @@ const exportToCSV = (items: HistoryItem[], filename: string) => {
       const order = item as ExecutedOrder;
       return [
         `${order.side} (executed)`,
-        order.orderNumber || order.id,
+        order.orderNumber || 'N/A',
         order.symbol,
         order.side,
         '-',
@@ -100,7 +100,7 @@ const exportToCSV = (items: HistoryItem[], filename: string) => {
       const order = item as PendingOrder;
       return [
         `${order.side} (pending)`,
-        order.orderNumber || order.id,
+        order.orderNumber || 'N/A',
         order.symbol,
         order.side,
         '-',
@@ -245,7 +245,7 @@ export default function HistoryPage() {
           });
 
           if (!response.ok) {
-            console.error(`Failed to fetch closed positions for account ${account.id}`);
+            console.error(`Failed to fetch closed positions for account ${account.account_id || account.id}`);
             return { contracts: [], total_pnl: 0 };
           }
 
@@ -535,7 +535,7 @@ export default function HistoryPage() {
                 {txn.description || (txn.metadata?.cardBrand && txn.metadata?.last4
                   ? `${txn.metadata.cardBrand.toUpperCase()} •••• ${txn.metadata.last4}`
                   : 'Card payment')}
-                {!txn.description && account && ` → Account ${account.account_number}`}
+                {!txn.description && account && ` → Account ${account.account_id}`}
               </p>
             </div>
           );
@@ -546,7 +546,7 @@ export default function HistoryPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 {txn.description || (txn.metadata?.bankName || 'Bank')}
                 {!txn.description && txn.metadata?.accountLast4 && ` •••• ${txn.metadata.accountLast4}`}
-                {!txn.description && account && ` ← Account ${account.account_number}`}
+                {!txn.description && account && ` ← Account ${account.account_id}`}
               </p>
             </div>
           );

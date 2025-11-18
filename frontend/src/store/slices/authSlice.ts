@@ -30,12 +30,14 @@ export const signUp = createAsyncThunk(
     password,
     firstName,
     lastName,
+    phoneNumber,
     country
   }: {
     email: string;
     password: string;
     firstName: string;
     lastName: string;
+    phoneNumber?: string;
     country: string;
   }, { rejectWithValue }) => {
     try {
@@ -44,6 +46,7 @@ export const signUp = createAsyncThunk(
         password,
         first_name: firstName,
         last_name: lastName,
+        phone_number: phoneNumber,
         country,
       });
 

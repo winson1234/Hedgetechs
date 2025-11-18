@@ -17,7 +17,7 @@ interface Balance {
 interface Account {
   id: string;
   user_id: string;
-  account_number: string;
+  account_id: string;
   type: 'live' | 'demo';
   product_type: 'spot' | 'cfd' | 'futures';
   currency: string;

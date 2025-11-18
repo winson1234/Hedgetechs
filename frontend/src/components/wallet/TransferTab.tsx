@@ -261,7 +261,7 @@ function TransferTab() {
               const balance = acc.balances.find(b => b.currency === acc.currency);
               return (
                 <option key={acc.id} value={acc.id}>
-                  {acc.id} ({acc.type}) - {formatCurrency(balance?.amount || 0, acc.currency)}
+                  {acc.account_id} ({acc.type}) - {formatCurrency(balance?.amount || 0, acc.currency)}
                 </option>
               );
             })}
@@ -293,7 +293,7 @@ function TransferTab() {
               const balance = acc.balances.find(b => b.currency === acc.currency);
               return (
                 <option key={acc.id} value={acc.id}>
-                  {acc.id} ({acc.type}) - {formatCurrency(balance?.amount || 0, acc.currency)}
+                  {acc.account_id} ({acc.type}) - {formatCurrency(balance?.amount || 0, acc.currency)}
                 </option>
               );
             })}

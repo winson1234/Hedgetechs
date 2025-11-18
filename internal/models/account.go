@@ -65,7 +65,8 @@ type User struct {
 type Account struct {
 	ID            uuid.UUID     `json:"id"`
 	UserID        uuid.UUID     `json:"user_id"`
-	AccountNumber string        `json:"account_number"`
+	AccountID     string        `json:"account_id"`            // Human-readable sequential ID (ACC-1000001)
+	AccountNumber string        `json:"account_number"`        // DEPRECATED: Alias for account_id (backward compatibility)
 	Type          AccountType   `json:"type"`
 	ProductType   *ProductType  `json:"product_type,omitempty"` // NULLABLE: Universal accounts have NULL product_type
 	Currency      string        `json:"currency"`

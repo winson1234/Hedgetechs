@@ -12,8 +12,8 @@ DROP TABLE IF EXISTS order_history CASCADE;
 DROP FUNCTION IF EXISTS generate_order_history_id();
 DROP SEQUENCE IF EXISTS order_history_id_seq;
 
-DROP TRIGGER IF EXISTS update_pending_registrationss_updated_at ON pending_registrationss;
-DROP TABLE IF EXISTS pending_registrationss CASCADE;
+DROP TRIGGER IF EXISTS update_pending_registrations_updated_at ON pending_registrations;
+DROP TABLE IF EXISTS pending_registrations CASCADE;
 
 -- ============================================================================
 -- STEP 2: Drop Account Balance Sync Trigger
@@ -289,7 +289,7 @@ BEGIN
     RAISE NOTICE 'Rollback 000008_restructure_auth_system completed';
     RAISE NOTICE 'WARNING: Custom authentication data may have been lost';
     RAISE NOTICE 'Summary:';
-    RAISE NOTICE '  - Dropped pending_registrationss table';
+    RAISE NOTICE '  - Dropped pending_registrations table';
     RAISE NOTICE '  - Dropped order_history table';
     RAISE NOTICE '  - Reverted users table to Supabase auth structure';
     RAISE NOTICE '  - Reverted accounts table structure';

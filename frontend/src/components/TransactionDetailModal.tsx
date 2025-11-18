@@ -40,10 +40,10 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
   // Get accounts from Redux store to look up account numbers
   const accounts = useAppSelector((state) => state.account.accounts);
 
-  // Helper function to get account number from account ID
+  // Helper function to get account ID from account UUID
   const getAccountNumber = (accountId: string): string => {
     const account = accounts.find(acc => acc.id === accountId);
-    return account?.account_number || accountId;
+    return account?.account_id || 'Unknown Account';
   };
 
   if (!item) return null;
@@ -283,9 +283,9 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
             <div>
               <p className="text-slate-500 dark:text-slate-400">Order Number</p>
               <div className="flex items-center gap-2">
-                <p className="font-mono text-xs text-slate-900 dark:text-slate-100">{order.orderNumber || order.id}</p>
+                <p className="font-mono text-xs text-slate-900 dark:text-slate-100">{order.orderNumber || 'N/A'}</p>
                 <button
-                  onClick={() => copyToClipboard(order.orderNumber || order.id)}
+                  onClick={() => copyToClipboard(order.orderNumber || 'N/A')}
                   className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
                   title="Copy Order Number"
                 >
@@ -356,9 +356,9 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
             <div>
               <p className="text-slate-500 dark:text-slate-400">Order Number</p>
               <div className="flex items-center gap-2">
-                <p className="font-mono text-xs text-slate-900 dark:text-slate-100">{order.orderNumber || order.id}</p>
+                <p className="font-mono text-xs text-slate-900 dark:text-slate-100">{order.orderNumber || 'N/A'}</p>
                 <button
-                  onClick={() => copyToClipboard(order.orderNumber || order.id)}
+                  onClick={() => copyToClipboard(order.orderNumber || 'N/A')}
                   className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
                   title="Copy Order Number"
                 >

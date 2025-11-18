@@ -215,10 +215,11 @@ func GetPendingOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build query with optional product_type filter
+	// CRITICAL FIX: Only return orders with status = 'pending' (exclude executed, cancelled, failed)
 	query := `SELECT id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price,
 	                 leverage, product_type, status, executed_at, executed_price, failure_reason, created_at, updated_at, order_number
 	          FROM pending_orders
-	          WHERE account_id = $1`
+	          WHERE account_id = $1 AND status = 'pending'`
 
 	args := []interface{}{accountID}
 
@@ -329,7 +330,21 @@ func CancelPendingOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if orderStatus != models.PendingOrderStatusPending {
-		respondWithJSONError(w, http.StatusBadRequest, "invalid_status", fmt.Sprintf("cannot cancel order with status: %s", orderStatus))
+		// Provide user-friendly error messages based on order status
+		var message string
+		switch orderStatus {
+		case models.PendingOrderStatusExecuted:
+			message = "This order has already been executed and cannot be cancelled"
+		case models.PendingOrderStatusCancelled:
+			message = "This order is already cancelled"
+		case models.PendingOrderStatusFailed:
+			message = "This order has failed and cannot be cancelled"
+		case models.PendingOrderStatusExpired:
+			message = "This order has expired and cannot be cancelled"
+		default:
+			message = fmt.Sprintf("Cannot cancel order with status: %s", orderStatus)
+		}
+		respondWithJSONError(w, http.StatusBadRequest, "invalid_status", message)
 		return
 	}
 

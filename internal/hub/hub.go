@@ -39,6 +39,17 @@ func NewHub() *Hub {
 	}
 }
 
+// BroadcastMessage sends a message to all connected clients via the Broadcast channel
+// This method provides a cleaner interface for sending messages from other packages
+func (h *Hub) BroadcastMessage(message []byte) {
+	select {
+	case h.Broadcast <- message:
+		// Successfully queued for broadcast
+	default:
+		log.Printf("WARNING: Broadcast channel full, dropping message")
+	}
+}
+
 // Run starts the hub's message processing loops.
 func (h *Hub) Run() {
 	log.Println("Hub started")

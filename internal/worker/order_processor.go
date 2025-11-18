@@ -19,10 +19,16 @@ import (
 // This is an event-driven worker that receives messages through a dedicated channel
 type OrderProcessor struct {
 	db                  *pgxpool.Pool
+	hub                 Hub              // Hub for broadcasting order execution notifications to WebSocket clients
 	MessageChannel      chan []byte      // Channel to receive raw messages (fed by main.go)
 	priceData           chan PriceUpdate // Channel to receive parsed price updates
 	quit                chan bool         // Channel to signal shutdown
 	liquidationService  *services.LiquidationService // Service for automatic liquidations
+}
+
+// Hub interface for broadcasting messages (allows dependency injection and testing)
+type Hub interface {
+	BroadcastMessage(message []byte)
 }
 
 // PriceUpdate represents a parsed price message from Binance
@@ -32,9 +38,10 @@ type PriceUpdate struct {
 }
 
 // NewOrderProcessor creates a new order processor instance
-func NewOrderProcessor(db *pgxpool.Pool) *OrderProcessor {
+func NewOrderProcessor(db *pgxpool.Pool, hub Hub) *OrderProcessor {
 	return &OrderProcessor{
 		db:                 db,
+		hub:                hub,
 		MessageChannel:     make(chan []byte, 8192),      // Increased buffer to match hub's broadcast channel
 		priceData:          make(chan PriceUpdate, 256), // Buffered channel for parsed price updates
 		quit:               make(chan bool),
@@ -261,6 +268,27 @@ func (op *OrderProcessor) executePendingOrder(ctx context.Context, order models.
 
 	log.Printf("Executed pending order %s: %s %.8f %s at %.8f (leverage: %dx)",
 		order.ID, order.Side, order.Quantity, order.Symbol, executionPrice, order.Leverage)
+
+	// Broadcast order execution notification to WebSocket clients
+	// This notifies the frontend to show a toast: "Your BUY limit order for 0.025 BTC at $100,000 has been executed"
+	notificationMsg := map[string]interface{}{
+		"type":            "order_executed",
+		"user_id":         order.UserID.String(), // For frontend filtering
+		"order_id":        order.ID.String(),
+		"order_number":    orderNumber,
+		"symbol":          order.Symbol,
+		"side":            order.Side,
+		"quantity":        fmt.Sprintf("%.8f", order.Quantity),
+		"execution_price": fmt.Sprintf("%.2f", executionPrice),
+		"product_type":    order.ProductType,
+		"leverage":        order.Leverage,
+	}
+	if msgBytes, err := json.Marshal(notificationMsg); err == nil {
+		op.hub.BroadcastMessage(msgBytes)
+		log.Printf("Broadcasted order execution notification for order %s", orderNumber)
+	} else {
+		log.Printf("ERROR: Failed to marshal order execution notification: %v", err)
+	}
 
 	// TODO: Log audit event for order execution
 	// utils.GlobalAuditLogger.LogPendingOrderExecuted(ctx, order.UserID, order.AccountID, order.ID, order.Symbol, fmt.Sprintf("%.8f", executionPrice))

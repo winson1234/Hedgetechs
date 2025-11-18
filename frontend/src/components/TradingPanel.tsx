@@ -15,6 +15,7 @@ export default function TradingPanel() {
   const selectedProductType = useAppSelector((state) => state.ui.selectedProductType);
   const { accounts, activeAccountId } = useAppSelector((state) => state.account);
   const { currentPrices } = useAppSelector((state) => state.price);
+  const { isPlacingOrder } = useAppSelector((state) => state.order);
 
   // Get active account
   const activeAccount = accounts.find((acc) => acc.id === activeAccountId);
@@ -156,8 +157,11 @@ export default function TradingPanel() {
 
 
     if (!isNaN(qty) && qty > 0 && !isNaN(priceForCalc) && priceForCalc > 0) {
-      // Lots calculation (1 lot = 100,000 units in forex, for crypto we use direct amount)
-      const calculatedLots = isSpot ? qty : qty / 100000;
+      // Lots calculation
+      // For crypto: 1 lot = the actual quantity (e.g., 0.1 BTC = 0.1 lots)
+      // For forex: 1 lot = 100,000 units
+      const isForex = baseCurrency.length === 6; // Forex pairs like EURUSD
+      const calculatedLots = isForex ? qty / 100000 : qty;
       setLots(calculatedLots);
 
       // Margin calculation (for leveraged trading)
@@ -165,17 +169,24 @@ export default function TradingPanel() {
       const calculatedMargin = isCFD ? totalValue / leverage : totalValue; // CFD uses leverage, Spot doesn't
       setMargin(calculatedMargin);
 
-      // Pip value calculation (1 pip = 0.0001 for most pairs)
-      // This might need adjustment based on the specific instrument's pip definition
-      const pipSize = quoteCurrency === 'JPY' ? 0.01 : 0.0001; // Example adjustment for JPY pairs
-      const calculatedPipValue = qty * pipSize;
+      // Pip value calculation
+      // For crypto: pip value = (lot size × $1 per point) - represents the value of a $1 price movement
+      // For forex: pip value = (lot size × pip size) / exchange rate
+      let calculatedPipValue: number;
+      if (isForex) {
+        const pipSize = quoteCurrency === 'JPY' ? 0.01 : 0.0001;
+        calculatedPipValue = calculatedLots * 100000 * pipSize;
+      } else {
+        // For crypto: pip value represents value of $1 price change per lot
+        calculatedPipValue = qty; // Each $1 price change = qty × $1
+      }
       setPipValue(calculatedPipValue);
     } else {
       setLots(0);
       setMargin(0);
       setPipValue(0);
     }
-  }, [amount, limitPrice, currentPrice, orderType, leverage, isCFD, isSpot, quoteCurrency]);
+  }, [amount, limitPrice, currentPrice, orderType, leverage, isCFD, isSpot, quoteCurrency, baseCurrency]);
 
   // Calculate fee amount
   const getFeeAmount = useCallback((): number => {
@@ -329,20 +340,32 @@ export default function TradingPanel() {
         .unwrap()
         .then(() => {
           console.log('Pending order placed successfully');
-          // Show success toast
+          // Show success toast with detailed information
+          const orderTypeText = orderType === 'stop-limit' ? 'Stop-Limit' : 'Limit';
+          const triggerPriceText = orderType === 'stop-limit' ? `stop at $${stopPrice}` : `at $${limitPrice}`;
+          const orderDetails = isCFD
+            ? `${orderTypeText} ${side.toUpperCase()}: ${qty.toFixed(8)} ${baseCurrency} ${triggerPriceText} (${leverage}x leverage)`
+            : `${orderTypeText} ${side.toUpperCase()}: ${qty.toFixed(8)} ${baseCurrency} ${triggerPriceText}`;
+
           dispatch(addToast({
             type: 'success',
-            message: `${orderType === 'stop-limit' ? 'Stop-limit' : 'Limit'} order placed successfully`,
-            duration: 5000,
+            message: `✓ Order Placed - ${orderDetails}`,
+            duration: 7000,
           }));
+
+          // Reset input fields after successful order
+          setAmount('');
+          setLimitPrice('');
+          setStopPrice('');
+          setPercentage(0);
         })
         .catch((error) => {
           console.error('Failed to place pending order:', error);
           // Show error toast
           dispatch(addToast({
             type: 'error',
-            message: `Failed to place order: ${error}`,
-            duration: 5000,
+            message: `✗ Order Failed - ${error}`,
+            duration: 7000,
           }));
         });
     } else {
@@ -379,11 +402,15 @@ export default function TradingPanel() {
       }))
         .unwrap()
         .then(() => {
-          // Show success toast
+          // Show success toast with detailed information
+          const orderDetails = isCFD
+            ? `${selectedProductType.toUpperCase()} ${side.toUpperCase()}: ${qty.toFixed(8)} ${baseCurrency} at $${currentPrice.toFixed(2)} (${leverage}x leverage)`
+            : `${selectedProductType.toUpperCase()} ${side.toUpperCase()}: ${qty.toFixed(8)} ${baseCurrency} at $${currentPrice.toFixed(2)}`;
+
           dispatch(addToast({
             type: 'success',
-            message: `Market ${side} order executed successfully`,
-            duration: 5000,
+            message: `✓ Order Executed - ${orderDetails}`,
+            duration: 7000, // Longer duration for better visibility
           }));
 
           // Refresh account balances
@@ -396,14 +423,18 @@ export default function TradingPanel() {
 
           // Trigger positions refresh (for CFD orders)
           dispatch(triggerPositionsRefresh());
+
+          // Reset input fields after successful order
+          setAmount('');
+          setPercentage(0);
         })
         .catch((error) => {
-          // Show error toast
+          // Show error toast with details
           console.error('Failed to execute market order:', error);
           dispatch(addToast({
             type: 'error',
-            message: `Failed to execute order: ${error}`,
-            duration: 5000,
+            message: `✗ Order Failed - ${error}`,
+            duration: 7000,
           }));
         });
     }
@@ -862,9 +893,10 @@ export default function TradingPanel() {
         <div className="grid grid-cols-2 gap-3 pt-2">
            <button
             onClick={() => handleOrder('buy')}
-            className="px-4 py-3 text-base font-bold bg-green-500 hover:bg-green-600 text-white rounded-lg transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            // Disable buy if not enough USD balance OR amount is zero/invalid
+            className="px-4 py-3 text-base font-bold bg-green-500 hover:bg-green-600 text-white rounded-lg transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            // Disable buy if not enough USD balance OR amount is zero/invalid OR order is being placed
             disabled={
+                isPlacingOrder || // Disable during order placement
                 parseFloat(amount || '0') <= 0 || // Amount must be positive
                 (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) || // Need valid price for market
                 (orderType !== 'market' && (parseFloat(getTotal() || 'Infinity') > usdBalance)) // Check total against balance for limit/stop
@@ -874,10 +906,11 @@ export default function TradingPanel() {
           </button>
           <button
             onClick={() => handleOrder('sell')}
-            className="px-4 py-3 text-base font-bold bg-red-500 hover:bg-red-600 text-white rounded-lg transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-             // Disable sell if amount entered is greater than current holding or amount is zero/invalid
+            className="px-4 py-3 text-base font-bold bg-red-500 hover:bg-red-600 text-white rounded-lg transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+             // Disable sell if amount entered is greater than current holding or amount is zero/invalid OR order is being placed
              // Also disable if price is needed but invalid (for limit/stop-limit)
             disabled={
+                isPlacingOrder || // Disable during order placement
                 parseFloat(amount || '0') <= 0 || // Amount must be positive
                 (isSpot && parseFloat(amount || '0') > currentHolding) || // Spot: Cannot sell more than held, CFD: can short without holding
                 (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) || // Need valid price for market
@@ -887,6 +920,43 @@ export default function TradingPanel() {
             {isCFD ? 'Hedge Sell' : `Sell ${baseCurrency}`}
           </button>
         </div>
+
+        {/* Order Processing Overlay - Centered */}
+        {isPlacingOrder && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm transition-opacity duration-200">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-8 max-w-sm mx-4 transform transition-all duration-300 scale-100 opacity-100">
+              <div className="flex flex-col items-center gap-6">
+                {/* Animated Spinner */}
+                <div className="relative">
+                  <svg className="animate-spin h-16 w-16 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="h-8 w-8 bg-blue-500 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+
+                {/* Processing Text */}
+                <div className="text-center">
+                  <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+                    ORDER PROCESSING
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Please wait while we process your order...
+                  </p>
+                </div>
+
+                {/* Progress Dots */}
+                <div className="flex gap-2">
+                  <div className="h-2 w-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="h-2 w-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="h-2 w-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

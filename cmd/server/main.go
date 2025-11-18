@@ -171,11 +171,12 @@ func main() {
 		go h.SubscribeToRedisForex(context.Background(), redisClient)
 	}
 
-	// Initialize event-driven order processor (requires database)
+	// Initialize event-driven order processor (requires database and hub)
 	var orderProcessor *worker.OrderProcessor
 	if dbPool, err := database.GetPool(); err == nil {
-		orderProcessor = worker.NewOrderProcessor(dbPool)
+		orderProcessor = worker.NewOrderProcessor(dbPool, h)
 		go orderProcessor.Run()
+		log.Println("Order processor initialized with WebSocket notification support")
 	} else {
 		log.Println("WARNING: Order processor disabled (database not available)")
 	}

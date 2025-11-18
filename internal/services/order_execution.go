@@ -43,6 +43,7 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 	defer tx.Rollback(ctx)
 
 	// Fetch order details (product_type now comes from orders table)
+	// PERFORMANCE: Use SELECT FOR UPDATE to lock row and prevent race conditions
 	var order models.Order
 	var accountCurrency, quoteCurrency string
 	err = tx.QueryRow(ctx,
@@ -54,7 +55,8 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 		 FROM orders o
 		 JOIN accounts a ON o.account_id = a.id
 		 JOIN instruments i ON o.symbol = i.symbol
-		 WHERE o.id = $1`,
+		 WHERE o.id = $1
+		 FOR UPDATE OF o NOWAIT`,
 		orderID,
 	).Scan(
 		&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.OrderNumber,
@@ -88,37 +90,55 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 	if isSpot {
 		result, err = s.executeSpotOrder(ctx, tx, &order, executionPrice, notionalValue, fee, accountCurrency, quoteCurrency)
 	} else {
-		// For leveraged products, check if we should route to LP (A-Book)
-		routingService := NewRoutingService(s.pool)
+		// For leveraged products, check if LP routing is enabled before creating service
+		// PERFORMANCE FIX: Skip routing service creation if disabled (saves 1-2 seconds)
+		var routingEnabled bool
+		err := s.pool.QueryRow(ctx, `
+			SELECT COALESCE((config_value->>'value')::boolean, false)
+			FROM lp_routing_config
+			WHERE config_key = 'enabled'
+			LIMIT 1
+		`).Scan(&routingEnabled)
 
-		// Make routing decision based on order size and exposure
-		var orderSideStr string
-		if order.Side == models.OrderSideBuy {
-			orderSideStr = "buy"
-		} else {
-			orderSideStr = "sell"
-		}
-
-		routingDecision, err := routingService.ShouldRouteToLP(
-			ctx,
-			order.Symbol,
-			orderSideStr,
-			decimal.NewFromFloat(order.AmountBase),
-			decimal.NewFromFloat(executionPrice),
-		)
-		if err != nil {
-			log.Printf("Routing decision error: %v, defaulting to B-Book", err)
-			routingDecision = &RoutingDecision{ShouldRouteToLP: false}
+		// Default to B-Book if query fails or table doesn't exist
+		if err != nil && err != pgx.ErrNoRows {
+			log.Printf("Failed to check routing config: %v, defaulting to B-Book", err)
 		}
 
 		var execErr error
-		if routingDecision.ShouldRouteToLP {
-			// A-Book: Route to external LP
-			log.Printf("Routing order %s to LP: %s", order.OrderNumber, routingDecision.Reason)
-			result, execErr = s.ExecuteExternalOrder(ctx, tx, &order, routingService.GetConfig().PrimaryLPProvider, notionalValue, fee, accountCurrency)
+		if routingEnabled {
+			// Routing is enabled - create service and make decision
+			routingService := NewRoutingService(s.pool)
+
+			var orderSideStr string
+			if order.Side == models.OrderSideBuy {
+				orderSideStr = "buy"
+			} else {
+				orderSideStr = "sell"
+			}
+
+			routingDecision, decisionErr := routingService.ShouldRouteToLP(
+				ctx,
+				order.Symbol,
+				orderSideStr,
+				decimal.NewFromFloat(order.AmountBase),
+				decimal.NewFromFloat(executionPrice),
+			)
+			if decisionErr != nil {
+				log.Printf("Routing decision error: %v, defaulting to B-Book", decisionErr)
+				result, execErr = s.ExecuteDualPositionOrder(ctx, tx, &order, executionPrice, notionalValue, fee, accountCurrency)
+			} else if routingDecision.ShouldRouteToLP {
+				// A-Book: Route to external LP
+				log.Printf("Routing order %s to LP: %s", order.OrderNumber, routingDecision.Reason)
+				result, execErr = s.ExecuteExternalOrder(ctx, tx, &order, routingService.GetConfig().PrimaryLPProvider, notionalValue, fee, accountCurrency)
+			} else {
+				// B-Book: Execute internally
+				log.Printf("Executing order %s internally (B-Book): %s", order.OrderNumber, routingDecision.Reason)
+				result, execErr = s.ExecuteDualPositionOrder(ctx, tx, &order, executionPrice, notionalValue, fee, accountCurrency)
+			}
 		} else {
-			// B-Book: Execute internally with dual-position hedging
-			log.Printf("Executing order %s internally (B-Book): %s", order.OrderNumber, routingDecision.Reason)
+			// Routing disabled - skip directly to B-Book (dual-position hedging)
+			log.Printf("Executing order %s internally (B-Book): LP routing disabled", order.OrderNumber)
 			result, execErr = s.ExecuteDualPositionOrder(ctx, tx, &order, executionPrice, notionalValue, fee, accountCurrency)
 		}
 
@@ -465,32 +485,24 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 	longLiquidationPrice := executionPrice * (1.0 - marginRatio)
 	shortLiquidationPrice := executionPrice * (1.0 + marginRatio)
 
-	// Create LONG position
+	// PERFORMANCE: Batch insert both positions in a single query (reduces DB round-trips)
 	longContractID := uuid.New()
-	_, err = tx.Exec(ctx,
-		`INSERT INTO contracts (id, user_id, account_id, symbol, contract_number, side, status,
-		                        lot_size, entry_price, margin_used, leverage, commission, liquidation_price, pair_id, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())`,
-		longContractID, order.UserID, order.AccountID, order.Symbol, longContractNumber,
-		models.ContractSideLong, models.ContractStatusOpen, order.AmountBase, executionPrice,
-		marginPerPosition-(fee/2.0), leverage, fee/2.0, longLiquidationPrice, pairID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create long contract: %w", err)
-	}
-
-	// Create SHORT position
 	shortContractID := uuid.New()
 	_, err = tx.Exec(ctx,
 		`INSERT INTO contracts (id, user_id, account_id, symbol, contract_number, side, status,
 		                        lot_size, entry_price, margin_used, leverage, commission, liquidation_price, pair_id, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())`,
-		shortContractID, order.UserID, order.AccountID, order.Symbol, shortContractNumber,
-		models.ContractSideShort, models.ContractStatusOpen, order.AmountBase, executionPrice,
-		marginPerPosition-(fee/2.0), leverage, fee/2.0, shortLiquidationPrice, pairID,
+		 VALUES
+		   ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW()),
+		   ($15, $2, $3, $4, $16, $17, $7, $8, $9, $10, $11, $12, $18, $14, NOW(), NOW())`,
+		// Long position (values $1-$14)
+		longContractID, order.UserID, order.AccountID, order.Symbol, longContractNumber,
+		models.ContractSideLong, models.ContractStatusOpen, order.AmountBase, executionPrice,
+		marginPerPosition-(fee/2.0), leverage, fee/2.0, longLiquidationPrice, pairID,
+		// Short position (values $15-$18, reuses $2-$14 where applicable)
+		shortContractID, shortContractNumber, models.ContractSideShort, shortLiquidationPrice,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create short contract: %w", err)
+		return nil, fmt.Errorf("failed to create dual positions: %w", err)
 	}
 
 	// Update order status

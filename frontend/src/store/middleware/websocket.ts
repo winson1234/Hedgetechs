@@ -108,6 +108,29 @@ export const websocketMiddleware: Middleware = (store) => {
           return; // Don't process as price message
         }
 
+        // Handle pending order execution notifications
+        if (data.type === 'order_executed') {
+          const symbol = data.symbol;
+          const side = data.side;
+          const quantity = data.quantity;
+          const executionPrice = data.execution_price;
+          const productType = data.product_type;
+          const orderNumber = data.order_number;
+
+          // Show success toast notification
+          const baseCurrency = symbol.replace('USDT', '').replace('USD', '');
+          const message = `${productType.toUpperCase()} ${side.toUpperCase()} order executed: ${quantity} ${baseCurrency} at $${executionPrice}`;
+
+          store.dispatch(addToast({
+            type: 'success',
+            message,
+            duration: 5000
+          }));
+
+          console.log(`[WebSocket] Order executed: ${orderNumber} - ${message}`);
+          return; // Don't process as price message
+        }
+
         // Handle different message types based on our backend format
         if (data.type === 'forex_quote') {
           // Forex quote message: { type: "forex_quote", symbol, bid, ask, timestamp }

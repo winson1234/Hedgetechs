@@ -48,6 +48,27 @@ export default defineConfig({
   plugins: [react()],
   // Load .env file from parent directory (project root)
   envDir: path.resolve(__dirname, '..'),
+  // Build optimizations for production
+  build: {
+    rollupOptions: {
+      output: {
+        // Manual chunk splitting for better caching and faster initial load
+        manualChunks: {
+          // Vendor chunks - rarely change, can be cached long-term
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'redux-vendor': ['@reduxjs/toolkit', 'react-redux', 'redux-persist'],
+          'ui-vendor': ['framer-motion', 'gsap', 'lenis'],
+          'chart-vendor': ['lightweight-charts', 'recharts'],
+          'stripe-vendor': ['@stripe/react-stripe-js', '@stripe/stripe-js'],
+          'supabase-vendor': ['@supabase/supabase-js'],
+        },
+      },
+    },
+    // Increase chunk size warning limit (we're intentionally splitting)
+    chunkSizeWarningLimit: 1000,
+    // Enable source maps for production debugging (optional)
+    sourcemap: false,
+  },
   server: {
     port: 5173,
     // Enable HTTPS if certificates are available and not in Docker

@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store';
 import { signOut } from '../store/slices/authSlice';
 import { setTheme, selectIsDarkMode, setActiveInstrument } from '../store/slices/uiSlice';
+import { clearAccounts } from '../store/slices/accountSlice';
+import { clearOrders } from '../store/slices/orderSlice';
 import MiniSparklineChart from '../components/MiniSparklineChart';
 import { getApiUrl } from '../config/api';
 import { useScrollAnimations } from '../hooks/useScrollAnimations';
@@ -192,12 +194,18 @@ const confirmLogout = async () => {
   // Step 3: wait for fade animation (400ms) before proceeding
   await new Promise(resolve => setTimeout(resolve, 400));
 
-  // Step 4: actually log out
+  // Step 4: actually log out and clear all state
   await dispatch(signOut());
+
+  // Clear all user-specific state
+  dispatch(clearAccounts());
+  dispatch(clearOrders());
 
   // Step 5: hide modal and navigate
   setShowLogoutModal(false);
-  navigate('/');
+
+  // Force page reload to ensure clean state
+  window.location.href = '/';
 };
 
 const cancelLogout = () => {

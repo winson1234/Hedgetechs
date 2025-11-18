@@ -45,7 +45,8 @@ export interface PendingOrder {
 interface OrderState {
   orders: Order[]; // Executed order history
   pendingOrders: PendingOrder[]; // Pending limit/stop-limit orders
-  loading: boolean;
+  loading: boolean; // General loading state for data fetching
+  isPlacingOrder: boolean; // Specific state for order placement operations
   error: string | null;
 }
 
@@ -54,6 +55,7 @@ const initialState: OrderState = {
   orders: [],
   pendingOrders: [],
   loading: false,
+  isPlacingOrder: false,
   error: null,
 };
 
@@ -279,15 +281,15 @@ const orderSlice = createSlice({
     // Create pending order
     builder
       .addCase(createPendingOrder.pending, (state) => {
-        state.loading = true;
+        state.isPlacingOrder = true; // Show order processing overlay
         state.error = null;
       })
       .addCase(createPendingOrder.fulfilled, (state, action) => {
-        state.loading = false;
+        state.isPlacingOrder = false;
         state.pendingOrders.push(action.payload);
       })
       .addCase(createPendingOrder.rejected, (state, action) => {
-        state.loading = false;
+        state.isPlacingOrder = false;
         state.error = action.payload as string;
       });
 
@@ -312,18 +314,18 @@ const orderSlice = createSlice({
     // Execute market order
     builder
       .addCase(executeMarketOrder.pending, (state) => {
-        state.loading = true;
+        state.isPlacingOrder = true; // Show order processing overlay
         state.error = null;
       })
       .addCase(executeMarketOrder.fulfilled, (state, action) => {
-        state.loading = false;
+        state.isPlacingOrder = false;
         // Add executed order to history
         if (action.payload.order) {
           state.orders.unshift(action.payload.order);
         }
       })
       .addCase(executeMarketOrder.rejected, (state, action) => {
-        state.loading = false;
+        state.isPlacingOrder = false;
         state.error = action.payload as string;
       });
   },

@@ -115,71 +115,6 @@ header.header,
   padding: 0 !important;
 }
 
-/* Subtle gradient overlay with shimmer effect */
-.header::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 150%;
-  background: linear-gradient(180deg,
-    rgba(10, 14, 39, 0.5) 0%,
-    rgba(10, 14, 39, 0.2) 50%,
-    rgba(10, 14, 39, 0) 100%
-  );
-  opacity: 1;
-  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-  pointer-events: none;
-  z-index: -1;
-}
-
-/* Animated shimmer effect on header */
-.header::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    rgba(253, 219, 146, 0.1) 50%,
-    transparent 100%
-  );
-  animation: shimmer 8s ease-in-out infinite;
-  pointer-events: none;
-  z-index: -1;
-  opacity: 0;
-  transition: opacity 0.8s ease;
-}
-
-.header:not(.scrolled)::after {
-  opacity: 1;
-}
-
-@keyframes shimmer {
-  0% { left: -100%; }
-  50% { left: 100%; }
-  100% { left: 100%; }
-}
-
-html:not(.dark) .header::before {
-  background: linear-gradient(180deg,
-    rgba(255, 255, 255, 0.8) 0%,
-    rgba(255, 255, 255, 0.4) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
-}
-
-html:not(.dark) .header::after {
-  background: linear-gradient(90deg,
-    transparent 0%,
-    rgba(253, 219, 146, 0.15) 50%,
-    transparent 100%
-  );
-}
-
 /* Hide header pseudo-elements when scrolled */
 .header.scrolled::before {
   opacity: 0;
@@ -299,7 +234,7 @@ body.light-mode .header.scrolled {
   background-clip: text;
 }
 
-html:not(.dark) .logo-text {
+body.light-mode .logo-text {
   background: linear-gradient(135deg, #1a1f3a 0%, #C76D00 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -361,7 +296,6 @@ html:not(.dark) .logo-text {
   50% { transform: scale(1.05); }
 }
 
-html:not(.dark) .nav-link,
 body.light-mode .nav-link {
   color: rgba(26, 31, 58, 0.9) !important;
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
@@ -389,11 +323,10 @@ body.light-mode .header.scrolled .nav-link {
 .nav-link::after {
   content: '';
   position: absolute;
-  bottom: 0px;
-  left: 0;
-  right: 0;
-  margin: 0 auto;
-  transform: scaleX(0);
+  bottom: -2px;
+  left: 50%;
+
+  transform: translateX(-50%) scaleX(0);
   width: 100%;
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
@@ -403,7 +336,7 @@ body.light-mode .header.scrolled .nav-link {
 }
 
 .nav-link:hover::after {
-  transform: scaleX(1);
+  transform: translateX(-50%) scaleX(1);
 }
 
 /* Nav Actions */
@@ -464,13 +397,13 @@ body.light-mode .header.scrolled .nav-link {
   backdrop-filter: none;
 }
 
-html:not(.dark) .icon-btn {
+body.light-mode .icon-btn {
   background: rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(0, 0, 0, 0.1);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
-html:not(.dark) .header.scrolled .icon-btn {
+body.light-mode .header.scrolled .icon-btn {
   background: transparent;
   border: 1px solid var(--border-color);
   box-shadow: none;
@@ -504,7 +437,6 @@ html:not(.dark) .header.scrolled .icon-btn {
   transition: all 0.4s ease;
 }
 
-html:not(.dark) .icon-btn svg,
 body.light-mode .icon-btn svg {
   color: #1a1f3a !important;
   stroke: #1a1f3a !important;
@@ -904,11 +836,11 @@ body.light-mode #languageToggle span {
   animation: shimmer 3s ease-in-out infinite;
 }
 
-html:not(.dark) .dropdown-header {
+body.light-mode .dropdown-header {
   background: linear-gradient(135deg, #f8f9fa, #ffffff);
 }
 
-html.dark .dropdown-header {
+body.dark-mode .dropdown-header {
   background: var(--bg-secondary);
 }
 
@@ -1022,7 +954,7 @@ html.dark .dropdown-header {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
-html:not(.dark) .btn-secondary {
+body.light-mode .btn-secondary {
   background: rgba(255, 255, 255, 0.7);
   color: rgba(26, 31, 58, 0.95);
   border: 1.5px solid rgba(0, 0, 0, 0.12);
@@ -1142,16 +1074,16 @@ body.light-mode .header.scrolled .btn-secondary {
   right: 0;
   height: 300px;
   background: linear-gradient(180deg,
-    transparent 0%,
+    rgba(10, 14, 39, 0) 0%,
     var(--bg-primary) 100%
   );
   pointer-events: none;
   z-index: 0;
 }
 
-html:not(.dark) .hero::before {
+body.light-mode .hero::before {
   background: linear-gradient(180deg,
-    transparent 0%,
+    rgba(255, 255, 255, 0) 0%,
     var(--bg-primary) 100%
   );
 }
@@ -1422,7 +1354,7 @@ html:not(.dark) .hero::before {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
-html:not(.dark) .hero-title {
+body.light-mode .hero-title {
   background: linear-gradient(135deg, #1a1f3a 0%, #1a1f3a 50%, #8B5A00 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

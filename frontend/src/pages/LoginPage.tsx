@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch } from '../store';
 import { signIn } from '../store/slices/authSlice';
 import './login.css';
@@ -7,10 +7,29 @@ import './login.css';
 export default function LoginPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const candlesticksRef = useRef<HTMLDivElement>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Scroll to top on mount and when location changes
+  useEffect(() => {
+    // Use setTimeout to ensure DOM is ready
+    const scrollToTop = () => {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    // Immediate scroll
+    scrollToTop();
+
+    // Also try after a short delay to ensure it works
+    setTimeout(scrollToTop, 0);
+    setTimeout(scrollToTop, 10);
+    setTimeout(scrollToTop, 50);
+  }, [location.pathname]);
 
   // Generate candlesticks on mount (matching original main.js)
   useEffect(() => {

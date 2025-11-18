@@ -159,6 +159,61 @@ export default function DashboardPage() {
     }
   }, [isDarkMode]);
 
+  // Handle active nav link based on hash
+  useEffect(() => {
+    const updateActiveNavLink = () => {
+      const hash = window.location.hash.slice(1); // Remove the # symbol
+      const navLinks = document.querySelectorAll('.nav-link');
+      
+      navLinks.forEach((link) => {
+        const href = link.getAttribute('href');
+        if (href && href.slice(1) === hash) {
+          link.classList.add('active');
+        } else {
+          link.classList.remove('active');
+        }
+      });
+    };
+
+    // Update on mount
+    updateActiveNavLink();
+
+    // Update on hash change
+    window.addEventListener('hashchange', updateActiveNavLink);
+    
+    // Also update on scroll (for smooth scroll behavior)
+    const handleScroll = () => {
+      const sections = ['market', 'news', 'features', 'about', 'faq'];
+      const scrollPosition = window.scrollY + 200; // Offset for sticky header
+
+      for (const section of sections) {
+        const element = document.getElementById(section);
+        if (element) {
+          const { offsetTop, offsetHeight } = element;
+          if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach((link) => {
+              const href = link.getAttribute('href');
+              if (href && href.slice(1) === section) {
+                link.classList.add('active');
+              } else {
+                link.classList.remove('active');
+              }
+            });
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('hashchange', updateActiveNavLink);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   const navigate = useNavigate();
   const [activeMarketTab, setActiveMarketTab] = useState('all');
   const [activeNewsTab, setActiveNewsTab] = useState('all');

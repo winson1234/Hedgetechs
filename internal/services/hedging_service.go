@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -24,12 +25,12 @@ func NewHedgingService(pool *pgxpool.Pool) *HedgingService {
 
 // PairedPosition represents a hedged position pair
 type PairedPosition struct {
-	PairID         uuid.UUID
-	LongContract   models.Contract
-	ShortContract  models.Contract
-	IsFullyOpen    bool // Both legs open
+	PairID            uuid.UUID
+	LongContract      models.Contract
+	ShortContract     models.Contract
+	IsFullyOpen       bool // Both legs open
 	IsPartiallyClosed bool // One leg closed
-	IsFullyClosed  bool // Both legs closed
+	IsFullyClosed     bool // Both legs closed
 }
 
 // GetPairedPosition fetches both contracts in a hedged pair
@@ -164,9 +165,25 @@ func (s *HedgingService) ClosePositionWithMarginRelease(
 	transactionID := uuid.New()
 	description := fmt.Sprintf("Position closed: %s %s (Contract %s)", contract.Side, contract.Symbol, contract.ContractNumber)
 
+	// Prepare metadata as JSON with string values for decimals to avoid precision issues
+	metadataMap := map[string]interface{}{
+		"entry_price":  fmt.Sprintf("%.8f", contract.EntryPrice),
+		"close_price":  fmt.Sprintf("%.8f", closePrice),
+		"lot_size":     fmt.Sprintf("%.8f", contract.LotSize),
+		"leverage":     contract.Leverage,
+		"margin_used":  fmt.Sprintf("%.8f", contract.MarginUsed),
+		"swap":         fmt.Sprintf("%.8f", contract.Swap),
+		"commission":   fmt.Sprintf("%.8f", contract.Commission),
+		"total_return": fmt.Sprintf("%.8f", totalReturn),
+	}
+	metadataJSON, err := json.Marshal(metadataMap)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
 	_, err = tx.Exec(ctx,
 		`INSERT INTO transactions (id, account_id, transaction_number, type, currency, amount, status, contract_id, description, metadata, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, NOW(), NOW())`,
 		transactionID,
 		contract.AccountID,
 		transactionNumber,
@@ -176,16 +193,7 @@ func (s *HedgingService) ClosePositionWithMarginRelease(
 		models.TransactionStatusCompleted,
 		contractID,
 		description,
-		map[string]interface{}{
-			"entry_price":  contract.EntryPrice,
-			"close_price":  closePrice,
-			"lot_size":     contract.LotSize,
-			"leverage":     contract.Leverage,
-			"margin_used":  contract.MarginUsed,
-			"swap":         contract.Swap,
-			"commission":   contract.Commission,
-			"total_return": totalReturn,
-		},
+		string(metadataJSON),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create position close transaction: %w", err)
@@ -285,9 +293,27 @@ func (s *HedgingService) CloseEntirePair(
 		transactionID := uuid.New()
 		description := fmt.Sprintf("Position closed: %s %s (Contract %s) - Hedged pair closure", contract.Side, contract.Symbol, contract.ContractNumber)
 
+		// Prepare metadata as JSON with string values for decimals to avoid precision issues
+		metadataMap := map[string]interface{}{
+			"entry_price":  fmt.Sprintf("%.8f", contract.EntryPrice),
+			"close_price":  fmt.Sprintf("%.8f", closePrice),
+			"lot_size":     fmt.Sprintf("%.8f", contract.LotSize),
+			"leverage":     contract.Leverage,
+			"margin_used":  fmt.Sprintf("%.8f", contract.MarginUsed),
+			"swap":         fmt.Sprintf("%.8f", contract.Swap),
+			"commission":   fmt.Sprintf("%.8f", contract.Commission),
+			"total_return": fmt.Sprintf("%.8f", totalReturn),
+			"pair_id":      pairID.String(),
+			"pair_closure": true,
+		}
+		metadataJSON, err := json.Marshal(metadataMap)
+		if err != nil {
+			return fmt.Errorf("failed to marshal metadata: %w", err)
+		}
+
 		_, err = tx.Exec(ctx,
 			`INSERT INTO transactions (id, account_id, transaction_number, type, currency, amount, status, contract_id, description, metadata, created_at, updated_at)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`,
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, NOW(), NOW())`,
 			transactionID,
 			contract.AccountID,
 			transactionNumber,
@@ -297,18 +323,7 @@ func (s *HedgingService) CloseEntirePair(
 			models.TransactionStatusCompleted,
 			contract.ID,
 			description,
-			map[string]interface{}{
-				"entry_price":  contract.EntryPrice,
-				"close_price":  closePrice,
-				"lot_size":     contract.LotSize,
-				"leverage":     contract.Leverage,
-				"margin_used":  contract.MarginUsed,
-				"swap":         contract.Swap,
-				"commission":   contract.Commission,
-				"total_return": totalReturn,
-				"pair_id":      pairID.String(),
-				"pair_closure": true,
-			},
+			string(metadataJSON),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create position close transaction for contract %s: %w", contract.ContractNumber, err)

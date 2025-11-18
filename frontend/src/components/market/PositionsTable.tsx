@@ -1,10 +1,11 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { formatCurrency } from '../../utils/formatters';
 import { ProductType } from '../../types';
 import { fetchPositions, closePosition, updateAllPositionsPnL } from '../../store/slices/positionSlice';
 import { fetchAccounts } from '../../store/slices/accountSlice';
 import { addToast } from '../../store/slices/uiSlice';
+import ConfirmDialog from '../ConfirmDialog';
 
 interface PositionsTableProps {
   filterByProductType: boolean;
@@ -17,6 +18,23 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
   const { currentPrices } = useAppSelector(state => state.price);
   const { positions, loading, error } = useAppSelector(state => state.position);
   const positionsRefreshTrigger = useAppSelector(state => state.ui.positionsRefreshTrigger);
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant: 'default' | 'danger' | 'warning';
+    details: Array<{ label: string; value: string; highlight?: boolean }>;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    variant: 'default',
+    details: [],
+    onConfirm: () => {}
+  });
 
   // Fetch positions when account changes or when triggered
   useEffect(() => {
@@ -68,32 +86,45 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
       const pairedPnL = pairedPosition.unrealized_pnl || 0;
       const pairedPnLText = pairedPnL >= 0 ? `+${formatCurrency(pairedPnL, 'USD')}` : formatCurrency(pairedPnL, 'USD');
 
-      const warningConfirmed = window.confirm(
-        `⚠️ HEDGED PAIR WARNING ⚠️\n\n` +
-        `This position is part of a hedged pair!\n\n` +
-        `Closing Position:\n` +
-        `${position.side.toUpperCase()} ${position.symbol} - P&L: ${pnlText}\n\n` +
-        `Paired Position (will remain open):\n` +
-        `${pairedPosition.side.toUpperCase()} ${pairedPosition.symbol} - P&L: ${pairedPnLText}\n\n` +
-        `Closing only one leg will break your hedge and expose you to market risk.\n\n` +
-        `Do you want to continue closing ONLY this position?`
-      );
-
-      if (!warningConfirmed) return;
+      setConfirmDialog({
+        isOpen: true,
+        title: '⚠️ Hedged Pair Warning',
+        message: `This position is part of a hedged pair. Closing only one leg will break your hedge and expose you to market risk.\n\nAre you sure you want to close ONLY this position?`,
+        variant: 'warning',
+        details: [
+          { label: 'Closing Position', value: `${position.side.toUpperCase()} ${position.symbol}`, highlight: true },
+          { label: 'P&L', value: pnlText },
+          { label: 'Close Price', value: formatCurrency(currentPrice, 'USD') },
+          { label: 'Paired Position', value: `${pairedPosition.side.toUpperCase()} ${pairedPosition.symbol}`, highlight: true },
+          { label: 'Paired P&L', value: pairedPnLText }
+        ],
+        onConfirm: async () => {
+          await executeClosePosition(contractId, currentPrice, pnlText);
+        }
+      });
     } else {
       // Standard confirmation dialog
-      const confirmed = window.confirm(
-        `Close ${position.side.toUpperCase()} ${position.symbol} position?\n\n` +
-        `Current P&L: ${pnlText}\n` +
-        `Close Price: ${formatCurrency(currentPrice, 'USD')}`
-      );
-
-      if (!confirmed) return;
+      setConfirmDialog({
+        isOpen: true,
+        title: `Close ${position.side.toUpperCase()} ${position.symbol} position?`,
+        message: 'Your position will be closed at the current market price.',
+        variant: 'default',
+        details: [
+          { label: 'Current P&L', value: pnlText, highlight: true },
+          { label: 'Close Price', value: formatCurrency(currentPrice, 'USD') }
+        ],
+        onConfirm: async () => {
+          await executeClosePosition(contractId, currentPrice, pnlText);
+        }
+      });
     }
+  };
 
+  // Execute position close
+  const executeClosePosition = async (contractId: string, closePrice: number, pnlText: string) => {
     try {
       // Dispatch close position action
-      await dispatch(closePosition({ contractId, closePrice: currentPrice })).unwrap();
+      await dispatch(closePosition({ contractId, closePrice })).unwrap();
 
       // Show success toast with P&L
       dispatch(addToast({
@@ -323,6 +354,17 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+        details={confirmDialog.details}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

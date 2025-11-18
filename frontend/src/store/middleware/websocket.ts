@@ -18,6 +18,11 @@ const TRADE_THROTTLE_MS = 100; // Only update trades every 100ms
 const tradeThrottleTimers: Record<string, number> = {};
 const pendingTrades: Record<string, { price: number; quantity: number; time: number; isBuyerMaker: boolean }> = {};
 
+// Throttling for price updates to prevent excessive Redux state updates and re-renders
+const PRICE_THROTTLE_MS = 100; // Only update prices every 100ms
+const priceThrottleTimers: Record<string, number> = {};
+const pendingPrices: Record<string, { price: number; timestamp: number }> = {};
+
 // WebSocket middleware for Redux
 export const websocketMiddleware: Middleware = (store) => {
   // Function to connect to WebSocket
@@ -195,14 +200,27 @@ export const websocketMiddleware: Middleware = (store) => {
           const timestamp = data.time;
           const isBuyerMaker = data.isBuyerMaker || false;
 
-          // Always update current price immediately (for chart)
-          store.dispatch(
-            updateCurrentPrice({
-              symbol,
-              price,
-              timestamp,
-            })
-          );
+          // Throttle price updates to prevent excessive Redux state updates
+          // Store the latest price for this symbol
+          pendingPrices[symbol] = { price, timestamp };
+
+          // Only dispatch price updates every PRICE_THROTTLE_MS
+          if (!priceThrottleTimers[symbol]) {
+            priceThrottleTimers[symbol] = window.setTimeout(() => {
+              const priceData = pendingPrices[symbol];
+              if (priceData) {
+                store.dispatch(
+                  updateCurrentPrice({
+                    symbol,
+                    price: priceData.price,
+                    timestamp: priceData.timestamp,
+                  })
+                );
+                delete pendingPrices[symbol];
+              }
+              priceThrottleTimers[symbol] = 0;
+            }, PRICE_THROTTLE_MS);
+          }
 
           // Throttle trade history updates to prevent buffer overflow
           // Store the latest trade for this symbol

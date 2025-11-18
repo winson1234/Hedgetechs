@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -16,9 +17,11 @@ import (
 // This service uses the Provider interface, allowing seamless switching between
 // real-time streams and simulated data without changing the orchestration logic.
 type MarketDataService struct {
-	providers     []market_data.Provider // List of all active data providers
-	priceCache    *PriceCache
-	broadcastChan chan []byte // Channel to broadcast updates (connected to hub)
+	providers      []market_data.Provider // List of all active data providers
+	priceCache     *PriceCache
+	broadcastChan  chan []byte // Channel to broadcast updates (connected to hub)
+	lastBroadcast  map[string]time.Time // Track last broadcast time per symbol (rate limiting)
+	rateLimitMutex sync.Mutex           // Mutex for lastBroadcast map
 }
 
 // NewMarketDataService creates a new market data orchestration service
@@ -27,9 +30,11 @@ func NewMarketDataService(
 	broadcastChan chan []byte,
 ) (*MarketDataService, error) {
 	service := &MarketDataService{
-		providers:     make([]market_data.Provider, 0),
-		priceCache:    GetGlobalPriceCache(),
-		broadcastChan: broadcastChan,
+		providers:      make([]market_data.Provider, 0),
+		priceCache:     GetGlobalPriceCache(),
+		broadcastChan:  broadcastChan,
+		lastBroadcast:  make(map[string]time.Time),
+		rateLimitMutex: sync.Mutex{},
 	}
 
 	return service, nil
@@ -96,7 +101,27 @@ func (s *MarketDataService) handlePriceUpdate(symbol string, price float64) {
 // broadcastUpdate sends a price update through all required channels:
 // 1. PriceCache (for market order execution)
 // 2. messageBroadcaster (for WebSocket clients and OrderProcessor)
+// Rate limiting: Max 10 updates per second per symbol (100ms interval)
 func (s *MarketDataService) broadcastUpdate(symbol string, price float64) {
+	const minBroadcastInterval = 100 * time.Millisecond // Max 10 updates/sec per symbol
+
+	// Check rate limiting
+	s.rateLimitMutex.Lock()
+	lastTime, exists := s.lastBroadcast[symbol]
+	now := time.Now()
+
+	if exists && now.Sub(lastTime) < minBroadcastInterval {
+		// Too soon since last broadcast, skip this update
+		s.rateLimitMutex.Unlock()
+		// Still update price cache (silent update for order execution)
+		s.priceCache.UpdatePrice(symbol, price)
+		return
+	}
+
+	// Update last broadcast time
+	s.lastBroadcast[symbol] = now
+	s.rateLimitMutex.Unlock()
+
 	// 1. Update global price cache (CRITICAL for order execution)
 	s.priceCache.UpdatePrice(symbol, price)
 

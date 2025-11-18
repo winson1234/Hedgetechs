@@ -30,9 +30,9 @@ type Client struct {
 // NewHub creates a new Hub instance.
 func NewHub() *Hub {
 	return &Hub{
-		// Buffered broadcast channel to absorb bursts of high-frequency trading data
-		// Increased to 8192 to handle 24 concurrent instruments (~340 msg/sec peak)
-		Broadcast:  make(chan []byte, 8192),
+		// Small buffer (256) provides early warning if message rate is too high
+		// With rate limiting in place, this should be sufficient for ~26 symbols
+		Broadcast:  make(chan []byte, 256),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),

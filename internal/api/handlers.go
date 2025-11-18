@@ -42,10 +42,10 @@ func HandleWebSocket(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Create a hub client with a per-client send channel
-	// Increased buffer size for 24 concurrent instrument streams (~340 msg/sec peak)
+	// Small buffer (256) provides early warning if client is slow or message rate is too high
 	client := &hub.Client{
 		Conn: conn,
-		Send: make(chan []byte, 8192), // 4x increase to handle high-frequency updates
+		Send: make(chan []byte, 256), // With rate limiting, this should be sufficient
 	}
 
 	// Register the new client with the hub

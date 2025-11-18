@@ -34,7 +34,7 @@ type OHLCVData = {
   volume: number
 }
 
-export default function ChartComponent() {
+function ChartComponent() {
   const dispatch = useAppDispatch();
   // Access Redux state
   const symbol = useAppSelector(state => state.ui.activeInstrument);
@@ -954,3 +954,6 @@ export default function ChartComponent() {
     </div>
   )
 }
+
+// Memoize to prevent unnecessary re-renders from parent component updates
+export default React.memo(ChartComponent);

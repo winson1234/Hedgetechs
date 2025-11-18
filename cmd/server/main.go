@@ -193,7 +193,7 @@ func main() {
 
 	// Create message broadcaster that fans out to both hub and order processor
 	// This allows both WebSocket clients and the order processor to receive real-time price updates
-	messageBroadcaster := make(chan []byte, 4096) // Large buffer for high-frequency data
+	messageBroadcaster := make(chan []byte, 256) // Small buffer with rate limiting in place
 	go func() {
 		for msg := range messageBroadcaster {
 			// Forward to hub for WebSocket clients (non-blocking)
@@ -213,21 +213,6 @@ func main() {
 			}
 		}
 	}()
-
-	// Create a wrapper that sends Binance messages to messageBroadcaster
-	// This allows both WebSocket clients AND the order processor to receive price updates
-	broadcastWrapper := &hub.Hub{
-		Broadcast:  messageBroadcaster,     // Messages go to broadcaster, which fans out to hub and order processor
-		Register:   make(chan *hub.Client), // Dummy channels (not used by Binance streams)
-		Unregister: make(chan *hub.Client),
-	}
-
-	// LEGACY: Start old Binance WebSocket streams (still working for orderbook and market trades)
-	// TODO: Remove these once fully migrated to Provider interface
-	go binance.StreamDepth(broadcastWrapper)
-	log.Println("Binance Depth WebSocket stream started (legacy)")
-	go binance.StreamTrades(broadcastWrapper)
-	log.Println("Binance Trades WebSocket stream started (legacy - for Market Trades display)")
 
 	// HYBRID MARKET DATA ENGINE: Real-Time Crypto (Binance) + Real-Time Forex (MT5/Redis)
 	// Initialize market data service using the Provider interface pattern

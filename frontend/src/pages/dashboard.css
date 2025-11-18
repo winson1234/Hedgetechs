@@ -92,92 +92,30 @@
 }
 
 /*HEADER & NAVIGATION*/
-/*HEADER & NAVIGATION - Force relative positioning */
+/*HEADER & NAVIGATION - Relative positioning (scrolls with page) */
 header.header,
 .dashboard-page header.header,
 .dashboard-page .header,
-.header {
+.header,
+.dashboard-page > header.header,
+.dashboard-page > header.header.header {
   position: relative !important;
-  top: auto !important;
-  left: auto !important;
-  right: auto !important;
   width: 100% !important;
-  background: transparent !important;
+  background-color: transparent;
   backdrop-filter: none !important;
   border-bottom: none !important;
   z-index: 1000;
-  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: none !important;
+  transition: background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              position 0s;
+  box-shadow: none;
   transform: none !important;
   margin: 0 !important;
   padding: 0 !important;
 }
 
-/* Subtle gradient overlay with shimmer effect */
-.header::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 150%;
-  background: linear-gradient(180deg, 
-    rgba(10, 14, 39, 0.5) 0%, 
-    rgba(10, 14, 39, 0.2) 50%,
-    rgba(10, 14, 39, 0) 100%
-  );
-  opacity: 1;
-  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-  pointer-events: none;
-  z-index: -1;
-}
-
-/* Animated shimmer effect on header */
-.header::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, 
-    transparent 0%, 
-    rgba(253, 219, 146, 0.1) 50%, 
-    transparent 100%
-  );
-  animation: shimmer 8s ease-in-out infinite;
-  pointer-events: none;
-  z-index: -1;
-  opacity: 0;
-  transition: opacity 0.8s ease;
-}
-
-.header:not(.scrolled)::after {
-  opacity: 1;
-}
-
-@keyframes shimmer {
-  0% { left: -100%; }
-  50% { left: 100%; }
-  100% { left: 100%; }
-}
-
-body.light-mode .header::before {
-  background: linear-gradient(180deg, 
-    rgba(255, 255, 255, 0.8) 0%,
-    rgba(255, 255, 255, 0.4) 50%, 
-    rgba(255, 255, 255, 0) 100%
-  );
-}
-
-body.light-mode .header::after {
-  background: linear-gradient(90deg, 
-    transparent 0%, 
-    rgba(253, 219, 146, 0.15) 50%, 
-    transparent 100%
-  );
-}
-
+/* Hide header pseudo-elements when scrolled */
 .header.scrolled::before {
   opacity: 0;
 }
@@ -186,32 +124,47 @@ body.light-mode .header::after {
   opacity: 0;
 }
 
+/* Header gets dark background when scrolled - but STAYS RELATIVE (scrolls with page) */
 header.header.scrolled,
-.header.scrolled {
+.dashboard-page header.header.scrolled,
+.dashboard-page .header.scrolled,
+.header.scrolled,
+#main-header.scrolled {
   position: relative !important;
-  top: auto !important;
-  left: auto !important;
-  right: auto !important;
-  transform: none !important;
-  background: rgba(10, 14, 39, 0.85) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border-bottom: 1px solid rgba(253, 219, 146, 0.12) !important;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(253, 219, 146, 0.1) !important;
+  background: #050813 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: 1px solid rgba(253, 219, 146, 0.2) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(253, 219, 146, 0.15) !important;
 }
 
+/* Light mode header - transparent by default */
+html:not(.dark) .header,
+body.light-mode header.header,
+body.light-mode .dashboard-page header.header,
+body.light-mode .dashboard-page .header,
 body.light-mode .header {
   background: transparent !important;
   border-bottom: none !important;
   box-shadow: none !important;
 }
 
+/* Light mode header - background when scrolled - but STAYS RELATIVE (scrolls with page) */
+html:not(.dark) header.header.scrolled,
+html:not(.dark) .dashboard-page header.header.scrolled,
+html:not(.dark) .dashboard-page .header.scrolled,
+html:not(.dark) .header.scrolled,
+html:not(.dark) #main-header.scrolled,
+body.light-mode header.header.scrolled,
+body.light-mode .dashboard-page header.header.scrolled,
+body.light-mode .dashboard-page .header.scrolled,
 body.light-mode .header.scrolled {
-  background: rgba(255, 255, 255, 0.85) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(253, 219, 146, 0.15) !important;
+  position: relative !important;
+  background: #1e293b !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(255, 255, 255, 0.1) !important;
 }
 
 .nav-wrapper {
@@ -309,7 +262,7 @@ body.light-mode .logo-text {
 }
 
 .nav-link {
-  color: var(--text-primary);
+  color: #ffffff !important;
   text-decoration: none;
   font-size: 16px;
   font-weight: 500;
@@ -344,14 +297,19 @@ body.light-mode .logo-text {
 }
 
 body.light-mode .nav-link {
-  color: rgba(26, 31, 58, 0.9);
+  color: rgba(26, 31, 58, 0.9) !important;
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
 }
 
+/* Ensure nav links stay white in dark mode even when scrolled */
 .header.scrolled .nav-link {
-  color: var(--text-secondary);
+  color: #ffffff !important;
   text-shadow: none;
   font-size: 14px;
+}
+
+body.light-mode .header.scrolled .nav-link {
+  color: rgba(26, 31, 58, 0.9) !important;
 }
 
 .nav-link:hover {
@@ -473,15 +431,15 @@ body.light-mode .header.scrolled .icon-btn {
 }
 
 /* Light / dark mode SVG colors */
-body.light-mode .icon-btn svg {
-  color: #1a1f3a !important;
-  stroke: #1a1f3a !important;
+.icon-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
   transition: all 0.4s ease;
 }
 
-body.dark-mode .icon-btn svg {
-  color: #ffffff !important;
-  stroke: #ffffff !important;
+body.light-mode .icon-btn svg {
+  color: #1a1f3a !important;
+  stroke: #1a1f3a !important;
   transition: all 0.4s ease;
 }
 
@@ -491,8 +449,12 @@ body.dark-mode .icon-btn svg {
   font-weight: 600;
   font-size: 14px;
   text-transform: uppercase;
-  color: var(--text-primary);
+  color: #ffffff !important;
   transition: all 0.4s ease;
+}
+
+body.light-mode #languageToggle span {
+  color: rgba(26, 31, 58, 0.9) !important;
 }
 
 /*LANGUAGE DROPDOWN with smooth appearance */
@@ -1001,10 +963,14 @@ body.light-mode .btn-secondary {
 
 .header.scrolled .btn-secondary {
   background: transparent;
-  color: var(--text-primary);
+  color: #ffffff !important;
   border: 1.5px solid var(--border-color);
   box-shadow: none;
   backdrop-filter: none;
+}
+
+body.light-mode .header.scrolled .btn-secondary {
+  color: rgba(26, 31, 58, 0.9) !important;
 }
 
 .btn-secondary:hover {
@@ -1646,18 +1612,25 @@ body.light-mode .hero-title {
   animation-duration: 7s;
 }
 
-/* FINAL OVERRIDE - Ensure header scrolls with page */
+/* FINAL OVERRIDE - ALWAYS relative (scrolls with page, NEVER sticky) */
 .dashboard-page > header.header,
 .dashboard-page header.header,
 .dashboard-page .header,
 header.header.header,
-.header.header {
+.header.header,
+header.header.header.header,
+.dashboard-page > header.header.scrolled,
+.dashboard-page header.header.scrolled,
+.dashboard-page .header.scrolled,
+header.header.header.scrolled,
+.header.header.scrolled {
   position: relative !important;
   top: auto !important;
   left: auto !important;
   right: auto !important;
+  bottom: auto !important;
   transform: none !important;
-  will-change: auto !important;
+  will-change: background-color, border-color, box-shadow !important;
 }
 
 .card-3 { 

@@ -19,12 +19,6 @@ const [showPassword, setShowPassword] = useState(false);
       window.scrollTo({ top: 0, behavior: 'instant' });
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
-      
-      // Also try with Lenis if available (check multiple possible locations)
-      const lenisInstance = (window as any).lenis || (window as any).__lenis;
-      if (lenisInstance && typeof lenisInstance.scrollTo === 'function') {
-        lenisInstance.scrollTo(0, { immediate: true });
-      }
     };
     
     // Immediate scroll

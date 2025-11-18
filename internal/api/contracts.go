@@ -231,10 +231,11 @@ func GetContracts(w http.ResponseWriter, r *http.Request) {
 			currentPrice, err := priceCache.GetPrice(contract.Symbol)
 			if err == nil && currentPrice > 0 {
 				var unrealizedPnL float64
-				if contract.Side == models.ContractSideLong {
+				switch contract.Side {
+				case models.ContractSideLong:
 					// Long position: profit when price goes up
 					unrealizedPnL = (currentPrice - contract.EntryPrice) * contract.LotSize
-				} else if contract.Side == models.ContractSideShort {
+				case models.ContractSideShort:
 					// Short position: profit when price goes down
 					unrealizedPnL = (contract.EntryPrice - currentPrice) * contract.LotSize
 				}
@@ -344,10 +345,10 @@ func GetContractHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":    true,
-		"contracts":  contracts,
-		"total_pnl":  totalPnL,
-		"count":      len(contracts),
+		"success":   true,
+		"contracts": contracts,
+		"total_pnl": totalPnL,
+		"count":     len(contracts),
 	})
 }
 

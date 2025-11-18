@@ -77,7 +77,6 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		UserID:   userID,
 		Type:     req.Type,
 		Currency: req.Currency,
-		Status:   models.AccountStatusActive, // Will map to 'online' for first account
 	}
 
 	// Set initial balance

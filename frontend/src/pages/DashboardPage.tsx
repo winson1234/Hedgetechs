@@ -152,11 +152,13 @@ export default function DashboardPage() {
 
   // Apply theme class to body element when theme changes
   useEffect(() => {
-    if (isDarkMode) {
+    document.body.classList.toggle('dark-mode', isDarkMode);
+    document.body.classList.toggle('light-mode', !isDarkMode);
+
+    return () => {
+      document.body.classList.remove('dark-mode');
       document.body.classList.remove('light-mode');
-    } else {
-      document.body.classList.add('light-mode');
-    }
+    };
   }, [isDarkMode]);
 
   // Handle active nav link based on hash

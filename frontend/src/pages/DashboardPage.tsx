@@ -33,7 +33,6 @@ if (typeof window !== 'undefined') {
     }
     
     headerScrollInitialized = true;
-    console.log('✅ Header found:', header);
 
     // Find the actual scroll container
     const scrollContainer = document.querySelector('.dashboard-page') as HTMLElement;
@@ -42,12 +41,9 @@ if (typeof window !== 'undefined') {
       const scrollTop = scrollContainer
         ? scrollContainer.scrollTop
         : window.scrollY;
-      
-      console.log('🔄 SCROLL! Position:', scrollTop);
-      
+            
       if (scrollTop > 10) {
         header.classList.add('scrolled');
-        console.log('✅ Added scrolled class');
       } else {
         header.classList.remove('scrolled');
       }
@@ -57,10 +53,8 @@ if (typeof window !== 'undefined') {
     
     if (scrollContainer) {
       scrollContainer.addEventListener('scroll', handleHeaderScroll, { passive: true });
-      console.log('✅ Listening to .dashboard-page scroll');
     } else {
       window.addEventListener('scroll', handleHeaderScroll, { passive: true });
-      console.log('✅ Listening to window scroll');
     }
   };
   // Wait for DOM to be fully loaded

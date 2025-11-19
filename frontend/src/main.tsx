@@ -9,6 +9,7 @@ import App from './App'
 import './index.css'
 import { Elements } from '@stripe/react-stripe-js'
 import { loadStripe } from '@stripe/stripe-js'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // Suppress Stripe telemetry errors (blocked by ad blockers)
 const originalError = console.error
@@ -90,21 +91,34 @@ const stripeElementsOptions = {
   },
 }
 
+// Create React Query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 30000, // 30 seconds
+    },
+  },
+})
+
 // Always mount the React app
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Provider store={store}>
-      <PersistGate loading={<div>Loading...</div>} persistor={persistor}>
-        <BrowserRouter>
-          <ThemeWrapper>
-            <AuthWrapper>
-              <Elements stripe={stripePromise} options={stripeElementsOptions}>
-                <App />
-              </Elements>
-            </AuthWrapper>
-          </ThemeWrapper>
-        </BrowserRouter>
-      </PersistGate>
-    </Provider>
+    <QueryClientProvider client={queryClient}>
+      <Provider store={store}>
+        <PersistGate loading={<div>Loading...</div>} persistor={persistor}>
+          <BrowserRouter>
+            <ThemeWrapper>
+              <AuthWrapper>
+                <Elements stripe={stripePromise} options={stripeElementsOptions}>
+                  <App />
+                </Elements>
+              </AuthWrapper>
+            </ThemeWrapper>
+          </BrowserRouter>
+        </PersistGate>
+      </Provider>
+    </QueryClientProvider>
   </React.StrictMode>
 )

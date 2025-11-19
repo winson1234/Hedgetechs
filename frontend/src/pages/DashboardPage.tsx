@@ -1507,8 +1507,11 @@ const cancelLogout = () => {
             <>
               <div className="news-grid">
                 {displayedNews.map((news, index) => (
-                <div 
-                  key={news.id} 
+                <a 
+                  key={news.id}
+                  href={news.link || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="news-item card-3d" 
                   data-gsap-animate="fade-up"
                   data-gsap-stagger={index * 0.1}
@@ -1520,7 +1523,18 @@ const cancelLogout = () => {
                   border: '1px solid rgba(255, 255, 255, 0.1)',
                   display: 'flex',
                   flexDirection: 'column',
-                  height: '100%'
+                  height: '100%',
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}>
                   <div className="news-badge" style={{
                     position: 'absolute',
@@ -1621,10 +1635,7 @@ const cancelLogout = () => {
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden'
                     }}>{news.excerpt}</p>
-                    <a
-                      href={news.link || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <div
                       style={{
                         color: '#FDDB92',
                         fontSize: '10px',
@@ -1632,20 +1643,13 @@ const cancelLogout = () => {
                         textDecoration: 'none',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '0.3rem',
-                        transition: 'gap 0.3s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.gap = '0.6rem';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.gap = '0.3rem';
+                        gap: '0.3rem'
                       }}
                     >
                       Read More <span>→</span>
-                    </a>
+                    </div>
                   </div>
-                </div>
+                </a>
               ))}
               </div>
 

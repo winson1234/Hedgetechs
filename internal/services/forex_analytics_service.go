@@ -37,7 +37,7 @@ func NewForexAnalyticsService(db *pgxpool.Pool, redisClient *redis.Client) *Fore
 // Forex symbols list (should match MT5 publisher configuration)
 var FOREX_SYMBOLS = []string{
 	"EURUSD", "GBPUSD", "USDJPY", "AUDUSD",
-	"NZDUSD", "USDCHF", "CADJPY", "AUDNZD", "EURGBP",
+	"NZDUSD", "USDCHF", "AUDJPY", "CADJPY", "AUDNZD", "EURGBP",
 	"USDCAD", "EURJPY", "GBPJPY",
 }
 

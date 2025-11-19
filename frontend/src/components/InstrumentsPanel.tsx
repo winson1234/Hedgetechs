@@ -86,8 +86,8 @@ function InstrumentsPanel() {
   // Build instruments from shared assetPrices prop
   const instruments = useMemo(() => {
     return instrumentSymbols.map(inst => {
-      // Check if this is a forex instrument
-      const isForex = inst.category === 'forex'
+      // Check if this is a forex instrument based on instrument_type
+      const isForex = inst.instrument_type === 'forex'
       const forexQuote = isForex ? forexQuotes[inst.symbol] : null
 
       // Use forex bid price for forex instruments, crypto price for others
@@ -170,8 +170,27 @@ function InstrumentsPanel() {
         iconUrl = iconMap[inst.base_currency] || ''
       }
 
-      const category = inst.category || 'altcoin'
-      
+      // Determine category based on instrument_type and symbol
+      let category: InstrumentCategory = 'altcoin' // default
+
+      if (inst.instrument_type === 'forex') {
+        category = 'forex'
+      } else if (inst.instrument_type === 'commodity') {
+        category = 'commodity'
+      } else if (inst.instrument_type === 'crypto') {
+        // Categorize crypto into major/defi/altcoin based on symbol
+        const majorCryptos = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT', 'AVAXUSDT']
+        const defiCryptos = ['MATICUSDT', 'LINKUSDT', 'UNIUSDT', 'ATOMUSDT', 'DOTUSDT', 'ARBUSDT', 'OPUSDT', 'APTUSDT']
+
+        if (majorCryptos.includes(inst.symbol)) {
+          category = 'major'
+        } else if (defiCryptos.includes(inst.symbol)) {
+          category = 'defi'
+        } else {
+          category = 'altcoin'
+        }
+      }
+
       // Format display name for forex pairs
       let displayName = baseCurrency
       if (isForexPair && forexPair.base && forexPair.quote) {

@@ -40,11 +40,14 @@ export default function App() {
 
     const hydratePrices = async () => {
       try {
-        // Build symbols list from instruments API (only crypto instruments for ticker)
-        const cryptoInstruments = instruments.filter(inst => inst.category !== 'forex')
-        if (cryptoInstruments.length === 0) return
-        
-        const symbols = cryptoInstruments.map(inst => inst.symbol).join(',')
+        // Build symbols list from instruments API (crypto + commodity instruments for ticker)
+        // Forex uses MT5/Redis, so exclude those
+        const tickerInstruments = instruments.filter(inst =>
+          inst.instrument_type === 'crypto' || inst.instrument_type === 'commodity'
+        )
+        if (tickerInstruments.length === 0) return
+
+        const symbols = tickerInstruments.map(inst => inst.symbol).join(',')
         const response = await fetch(getApiUrl(`/api/v1/ticker?symbols=${symbols}`))
         if (!response.ok) throw new Error('Failed to fetch 24h ticker data')
         const data = await response.json()

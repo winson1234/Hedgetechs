@@ -241,22 +241,53 @@ type KYCDocument struct {
 // INSTRUMENT MODELS
 // ================================================================
 
-// Instrument represents a tradeable instrument
+// Instrument represents a tradeable instrument (master table)
 type Instrument struct {
-	Symbol              string    `json:"symbol"`
-	Name                *string   `json:"name,omitempty"`
-	BaseCurrency        *string   `json:"base_currency,omitempty"`
-	QuoteCurrency       *string   `json:"quote_currency,omitempty"`
-	InstrumentType      *string   `json:"instrument_type,omitempty"` // crypto, forex, commodity
-	Category            *string   `json:"category,omitempty"`        // major, defi, altcoin, forex, commodity
-	IsTradeable         bool      `json:"is_tradeable"`
-	LeverageCap         int       `json:"leverage_cap"`
-	SpreadAdjustmentBps int       `json:"spread_adjustment_bps"`
-	MinOrderSize        *float64  `json:"min_order_size,omitempty"`
-	MaxOrderSize        *float64  `json:"max_order_size,omitempty"`
-	TickSize            *float64  `json:"tick_size,omitempty"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	Symbol         string    `json:"symbol"`
+	InstrumentType string    `json:"instrument_type"` // crypto, forex, commodity
+	BaseCurrency   string    `json:"base_currency"`
+	QuoteCurrency  string    `json:"quote_currency"`
+	IsTradeable    bool      `json:"is_tradeable"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+
+	// Nested configurations (populated via JOINs)
+	SpotConfig  *SpotConfiguration  `json:"spot_config,omitempty"`
+	ForexConfig *ForexConfiguration `json:"forex_config,omitempty"`
+}
+
+// SpotConfiguration represents crypto spot trading configuration
+type SpotConfiguration struct {
+	Symbol          string  `json:"symbol"`
+	BasePrecision   int     `json:"base_precision"`
+	QuotePrecision  int     `json:"quote_precision"`
+	TickSize        float64 `json:"tick_size"`
+	StepSize        float64 `json:"step_size"`
+	MinQuantity     float64 `json:"min_quantity"`
+	MaxQuantity     float64 `json:"max_quantity"`
+	MinNotional     float64 `json:"min_notional"`
+	MaxNotional     float64 `json:"max_notional"`
+	MakerFeeRate    float64 `json:"maker_fee_rate"`
+	TakerFeeRate    float64 `json:"taker_fee_rate"`
+}
+
+// ForexConfiguration represents forex trading configuration
+type ForexConfiguration struct {
+	Symbol         string  `json:"symbol"`
+	Digits         int     `json:"digits"`
+	ContractSize   int     `json:"contract_size"`
+	PipSize        float64 `json:"pip_size"`
+	MinLot         float64 `json:"min_lot"`
+	MaxLot         float64 `json:"max_lot"`
+	LotStep        float64 `json:"lot_step"`
+	MaxLeverage    int     `json:"max_leverage"`
+	MarginCurrency string  `json:"margin_currency"`
+	StopLevel      int     `json:"stop_level"`
+	FreezeLevel    int     `json:"freeze_level"`
+	SwapEnable     bool    `json:"swap_enable"`
+	SwapLong       float64 `json:"swap_long"`
+	SwapShort      float64 `json:"swap_short"`
+	SwapTripleDay  string  `json:"swap_triple_day"`
 }
 
 // ================================================================

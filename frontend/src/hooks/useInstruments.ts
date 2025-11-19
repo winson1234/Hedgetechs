@@ -3,22 +3,53 @@ import { apiFetch } from '../utils/api';
 
 export type InstrumentCategory = 'major' | 'defi' | 'altcoin' | 'forex' | 'commodity';
 
+export interface SpotConfiguration {
+  symbol: string;
+  base_precision: number;
+  quote_precision: number;
+  tick_size: number;
+  step_size: number;
+  min_quantity: number;
+  max_quantity: number;
+  min_notional: number;
+  max_notional: number;
+  maker_fee_rate: number;
+  taker_fee_rate: number;
+}
+
+export interface ForexConfiguration {
+  symbol: string;
+  digits: number;
+  contract_size: number;
+  pip_size: number;
+  min_lot: number;
+  max_lot: number;
+  lot_step: number;
+  max_leverage: number;
+  margin_currency: string;
+  stop_level: number;
+  freeze_level: number;
+  swap_enable: boolean;
+  swap_long: number;
+  swap_short: number;
+  swap_triple_day: string;
+}
+
 export interface Instrument {
   symbol: string;
-  name?: string | null;
-  base_currency?: string | null;
-  quote_currency?: string | null;
-  instrument_type?: string | null;
-  category?: string | null; // major, defi, altcoin, forex, commodity (from database)
+  instrument_type: 'crypto' | 'forex' | 'commodity';
+  base_currency: string;
+  quote_currency: string;
   is_tradeable: boolean;
-  leverage_cap: number;
-  spread_adjustment_bps?: number;
-  min_order_size?: number | null;
-  max_order_size?: number | null;
-  tick_size?: number | null;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
+
+  // Nested configurations (populated by backend)
+  spot_config?: SpotConfiguration;
+  forex_config?: ForexConfiguration;
+
   // Legacy fields for backward compatibility
+  category?: string | null; // Derived from instrument_type
   displayName?: string;
   baseCurrency?: string;
   iconUrl?: string;

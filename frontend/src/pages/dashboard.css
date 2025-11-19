@@ -1144,6 +1144,10 @@ body.light-mode .header.scrolled .btn-secondary {
   transition: color 0.3s ease;
 }
 
+.mobile-nav-link.active {
+  color: var(--primary-color);
+}
+
 .mobile-nav-link:hover {
   color: var(--text-primary);
 }

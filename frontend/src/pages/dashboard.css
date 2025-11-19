@@ -3,11 +3,7 @@ html {
   scroll-padding-top: 140px;
   scroll-behavior: smooth;
 }
-.dashboard-page {
-  height: 100vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
+
 /* ===========================
    Global Section Sizing (Reduce Zoom)
    =========================== */

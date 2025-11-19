@@ -105,9 +105,10 @@ func (ms *MarginService) CalculateMargin(accountID uuid.UUID) (*MarginMetrics, e
 			// Long position: (currentPrice - entryPrice) * lotSize
 			// Short position: (entryPrice - currentPrice) * lotSize
 			var pnl float64
-			if side == "long" {
+			switch side {
+			case "long":
 				pnl = (currentPrice - entryPrice) * lotSize
-			} else if side == "short" {
+			case "short":
 				pnl = (entryPrice - currentPrice) * lotSize
 			}
 			totalUnrealizedPnL += pnl

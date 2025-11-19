@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -30,12 +31,16 @@ func InitDB() error {
 	}
 
 	// Configure connection pool settings
-	config.MaxConns = 25                           // Maximum number of connections in the pool
-	config.MinConns = 5                            // Minimum number of connections to maintain
-	config.MaxConnLifetime = time.Hour             // Maximum lifetime of a connection
-	config.MaxConnIdleTime = 30 * time.Minute      // Maximum idle time before closing connection
-	config.HealthCheckPeriod = 1 * time.Minute     // How often to check connection health
+	config.MaxConns = 25                               // Maximum number of connections in the pool
+	config.MinConns = 5                                // Minimum number of connections to maintain
+	config.MaxConnLifetime = time.Hour                 // Maximum lifetime of a connection
+	config.MaxConnIdleTime = 30 * time.Minute          // Maximum idle time before closing connection
+	config.HealthCheckPeriod = 1 * time.Minute         // How often to check connection health
 	config.ConnConfig.ConnectTimeout = 5 * time.Second // Timeout for establishing new connections
+
+	// Disable prepared statements for compatibility with PgBouncer (Supabase Session Pooler)
+	// Supabase uses PgBouncer in session mode which doesn't support prepared statements
+	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
 	// Create the connection pool
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

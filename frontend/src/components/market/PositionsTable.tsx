@@ -1,32 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useAppSelector } from '../../store';
+import { useEffect, useMemo, useState } from 'react';
+import { useAppSelector, useAppDispatch } from '../../store';
 import { formatCurrency } from '../../utils/formatters';
 import { ProductType } from '../../types';
-
-interface Position {
-  id: string;
-  user_id: string;
-  account_id: string;
-  symbol: string;
-  contract_number: string;
-  side: 'long' | 'short';
-  status: 'open' | 'closed' | 'liquidated';
-  lot_size: number;
-  entry_price: number;
-  margin_used: number;
-  leverage: number;
-  product_type?: 'spot' | 'cfd' | 'futures'; // Product type for the position
-  tp_price?: number | null;
-  sl_price?: number | null;
-  close_price?: number | null;
-  pnl?: number | null;
-  liquidation_price?: number | null;
-  swap: number;
-  commission: number;
-  created_at: string;
-  closed_at?: string | null;
-  updated_at: string;
-}
+import { fetchPositions, closePosition, closePair, updateAllPositionsPnL } from '../../store/slices/positionSlice';
+import { fetchAccounts } from '../../store/slices/accountSlice';
+import { addToast } from '../../store/slices/uiSlice';
+import ConfirmDialog from '../ConfirmDialog';
 
 interface PositionsTableProps {
   filterByProductType: boolean;
@@ -34,47 +13,42 @@ interface PositionsTableProps {
 }
 
 export default function PositionsTable({ filterByProductType, selectedProductType }: PositionsTableProps) {
+  const dispatch = useAppDispatch();
   const { activeAccountId } = useAppSelector(state => state.account);
   const { currentPrices } = useAppSelector(state => state.price);
-  const session = useAppSelector(state => state.auth.session);
-
+  const { positions, loading, error } = useAppSelector(state => state.position);
   const positionsRefreshTrigger = useAppSelector(state => state.ui.positionsRefreshTrigger);
-  const [positions, setPositions] = useState<Position[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Fetch open positions
-  const fetchPositions = useCallback(async () => {
-    if (!activeAccountId || !session?.access_token) return;
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant: 'default' | 'danger' | 'warning';
+    details: Array<{ label: string; value: string; highlight?: boolean }>;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    variant: 'default',
+    details: [],
+    onConfirm: () => {}
+  });
 
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `/api/v1/contracts?account_id=${activeAccountId}&status=open`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (!response.ok) throw new Error('Failed to fetch positions');
-
-      const data = await response.json();
-      setPositions(data.contracts || []);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching positions:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch positions');
-    } finally {
-      setLoading(false);
-    }
-  }, [activeAccountId, session?.access_token]);
-
-  // Fetch positions on mount, when account changes, or when triggered
+  // Fetch positions when account changes or when triggered
   useEffect(() => {
-    fetchPositions();
-  }, [fetchPositions, positionsRefreshTrigger]);
+    if (activeAccountId) {
+      dispatch(fetchPositions({ accountId: activeAccountId, status: 'open' }));
+    }
+  }, [dispatch, activeAccountId, positionsRefreshTrigger]);
+
+  // Update all positions' P&L when prices change
+  useEffect(() => {
+    if (currentPrices && Object.keys(currentPrices).length > 0) {
+      dispatch(updateAllPositionsPnL(currentPrices));
+    }
+  }, [dispatch, currentPrices]);
 
   // Filter positions by product type
   const filteredPositions = useMemo(() =>
@@ -85,69 +59,123 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
     [positions, filterByProductType, selectedProductType]
   );
 
-  // Close position handler
+  // Close position handler with confirmation and hedged pair warning
   const handleClosePosition = async (contractId: string, symbol: string) => {
-    if (!session?.access_token) return;
+    // Get current market price for this symbol
+    const priceData = currentPrices[symbol];
+    const currentPrice = priceData?.price;
 
-    try {
-      // Get current market price for this symbol
-      const priceData = currentPrices[symbol];
-      const currentPrice = priceData?.price;
+    if (!currentPrice) {
+      dispatch(addToast({ message: 'Unable to get current market price. Please try again.', type: 'error' }));
+      return;
+    }
 
-      if (!currentPrice) {
-        alert('Unable to get current market price. Please try again.');
-        return;
-      }
+    // Find the position to show P&L in confirmation
+    const position = positions.find(p => p.id === contractId);
+    if (!position) return;
 
-      const response = await fetch(`/api/v1/contracts/close?contract_id=${contractId}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          close_price: currentPrice,
-        }),
+    const unrealizedPnL = position.unrealized_pnl || 0;
+    const pnlText = unrealizedPnL >= 0 ? `+${formatCurrency(unrealizedPnL, 'USD')}` : formatCurrency(unrealizedPnL, 'USD');
+
+    // Check if this position is part of a hedged pair
+    const isHedgedPosition = position.pair_id !== null && position.pair_id !== undefined;
+    const pairedPosition = isHedgedPosition ? positions.find(p => p.pair_id === position.pair_id && p.id !== position.id) : null;
+
+    // Close hedged pair (both positions) if applicable
+    if (isHedgedPosition && pairedPosition && pairedPosition.status === 'open') {
+      const pairedPnL = pairedPosition.unrealized_pnl || 0;
+      const pairedPnLText = pairedPnL >= 0 ? `+${formatCurrency(pairedPnL, 'USD')}` : formatCurrency(pairedPnL, 'USD');
+      const totalPnL = unrealizedPnL + pairedPnL;
+      const totalPnLText = totalPnL >= 0 ? `+${formatCurrency(totalPnL, 'USD')}` : formatCurrency(totalPnL, 'USD');
+
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Close Hedged Pair',
+        message: 'This will close both positions in the hedged pair at the current market price.',
+        variant: 'default',
+        details: [
+          { label: `${position.side.toUpperCase()} Position`, value: position.symbol, highlight: true },
+          { label: 'P&L', value: pnlText },
+          { label: `${pairedPosition.side.toUpperCase()} Position`, value: pairedPosition.symbol, highlight: true },
+          { label: 'P&L', value: pairedPnLText },
+          { label: 'Combined P&L', value: totalPnLText, highlight: true },
+          { label: 'Close Price', value: formatCurrency(currentPrice, 'USD') }
+        ],
+        onConfirm: async () => {
+          // Close dialog immediately to prevent double-execution
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          await executeClosePair(position.pair_id!, currentPrice, totalPnL);
+        }
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to close position');
-      }
-
-      // Refresh positions after closing
-      await fetchPositions();
-    } catch (err) {
-      console.error('Error closing position:', err);
-      alert(err instanceof Error ? err.message : 'Failed to close position');
+    } else {
+      // Standard confirmation dialog
+      setConfirmDialog({
+        isOpen: true,
+        title: `Close ${position.side.toUpperCase()} ${position.symbol} position?`,
+        message: 'Your position will be closed at the current market price.',
+        variant: 'default',
+        details: [
+          { label: 'Current P&L', value: pnlText, highlight: true },
+          { label: 'Close Price', value: formatCurrency(currentPrice, 'USD') }
+        ],
+        onConfirm: async () => {
+          // Close dialog immediately to prevent double-execution
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          await executeClosePosition(contractId, currentPrice, pnlText);
+        }
+      });
     }
   };
 
-  // Calculate real-time P&L for each position
-  const positionsWithPnL = useMemo(() => {
-    return filteredPositions.map(position => {
-      const priceData = currentPrices[position.symbol];
-      const currentPrice = priceData?.price || position.entry_price;
+  // Execute position close
+  const executeClosePosition = async (contractId: string, closePrice: number, pnlText: string) => {
+    try {
+      // Dispatch close position action
+      await dispatch(closePosition({ contractId, closePrice })).unwrap();
 
-      // Calculate unrealized P&L
-      let unrealizedPnL: number;
-      if (position.side === 'long') {
-        unrealizedPnL = (currentPrice - position.entry_price) * position.lot_size;
-      } else {
-        unrealizedPnL = (position.entry_price - currentPrice) * position.lot_size;
-      }
+      // Show success toast with P&L
+      dispatch(addToast({
+        message: `Position closed: ${pnlText}`,
+        type: 'success'
+      }));
 
-      // Calculate ROE (Return on Equity) as percentage of margin
-      const roe = (unrealizedPnL / position.margin_used) * 100;
+      // Refresh account balance
+      dispatch(fetchAccounts());
+    } catch (err) {
+      // Error toast is handled by the thunk rejection
+      dispatch(addToast({
+        message: err instanceof Error ? err.message : 'Failed to close position',
+        type: 'error'
+      }));
+    }
+  };
 
-      return {
-        ...position,
-        currentPrice,
-        unrealizedPnL,
-        roe,
-      };
-    });
-  }, [filteredPositions, currentPrices]);
+  // Execute hedged pair close (closes both long and short positions)
+  const executeClosePair = async (pairId: string, closePrice: number, totalPnL: number) => {
+    try {
+      // Dispatch close pair action
+      await dispatch(closePair({ pairId, closePrice })).unwrap();
+
+      // Show success toast with combined P&L
+      const pnlText = totalPnL >= 0 ? `+${formatCurrency(totalPnL, 'USD')}` : formatCurrency(totalPnL, 'USD');
+      dispatch(addToast({
+        message: `Hedged pair closed: ${pnlText}`,
+        type: 'success'
+      }));
+
+      // Refresh account balance
+      dispatch(fetchAccounts());
+    } catch (err) {
+      // Error toast
+      dispatch(addToast({
+        message: err instanceof Error ? err.message : 'Failed to close pair',
+        type: 'error'
+      }));
+    }
+  };
+
+  // Positions already have P&L calculated by Redux, just use filteredPositions
+  const positionsWithPnL = filteredPositions;
 
   // Format timestamp to readable date
   const formatTimestamp = (timestamp: string) => {
@@ -260,9 +288,10 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                   </div>
                   <button
                     onClick={() => handleClosePosition(position.id, position.symbol)}
-                    className="px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
+                    disabled={loading}
+                    className="px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Close
+                    {loading ? 'Closing...' : 'Close'}
                   </button>
                 </div>
 
@@ -288,7 +317,7 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                   <div className="flex justify-between">
                     <span className="text-slate-600 dark:text-slate-400">Current:</span>
                     <span className="font-medium text-slate-900 dark:text-slate-100">
-                      {formatCurrency(position.currentPrice, 'USD')}
+                      {formatCurrency(position.current_price || position.entry_price, 'USD')}
                     </span>
                   </div>
 
@@ -316,26 +345,26 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                       <span className="text-xs text-slate-600 dark:text-slate-400">Unrealized P&L:</span>
                       <span
                         className={`ml-2 text-sm font-bold ${
-                          position.unrealizedPnL >= 0
+                          (position.unrealized_pnl || 0) >= 0
                             ? 'text-green-600 dark:text-green-400'
                             : 'text-red-600 dark:text-red-400'
                         }`}
                       >
-                        {position.unrealizedPnL >= 0 ? '+' : ''}
-                        {formatCurrency(position.unrealizedPnL, 'USD')}
+                        {(position.unrealized_pnl || 0) >= 0 ? '+' : ''}
+                        {formatCurrency(position.unrealized_pnl || 0, 'USD')}
                       </span>
                     </div>
                     <div>
                       <span className="text-xs text-slate-600 dark:text-slate-400">ROE:</span>
                       <span
                         className={`ml-2 text-sm font-bold ${
-                          position.roe >= 0
+                          (position.roe || 0) >= 0
                             ? 'text-green-600 dark:text-green-400'
                             : 'text-red-600 dark:text-red-400'
                         }`}
                       >
-                        {position.roe >= 0 ? '+' : ''}
-                        {position.roe.toFixed(2)}%
+                        {(position.roe || 0) >= 0 ? '+' : ''}
+                        {(position.roe || 0).toFixed(2)}%
                       </span>
                     </div>
                   </div>
@@ -357,6 +386,17 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+        details={confirmDialog.details}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

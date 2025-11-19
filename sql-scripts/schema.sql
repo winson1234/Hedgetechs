@@ -25,7 +25,7 @@ CREATE TYPE product_type AS ENUM ('spot', 'cfd', 'futures');
 CREATE TYPE account_status AS ENUM ('active', 'deactivated', 'suspended');
 
 -- Transaction type
-CREATE TYPE transaction_type AS ENUM ('deposit', 'withdrawal', 'transfer');
+CREATE TYPE transaction_type AS ENUM ('deposit', 'withdrawal', 'transfer', 'position_close');
 
 -- Transaction status
 CREATE TYPE transaction_status AS ENUM ('pending', 'completed', 'failed');

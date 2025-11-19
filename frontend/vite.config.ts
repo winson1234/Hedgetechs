@@ -60,7 +60,6 @@ export default defineConfig({
           'ui-vendor': ['framer-motion', 'gsap', 'lenis'],
           'chart-vendor': ['lightweight-charts', 'recharts'],
           'stripe-vendor': ['@stripe/react-stripe-js', '@stripe/stripe-js'],
-          'supabase-vendor': ['@supabase/supabase-js'],
         },
       },
     },

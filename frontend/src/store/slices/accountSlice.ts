@@ -41,7 +41,7 @@ const initialState: AccountState = {
 // Helper to get auth token from state
 const getAuthToken = (getState: () => RootState) => {
   const state = getState();
-  return state.auth.session?.access_token || null;
+  return state.auth.token || null;
 };
 
 // Async thunks

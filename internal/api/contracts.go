@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"brokerageProject/internal/database"
+	"brokerageProject/internal/hub"
 	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/models"
 	"brokerageProject/internal/services"
@@ -120,14 +121,14 @@ func CreateContract(w http.ResponseWriter, r *http.Request) {
 	var contract models.Contract
 	err = pool.QueryRow(ctx,
 		`SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size, entry_price, margin_used, leverage,
-		        tp_price, sl_price, close_price, pnl, swap, commission, created_at, closed_at, updated_at
+		        tp_price, sl_price, close_price, pnl, swap, commission, pair_id, created_at, closed_at, updated_at
 		 FROM contracts WHERE id = $1`,
 		contractID,
 	).Scan(
 		&contract.ID, &contract.UserID, &contract.AccountID, &contract.Symbol, &contract.ContractNumber, &contract.Side, &contract.Status,
 		&contract.LotSize, &contract.EntryPrice, &contract.MarginUsed, &contract.Leverage,
 		&contract.TPPrice, &contract.SLPrice, &contract.ClosePrice, &contract.PnL,
-		&contract.Swap, &contract.Commission, &contract.CreatedAt, &contract.ClosedAt, &contract.UpdatedAt,
+		&contract.Swap, &contract.Commission, &contract.PairID, &contract.CreatedAt, &contract.ClosedAt, &contract.UpdatedAt,
 	)
 	if err != nil {
 		log.Printf("Failed to fetch contract: %v", err)
@@ -186,7 +187,7 @@ func GetContracts(w http.ResponseWriter, r *http.Request) {
 
 	// Build query based on status filter
 	query := `SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size, entry_price, margin_used, leverage,
-	                 tp_price, sl_price, close_price, pnl, swap, commission, created_at, closed_at, updated_at
+	                 tp_price, sl_price, close_price, pnl, swap, commission, pair_id, created_at, closed_at, updated_at
 	          FROM contracts
 	          WHERE account_id = $1`
 
@@ -218,7 +219,7 @@ func GetContracts(w http.ResponseWriter, r *http.Request) {
 			&contract.ID, &contract.UserID, &contract.AccountID, &contract.Symbol, &contract.ContractNumber, &contract.Side, &contract.Status,
 			&contract.LotSize, &contract.EntryPrice, &contract.MarginUsed, &contract.Leverage,
 			&contract.TPPrice, &contract.SLPrice, &contract.ClosePrice, &contract.PnL,
-			&contract.Swap, &contract.Commission, &contract.CreatedAt, &contract.ClosedAt, &contract.UpdatedAt,
+			&contract.Swap, &contract.Commission, &contract.PairID, &contract.CreatedAt, &contract.ClosedAt, &contract.UpdatedAt,
 		)
 		if err != nil {
 			log.Printf("Failed to scan contract: %v", err)
@@ -230,10 +231,11 @@ func GetContracts(w http.ResponseWriter, r *http.Request) {
 			currentPrice, err := priceCache.GetPrice(contract.Symbol)
 			if err == nil && currentPrice > 0 {
 				var unrealizedPnL float64
-				if contract.Side == models.ContractSideLong {
+				switch contract.Side {
+				case models.ContractSideLong:
 					// Long position: profit when price goes up
 					unrealizedPnL = (currentPrice - contract.EntryPrice) * contract.LotSize
-				} else if contract.Side == models.ContractSideShort {
+				case models.ContractSideShort:
 					// Short position: profit when price goes down
 					unrealizedPnL = (contract.EntryPrice - currentPrice) * contract.LotSize
 				}
@@ -256,9 +258,103 @@ func GetContracts(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetContractHistory handles GET /api/v1/contracts/history
+// Returns closed and liquidated contracts for an account
+func GetContractHistory(w http.ResponseWriter, r *http.Request) {
+	userID, err := middleware.GetUserIDFromContext(r.Context())
+	if err != nil {
+		respondWithJSONError(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
+		return
+	}
+
+	accountIDStr := r.URL.Query().Get("account_id")
+	if accountIDStr == "" {
+		respondWithJSONError(w, http.StatusBadRequest, "invalid_request", "account_id parameter is required")
+		return
+	}
+
+	accountID, err := uuid.Parse(accountIDStr)
+	if err != nil {
+		respondWithJSONError(w, http.StatusBadRequest, "invalid_request", "invalid account_id format")
+		return
+	}
+
+	pool, err := database.GetPool()
+	if err != nil {
+		log.Printf("Database pool error: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "database connection error")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Verify account belongs to user
+	var accountUserID uuid.UUID
+	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", accountID).Scan(&accountUserID)
+	if err != nil || accountUserID != userID {
+		respondWithJSONError(w, http.StatusForbidden, "forbidden", "account does not belong to user")
+		return
+	}
+
+	// Query closed and liquidated contracts
+	query := `SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size, entry_price, margin_used, leverage,
+	                 tp_price, sl_price, close_price, pnl, swap, commission, pair_id, created_at, closed_at, updated_at
+	          FROM contracts
+	          WHERE account_id = $1 AND status IN ('closed', 'liquidated')
+	          ORDER BY closed_at DESC NULLS LAST, created_at DESC
+	          LIMIT 200`
+
+	rows, err := pool.Query(ctx, query, accountID)
+	if err != nil {
+		log.Printf("Failed to query contract history: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to fetch contract history")
+		return
+	}
+	defer rows.Close()
+
+	var contracts []models.Contract
+	for rows.Next() {
+		var contract models.Contract
+		err := rows.Scan(
+			&contract.ID, &contract.UserID, &contract.AccountID, &contract.Symbol, &contract.ContractNumber,
+			&contract.Side, &contract.Status, &contract.LotSize, &contract.EntryPrice, &contract.MarginUsed,
+			&contract.Leverage, &contract.TPPrice, &contract.SLPrice, &contract.ClosePrice, &contract.PnL,
+			&contract.Swap, &contract.Commission, &contract.PairID, &contract.CreatedAt, &contract.ClosedAt, &contract.UpdatedAt,
+		)
+		if err != nil {
+			log.Printf("Failed to scan contract: %v", err)
+			continue
+		}
+
+		contracts = append(contracts, contract)
+	}
+
+	if contracts == nil {
+		contracts = []models.Contract{}
+	}
+
+	// Calculate total realized P&L
+	var totalPnL float64
+	for _, contract := range contracts {
+		if contract.PnL != nil {
+			totalPnL += *contract.PnL
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"contracts": contracts,
+		"total_pnl": totalPnL,
+		"count":     len(contracts),
+	})
+}
+
 // CloseContract handles POST /api/v1/contracts/{contract_id}/close
 // Closes an open contract with margin release (supports independent closure of hedged positions)
-func CloseContract(w http.ResponseWriter, r *http.Request) {
+func CloseContract(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	userID, err := middleware.GetUserIDFromContext(r.Context())
 	if err != nil {
 		respondWithJSONError(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
@@ -333,18 +429,30 @@ func CloseContract(w http.ResponseWriter, r *http.Request) {
 	var contract models.Contract
 	err = pool.QueryRow(ctx,
 		`SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size, entry_price, margin_used, leverage,
-		        tp_price, sl_price, close_price, pnl, swap, commission, created_at, closed_at, updated_at
+		        tp_price, sl_price, close_price, pnl, swap, commission, pair_id, created_at, closed_at, updated_at
 		 FROM contracts WHERE id = $1`,
 		contractID,
 	).Scan(
 		&contract.ID, &contract.UserID, &contract.AccountID, &contract.Symbol, &contract.ContractNumber, &contract.Side, &contract.Status,
 		&contract.LotSize, &contract.EntryPrice, &contract.MarginUsed, &contract.Leverage,
 		&contract.TPPrice, &contract.SLPrice, &contract.ClosePrice, &contract.PnL,
-		&contract.Swap, &contract.Commission, &contract.CreatedAt, &contract.ClosedAt, &contract.UpdatedAt,
+		&contract.Swap, &contract.Commission, &contract.PairID, &contract.CreatedAt, &contract.ClosedAt, &contract.UpdatedAt,
 	)
 	if err != nil {
 		log.Printf("Failed to fetch closed contract: %v", err)
 		// Contract was closed successfully, just couldn't fetch details
+	}
+
+	// Broadcast position closed event to all connected WebSocket clients
+	if h != nil {
+		positionUpdate := map[string]interface{}{
+			"type":       "position_closed",
+			"contract":   contract,
+			"account_id": contract.AccountID.String(),
+		}
+		if updateBytes, err := json.Marshal(positionUpdate); err == nil {
+			h.BroadcastMessage(updateBytes)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -353,6 +461,151 @@ func CloseContract(w http.ResponseWriter, r *http.Request) {
 		"success":  true,
 		"message":  "contract closed successfully with margin released",
 		"contract": contract,
+	})
+}
+
+// ClosePair handles POST /api/v1/contracts/close-pair
+// Closes both positions in a hedged pair atomically
+func ClosePair(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
+	userID, err := middleware.GetUserIDFromContext(r.Context())
+	if err != nil {
+		respondWithJSONError(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
+		return
+	}
+
+	pairIDStr := r.URL.Query().Get("pair_id")
+	if pairIDStr == "" {
+		respondWithJSONError(w, http.StatusBadRequest, "invalid_request", "pair_id parameter is required")
+		return
+	}
+
+	pairID, err := uuid.Parse(pairIDStr)
+	if err != nil {
+		respondWithJSONError(w, http.StatusBadRequest, "invalid_request", "invalid pair_id format")
+		return
+	}
+
+	var req models.CloseContractRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithJSONError(w, http.StatusBadRequest, "invalid_request", "invalid request body")
+		return
+	}
+
+	if req.ClosePrice <= 0 {
+		respondWithJSONError(w, http.StatusBadRequest, "validation_error", "close_price must be positive")
+		return
+	}
+
+	pool, err := database.GetPool()
+	if err != nil {
+		log.Printf("Database pool error: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "database connection error")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Verify both contracts in the pair belong to user and are open
+	var longContractID uuid.UUID
+	var shortContractID uuid.UUID
+	var longUserID uuid.UUID
+	var shortUserID uuid.UUID
+	var longStatus models.ContractStatus
+	var shortStatus models.ContractStatus
+	var accountID uuid.UUID
+
+	// Get long contract
+	err = pool.QueryRow(ctx,
+		`SELECT id, user_id, status, account_id FROM contracts
+		 WHERE pair_id = $1 AND side = 'long'`,
+		pairID,
+	).Scan(&longContractID, &longUserID, &longStatus, &accountID)
+
+	if err != nil {
+		respondWithJSONError(w, http.StatusNotFound, "not_found", "long contract in pair not found")
+		return
+	}
+
+	// Get short contract
+	err = pool.QueryRow(ctx,
+		`SELECT id, user_id, status FROM contracts
+		 WHERE pair_id = $1 AND side = 'short'`,
+		pairID,
+	).Scan(&shortContractID, &shortUserID, &shortStatus)
+
+	if err != nil {
+		respondWithJSONError(w, http.StatusNotFound, "not_found", "short contract in pair not found")
+		return
+	}
+
+	// Verify ownership and status
+	if longUserID != userID || shortUserID != userID {
+		respondWithJSONError(w, http.StatusForbidden, "forbidden", "pair does not belong to user")
+		return
+	}
+	if longStatus != models.ContractStatusOpen || shortStatus != models.ContractStatusOpen {
+		respondWithJSONError(w, http.StatusBadRequest, "invalid_state", "both contracts in pair must be open")
+		return
+	}
+
+	// Use HedgingService to close entire pair atomically
+	hedgingService := services.NewHedgingService(pool)
+	err = hedgingService.CloseEntirePair(ctx, pairID, req.ClosePrice)
+	if err != nil {
+		log.Printf("Failed to close pair: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "execution_error", fmt.Sprintf("failed to close pair: %v", err))
+		return
+	}
+
+	// Fetch both closed contracts to return details
+	query := `SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size, entry_price, margin_used, leverage,
+	                 tp_price, sl_price, close_price, pnl, swap, commission, pair_id, created_at, closed_at, updated_at
+	          FROM contracts WHERE pair_id = $1`
+
+	rows, err := pool.Query(ctx, query, pairID)
+	if err != nil {
+		log.Printf("Failed to fetch closed pair contracts: %v", err)
+		// Pair was closed successfully, just couldn't fetch details
+	}
+	defer rows.Close()
+
+	var contracts []models.Contract
+	for rows.Next() {
+		var contract models.Contract
+		err := rows.Scan(
+			&contract.ID, &contract.UserID, &contract.AccountID, &contract.Symbol, &contract.ContractNumber, &contract.Side, &contract.Status,
+			&contract.LotSize, &contract.EntryPrice, &contract.MarginUsed, &contract.Leverage,
+			&contract.TPPrice, &contract.SLPrice, &contract.ClosePrice, &contract.PnL,
+			&contract.Swap, &contract.Commission, &contract.PairID, &contract.CreatedAt, &contract.ClosedAt, &contract.UpdatedAt,
+		)
+		if err != nil {
+			log.Printf("Failed to scan contract: %v", err)
+			continue
+		}
+		contracts = append(contracts, contract)
+	}
+
+	// Broadcast pair closed event to all connected WebSocket clients
+	if h != nil {
+		pairUpdate := map[string]interface{}{
+			"type":       "pair_closed",
+			"contracts":  contracts,
+			"pair_id":    pairID.String(),
+			"account_id": accountID.String(),
+		}
+		if updateBytes, err := json.Marshal(pairUpdate); err == nil {
+			h.BroadcastMessage(updateBytes)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"message":   "hedged pair closed successfully",
+		"contracts": contracts,
+		"pair_id":   pairID.String(),
 	})
 }
 

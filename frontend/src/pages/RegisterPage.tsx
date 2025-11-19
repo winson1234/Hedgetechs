@@ -14,6 +14,7 @@ export default function RegisterPage() {
     firstName: '',
     lastName: '',
     email: '',
+    phoneNumber: '',
     password: '',
     retypePassword: ''
   });
@@ -128,20 +129,23 @@ useEffect(() => {
   }
 
   try {
-    // Combine first and last name for full name
-    const fullName = `${formData.firstName} ${formData.lastName}`.trim();
-
-    await dispatch(signUp({
+    const result = await dispatch(signUp({
       email: formData.email,
       password: formData.password,
-      fullName: fullName,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      phoneNumber: formData.phoneNumber,
       country: formData.country
     })).unwrap();
 
-    navigate('/profile');
+    // Show pending approval message
+    alert(`Registration submitted successfully!\n\n${result.message || 'Your account is pending admin approval. You will be notified via email once approved.'}`);
+    
+    // Redirect to login page
+    navigate('/login');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Registration failed';
-    alert(message);
+    alert(`Registration failed: ${message}`);
   }
   };
 
@@ -198,6 +202,18 @@ useEffect(() => {
               <label className="form-label">Email Address <span className="required">*</span></label>
               <input type="email" id="email" value={formData.email} onChange={handleChange} required />
               {emailError && <div className="error-message show">Please enter a valid email address</div>}
+            </div>
+
+            {/* Phone Number */}
+            <div className="form-group">
+              <label className="form-label">Phone Number</label>
+              <input
+                type="tel"
+                id="phoneNumber"
+                placeholder="+60123456789"
+                value={formData.phoneNumber}
+                onChange={handleChange}
+              />
             </div>
 
             {/* Password */}

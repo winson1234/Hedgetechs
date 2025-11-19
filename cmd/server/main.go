@@ -8,6 +8,7 @@ import (
 	"brokerageProject/internal/hub"
 	redisProvider "brokerageProject/internal/market_data/redis"
 	"brokerageProject/internal/middleware"
+	"brokerageProject/internal/mt5client"
 	"brokerageProject/internal/services"
 	"brokerageProject/internal/utils"
 	"brokerageProject/internal/worker"
@@ -59,6 +60,16 @@ func main() {
 		log.Printf("STRIPE_SECRET_KEY loaded successfully (length: %d)", len(stripeKey))
 	} else {
 		log.Println("WARNING: STRIPE_SECRET_KEY is not set!")
+	}
+
+	// Validate JWT_SECRET for custom authentication
+	if jwtSecret := os.Getenv("JWT_SECRET"); jwtSecret != "" {
+		log.Printf("JWT_SECRET loaded successfully (length: %d)", len(jwtSecret))
+		if len(jwtSecret) < 32 {
+			log.Println("WARNING: JWT_SECRET should be at least 32 characters for security!")
+		}
+	} else {
+		log.Fatalf("CRITICAL: JWT_SECRET is not set! Custom authentication requires JWT_SECRET.")
 	}
 
 	// Initialize Stripe after loading environment variables
@@ -114,6 +125,9 @@ func main() {
 		log.Printf("Redis client initialized successfully (addr=%s)", redisAddr)
 	}
 
+	// Define forex symbols (used by multiple services)
+	forexSymbols := []string{"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCHF", "CADJPY", "AUDNZD", "EURGBP", "USDCAD", "EURJPY", "GBPJPY"}
+
 	// Initialize forex services (if Redis is available)
 	var forexAggregator *services.ForexAggregatorService
 	var forexAnalytics *services.ForexAnalyticsService
@@ -135,6 +149,37 @@ func main() {
 		log.Println("Forex klines service initialized")
 	} else {
 		log.Println("WARNING: Forex services disabled (Redis unavailable)")
+	}
+
+	// Initialize Data Integrity Service (gap detection and automatic backfill)
+	windowsAPIURL := os.Getenv("WINDOWS_API_URL")
+	if windowsAPIURL == "" {
+		windowsAPIURL = "http://localhost:5000"
+	}
+
+	if windowsAPIURL != "" && redisClient != nil {
+		mt5Client := mt5client.NewClient(mt5client.Config{
+			BaseURL:    windowsAPIURL,
+			Timeout:    30 * time.Second,
+			MaxRetries: 3,
+		})
+
+		dataIntegrityService := services.NewDataIntegrityService(services.DataIntegrityConfig{
+			DB:             dbPool,
+			MT5Client:      mt5Client,
+			TrackedSymbols: forexSymbols,
+			CheckSchedule:  "0 * * * *", // Run every hour at minute 0
+			GapWindow:      2 * time.Minute,
+			MaxBackoff:     1 * time.Hour,
+		})
+
+		if err := dataIntegrityService.Start(context.Background()); err != nil {
+			log.Printf("WARNING: Data Integrity Service failed to start: %v", err)
+		} else {
+			log.Println("Data Integrity Service started (gap detection every hour)")
+		}
+	} else {
+		log.Println("WARNING: Data Integrity Service disabled (MT5 API or Redis unavailable)")
 	}
 
 	// Initialize rate limiter (100 requests per minute per user, burst of 20)
@@ -183,7 +228,7 @@ func main() {
 
 	// Create message broadcaster that fans out to both hub and order processor
 	// This allows both WebSocket clients and the order processor to receive real-time price updates
-	messageBroadcaster := make(chan []byte, 4096) // Large buffer for high-frequency data
+	messageBroadcaster := make(chan []byte, 256) // Small buffer with rate limiting in place
 	go func() {
 		for msg := range messageBroadcaster {
 			// Forward to hub for WebSocket clients (non-blocking)
@@ -203,21 +248,6 @@ func main() {
 			}
 		}
 	}()
-
-	// Create a wrapper that sends Binance messages to messageBroadcaster
-	// This allows both WebSocket clients AND the order processor to receive price updates
-	broadcastWrapper := &hub.Hub{
-		Broadcast:  messageBroadcaster,     // Messages go to broadcaster, which fans out to hub and order processor
-		Register:   make(chan *hub.Client), // Dummy channels (not used by Binance streams)
-		Unregister: make(chan *hub.Client),
-	}
-
-	// LEGACY: Start old Binance WebSocket streams (still working for orderbook and market trades)
-	// TODO: Remove these once fully migrated to Provider interface
-	go binance.StreamDepth(broadcastWrapper)
-	log.Println("Binance Depth WebSocket stream started (legacy)")
-	go binance.StreamTrades(broadcastWrapper)
-	log.Println("Binance Trades WebSocket stream started (legacy - for Market Trades display)")
 
 	// HYBRID MARKET DATA ENGINE: Real-Time Crypto (Binance) + Real-Time Forex (MT5/Redis)
 	// Initialize market data service using the Provider interface pattern
@@ -244,8 +274,7 @@ func main() {
 	// Crypto symbols are handled by Binance provider (ignored by Redis)
 	// Forex symbols are handled by Redis provider (ignored by Binance)
 	// Forex list: All forex pairs supported by MT5 Publisher
-	allSymbols := []string{"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCHF", "CADJPY", "AUDNZD", "EURGBP", "USDCAD", "EURJPY", "GBPJPY"}
-	if err := marketDataService.Start(allSymbols); err != nil {
+	if err := marketDataService.Start(forexSymbols); err != nil {
 		log.Printf("WARNING: Market data service failed to start: %v", err)
 	} else {
 		log.Println("Market data service started successfully (Hybrid Engine: Crypto + Forex)")
@@ -298,6 +327,127 @@ func main() {
 	})
 	// REST handler for crypto exchange rates (with CORS and HEAD support)
 	http.HandleFunc(config.ExchangeRateAPIPath, api.CORSMiddleware(allowHEAD(exchangeRateHandler.HandleGetRates)))
+
+	// ========== AUTHENTICATION ENDPOINTS (Public - No Auth Required) ==========
+
+	// POST /api/v1/auth/register - User registration (creates pending_registrations record)
+	http.HandleFunc("/api/v1/auth/register", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleRegister))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/auth/login - User login (verifies pending_registrations status, creates user if approved)
+	http.HandleFunc("/api/v1/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleLogin))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/auth/check-status - Check registration approval status
+	http.HandleFunc("/api/v1/auth/check-status", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleCheckStatus))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/auth/forgot-password - Request password reset OTP
+	http.HandleFunc("/api/v1/auth/forgot-password", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleForgotPassword))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/auth/verify-otp - Verify OTP and get reset token
+	http.HandleFunc("/api/v1/auth/verify-otp", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleVerifyOTP))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/auth/reset-password - Reset password with token
+	http.HandleFunc("/api/v1/auth/reset-password", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleResetPassword))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// ========== ACCOUNT ACTIVATION ENDPOINTS (Protected - Auth Required) ==========
+
+	// POST /api/v1/accounts/{account_id}/activate - Activate/switch to specific account
+	http.HandleFunc("/api/v1/accounts/", func(w http.ResponseWriter, r *http.Request) {
+		// Check if the path ends with /activate
+		if r.Method == http.MethodPost && len(r.URL.Path) > len("/api/v1/accounts/") {
+			// This handles /api/v1/accounts/{account_id}/activate
+			if r.URL.Path[len(r.URL.Path)-9:] == "/activate" {
+				api.CORSMiddleware(middleware.AuthMiddleware(api.HandleActivateAccount))(w, r)
+				return
+			}
+		}
+		if r.Method == http.MethodOptions {
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	// POST /api/v1/accounts/deactivate-all - Deactivate all user accounts (logout)
+	http.HandleFunc("/api/v1/accounts/deactivate-all", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.AuthMiddleware(api.HandleDeactivateAllAccounts))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
 
 	// Account management endpoints (protected with JWT authentication)
 	// POST /api/v1/accounts - Create a new trading account
@@ -379,7 +529,7 @@ func main() {
 		// GET /api/v1/forex/quotes - All forex pair quotes with 24h stats
 		http.HandleFunc("/api/v1/forex/quotes", api.CORSMiddleware(allowHEAD(api.HandleForexQuotes(redisClient))))
 		// GET /api/v1/forex/klines?symbol=EURUSD&interval=1h&limit=100 - Historical klines
-		http.HandleFunc("/api/v1/forex/klines", api.CORSMiddleware(allowHEAD(api.HandleForexKlines(forexKlines))))
+		http.HandleFunc("/api/v1/forex/klines", api.CORSMiddleware(allowHEAD(api.HandleForexKlines(forexKlines, redisClient))))
 		log.Println("Forex API endpoints registered: /api/v1/forex/quotes, /api/v1/forex/klines")
 	}
 
@@ -470,7 +620,39 @@ func main() {
 	http.HandleFunc("/api/v1/contracts/close", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.CloseContract))(w, r)
+			api.CORSMiddleware(middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				api.CloseContract(h, w, r)
+			}))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/contracts/close-pair?pair_id={uuid} - Close both positions in a hedged pair
+	http.HandleFunc("/api/v1/contracts/close-pair", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				api.ClosePair(h, w, r)
+			}))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// GET /api/v1/contracts/history?account_id={uuid} - Get closed/liquidated positions
+	http.HandleFunc("/api/v1/contracts/history", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			api.CORSMiddleware(middleware.AuthMiddleware(api.GetContractHistory))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)

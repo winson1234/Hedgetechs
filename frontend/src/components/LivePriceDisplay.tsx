@@ -7,7 +7,7 @@ type LivePriceDisplayProps = {
   symbol: string
 }
 
-export default function LivePriceDisplay({ symbol }: LivePriceDisplayProps) {
+function LivePriceDisplay({ symbol }: LivePriceDisplayProps) {
   // Get instruments from backend API
   const { instruments } = useInstruments()
 
@@ -169,3 +169,9 @@ export default function LivePriceDisplay({ symbol }: LivePriceDisplayProps) {
     </div>
   )
 }
+
+// Memoize to prevent unnecessary re-renders when symbol hasn't changed
+export default React.memo(LivePriceDisplay, (prevProps, nextProps) => {
+  // Only re-render if symbol changes
+  return prevProps.symbol === nextProps.symbol;
+});

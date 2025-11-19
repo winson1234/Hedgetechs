@@ -1,14 +1,17 @@
 import { formatBalance } from '../utils/formatters';
-import type { Transaction } from '../types';
+import type { Transaction, Position } from '../types';
 import {
   type LegacyExecutedOrder as ExecutedOrder,
   type LegacyPendingOrder as PendingOrder
 } from '../utils/orderAdapters';
 import { useAppSelector } from '../store';
 
-type DetailItem = (Transaction | ExecutedOrder | PendingOrder) & {
-  itemType: 'transaction' | 'executedOrder' | 'pendingOrder'
-};
+type ClosedPosition = Position & { timestamp: number; itemType: 'closedPosition' };
+type DetailItem = 
+  | (Transaction & { itemType: 'transaction' })
+  | (ExecutedOrder & { itemType: 'executedOrder' })
+  | (PendingOrder & { itemType: 'pendingOrder' })
+  | ClosedPosition;
 
 interface TransactionDetailModalProps {
   item: DetailItem | null;
@@ -37,10 +40,10 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
   // Get accounts from Redux store to look up account numbers
   const accounts = useAppSelector((state) => state.account.accounts);
 
-  // Helper function to get account number from account ID
+  // Helper function to get account ID from account UUID
   const getAccountNumber = (accountId: string): string => {
     const account = accounts.find(acc => acc.id === accountId);
-    return account?.account_number || accountId;
+    return account?.account_id || 'Unknown Account';
   };
 
   if (!item) return null;
@@ -177,6 +180,99 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
     );
   };
 
+  // Render closed position details
+  const renderClosedPositionDetails = () => {
+    if (item.itemType !== 'closedPosition') return null;
+    const position = item as ClosedPosition;
+
+    return (
+      <>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-slate-500 dark:text-slate-400">Contract Number</p>
+            <div className="flex items-center gap-2">
+              <p className="font-mono text-xs text-slate-900 dark:text-slate-100">{position.contract_number}</p>
+              <button
+                onClick={() => copyToClipboard(position.contract_number)}
+                className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
+                title="Copy Contract Number"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-slate-500 dark:text-slate-400">Symbol</p>
+            <p className="font-semibold text-slate-900 dark:text-slate-100">{position.symbol}</p>
+          </div>
+
+          <div>
+            <p className="text-slate-500 dark:text-slate-400">Side</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100 capitalize">{position.side}</p>
+          </div>
+
+          <div>
+            <p className="text-slate-500 dark:text-slate-400">Lot Size</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">{position.lot_size}</p>
+          </div>
+
+          <div>
+            <p className="text-slate-500 dark:text-slate-400">Entry Price</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">{formatBalance(position.entry_price, 'USD')}</p>
+          </div>
+
+          <div>
+            <p className="text-slate-500 dark:text-slate-400">Close Price</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">{position.close_price ? formatBalance(position.close_price, 'USD') : 'N/A'}</p>
+          </div>
+
+          <div>
+            <p className="text-slate-500 dark:text-slate-400">P&L</p>
+            <p className={`font-semibold ${(position.pnl || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+              {formatBalance(position.pnl || 0, 'USD')}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-slate-500 dark:text-slate-400">Leverage</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">{position.leverage}x</p>
+          </div>
+
+          <div>
+            <p className="text-slate-500 dark:text-slate-400">Status</p>
+            <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
+              position.status === 'closed' ? 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300' :
+              position.status === 'liquidated' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' :
+              'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+            }`}>
+              {position.status}
+            </span>
+          </div>
+
+          <div>
+            <p className="text-slate-500 dark:text-slate-400">Account</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">{getAccountNumber(position.account_id)}</p>
+          </div>
+
+          <div>
+            <p className="text-slate-500 dark:text-slate-400">Opened</p>
+            <p className="text-slate-900 dark:text-slate-100">{formatDateTime(new Date(position.created_at).getTime())}</p>
+          </div>
+
+          {position.closed_at && (
+            <div>
+              <p className="text-slate-500 dark:text-slate-400">Closed</p>
+              <p className="text-slate-900 dark:text-slate-100">{formatDateTime(new Date(position.closed_at).getTime())}</p>
+            </div>
+          )}
+        </div>
+      </>
+    );
+  };
+
   // Render order details
   const renderOrderDetails = () => {
     if (item.itemType === 'executedOrder') {
@@ -187,9 +283,9 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
             <div>
               <p className="text-slate-500 dark:text-slate-400">Order Number</p>
               <div className="flex items-center gap-2">
-                <p className="font-mono text-xs text-slate-900 dark:text-slate-100">{order.orderNumber || order.id}</p>
+                <p className="font-mono text-xs text-slate-900 dark:text-slate-100">{order.orderNumber || 'N/A'}</p>
                 <button
-                  onClick={() => copyToClipboard(order.orderNumber || order.id)}
+                  onClick={() => copyToClipboard(order.orderNumber || 'N/A')}
                   className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
                   title="Copy Order Number"
                 >
@@ -260,9 +356,9 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
             <div>
               <p className="text-slate-500 dark:text-slate-400">Order Number</p>
               <div className="flex items-center gap-2">
-                <p className="font-mono text-xs text-slate-900 dark:text-slate-100">{order.orderNumber || order.id}</p>
+                <p className="font-mono text-xs text-slate-900 dark:text-slate-100">{order.orderNumber || 'N/A'}</p>
                 <button
-                  onClick={() => copyToClipboard(order.orderNumber || order.id)}
+                  onClick={() => copyToClipboard(order.orderNumber || 'N/A')}
                   className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
                   title="Copy Order Number"
                 >
@@ -358,7 +454,8 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
               {item.itemType === 'transaction' ? 'Transaction Details' :
                item.itemType === 'executedOrder' ? 'Order Details (Executed)' :
-               'Order Details (Pending)'}
+               item.itemType === 'pendingOrder' ? 'Order Details (Pending)' :
+               'Position Details (Closed)'}
             </h2>
             <button
               onClick={onClose}
@@ -372,7 +469,9 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
 
           {/* Content */}
           <div className="p-6">
-            {item.itemType === 'transaction' ? renderTransactionDetails() : renderOrderDetails()}
+            {item.itemType === 'transaction' ? renderTransactionDetails() :
+             item.itemType === 'closedPosition' ? renderClosedPositionDetails() :
+             renderOrderDetails()}
           </div>
 
           {/* Footer */}

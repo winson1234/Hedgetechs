@@ -7,10 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -28,15 +26,7 @@ const (
 	UserAgentKey ContextKey = "user_agent"
 )
 
-// SupabaseJWTClaims represents the claims in a Supabase JWT token
-type SupabaseJWTClaims struct {
-	jwt.RegisteredClaims
-	Sub   string `json:"sub"`   // User ID (UUID)
-	Email string `json:"email"` // User email
-	Role  string `json:"role"`  // User role (e.g., "authenticated")
-}
-
-// AuthMiddleware validates the Supabase JWT token and extracts user information
+// AuthMiddleware validates the custom JWT token and extracts user information
 // It requires the Authorization header with format: "Bearer <jwt_token>"
 // On success, it injects the user_id and email into the request context
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -61,11 +51,19 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Validate and parse the JWT token
-		userID, email, err := validateSupabaseJWT(tokenString)
+		// Validate and parse the JWT token using custom JWT validator
+		claims, err := utils.ValidateJWT(tokenString)
 		if err != nil {
 			log.Printf("JWT validation error: %v", err)
 			respondWithError(w, http.StatusUnauthorized, "invalid or expired token")
+			return
+		}
+
+		// Parse user ID from claims
+		userID, err := uuid.Parse(claims.UserID)
+		if err != nil {
+			log.Printf("Invalid user ID in token: %v", err)
+			respondWithError(w, http.StatusUnauthorized, "invalid user ID in token")
 			return
 		}
 
@@ -75,54 +73,13 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		// Inject user information and request metadata into the request context
 		ctx := context.WithValue(r.Context(), UserIDKey, userID)
-		ctx = context.WithValue(ctx, UserEmailKey, email)
+		ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
 		ctx = context.WithValue(ctx, IPAddressKey, ipAddress)
 		ctx = context.WithValue(ctx, UserAgentKey, userAgent)
 
 		// Call the next handler with the updated context
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
-}
-
-// validateSupabaseJWT validates a Supabase JWT token and extracts user information
-func validateSupabaseJWT(tokenString string) (uuid.UUID, string, error) {
-	// Get the JWT secret from environment
-	jwtSecret := os.Getenv("SUPABASE_JWT_SECRET")
-	if jwtSecret == "" {
-		return uuid.Nil, "", fmt.Errorf("SUPABASE_JWT_SECRET not set")
-	}
-
-	// Parse and validate the token
-	token, err := jwt.ParseWithClaims(tokenString, &SupabaseJWTClaims{}, func(token *jwt.Token) (interface{}, error) {
-		// Verify the signing method is HMAC
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(jwtSecret), nil
-	})
-
-	if err != nil {
-		return uuid.Nil, "", fmt.Errorf("failed to parse token: %w", err)
-	}
-
-	// Extract and validate claims
-	claims, ok := token.Claims.(*SupabaseJWTClaims)
-	if !ok || !token.Valid {
-		return uuid.Nil, "", fmt.Errorf("invalid token claims")
-	}
-
-	// Parse the user ID (UUID from "sub" claim)
-	userID, err := uuid.Parse(claims.Sub)
-	if err != nil {
-		return uuid.Nil, "", fmt.Errorf("invalid user ID in token: %w", err)
-	}
-
-	// Validate that the user has the authenticated role
-	if claims.Role != "authenticated" {
-		return uuid.Nil, "", fmt.Errorf("user is not authenticated")
-	}
-
-	return userID, claims.Email, nil
 }
 
 // GetUserIDFromContext extracts the user ID from the request context
@@ -182,10 +139,12 @@ func OptionalAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			parts := strings.SplitN(authHeader, " ", 2)
 			if len(parts) == 2 && parts[0] == "Bearer" {
 				tokenString := parts[1]
-				if userID, email, err := validateSupabaseJWT(tokenString); err == nil {
-					ctx := context.WithValue(r.Context(), UserIDKey, userID)
-					ctx = context.WithValue(ctx, UserEmailKey, email)
-					r = r.WithContext(ctx)
+				if claims, err := utils.ValidateJWT(tokenString); err == nil {
+					if userID, parseErr := uuid.Parse(claims.UserID); parseErr == nil {
+						ctx := context.WithValue(r.Context(), UserIDKey, userID)
+						ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+						r = r.WithContext(ctx)
+					}
 				}
 			}
 		}

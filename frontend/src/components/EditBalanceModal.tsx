@@ -98,7 +98,7 @@ function EditBalanceModal({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            Edit Demo Balance ({account.id})
+            Edit Demo Balance ({account.account_id})
           </h2>
           <button
             onClick={onClose}

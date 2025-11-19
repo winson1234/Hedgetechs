@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store';
-import { cancelPendingOrder } from '../../store/slices/orderSlice';
+import { cancelPendingOrder, fetchPendingOrders } from '../../store/slices/orderSlice';
 import { addToast } from '../../store/slices/uiSlice';
 import { formatCurrency } from '../../utils/formatters';
 import { ProductType } from '../../types';
@@ -14,6 +14,7 @@ export default function PendingOrdersTab({ filterByProductType, selectedProductT
   const dispatch = useAppDispatch();
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
   const allPendingOrders = useAppSelector(state => state.order.pendingOrders);
+  const activeAccountId = useAppSelector(state => state.account.activeAccountId);
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
 
   // Memoize filtered orders to prevent unnecessary rerenders
@@ -41,6 +42,12 @@ export default function PendingOrdersTab({ filterByProductType, selectedProductT
         type: 'error',
         message: error as string || 'Failed to cancel order'
       }));
+
+      // Refresh pending orders to remove any failed orders from UI
+      // (Backend filters by status='pending', so failed orders will be excluded)
+      if (activeAccountId) {
+        dispatch(fetchPendingOrders({ accountId: activeAccountId }));
+      }
     } finally {
       setCancellingOrderId(null);
     }
@@ -168,6 +175,14 @@ export default function PendingOrdersTab({ filterByProductType, selectedProductT
                       {formatTimestamp(order.created_at)}
                     </span>
                   </div>
+                  {order.order_number && (
+                    <div className="flex justify-between text-xs mt-1">
+                      <span className="text-slate-400 dark:text-slate-500">Order ID:</span>
+                      <span className="text-slate-400 dark:text-slate-500 font-mono text-[11px]">
+                        {order.order_number}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

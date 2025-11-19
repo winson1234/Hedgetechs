@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -24,12 +25,12 @@ func NewHedgingService(pool *pgxpool.Pool) *HedgingService {
 
 // PairedPosition represents a hedged position pair
 type PairedPosition struct {
-	PairID         uuid.UUID
-	LongContract   models.Contract
-	ShortContract  models.Contract
-	IsFullyOpen    bool // Both legs open
+	PairID            uuid.UUID
+	LongContract      models.Contract
+	ShortContract     models.Contract
+	IsFullyOpen       bool // Both legs open
 	IsPartiallyClosed bool // One leg closed
-	IsFullyClosed  bool // Both legs closed
+	IsFullyClosed     bool // Both legs closed
 }
 
 // GetPairedPosition fetches both contracts in a hedged pair
@@ -154,6 +155,50 @@ func (s *HedgingService) ClosePositionWithMarginRelease(
 		return fmt.Errorf("failed to close contract: %w", err)
 	}
 
+	// Create transaction record for the position closure (audit trail)
+	var transactionNumber string
+	err = tx.QueryRow(ctx, "SELECT generate_transaction_number()").Scan(&transactionNumber)
+	if err != nil {
+		return fmt.Errorf("failed to generate transaction number: %w", err)
+	}
+
+	transactionID := uuid.New()
+	description := fmt.Sprintf("Position closed: %s %s (Contract %s)", contract.Side, contract.Symbol, contract.ContractNumber)
+
+	// Prepare metadata as JSON with string values for decimals to avoid precision issues
+	metadataMap := map[string]interface{}{
+		"entry_price":  fmt.Sprintf("%.8f", contract.EntryPrice),
+		"close_price":  fmt.Sprintf("%.8f", closePrice),
+		"lot_size":     fmt.Sprintf("%.8f", contract.LotSize),
+		"leverage":     contract.Leverage,
+		"margin_used":  fmt.Sprintf("%.8f", contract.MarginUsed),
+		"swap":         fmt.Sprintf("%.8f", contract.Swap),
+		"commission":   fmt.Sprintf("%.8f", contract.Commission),
+		"total_return": fmt.Sprintf("%.8f", totalReturn),
+	}
+	metadataJSON, err := json.Marshal(metadataMap)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	_, err = tx.Exec(ctx,
+		`INSERT INTO transactions (id, account_id, transaction_number, type, currency, amount, status, contract_id, description, metadata, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, NOW(), NOW())`,
+		transactionID,
+		contract.AccountID,
+		transactionNumber,
+		models.TransactionTypePositionClose,
+		accountCurrency,
+		pnl, // Realized P&L
+		models.TransactionStatusCompleted,
+		contractID,
+		description,
+		string(metadataJSON),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create position close transaction: %w", err)
+	}
+
 	// If this contract is part of a hedged pair, log the partial closure
 	if pairID.Valid {
 		pairUUID, _ := uuid.Parse(pairID.String)
@@ -205,6 +250,13 @@ func (s *HedgingService) CloseEntirePair(
 	}
 	defer tx.Rollback(ctx)
 
+	// Fetch account currency
+	var accountCurrency string
+	err = tx.QueryRow(ctx, "SELECT currency FROM accounts WHERE id = $1", pair.LongContract.AccountID).Scan(&accountCurrency)
+	if err != nil {
+		return fmt.Errorf("failed to fetch account currency: %w", err)
+	}
+
 	// Close both positions
 	for _, contract := range []models.Contract{pair.LongContract, pair.ShortContract} {
 		pnl := s.calculatePnL(contract.Side, contract.LotSize, contract.EntryPrice, closePrice)
@@ -213,8 +265,8 @@ func (s *HedgingService) CloseEntirePair(
 		// Release margin
 		_, err = tx.Exec(ctx,
 			`UPDATE balances SET amount = amount + $1, updated_at = NOW()
-			 WHERE account_id = $2 AND currency = 'USDT'`, // Assuming USDT for now
-			totalReturn, contract.AccountID,
+			 WHERE account_id = $2 AND currency = $3`,
+			totalReturn, contract.AccountID, accountCurrency,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to release margin for contract %s: %w", contract.ContractNumber, err)
@@ -229,6 +281,52 @@ func (s *HedgingService) CloseEntirePair(
 		)
 		if err != nil {
 			return fmt.Errorf("failed to close contract %s: %w", contract.ContractNumber, err)
+		}
+
+		// Create transaction record for each position closure
+		var transactionNumber string
+		err = tx.QueryRow(ctx, "SELECT generate_transaction_number()").Scan(&transactionNumber)
+		if err != nil {
+			return fmt.Errorf("failed to generate transaction number: %w", err)
+		}
+
+		transactionID := uuid.New()
+		description := fmt.Sprintf("Position closed: %s %s (Contract %s) - Hedged pair closure", contract.Side, contract.Symbol, contract.ContractNumber)
+
+		// Prepare metadata as JSON with string values for decimals to avoid precision issues
+		metadataMap := map[string]interface{}{
+			"entry_price":  fmt.Sprintf("%.8f", contract.EntryPrice),
+			"close_price":  fmt.Sprintf("%.8f", closePrice),
+			"lot_size":     fmt.Sprintf("%.8f", contract.LotSize),
+			"leverage":     contract.Leverage,
+			"margin_used":  fmt.Sprintf("%.8f", contract.MarginUsed),
+			"swap":         fmt.Sprintf("%.8f", contract.Swap),
+			"commission":   fmt.Sprintf("%.8f", contract.Commission),
+			"total_return": fmt.Sprintf("%.8f", totalReturn),
+			"pair_id":      pairID.String(),
+			"pair_closure": true,
+		}
+		metadataJSON, err := json.Marshal(metadataMap)
+		if err != nil {
+			return fmt.Errorf("failed to marshal metadata: %w", err)
+		}
+
+		_, err = tx.Exec(ctx,
+			`INSERT INTO transactions (id, account_id, transaction_number, type, currency, amount, status, contract_id, description, metadata, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, NOW(), NOW())`,
+			transactionID,
+			contract.AccountID,
+			transactionNumber,
+			models.TransactionTypePositionClose,
+			accountCurrency,
+			pnl,
+			models.TransactionStatusCompleted,
+			contract.ID,
+			description,
+			string(metadataJSON),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create position close transaction for contract %s: %w", contract.ContractNumber, err)
 		}
 	}
 

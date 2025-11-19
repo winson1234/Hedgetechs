@@ -22,7 +22,7 @@ export type Account = {
 export type BackendAccount = {
   id: string
   user_id: string
-  account_number: string
+  account_id: string
   type: 'live' | 'demo'
   product_type: ProductType
   currency: string
@@ -53,7 +53,7 @@ export type ToastState = {
 
 // Transaction types for wallet operations
 export type TransactionStatus = 'pending' | 'processing' | 'completed' | 'failed'
-export type TransactionType = 'deposit' | 'withdraw' | 'transfer'
+export type TransactionType = 'deposit' | 'withdraw' | 'transfer' | 'position_close'
 
 export type PaymentMethodMetadata = {
   // For card payments
@@ -150,3 +150,37 @@ export type DrawingState = {
   type: DrawingType
   point1: DrawingPoint
 } | null
+
+// Position/Contract types for CFD trading
+export type ContractSide = 'long' | 'short'
+export type ContractStatus = 'open' | 'closed' | 'liquidated'
+
+export type Position = {
+  id: string
+  user_id: string
+  account_id: string
+  symbol: string
+  contract_number: string
+  side: ContractSide
+  status: ContractStatus
+  lot_size: number
+  entry_price: number
+  margin_used: number
+  leverage: number
+  product_type?: ProductType
+  tp_price?: number | null
+  sl_price?: number | null
+  close_price?: number | null
+  pnl?: number | null
+  liquidation_price?: number | null
+  swap: number
+  commission: number
+  pair_id?: string | null // Links to hedged pair
+  created_at: string
+  closed_at?: string | null
+  updated_at: string
+  // Transient fields calculated on frontend
+  unrealized_pnl?: number
+  current_price?: number
+  roe?: number // Return on Equity (%)
+}

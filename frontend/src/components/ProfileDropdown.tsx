@@ -183,7 +183,7 @@ const confirmLogout = async () => {
     navigate('/settings/security');
   };
 
-  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
+  const displayName = user ? `${user.first_name} ${user.last_name}`.trim() || user.email?.split('@')[0] : 'User';
   const avatarLetter = displayName.charAt(0).toUpperCase();
 
   // Create a renderable element for the account type badge

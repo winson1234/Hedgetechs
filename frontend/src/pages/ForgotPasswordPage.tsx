@@ -1,31 +1,24 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { getApiUrl } from '../utils/api';
 import './forgotpassword.css';
-
-// Password hashing utility using Web Crypto API
-const hashPassword = async (password: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-};
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<'email' | 'otp' | 'password' | 'success'>('email');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [confirmError, setConfirmError] = useState('');
   const [passwordStrength, setPasswordStrength] = useState({ level: 0, text: '', color: '' });
-const [showPassword, setShowPassword] = useState(false);
-const togglePassword = () => setShowPassword((prev) => !prev);
-const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const togglePassword = () => setShowPassword((prev) => !prev);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const otpRefs = [
     useRef<HTMLInputElement>(null),
@@ -62,48 +55,60 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     setPasswordStrength({ level: strength, ...levels[strength] });
   }, [newPassword]);
 
-  const handleEmailSubmit = () => {
+  const handleEmailSubmit = async () => {
     if (!email || !email.includes('@')) {
       setEmailError('Please enter a valid email address');
       return;
     }
 
-    // Check if user exists
-    const registeredUsersData = localStorage.getItem('registeredUsers');
-    if (!registeredUsersData) {
-      setEmailError('No account found with this email address');
-      return;
-    }
-
-    const registeredUsers = JSON.parse(registeredUsersData);
-    if (!registeredUsers[email]) {
-      setEmailError('No account found with this email address');
-      return;
-    }
-
     setEmailError('');
+    setIsLoading(true);
 
-    // Generate random 6-digit OTP
-    const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(randomOtp);
+    try {
+      const response = await fetch(getApiUrl('/api/v1/auth/forgot-password'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
 
-    // Store OTP in localStorage for persistence
-    localStorage.setItem('reset_otp', randomOtp);
-    localStorage.setItem('reset_email', email);
+      const data = await response.json();
 
-    // Log OTP to console for testing (in production, this would be sent via email)
-    console.log('='.repeat(50));
-    console.log('🔐 PASSWORD RESET OTP');
-    console.log('='.repeat(50));
-    console.log(`Email: ${email}`);
-    console.log(`OTP Code: ${randomOtp}`);
-    console.log('='.repeat(50));
-    console.log('⚠️ This OTP is valid for this session only');
-    console.log('='.repeat(50));
+      if (!response.ok) {
+        // Handle different error statuses
+        if (data.status === 'not_found') {
+          setEmailError('No account found with this email address');
+        } else if (data.status === 'pending') {
+          setEmailError('Your registration is still pending admin approval. Password reset is not available.');
+        } else if (data.status === 'rejected') {
+          setEmailError('Your registration has been rejected. Password reset is not available. Please contact support.');
+        } else {
+          setEmailError(data.message || 'An error occurred. Please try again.');
+        }
+        return;
+      }
 
-    alert(`OTP has been generated! Check the console (F12) for the OTP code.\n\nOTP: ${randomOtp}`);
-
-    setStep('otp');
+      // Success - OTP sent
+      // For development, display OTP in alert and console
+      if (data.otp) {
+        console.log('='.repeat(50));
+        console.log('🔐 PASSWORD RESET OTP');
+        console.log('='.repeat(50));
+        console.log(`Email: ${email}`);
+        console.log(`OTP Code: ${data.otp}`);
+        console.log('='.repeat(50));
+        alert(`OTP has been sent!\n\nFor development, your OTP is: ${data.otp}\n\n(Also logged to browser console)`);
+      } else {
+        alert('OTP has been sent! Check your email or backend console logs.');
+      }
+      setStep('otp');
+    } catch (error) {
+      console.error('Error requesting password reset:', error);
+      setEmailError('Failed to connect to server. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleOtpChange = (index: number, value: string) => {
@@ -125,22 +130,41 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     }
   };
 
-  const handleVerifyOtp = () => {
+  const handleVerifyOtp = async () => {
     const otpValue = otp.join('');
     if (otpValue.length !== 6) {
       setConfirmError('Please enter all 6 digits');
       return;
     }
 
-    // Verify OTP matches generated OTP
-    const storedOtp = localStorage.getItem('reset_otp') || generatedOtp;
-    if (otpValue !== storedOtp) {
-      setConfirmError('Invalid OTP. Please check and try again.');
-      return;
-    }
-
     setConfirmError('');
-    setStep('password');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(getApiUrl('/api/v1/auth/verify-otp'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, otp: otpValue }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setConfirmError(data.message || 'Invalid OTP. Please check and try again.');
+        return;
+      }
+
+      // Success - OTP verified, store reset token
+      setResetToken(data.reset_token);
+      setStep('password');
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      setConfirmError('Failed to connect to server. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -158,32 +182,29 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     }
     setConfirmError('');
 
+    setIsLoading(true);
+
     try {
-      // Get the email from localStorage
-      const resetEmail = localStorage.getItem('reset_email') || email;
+      const response = await fetch(getApiUrl('/api/v1/auth/reset-password'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          reset_token: resetToken,
+          new_password: newPassword,
+        }),
+      });
 
-      // Hash the new password
-      const newPasswordHash = await hashPassword(newPassword);
+      const data = await response.json();
 
-      // Update registered users database
-      const registeredUsersData = localStorage.getItem('registeredUsers');
-      if (registeredUsersData) {
-        const registeredUsers = JSON.parse(registeredUsersData);
-        if (registeredUsers[resetEmail]) {
-          registeredUsers[resetEmail].passwordHash = newPasswordHash;
-          localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
-
-          // Also update the standalone password hash
-          localStorage.setItem(`userPasswordHash_${resetEmail}`, newPasswordHash);
-
-          console.log('✅ Password updated successfully for:', resetEmail);
-        }
+      if (!response.ok) {
+        setPasswordError(data.message || 'Failed to reset password. Please try again.');
+        return;
       }
 
-      // Clear reset data
-      localStorage.removeItem('reset_otp');
-      localStorage.removeItem('reset_email');
-
+      // Success - password reset
       setStep('success');
 
       // Redirect to login after 2 seconds
@@ -191,8 +212,10 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
         navigate('/login');
       }, 2000);
     } catch (error) {
-      console.error('Error updating password:', error);
-      setPasswordError('An error occurred while updating password');
+      console.error('Error resetting password:', error);
+      setPasswordError('Failed to connect to server. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -237,7 +260,9 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
                   />
                 ))}
               </div>
-              <button id="verifyOtpBtn" onClick={handleVerifyOtp}>Verify OTP</button>
+              <button id="verifyOtpBtn" onClick={handleVerifyOtp} disabled={isLoading}>
+                {isLoading ? 'Verifying...' : 'Verify OTP'}
+              </button>
               {confirmError && <div className="error-message show">{confirmError}</div>}
             </div>
           )}
@@ -264,7 +289,9 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
                   />
                   {emailError && <div className="error-message show">{emailError}</div>}
                 </div>
-                <button type="button" id="verifyEmailBtn" onClick={handleEmailSubmit}>Continue</button>
+                <button type="button" id="verifyEmailBtn" onClick={handleEmailSubmit} disabled={isLoading}>
+                  {isLoading ? 'Sending...' : 'Continue'}
+                </button>
               </div>
             )}
 
@@ -373,7 +400,9 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 </div>
 
 
-    <button type="submit" id="submitBtn">Reset Password</button>
+    <button type="submit" id="submitBtn" disabled={isLoading}>
+      {isLoading ? 'Resetting...' : 'Reset Password'}
+    </button>
   </div>
 )}
 

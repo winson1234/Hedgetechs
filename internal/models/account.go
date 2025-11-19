@@ -36,9 +36,10 @@ const (
 type TransactionType string
 
 const (
-	TransactionTypeDeposit    TransactionType = "deposit"
-	TransactionTypeWithdrawal TransactionType = "withdrawal"
-	TransactionTypeTransfer   TransactionType = "transfer"
+	TransactionTypeDeposit       TransactionType = "deposit"
+	TransactionTypeWithdrawal    TransactionType = "withdrawal"
+	TransactionTypeTransfer      TransactionType = "transfer"
+	TransactionTypePositionClose TransactionType = "position_close"
 )
 
 // TransactionStatus represents the status of a transaction
@@ -64,7 +65,8 @@ type User struct {
 type Account struct {
 	ID            uuid.UUID     `json:"id"`
 	UserID        uuid.UUID     `json:"user_id"`
-	AccountNumber string        `json:"account_number"`
+	AccountID     string        `json:"account_id"`            // Human-readable sequential ID (ACC-1000001)
+	AccountNumber string        `json:"account_number"`        // DEPRECATED: Alias for account_id (backward compatibility)
 	Type          AccountType   `json:"type"`
 	ProductType   *ProductType  `json:"product_type,omitempty"` // NULLABLE: Universal accounts have NULL product_type
 	Currency      string        `json:"currency"`
@@ -415,6 +417,7 @@ type Contract struct {
 	PnL              *float64       `json:"pnl,omitempty"`
 	Swap             float64        `json:"swap"`
 	Commission       float64        `json:"commission"`
+	PairID           *uuid.UUID     `json:"pair_id,omitempty"` // Links hedged positions (dual-position mode)
 	CreatedAt        time.Time      `json:"created_at"`
 	ClosedAt         *time.Time     `json:"closed_at,omitempty"`
 	UpdatedAt        time.Time      `json:"updated_at"`

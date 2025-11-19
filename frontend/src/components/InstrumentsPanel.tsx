@@ -9,7 +9,7 @@ import ForexPairIcon from './ForexPairIcon'
 
 type CategoryFilter = 'all' | InstrumentCategory
 
-export default function InstrumentsPanel() {
+function InstrumentsPanel() {
   const dispatch = useAppDispatch();
   // Access Redux state
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
@@ -469,3 +469,6 @@ export default function InstrumentsPanel() {
     </div>
   )
 }
+
+// Memoize to prevent unnecessary re-renders from parent component updates
+export default React.memo(InstrumentsPanel);

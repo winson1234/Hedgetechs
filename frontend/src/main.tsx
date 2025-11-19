@@ -4,12 +4,11 @@ import { BrowserRouter } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { PersistGate } from 'redux-persist/integration/react'
 import { store, persistor, useAppDispatch, useAppSelector } from './store'
-import { refreshSession, setSession } from './store/slices/authSlice'
+import { validateSession } from './store/slices/authSlice'
 import App from './App'
 import './index.css'
 import { Elements } from '@stripe/react-stripe-js'
 import { loadStripe } from '@stripe/stripe-js'
-import { supabase } from './lib/supabase'
 
 // Suppress Stripe telemetry errors (blocked by ad blockers)
 const originalError = console.error
@@ -53,26 +52,13 @@ if (!stripeKey || stripeKey.trim() === '') {
   // Suppress the warning - it's expected in development without Stripe configured
 }
 
-// Auth wrapper component to initialize auth state and listen to Supabase auth changes
+// Auth wrapper component to validate JWT session on app load
 function AuthWrapper({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch()
 
   useEffect(() => {
-    // Check initial session
-    dispatch(refreshSession())
-
-    // Listen to auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      dispatch(setSession({
-        user: session?.user || null,
-        session: session,
-      }))
-    })
-
-    // Cleanup subscription
-    return () => {
-      subscription.unsubscribe()
-    }
+    // Validate session from localStorage (JWT token)
+    dispatch(validateSession())
   }, [dispatch])
 
   return <>{children}</>

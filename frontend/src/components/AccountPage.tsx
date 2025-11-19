@@ -259,7 +259,7 @@ export default function AccountPage() {
             )}
           </div>
         </div>
-        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 truncate">{acc.account_number}</p>
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 truncate">{acc.account_id}</p>
 
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1">
@@ -312,8 +312,8 @@ export default function AccountPage() {
                     <div className="space-y-4 text-sm">
                         {/* Account Information */}
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                             <div className="text-slate-500 dark:text-slate-400">Account Number:</div>
-                             <div className="font-medium text-slate-700 dark:text-slate-300 truncate text-right">{selectedAccount.account_number}</div>
+                             <div className="text-slate-500 dark:text-slate-400">Account ID:</div>
+                             <div className="font-medium text-slate-700 dark:text-slate-300 truncate text-right">{selectedAccount.account_id}</div>
 
                              <div className="text-slate-500 dark:text-slate-400">Type:</div>
                              <div className="text-right">

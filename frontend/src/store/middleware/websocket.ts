@@ -4,6 +4,7 @@ import { createDeposit } from '../slices/transactionSlice';
 import { fetchAccounts } from '../slices/accountSlice';
 import { addToast } from '../slices/uiSlice';
 import { updateForexQuote } from '../slices/forexSlice';
+import { removePosition } from '../slices/positionSlice';
 
 // WebSocket connection instance
 let ws: WebSocket | null = null;
@@ -16,6 +17,11 @@ const BASE_RECONNECT_DELAY = 1000; // 1 second
 const TRADE_THROTTLE_MS = 100; // Only update trades every 100ms
 const tradeThrottleTimers: Record<string, number> = {};
 const pendingTrades: Record<string, { price: number; quantity: number; time: number; isBuyerMaker: boolean }> = {};
+
+// Throttling for price updates to prevent excessive Redux state updates and re-renders
+const PRICE_THROTTLE_MS = 100; // Only update prices every 100ms
+const priceThrottleTimers: Record<string, number> = {};
+const pendingPrices: Record<string, { price: number; timestamp: number }> = {};
 
 // WebSocket middleware for Redux
 export const websocketMiddleware: Middleware = (store) => {
@@ -131,6 +137,26 @@ export const websocketMiddleware: Middleware = (store) => {
           return; // Don't process as price message
         }
 
+        // Handle position closed notifications
+        if (data.type === 'position_closed') {
+          const contract = data.contract;
+          const accountId = data.account_id;
+
+          // Remove position from Redux store
+          if (contract && contract.id) {
+            store.dispatch(removePosition(contract.id));
+          }
+
+          // Refresh account balance
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (store.dispatch as any)(fetchAccounts()).catch((err: unknown) => {
+            console.error('Failed to fetch accounts after position close:', err);
+          });
+
+          console.log(`[WebSocket] Position closed: ${contract?.contract_number} on account ${accountId}`);
+          return; // Don't process as price message
+        }
+
         // Handle different message types based on our backend format
         if (data.type === 'forex_quote') {
           // Forex quote message: { type: "forex_quote", symbol, bid, ask, timestamp }
@@ -174,14 +200,27 @@ export const websocketMiddleware: Middleware = (store) => {
           const timestamp = data.time;
           const isBuyerMaker = data.isBuyerMaker || false;
 
-          // Always update current price immediately (for chart)
-          store.dispatch(
-            updateCurrentPrice({
-              symbol,
-              price,
-              timestamp,
-            })
-          );
+          // Throttle price updates to prevent excessive Redux state updates
+          // Store the latest price for this symbol
+          pendingPrices[symbol] = { price, timestamp };
+
+          // Only dispatch price updates every PRICE_THROTTLE_MS
+          if (!priceThrottleTimers[symbol]) {
+            priceThrottleTimers[symbol] = window.setTimeout(() => {
+              const priceData = pendingPrices[symbol];
+              if (priceData) {
+                store.dispatch(
+                  updateCurrentPrice({
+                    symbol,
+                    price: priceData.price,
+                    timestamp: priceData.timestamp,
+                  })
+                );
+                delete pendingPrices[symbol];
+              }
+              priceThrottleTimers[symbol] = 0;
+            }, PRICE_THROTTLE_MS);
+          }
 
           // Throttle trade history updates to prevent buffer overflow
           // Store the latest trade for this symbol

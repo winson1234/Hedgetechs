@@ -60,40 +60,52 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx) // Rollback if not committed
 
-	// Generate account number using Supabase RPC function
-	var accountNumber string
-	err = tx.QueryRow(ctx, "SELECT generate_account_number($1)", string(req.Type)).Scan(&accountNumber)
+	// Generate account_id (format: ACC-12345678)
+	var accountID string
+	err = tx.QueryRow(ctx, `
+		SELECT 'ACC-' || LPAD(FLOOR(RANDOM() * 99999999)::TEXT, 8, '0')
+	`).Scan(&accountID)
 	if err != nil {
-		log.Printf("Failed to generate account number: %v", err)
-		respondWithJSONError(w, http.StatusInternalServerError, "generation_error", "failed to generate account number")
+		log.Printf("Failed to generate account ID: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "generation_error", "failed to generate account ID")
 		return
 	}
 
-	// Create account record (ProductType is now optional - universal accounts)
+	// Create account record with new schema
 	account := models.Account{
-		ID:            uuid.New(),
-		UserID:        userID,
-		AccountNumber: accountNumber,
-		Type:          req.Type,
-		Currency:      req.Currency,
-		Status:        models.AccountStatusActive,
+		ID:       uuid.New(),
+		UserID:   userID,
+		Type:     req.Type,
+		Currency: req.Currency,
 	}
 
-	// Determine product_type value for database (NULL for new universal accounts)
-	var dbProductType interface{}
-	if req.ProductType != nil {
-		// Legacy: If client explicitly provides product_type, use it
-		dbProductType = *req.ProductType
+	// Set initial balance
+	initialBalance := req.InitialBalance
+	if initialBalance == 0 {
+		initialBalance = 0 // Start with 0 balance
+	}
+
+	// Determine status: first account should be 'active', others 'deactivated'
+	var accountStatus string
+	var existingCount int
+	err = tx.QueryRow(ctx, "SELECT COUNT(*) FROM accounts WHERE user_id = $1", userID).Scan(&existingCount)
+	if err != nil {
+		log.Printf("Failed to count existing accounts: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to check existing accounts")
+		return
+	}
+
+	if existingCount == 0 {
+		accountStatus = "active" // First account is active by default
 	} else {
-		// New: Universal account - set NULL in database
-		dbProductType = nil
+		accountStatus = "deactivated" // Additional accounts start deactivated
 	}
 
-	// Insert account into database
+	// Insert account into database (new schema: account_id, account_type, balance, status)
 	_, err = tx.Exec(ctx,
-		`INSERT INTO accounts (id, user_id, account_number, type, product_type, currency, status, created_at, updated_at)
+		`INSERT INTO accounts (id, user_id, account_id, account_type, currency, balance, status, last_updated, created_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
-		account.ID, account.UserID, account.AccountNumber, account.Type, dbProductType, account.Currency, account.Status,
+		account.ID, account.UserID, accountID, account.Type, account.Currency, initialBalance, accountStatus,
 	)
 	if err != nil {
 		log.Printf("Failed to insert account: %v", err)
@@ -118,6 +130,16 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to insert balance: %v", err)
 		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to create balance")
 		return
+	}
+
+	// Update user's is_active status if this is the first account and it's active
+	if accountStatus == "active" {
+		_, err = tx.Exec(ctx, "UPDATE users SET is_active = true WHERE id = $1", userID)
+		if err != nil {
+			log.Printf("Failed to update user is_active status: %v", err)
+			respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to update user status")
+			return
+		}
 	}
 
 	// Commit the transaction
@@ -165,10 +187,10 @@ func GetAccounts(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	// Fetch all accounts for the user
+	// Fetch all accounts for the user (new schema)
 	rows, err := pool.Query(ctx,
-		`SELECT id, user_id, account_number, type, product_type, currency, status, created_at, updated_at,
-		        nickname, color, icon, last_accessed_at, access_count
+		`SELECT id, user_id, account_id, account_type, currency, balance, status, 
+		        last_updated, last_login, created_at
 		 FROM accounts
 		 WHERE user_id = $1
 		 ORDER BY created_at DESC`,
@@ -185,16 +207,23 @@ func GetAccounts(w http.ResponseWriter, r *http.Request) {
 	var accounts []models.Account
 	for rows.Next() {
 		var account models.Account
+		var accountIDStr string
+		var balance float64
+		var lastUpdated, lastLogin *time.Time
+
 		err := rows.Scan(
-			&account.ID, &account.UserID, &account.AccountNumber,
-			&account.Type, &account.ProductType, &account.Currency,
-			&account.Status, &account.CreatedAt, &account.UpdatedAt,
-			&account.Nickname, &account.Color, &account.Icon, &account.LastAccessedAt, &account.AccessCount,
+			&account.ID, &account.UserID, &accountIDStr,
+			&account.Type, &account.Currency, &balance,
+			&account.Status, &lastUpdated, &lastLogin, &account.CreatedAt,
 		)
 		if err != nil {
 			log.Printf("Failed to scan account: %v", err)
 			continue
 		}
+
+		// Populate both account_id (new) and account_number (deprecated) fields
+		account.AccountID = accountIDStr
+		account.AccountNumber = accountIDStr
 
 		// Fetch balances for this account
 		balances, err := getBalancesForAccount(ctx, pool, account.ID)
@@ -255,23 +284,30 @@ type DBQuerier interface {
 // Helper function to get account by ID
 func getAccountByID(ctx context.Context, pool DBQuerier, accountID, userID uuid.UUID) (models.Account, error) {
 	var account models.Account
+	var accountIDStr string
+	var balance float64
+	var lastUpdated, lastLogin *time.Time
+
 	err := pool.QueryRow(ctx,
-		`SELECT id, user_id, account_number, type, product_type, currency, status, created_at, updated_at,
-		        nickname, color, icon, last_accessed_at, access_count
+		`SELECT id, user_id, account_id, account_type, currency, balance, status,
+		        last_updated, last_login, created_at
 		 FROM accounts
 		 WHERE id = $1 AND user_id = $2`,
 		accountID, userID,
 	).Scan(
-		&account.ID, &account.UserID, &account.AccountNumber,
-		&account.Type, &account.ProductType, &account.Currency,
-		&account.Status, &account.CreatedAt, &account.UpdatedAt,
-		&account.Nickname, &account.Color, &account.Icon, &account.LastAccessedAt, &account.AccessCount,
+		&account.ID, &account.UserID, &accountIDStr,
+		&account.Type, &account.Currency, &balance,
+		&account.Status, &lastUpdated, &lastLogin, &account.CreatedAt,
 	)
 	if err != nil {
 		return account, fmt.Errorf("failed to fetch account: %w", err)
 	}
 
-	// Fetch balances
+	// Populate both account_id (new) and account_number (deprecated) fields
+	account.AccountID = accountIDStr
+	account.AccountNumber = accountIDStr
+
+	// Fetch balances (still used for multi-currency support)
 	balances, err := getBalancesForAccount(ctx, pool, accountID)
 	if err != nil {
 		return account, fmt.Errorf("failed to fetch balances: %w", err)

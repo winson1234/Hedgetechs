@@ -600,11 +600,11 @@ export default function TradingPanel() {
             value={activeAccountId || ''}
             onChange={(e) => dispatch(setActiveAccount(e.target.value))}
             className="max-w-[140px] min-w-0 px-1.5 py-1 text-[11px] bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-700 dark:text-slate-300 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-            title={`Account ${accounts.find((acc) => acc.id === activeAccountId)?.account_number}`}
+            title={`Account ${accounts.find((acc) => acc.id === activeAccountId)?.account_id}`}
           >
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
-                {account.account_number} ({account.type === 'live' ? 'LIVE' : 'DEMO'})
+                {account.account_id} ({account.type === 'live' ? 'LIVE' : 'DEMO'})
               </option>
             ))}
           </select>
@@ -648,7 +648,7 @@ export default function TradingPanel() {
           )}
           {isCFD && (
             <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
-              <span className="text-slate-600 dark:text-slate-400">Available Margin:</span>
+              <span className="text-slate-600 dark:text-slate-400">Total Balance:</span>
               <span className="font-bold text-green-600 dark:text-green-400">
                 {accountBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {accountCurrency}
               </span>

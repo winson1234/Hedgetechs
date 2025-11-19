@@ -1,7 +1,37 @@
-
 html {
-  scroll-padding-top: 140px;
+  scroll-padding-top: 130px;
   scroll-behavior: smooth;
+}
+
+/* ===========================
+   VIDEO BACKGROUND
+   =========================== */
+.dashboard-video-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
+  opacity: 1;
+  transition: opacity 1.2s ease-in-out;
+  pointer-events: none;
+}
+
+/* Dark overlay on top of video */
+.dashboard-video-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Ensure dashboard content appears above video */
+.dashboard-page {
+  position: relative;
+  z-index: 0;
 }
 
 /* ===========================
@@ -98,50 +128,99 @@ html {
   font-size: 0.8rem;
   line-height: 1.5;
 }
-/*HEADER & NAVIGATION - Sticky positioning */
-.header {
-  position: fixed !important;
+
+/*HEADER & NAVIGATION*/
+/*HEADER & NAVIGATION - Sticky positioning (follows user on scroll) */
+header.header,
+.dashboard-page header.header,
+.dashboard-page .header,
+.header,
+.dashboard-page > header.header,
+.dashboard-page > header.header.header {
+  position: sticky !important;
   top: 0 !important;
   width: 100% !important;
-  z-index: 1000;
-  background: transparent !important;
   backdrop-filter: none !important;
   border-bottom: none !important;
-  box-shadow: none !important;
-  transition: all 0.3s ease;
+  z-index: 1000;
+  background: rgba(4, 6, 18, 0) !important;
+  transition: background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: none;
+  transform: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  /* Ensure header is always visible - no fade-in animation */
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
-/* Header gets solid background when scrolled */
-.header.scrolled {
-  background:   var(--bg-header)  !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
+/* Override any scroll animation effects on header */
+header.header[data-scroll],
+header.header[data-scroll-animate],
+header.header[data-gsap-animate] {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+}
+
+/* Hide header pseudo-elements when scrolled */
+.header.scrolled::before {
+  opacity: 0;
+}
+
+.header.scrolled::after {
+  opacity: 0;
+}
+
+/* Header gets dark background when scrolled - STAYS STICKY (follows user) */
+header.header.scrolled,
+.dashboard-page header.header.scrolled,
+.dashboard-page .header.scrolled,
+.header.scrolled,
+#main-header.scrolled {
+  position: sticky !important;
+  top: 0 !important;
+  background: #050813 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(4, 6, 18, 0.95) !important;
   border-bottom: 1px solid rgba(253, 219, 146, 0.2) !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(253, 219, 146, 0.15) !important;
 }
 
-/* Light mode - transparent by default */
+/* Light mode header - transparent by default */
+body.light-mode header.header,
+body.light-mode .dashboard-page header.header,
+body.light-mode .dashboard-page .header,
 body.light-mode .header {
   background: transparent !important;
   border-bottom: none !important;
   box-shadow: none !important;
 }
 
-/* Light mode - solid when scrolled */
+/* Light mode header - background when scrolled - STAYS STICKY (follows user) */
+body.light-mode header.header.scrolled,
+body.light-mode .dashboard-page header.header.scrolled,
+body.light-mode .dashboard-page .header.scrolled,
 body.light-mode .header.scrolled {
-  background: rgba(255, 255, 255, 0.95) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+  position: sticky !important;
+  top: 0 !important;
+  background: #1e293b !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(255, 255, 255, 0.1) !important;
 }
+
 .nav-wrapper {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 36px 0;
   gap: 48px;
-  transition: padding 0.3s ease;
+  transition: padding 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .header.scrolled .nav-wrapper {
@@ -227,6 +306,10 @@ body.light-mode .logo-text {
   gap: 48px;
   flex: 1;
   justify-content: center;
+  /* Ensure nav menu is always visible - no fade-in animation */
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
 }
 
 .nav-link {
@@ -239,6 +322,10 @@ body.light-mode .logo-text {
   padding-bottom: 6px;
   letter-spacing: 0.5px;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  /* Ensure nav links are always visible - no fade-in animation */
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
 }
 
 
@@ -313,6 +400,25 @@ body.light-mode .header.scrolled .nav-link {
 .nav-link.active {
   color: var(  --thirthier-color) !important;
   text-shadow: 0 4px 12px rgba(253, 219, 146, 0.4);
+}
+
+/* Override any scroll animation effects on nav menu and links */
+.nav-menu[data-scroll-animate],
+.nav-menu[data-gsap-animate],
+.nav-link[data-scroll-animate],
+.nav-link[data-gsap-animate] {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+}
+
+.nav-menu[data-scroll-animate].animate-in,
+.nav-menu[data-gsap-animate].animate-in,
+.nav-link[data-scroll-animate].animate-in,
+.nav-link[data-gsap-animate].animate-in {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
 }
 
 /* Nav Actions */

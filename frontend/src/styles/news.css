@@ -448,7 +448,7 @@
    =========================== */
 .payout-section {
   padding: 100px 0;
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   position: relative;
 }
 

@@ -8,6 +8,7 @@ import (
 	"brokerageProject/internal/hub"
 	redisProvider "brokerageProject/internal/market_data/redis"
 	"brokerageProject/internal/middleware"
+	"brokerageProject/internal/mt5client"
 	"brokerageProject/internal/services"
 	"brokerageProject/internal/utils"
 	"brokerageProject/internal/worker"
@@ -124,6 +125,9 @@ func main() {
 		log.Printf("Redis client initialized successfully (addr=%s)", redisAddr)
 	}
 
+	// Define forex symbols (used by multiple services)
+	forexSymbols := []string{"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCHF", "CADJPY", "AUDNZD", "EURGBP", "USDCAD", "EURJPY", "GBPJPY"}
+
 	// Initialize forex services (if Redis is available)
 	var forexAggregator *services.ForexAggregatorService
 	var forexAnalytics *services.ForexAnalyticsService
@@ -145,6 +149,37 @@ func main() {
 		log.Println("Forex klines service initialized")
 	} else {
 		log.Println("WARNING: Forex services disabled (Redis unavailable)")
+	}
+
+	// Initialize Data Integrity Service (gap detection and automatic backfill)
+	windowsAPIURL := os.Getenv("WINDOWS_API_URL")
+	if windowsAPIURL == "" {
+		windowsAPIURL = "http://localhost:5000"
+	}
+
+	if windowsAPIURL != "" && redisClient != nil {
+		mt5Client := mt5client.NewClient(mt5client.Config{
+			BaseURL:    windowsAPIURL,
+			Timeout:    30 * time.Second,
+			MaxRetries: 3,
+		})
+
+		dataIntegrityService := services.NewDataIntegrityService(services.DataIntegrityConfig{
+			DB:             dbPool,
+			MT5Client:      mt5Client,
+			TrackedSymbols: forexSymbols,
+			CheckSchedule:  "0 * * * *", // Run every hour at minute 0
+			GapWindow:      2 * time.Minute,
+			MaxBackoff:     1 * time.Hour,
+		})
+
+		if err := dataIntegrityService.Start(context.Background()); err != nil {
+			log.Printf("WARNING: Data Integrity Service failed to start: %v", err)
+		} else {
+			log.Println("Data Integrity Service started (gap detection every hour)")
+		}
+	} else {
+		log.Println("WARNING: Data Integrity Service disabled (MT5 API or Redis unavailable)")
 	}
 
 	// Initialize rate limiter (100 requests per minute per user, burst of 20)
@@ -239,8 +274,7 @@ func main() {
 	// Crypto symbols are handled by Binance provider (ignored by Redis)
 	// Forex symbols are handled by Redis provider (ignored by Binance)
 	// Forex list: All forex pairs supported by MT5 Publisher
-	allSymbols := []string{"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCHF", "CADJPY", "AUDNZD", "EURGBP", "USDCAD", "EURJPY", "GBPJPY"}
-	if err := marketDataService.Start(allSymbols); err != nil {
+	if err := marketDataService.Start(forexSymbols); err != nil {
 		log.Printf("WARNING: Market data service failed to start: %v", err)
 	} else {
 		log.Println("Market data service started successfully (Hybrid Engine: Crypto + Forex)")
@@ -495,7 +529,7 @@ func main() {
 		// GET /api/v1/forex/quotes - All forex pair quotes with 24h stats
 		http.HandleFunc("/api/v1/forex/quotes", api.CORSMiddleware(allowHEAD(api.HandleForexQuotes(redisClient))))
 		// GET /api/v1/forex/klines?symbol=EURUSD&interval=1h&limit=100 - Historical klines
-		http.HandleFunc("/api/v1/forex/klines", api.CORSMiddleware(allowHEAD(api.HandleForexKlines(forexKlines))))
+		http.HandleFunc("/api/v1/forex/klines", api.CORSMiddleware(allowHEAD(api.HandleForexKlines(forexKlines, redisClient))))
 		log.Println("Forex API endpoints registered: /api/v1/forex/quotes, /api/v1/forex/klines")
 	}
 

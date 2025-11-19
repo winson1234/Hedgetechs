@@ -291,3 +291,90 @@ func (p *Provider) increaseBackoff(current time.Duration) time.Duration {
 	}
 	return next
 }
+
+// ===== K-lines Caching Helper Methods =====
+
+// TrimKlinesByAge removes K-lines older than the specified retention duration from Redis ZSET
+func (p *Provider) TrimKlinesByAge(ctx context.Context, symbol string, retention time.Duration) (int64, error) {
+	key := fmt.Sprintf("forex:klines:1m:%s", symbol)
+	cutoffTime := time.Now().Add(-retention)
+	cutoffScore := float64(cutoffTime.UnixMilli())
+
+	removed, err := p.client.ZRemRangeByScore(ctx, key, "-inf", fmt.Sprintf("%f", cutoffScore)).Result()
+	if err != nil {
+		return 0, fmt.Errorf("failed to trim klines for %s: %w", symbol, err)
+	}
+
+	return removed, nil
+}
+
+// GetKlinesFromCache retrieves K-lines from Redis ZSET for the specified time range
+func (p *Provider) GetKlinesFromCache(ctx context.Context, symbol string, startTime, endTime time.Time) ([]string, error) {
+	key := fmt.Sprintf("forex:klines:1m:%s", symbol)
+	startScore := float64(startTime.UnixMilli())
+	endScore := float64(endTime.UnixMilli())
+
+	// Query Redis ZSET by score range (ZRANGEBYSCORE)
+	klines, err := p.client.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+		Min: fmt.Sprintf("%f", startScore),
+		Max: fmt.Sprintf("%f", endScore),
+	}).Result()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get klines from cache for %s: %w", symbol, err)
+	}
+
+	return klines, nil
+}
+
+// CacheKline adds a single K-line to Redis ZSET
+func (p *Provider) CacheKline(ctx context.Context, symbol string, timestamp time.Time, klineJSON string) error {
+	key := fmt.Sprintf("forex:klines:1m:%s", symbol)
+	score := float64(timestamp.UnixMilli())
+
+	err := p.client.ZAdd(ctx, key, redis.Z{
+		Score:  score,
+		Member: klineJSON,
+	}).Err()
+
+	if err != nil {
+		return fmt.Errorf("failed to cache kline for %s: %w", symbol, err)
+	}
+
+	return nil
+}
+
+// GetCacheStats returns statistics about the K-lines cache for a symbol
+func (p *Provider) GetCacheStats(ctx context.Context, symbol string) (count int64, oldest, newest time.Time, err error) {
+	key := fmt.Sprintf("forex:klines:1m:%s", symbol)
+
+	// Get count
+	count, err = p.client.ZCard(ctx, key).Result()
+	if err != nil {
+		return 0, time.Time{}, time.Time{}, fmt.Errorf("failed to get cache count: %w", err)
+	}
+
+	if count == 0 {
+		return 0, time.Time{}, time.Time{}, nil
+	}
+
+	// Get oldest (first element)
+	oldestScores, err := p.client.ZRangeWithScores(ctx, key, 0, 0).Result()
+	if err != nil {
+		return 0, time.Time{}, time.Time{}, fmt.Errorf("failed to get oldest: %w", err)
+	}
+	if len(oldestScores) > 0 {
+		oldest = time.UnixMilli(int64(oldestScores[0].Score))
+	}
+
+	// Get newest (last element)
+	newestScores, err := p.client.ZRevRangeWithScores(ctx, key, 0, 0).Result()
+	if err != nil {
+		return 0, time.Time{}, time.Time{}, fmt.Errorf("failed to get newest: %w", err)
+	}
+	if len(newestScores) > 0 {
+		newest = time.UnixMilli(int64(newestScores[0].Score))
+	}
+
+	return count, oldest, newest, nil
+}

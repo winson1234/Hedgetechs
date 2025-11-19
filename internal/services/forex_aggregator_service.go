@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -210,8 +211,76 @@ func (s *ForexAggregatorService) flushBars(ctx context.Context, ticker *time.Tic
 				// TODO: Implement retry queue or dead-letter queue for production
 			} else {
 				log.Printf("[Forex Aggregator] Successfully flushed %d bars to database", len(rows))
+
+				// ===== REDIS ZSET CACHING =====
+				// Write-through cache: Add bars to Redis ZSET after successful DB insert
+				if s.redisClient != nil {
+					s.cacheKlinesToRedis(ctx, barsToFlush)
+				}
+				// ===== END REDIS CACHING =====
 			}
 			// ===== END BATCH INSERT =====
 		}
 	}
+}
+
+// cacheKlinesToRedis adds completed K-lines to Redis ZSET and trims old data
+func (s *ForexAggregatorService) cacheKlinesToRedis(ctx context.Context, bars map[string]*CurrentBar) {
+	const retentionDuration = 7 * 24 * time.Hour // 7 days
+
+	for _, bar := range bars {
+		bar.mu.Lock()
+
+		// Build K-line JSON for Redis
+		kline := map[string]interface{}{
+			"timestamp":  bar.Timestamp.UnixMilli(),
+			"open_bid":   bar.OpenBid,
+			"high_bid":   bar.HighBid,
+			"low_bid":    bar.LowBid,
+			"close_bid":  bar.CloseBid,
+			"open_ask":   bar.OpenAsk,
+			"high_ask":   bar.HighAsk,
+			"low_ask":    bar.LowAsk,
+			"close_ask":  bar.CloseAsk,
+			"volume":     bar.TickCount,
+		}
+
+		klineJSON, err := json.Marshal(kline)
+		if err != nil {
+			log.Printf("[Forex Aggregator] ERROR: Failed to marshal kline for Redis: %v", err)
+			bar.mu.Unlock()
+			continue
+		}
+
+		// Redis key: forex:klines:1m:<SYMBOL>
+		key := "forex:klines:1m:" + bar.Symbol
+		score := float64(bar.Timestamp.UnixMilli())
+
+		// Add to ZSET (score = timestamp in milliseconds)
+		err = s.redisClient.ZAdd(ctx, key, redis.Z{
+			Score:  score,
+			Member: string(klineJSON),
+		}).Err()
+
+		if err != nil {
+			log.Printf("[Forex Aggregator] ERROR: Failed to ZADD kline to Redis for %s: %v", bar.Symbol, err)
+			bar.mu.Unlock()
+			continue
+		}
+
+		// Trim old data (remove bars older than 7 days)
+		cutoffTime := time.Now().Add(-retentionDuration)
+		cutoffScore := float64(cutoffTime.UnixMilli())
+
+		removed, err := s.redisClient.ZRemRangeByScore(ctx, key, "-inf", fmt.Sprintf("%f", cutoffScore)).Result()
+		if err != nil {
+			log.Printf("[Forex Aggregator] WARN: Failed to trim old klines for %s: %v", bar.Symbol, err)
+		} else if removed > 0 {
+			log.Printf("[Forex Aggregator] Trimmed %d old bars from Redis cache for %s", removed, bar.Symbol)
+		}
+
+		bar.mu.Unlock()
+	}
+
+	log.Printf("[Forex Aggregator] Cached %d bars to Redis ZSET", len(bars))
 }

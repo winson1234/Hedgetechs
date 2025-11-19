@@ -125,9 +125,13 @@ func HandleForexQuotes(redisClient *redis.Client) http.HandlerFunc {
 	}
 }
 
-// HandleForexKlines returns historical klines for a forex pair (cache-first)
+// HandleForexKlines returns historical klines for a forex pair with cache-aside pattern
 // GET /api/v1/forex/klines?symbol=EURUSD&interval=1h&limit=100
-func HandleForexKlines(klinesService *services.ForexKlinesService) http.HandlerFunc {
+//
+// Cache Strategy:
+// - 1m interval: Cache-aside (Redis first, PostgreSQL fallback + hydrate)
+// - Other intervals: Direct PostgreSQL aggregation (cached bars used if available)
+func HandleForexKlines(klinesService *services.ForexKlinesService, redisClient *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -164,13 +168,41 @@ func HandleForexKlines(klinesService *services.ForexKlinesService) http.HandlerF
 		}
 
 		ctx := context.Background()
+		cacheHit := false
 
-		// Fetch klines from service (uses database query)
-		klines, err := klinesService.GetHistoricalKlines(ctx, symbol, interval, limit)
-		if err != nil {
-			log.Printf("[Forex API] ERROR fetching klines for %s: %v", symbol, err)
-			http.Error(w, "Failed to fetch klines", http.StatusInternalServerError)
-			return
+		var klines interface{}
+
+		// ===== CACHE-ASIDE PATTERN FOR 1M INTERVALS =====
+		if interval == "1m" && redisClient != nil {
+			// Try Redis cache first
+			cachedKlines, err := fetchKlinesFromCache(ctx, redisClient, symbol, limit)
+			if err == nil && len(cachedKlines) > 0 {
+				klines = cachedKlines
+				cacheHit = true
+				log.Printf("[Forex API] Cache HIT for %s 1m klines (returned %d bars)", symbol, len(cachedKlines))
+			} else {
+				// Cache miss - fetch from PostgreSQL
+				log.Printf("[Forex API] Cache MISS for %s 1m klines, querying PostgreSQL", symbol)
+				dbKlines, err := klinesService.GetHistoricalKlines(ctx, symbol, interval, limit)
+				if err != nil {
+					log.Printf("[Forex API] ERROR fetching klines from DB for %s: %v", symbol, err)
+					http.Error(w, "Failed to fetch klines", http.StatusInternalServerError)
+					return
+				}
+				klines = dbKlines
+
+				// Hydrate Redis cache asynchronously
+				go hydrateCache(context.Background(), redisClient, symbol, dbKlines)
+			}
+		} else {
+			// For other intervals, use PostgreSQL aggregation directly
+			dbKlines, err := klinesService.GetHistoricalKlines(ctx, symbol, interval, limit)
+			if err != nil {
+				log.Printf("[Forex API] ERROR fetching klines for %s: %v", symbol, err)
+				http.Error(w, "Failed to fetch klines", http.StatusInternalServerError)
+				return
+			}
+			klines = dbKlines
 		}
 
 		// Return klines
@@ -182,9 +214,84 @@ func HandleForexKlines(klinesService *services.ForexKlinesService) http.HandlerF
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		if cacheHit {
+			w.Header().Set("X-Cache", "HIT")
+		} else {
+			w.Header().Set("X-Cache", "MISS")
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(out)
 	}
+}
+
+// fetchKlinesFromCache retrieves K-lines from Redis cache (sorted set)
+func fetchKlinesFromCache(ctx context.Context, redisClient *redis.Client, symbol string, limit int) ([]map[string]interface{}, error) {
+	key := "forex:klines:1m:" + symbol
+
+	// Get the last N bars using ZREVRANGE (reverse order by score/timestamp)
+	klineStrings, err := redisClient.ZRevRange(ctx, key, 0, int64(limit-1)).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(klineStrings) == 0 {
+		return nil, nil
+	}
+
+	// Parse JSON strings into kline objects
+	klines := make([]map[string]interface{}, 0, len(klineStrings))
+	for i := len(klineStrings) - 1; i >= 0; i-- { // Reverse to get chronological order
+		var kline map[string]interface{}
+		if err := json.Unmarshal([]byte(klineStrings[i]), &kline); err != nil {
+			log.Printf("[Forex API] WARN: Failed to unmarshal cached kline: %v", err)
+			continue
+		}
+		klines = append(klines, kline)
+	}
+
+	return klines, nil
+}
+
+// hydrateCache writes fetched klines to Redis cache asynchronously
+func hydrateCache(ctx context.Context, redisClient *redis.Client, symbol string, klines interface{}) {
+	// Type assert to slice of maps
+	klinesSlice, ok := klines.([]map[string]interface{})
+	if !ok {
+		log.Printf("[Forex API] WARN: Cannot hydrate cache - unexpected klines type")
+		return
+	}
+
+	if len(klinesSlice) == 0 {
+		return
+	}
+
+	key := "forex:klines:1m:" + symbol
+
+	// Add each kline to Redis ZSET
+	for _, kline := range klinesSlice {
+		timestamp, ok := kline["timestamp"].(float64)
+		if !ok {
+			continue
+		}
+
+		klineJSON, err := json.Marshal(kline)
+		if err != nil {
+			continue
+		}
+
+		// ZADD with score = timestamp
+		err = redisClient.ZAdd(ctx, key, redis.Z{
+			Score:  timestamp,
+			Member: string(klineJSON),
+		}).Err()
+
+		if err != nil {
+			log.Printf("[Forex API] WARN: Failed to hydrate cache for %s: %v", symbol, err)
+			return
+		}
+	}
+
+	log.Printf("[Forex API] Cache hydrated for %s (%d bars)", symbol, len(klinesSlice))
 }
 
 // calculateSpreadPips calculates spread in pips

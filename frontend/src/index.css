@@ -71,3 +71,8 @@ body.light-mode img[src*="KrypitalX"] {
 body:not(.light-mode) img[src*="KrypitalX"] {
   filter: none;
 }
+
+/* Login and Register pages: Always use darkened text (like light mode) */
+.login-page img[src*="KrypitalX"] {
+  filter: brightness(0.65) saturate(2.2) contrast(1.2) !important;
+}

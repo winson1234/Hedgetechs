@@ -249,17 +249,12 @@ body.light-mode .header.scrolled {
 }
 
 .logo a:hover::before {
-  opacity: 1;
-  animation: logoGlow 1.5s ease-in-out infinite;
-}
-
-@keyframes logoGlow {
-  0%, 100% { transform: scale(0.9); opacity: 0.3; }
-  50% { transform: scale(1.2); opacity: 0.6; }
+  opacity: 0.5;
 }
 
 .logo a:hover {
-  transform: scale(1.05) rotate(-2deg);
+  /* Subtle opacity change only, no motion */
+  opacity: 0.85;
 }
 
 .language-menu li.selected {

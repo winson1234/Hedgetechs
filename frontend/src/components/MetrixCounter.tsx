@@ -117,53 +117,67 @@ const MetricsCounter: React.FC = () => {
     };
   }, [startCountAnimation]);
 
+  const metrics = [
+    {
+      key: 'volume',
+      label: '24h Trading Volume',
+      value: (
+        <>
+          <span className="slot-digit">${counts.volume.toFixed(1)}</span>B+
+        </>
+      ),
+    },
+    {
+      key: 'traders',
+      label: 'Active Traders',
+      value: (
+        <>
+          <span className="slot-digit">{counts.traders}</span>M+
+        </>
+      ),
+    },
+    {
+      key: 'countries',
+      label: 'Countries',
+      value: (
+        <>
+          <span className="slot-digit">{counts.countries}</span>+
+        </>
+      ),
+    },
+    {
+      key: 'pairs',
+      label: 'Trading Pairs',
+      value: (
+        <>
+          <span className="slot-digit">{counts.pairs}</span>+
+        </>
+      ),
+    },
+  ];
+
   return (
     <section 
       ref={sectionRef}
       className={`metrics-section ${isVisible ? 'visible' : ''}`}
     >
       <div className="metrics-container">
-        <div className="bubble bubble-1"></div>
-        <div className="bubble bubble-2"></div>
-        {/* Metric 1 - Trading Volume */}
-        <div className="metric-item">
-          <div className="metric-value slot-machine">
-            <span className="slot-digit">${counts.volume.toFixed(1)}</span>B+
+        <span className="bubble bubble-1" aria-hidden="true"></span>
+        <span className="bubble bubble-2" aria-hidden="true"></span>
+        {metrics.map((metric, index) => (
+          <div
+            key={metric.key}
+            className="metric-item"
+            data-metric-index={index + 1}
+          >
+            <div className="metric-value slot-machine">
+              {metric.value}
+            </div>
+            <div className="metric-label">
+              {metric.label}
+            </div>
           </div>
-          <div className="metric-label">
-            24h Trading Volume
-          </div>
-        </div>
-
-        {/* Metric 2 - Active Traders */}
-        <div className="metric-item">
-          <div className="metric-value slot-machine">
-            <span className="slot-digit">{counts.traders}</span>M+
-          </div>
-          <div className="metric-label">
-            Active Traders
-          </div>
-        </div>
-
-        {/* Metric 3 - Countries */}
-        <div className="metric-item">
-          <div className="metric-value slot-machine">
-            <span className="slot-digit">{counts.countries}</span>+
-          </div>
-          <div className="metric-label">
-            Countries
-          </div>
-        </div>
-
-        {/* Metric 4 - Trading Pairs */}
-        <div className="metric-item">
-          <div className="metric-value slot-machine">
-            <span className="slot-digit">{counts.pairs}</span>+
-          </div>
-          <div className="metric-label">
-            Trading Pairs
-          </div>
-        </div>
+        ))}
       </div>
     </section>
   );

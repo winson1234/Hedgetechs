@@ -19,6 +19,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
+
 // ===== HEADER SCROLL HANDLER - MUST BE OUTSIDE COMPONENT =====
 if (typeof window !== 'undefined') {
   let headerScrollInitialized = false;
@@ -74,6 +75,8 @@ import '../styles/crypto.css';
 import '../styles/mobile.css';
 import '../styles/trust.css';
 import '../styles/luxuryanimation.css';
+import '../styles/section-scroll.css';
+
 import MetricsCounter from "../components/MetrixCounter";
 
 interface CryptoData {
@@ -108,13 +111,366 @@ const CRYPTO_FORMATTER = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 8,
 });
 
+export const useSectionScroll = () => {
+  const [currentSection, setCurrentSection] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const sectionsRef = useRef<HTMLElement[]>([]);
+  const lastUpdateRef = useRef(0);
+const wheelTimeoutRef = useRef<number | null>(null);
+const touchStartRef = useRef<number>(0);
+  const sections = [
+    { id: 'home', name: 'Hero' },
+    { id: 'market', name: 'Markets' },
+    { id: 'news', name: 'News' },
+    { id: 'payout', name: 'Exchange' },
+    { id: 'features', name: 'Features' },
+    { id: 'about', name: 'About' },
+    { id: 'faq', name: 'FAQ' },
+    { id: 'footer', name: 'Footer' }
+
+  ];
+
+  // Function to update section classes based on current position
+  const updateSectionClasses = (activeIndex: number) => {
+    // Throttle updates to prevent excessive DOM manipulation
+    const now = Date.now();
+    if (now - lastUpdateRef.current < 100) return;
+    lastUpdateRef.current = now;
+
+    sections.forEach((section, index) => {
+      const element = document.getElementById(section.id);
+      if (!element) return;
+
+      // Remove all classes first
+      element.classList.remove('section-active', 'section-above', 'section-below');
+
+      // Add appropriate class based on position
+      if (index === activeIndex) {
+        element.classList.add('section-active');
+      } else if (index < activeIndex) {
+        element.classList.add('section-above');
+      } else {
+        element.classList.add('section-below');
+      }
+    });
+  };
+  // Wheel event handler for section-by-section scrolling
+const handleWheel = (e: WheelEvent) => {
+  e.preventDefault();
+  
+  if (isTransitioning) return; // Block all scrolling during transition
+  
+  // Clear existing timeout
+  if (wheelTimeoutRef.current) {
+    clearTimeout(wheelTimeoutRef.current);
+  }
+  
+  // Debounce wheel events - only trigger once
+  wheelTimeoutRef.current = setTimeout(() => {
+    if (e.deltaY > 0 && currentSection < sections.length - 1) {
+      // Scroll down
+      scrollToSection(currentSection + 1);
+    } else if (e.deltaY < 0 && currentSection > 0) {
+      // Scroll up
+      scrollToSection(currentSection - 1);
+    }
+  }, 100); // Increased to prevent rapid scrolling
+};
+const scrollToSection = (index: number) => {
+  if (isTransitioning || index < 0 || index >= sections.length) return;
+  
+  setIsTransitioning(true); // Lock scrolling
+  
+  // IMMEDIATELY update state and classes BEFORE scrolling
+  setCurrentSection(index);
+  updateSectionClasses(index);
+  
+  const section = document.getElementById(sections[index].id);
+  if (section) {
+    // Use instant scroll
+    section.scrollIntoView({ 
+      behavior: 'auto',
+      block: 'center',
+      inline: 'nearest'
+    });
+  }
+  
+  // Lock for longer to prevent scroll-through (1200ms = 1.2s)
+  setTimeout(() => setIsTransitioning(false), 1200);
+};
+ useEffect(() => {
+  // Hide default scrollbar
+  document.body.style.overflow = 'hidden';
+  document.documentElement.style.overflow = 'hidden';
+  
+  // Initialize classes on mount
+  updateSectionClasses(0);
+
+  // Wheel event handler for section-by-section scrolling
+  const handleWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    
+    if (isTransitioning) return;
+    
+    // Clear existing timeout
+    if (wheelTimeoutRef.current) {
+      clearTimeout(wheelTimeoutRef.current);
+    }
+    
+           // Debounce wheel events
+          // Debounce wheel events - REDUCE from 50ms to 10ms
+          wheelTimeoutRef.current = setTimeout(() => {
+         if (e.deltaY > 0 && currentSection < sections.length - 1) {
+             // Scroll down
+            scrollToSection(currentSection + 1);
+           } else if (e.deltaY < 0 && currentSection > 0) {
+          // Scroll up
+          scrollToSection(currentSection - 1);
+     }
+    }, 10); // Changed from 50 to 10
+  };
+
+  // Touch event handlers for mobile
+  const handleTouchStart = (e: TouchEvent) => {
+    touchStartRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: TouchEvent) => {
+    if (isTransitioning) return;
+    
+    const touchEnd = e.changedTouches[0].clientY;
+    const diff = touchStartRef.current - touchEnd;
+    
+    // Minimum swipe distance
+    if (Math.abs(diff) > 50) {
+      if (diff > 0 && currentSection < sections.length - 1) {
+        // Swipe up - go to next section
+        scrollToSection(currentSection + 1);
+      } else if (diff < 0 && currentSection > 0) {
+        // Swipe down - go to previous section
+        scrollToSection(currentSection - 1);
+      }
+    }
+  };
+
+  // Add event listeners
+  window.addEventListener('wheel', handleWheel, { passive: false });
+  window.addEventListener('touchstart', handleTouchStart, { passive: true });
+  window.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+  // Keyboard navigation
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (isTransitioning) return;
+    
+    if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+      e.preventDefault();
+      if (currentSection < sections.length - 1) {
+        scrollToSection(currentSection + 1);
+      }
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault();
+      if (currentSection > 0) {
+        scrollToSection(currentSection - 1);
+      }
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      scrollToSection(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      scrollToSection(sections.length - 1);
+    }
+  };
+
+  window.addEventListener('keydown', handleKeyDown);
+
+  return () => {
+    // Restore scrollbar
+    document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
+    
+    window.removeEventListener('wheel', handleWheel);
+    window.removeEventListener('touchstart', handleTouchStart);
+    window.removeEventListener('touchend', handleTouchEnd);
+    window.removeEventListener('keydown', handleKeyDown);
+    
+    if (wheelTimeoutRef.current) {
+      clearTimeout(wheelTimeoutRef.current);
+    }
+  };
+}, [currentSection, isTransitioning]);
+  return {
+    currentSection,
+    sections,
+    scrollToSection
+  };
+};
+// Navigation Dots Component
+// Navigation Dots Component
+export const SectionNavigationDots = ({ 
+  currentSection, 
+  sections, 
+  scrollToSection 
+}: {
+  currentSection: number;
+  sections: { id: string; name: string }[];
+  scrollToSection: (index: number) => void;
+}) => {
+  return (
+    <div style={{
+      position: 'fixed',
+      right: '2rem',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      zIndex: 9999, // Increased z-index to be above everything
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1rem',
+      pointerEvents: 'auto' // Ensure it's clickable
+    }}>
+      {sections.map((section, index) => (
+        <button
+          key={section.id}
+          onClick={() => scrollToSection(index)}
+          title={section.name}
+          style={{
+            width: currentSection === index ? '12px' : '8px',
+            height: currentSection === index ? '12px' : '8px',
+            borderRadius: '50%',
+            border: 'none',
+            background: currentSection === index 
+              ? 'linear-gradient(135deg, #C76D00, #FDDB92)'
+              : 'rgba(255, 255, 255, 0.3)',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            padding: 0,
+            position: 'relative',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)' // Add shadow for visibility
+          }}
+          onMouseEnter={(e) => {
+            if (currentSection !== index) {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
+              e.currentTarget.style.transform = 'scale(1.2)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (currentSection !== index) {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }
+          }}
+        >
+          <span style={{
+            position: 'absolute',
+            right: '1.5rem',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            whiteSpace: 'nowrap',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            color: '#fff',
+            background: 'rgba(0, 0, 0, 0.8)',
+            padding: '0.25rem 0.75rem',
+            borderRadius: '4px',
+            opacity: 0,
+            pointerEvents: 'none',
+            transition: 'opacity 0.2s ease'
+          }}
+          className="tooltip">
+            {section.name}
+          </span>
+        </button>
+      ))}
+      <style>{`
+        button:hover .tooltip {
+          opacity: 1;
+        }
+        @media (max-width: 768px) {
+          div[style*="position: fixed"] {
+            display: none !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+// Progress Bar Component
+export const ScrollProgressBar = ({ 
+  currentSection, 
+  totalSections 
+}: {
+  currentSection: number;
+  totalSections: number;
+}) => {
+  const progress = ((currentSection + 1) / totalSections) * 100;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '3px',
+      background: 'rgba(255, 255, 255, 0.1)',
+      zIndex: 1000
+    }}>
+      <div style={{
+        height: '100%',
+        width: `${progress}%`,
+        background: 'linear-gradient(90deg, #C76D00, #FDDB92)',
+        transition: 'width 0.5s ease'
+      }} />
+    </div>
+  );
+};
+
+// Section indicator badge
+export const SectionIndicator = ({ 
+  currentSection, 
+  sections 
+}: {
+  currentSection: number;
+  sections: { id: string; name: string }[];
+}) => {
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: '2rem',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 1000,
+      background: 'rgba(0, 0, 0, 0.8)',
+      backdropFilter: 'blur(10px)',
+      padding: '0.75rem 1.5rem',
+      borderRadius: '50px',
+      color: '#fff',
+      fontSize: '0.875rem',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      border: '1px solid rgba(255, 255, 255, 0.1)'
+    }}>
+      <span style={{ color: '#FDDB92' }}>{currentSection + 1}</span>
+      <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>/</span>
+      <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>{sections.length}</span>
+      <span style={{ 
+        marginLeft: '0.5rem',
+        color: '#fff'
+      }}>
+        {sections[currentSection].name}
+      </span>
+    </div>
+  );
+};
 export default function DashboardPage() {
   const dispatch = useAppDispatch();
   const isLoggedIn = useAppSelector(state => !!state.auth.token);
   const user = useAppSelector(state => state.auth.user);
   const isDarkMode = useAppSelector(selectIsDarkMode);
   const currentPrices = useAppSelector(state => state.price.currentPrices);
-  
+  const { currentSection, sections, scrollToSection } = useSectionScroll();
+
   // Initialize scroll animations
   useGSAPScrollAnimations();
   useMicroParallax();
@@ -914,6 +1270,10 @@ const cancelLogout = () => {
     
     // Navigate to register page with email as query parameter
     navigate(`/register?email=${encodeURIComponent(email)}`);
+
+
+
+    
   };
   
 
@@ -937,6 +1297,7 @@ const cancelLogout = () => {
             <nav className="nav-menu">
               <a href="#market" className="nav-link">Markets</a>
               <a href="#news" className="nav-link">News</a>
+              <a href="#echange" className="nav-link">Exchange</a>
               <a href="#features" className="nav-link">Features</a>
               <a href="#about" className="nav-link">About</a>
               <a href="#faq" className="nav-link">FAQ</a>
@@ -1250,17 +1611,17 @@ const cancelLogout = () => {
       {/* Market Overview */}
       <section className="market-section" id="market">
         <div className="container">
-          <div className="section-header" style={{ textAlign: 'center' }} data-gsap-animate="fade-up" data-gsap-duration="1.2">
-            <h2 className="section-title" style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }} data-gsap-animate="fade-up" data-gsap-delay="0.1">
+          <div className="section-header" style={{ textAlign: 'center' }} data-animate="slide-left" data-delay="2">
+            <h2 className="section-title" style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem' }} data-animate data-delay="1" data-gsap-delay="0.1">
               Today&apos;s Cryptocurrency Prices
             </h2>
-            <p className="section-subtitle" style={{ fontSize: '0.9rem' }}>
+            <p className="section-subtitle" style={{ fontSize: '0.9rem' ,marginTop: '1',marginBottom: '-1rem' }} data-animate="slide-right" data-delay="1">
               Track real-time prices and 24-hour trading volume across major cryptocurrencies
             </p>
           </div>
 
           {/* Market Tabs */}
-          <div className="market-tabs" style={{ justifyContent: 'center' }}>
+          <div className="market-tabs" style={{ justifyContent: 'center' }} data-animate="zoom-in" data-delay="2">
             <button className={`market-tab ${activeMarketTab === 'all' ? 'active' : ''}`} onClick={() => setActiveMarketTab('all')}>
               <span className="tab-icon">🪙</span>
               All Coins
@@ -1462,10 +1823,10 @@ const cancelLogout = () => {
         <div className="container">
           {/* Section Header */}
           <div className="section-header" style={{ textAlign: 'center' }} data-gsap-animate="fade-up" data-gsap-duration="1.2">
-            <h2 className="section-title" style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }} data-gsap-animate="fade-up" data-gsap-delay="0.1">
+            <h2 className="section-title" style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '2rem' }} data-gsap-animate="fade-up" data-gsap-delay="0.1">
               Latest Market News
             </h2>
-            <p className="section-subtitle" style={{ fontSize: '0.9rem' }}>
+            <p className="section-subtitle" style={{ fontSize: '0.9rem',marginBottom: '-1.2rem' }}>
               Stay updated with real-time crypto and financial headlines
             </p>
           </div>
@@ -1799,8 +2160,8 @@ const cancelLogout = () => {
       </section>
 
       {/* One Click Payout Section */}
-      <section className="payout-section">
-        <div className="container">
+          <section className="payout-section" id="payout">
+          <div className="container">
           <div className="payout-container">
             {/* Left Side - Trading Card Image */}
             <div className="payout-image">
@@ -2093,7 +2454,7 @@ const cancelLogout = () => {
       </section>
 
       {/* Footer */}
-      <footer className="footer">
+      <footer className="footer" id="footer">
         <div className="container">
           <div className="footer-content">
             <div className="footer-brand">
@@ -2144,6 +2505,7 @@ const cancelLogout = () => {
       width: '100vw',
       height: '100vh',
     }}
+    
   >
     <div
       className={`logout-confirmation-modal ${fadeOut ? 'fade-out' : ''}`}
@@ -2171,7 +2533,22 @@ const cancelLogout = () => {
     </div>
   </div>
 )}
+{/* ADD THESE SCROLL ANIMATION COMPONENTS HERE */}
+<ScrollProgressBar 
+  currentSection={currentSection} 
+  totalSections={sections.length} 
+/>
 
+<SectionNavigationDots 
+  currentSection={currentSection}
+  sections={sections}
+  scrollToSection={scrollToSection}
+/>
+
+<SectionIndicator 
+  currentSection={currentSection}
+  sections={sections}
+/>
 
       </div>
     </>

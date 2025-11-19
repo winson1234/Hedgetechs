@@ -72,6 +72,7 @@ export function useGSAPScrollAnimations() {
         opacity: 0,
         y: initialY,
         scale: initialScale,
+         immediateRender: false,
       });
 
       // Create animation
@@ -81,6 +82,7 @@ export function useGSAPScrollAnimations() {
           start: 'top 85%',
           end: 'bottom 20%',
           toggleActions: 'play none none reverse',
+           immediateRender: false,
         },
       });
 
@@ -91,6 +93,7 @@ export function useGSAPScrollAnimations() {
         duration: duration,
         delay: delay, // Use the calculated delay (stagger already included)
         ease: easeType,
+        immediateRender: false,
       });
 
       elementsRef.current.set(`element-${index}`, tl);
@@ -128,6 +131,7 @@ export function useGSAPScrollAnimations() {
             trigger: element,
             start: 'top 90%',
             toggleActions: 'play none none reverse',
+             immediateRender: false,
           },
         });
 
@@ -137,6 +141,7 @@ export function useGSAPScrollAnimations() {
           duration: 0.4, // Short duration - not too long
           delay: index * 0.03, // Small stagger
           ease: 'power2.out',
+           immediateRender: false,
         });
 
         elementsRef.current.set(`content-${selector}-${index}`, tl);
@@ -161,6 +166,7 @@ export function useGSAPScrollAnimations() {
           trigger: trustSectionHeader,
           start: 'top 90%',
           toggleActions: 'play none none reverse',
+           immediateRender: false,
         },
       });
 
@@ -169,6 +175,7 @@ export function useGSAPScrollAnimations() {
         y: 0,
         duration: 0.3, // Very short
         ease: 'power2.out',
+         immediateRender: false,
       });
 
       elementsRef.current.set('trust-header', headerTl);
@@ -185,6 +192,7 @@ export function useGSAPScrollAnimations() {
           trigger: trustGrid,
           start: 'top 90%',
           toggleActions: 'play none none reverse',
+           immediateRender: false,
         },
       });
 
@@ -193,6 +201,7 @@ export function useGSAPScrollAnimations() {
         y: 0,
         duration: 0.25, // Very short
         ease: 'power2.out',
+         immediateRender: false,
       });
 
       elementsRef.current.set('trust-grid', gridTl);

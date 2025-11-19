@@ -19,6 +19,58 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
+// ===== HEADER SCROLL HANDLER - MUST BE OUTSIDE COMPONENT =====
+if (typeof window !== 'undefined') {
+  let headerScrollInitialized = false;
+  
+  const initHeaderScroll = () => {
+    if (headerScrollInitialized) return;
+    
+    const header = document.querySelector('.header') as HTMLElement;
+    if (!header) {
+      setTimeout(initHeaderScroll, 100);
+      return;
+    }
+    
+    headerScrollInitialized = true;
+    console.log('✅ Header found:', header);
+    
+    // Find the actual scroll container
+    const scrollContainer = document.querySelector('.dashboard-page') as HTMLElement;
+    const scrollElement = scrollContainer || window;
+    
+    const handleHeaderScroll = () => {
+      const scrollTop = scrollContainer 
+        ? scrollContainer.scrollTop 
+        : window.scrollY;
+      
+      console.log('🔄 SCROLL! Position:', scrollTop);
+      
+      if (scrollTop > 10) {
+        header.classList.add('scrolled');
+        console.log('✅ Added scrolled class');
+      } else {
+        header.classList.remove('scrolled');
+      }
+    };
+    
+    handleHeaderScroll();
+    
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', handleHeaderScroll, { passive: true });
+      console.log('✅ Listening to .dashboard-page scroll');
+    } else {
+      window.addEventListener('scroll', handleHeaderScroll, { passive: true });
+      console.log('✅ Listening to window scroll');
+    }
+  };
+  // Wait for DOM to be fully loaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initHeaderScroll);
+  } else {
+    setTimeout(initHeaderScroll, 50);
+  }
+}
 import '../styles/color.css';
 import './dashboard.css';
 import '../styles/scroll-animations.css';
@@ -726,45 +778,11 @@ const cancelLogout = () => {
     setCurrentPage(1);
   }, [activeNewsTab]);
 // Header scroll detection - add 'scrolled' class when scrolled
-useEffect(() => {
-  const header = document.querySelector('.header') as HTMLElement;
+
   
-  if (!header) return;
+  let isMounted = true;
   
-  let ticking = false;
-
-  const handleScroll = () => {
-    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    
-    if (!ticking) {
-      window.requestAnimationFrame(() => {
-        // Add 'scrolled' class when scrolled down more than 10px
-        // Header becomes solid with shadow and reduced padding
-        if (scrollTop > 10) {
-          header?.classList.add('scrolled');
-        } else {
-          header?.classList.remove('scrolled');
-        }
-        
-        ticking = false;
-      });
-      
-      ticking = true;
-    }
-  };
-
-  // Add scroll event listener with passive for better performance
-  window.addEventListener('scroll', handleScroll, { passive: true });
   
-  // Initial check on mount
-  handleScroll();
-
-  // Cleanup
-  return () => {
-    window.removeEventListener('scroll', handleScroll);
-  };
-}, []);
-
   // Position crypto menu dynamically and close when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -901,12 +919,14 @@ useEffect(() => {
       return;
     }
     
+    
     // Clear error
     setHeroEmailError('');
     
     // Navigate to register page with email as query parameter
     navigate(`/register?email=${encodeURIComponent(email)}`);
   };
+  
 
   return (
     <>

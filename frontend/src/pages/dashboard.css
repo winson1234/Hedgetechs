@@ -1,6 +1,12 @@
+
 html {
   scroll-padding-top: 140px;
   scroll-behavior: smooth;
+}
+.dashboard-page {
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 /* ===========================
    Global Section Sizing (Reduce Zoom)
@@ -111,7 +117,7 @@ html {
 
 /* Header gets solid background when scrolled */
 .header.scrolled {
-  background: rgba(4, 6, 18, 0.95) !important;
+  background:   var(--bg-header)  !important;
   backdrop-filter: blur(10px) !important;
   -webkit-backdrop-filter: blur(10px) !important;
   border-bottom: 1px solid rgba(253, 219, 146, 0.2) !important;

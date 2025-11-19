@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, MouseEvent as ReactMouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store';
 import { signOut } from '../store/slices/authSlice';
@@ -111,6 +111,15 @@ const CRYPTO_FORMATTER = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 8,
 });
 
+const PRIMARY_NAV_ITEMS = [
+  { id: 'market', label: 'Markets' },
+  { id: 'news', label: 'News' },
+  { id: 'exchange', label: 'Exchange' },
+  { id: 'features', label: 'Features' },
+  { id: 'about', label: 'About' },
+  { id: 'faq', label: 'FAQ' }
+] as const;
+
 export const useSectionScroll = () => {
   const [currentSection, setCurrentSection] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -122,7 +131,7 @@ const touchStartRef = useRef<number>(0);
     { id: 'home', name: 'Hero' },
     { id: 'market', name: 'Markets' },
     { id: 'news', name: 'News' },
-    { id: 'payout', name: 'Exchange' },
+    { id: 'exchange', name: 'Exchange' },
     { id: 'features', name: 'Features' },
     { id: 'about', name: 'About' },
     { id: 'faq', name: 'FAQ' },
@@ -193,6 +202,14 @@ const scrollToSection = (index: number) => {
       block: 'center',
       inline: 'nearest'
     });
+
+    if (typeof window !== 'undefined') {
+      const targetId = sections[index].id;
+      const hash = `#${targetId}`;
+      if (window.location.hash !== hash) {
+        window.history.replaceState(null, '', hash);
+      }
+    }
   }
   
   // Lock for longer to prevent scroll-through (1200ms = 1.2s)
@@ -562,61 +579,6 @@ export default function DashboardPage() {
     };
   }, [isDarkMode]);
 
-  // Handle active nav link based on hash
-  useEffect(() => {
-    const updateActiveNavLink = () => {
-      const hash = window.location.hash.slice(1); // Remove the # symbol
-      const navLinks = document.querySelectorAll('.nav-link');
-      
-      navLinks.forEach((link) => {
-        const href = link.getAttribute('href');
-        if (href && href.slice(1) === hash) {
-          link.classList.add('active');
-        } else {
-          link.classList.remove('active');
-        }
-      });
-    };
-
-    // Update on mount
-    updateActiveNavLink();
-
-    // Update on hash change
-    window.addEventListener('hashchange', updateActiveNavLink);
-    
-    // Also update on scroll (for smooth scroll behavior)
-    const handleScroll = () => {
-      const sections = ['market', 'news', 'features', 'about', 'faq'];
-      const scrollPosition = window.scrollY + 200; // Offset for sticky header
-
-      for (const section of sections) {
-        const element = document.getElementById(section);
-        if (element) {
-          const { offsetTop, offsetHeight } = element;
-          if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
-            const navLinks = document.querySelectorAll('.nav-link');
-            navLinks.forEach((link) => {
-              const href = link.getAttribute('href');
-              if (href && href.slice(1) === section) {
-                link.classList.add('active');
-              } else {
-                link.classList.remove('active');
-              }
-            });
-            break;
-          }
-        }
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener('hashchange', updateActiveNavLink);
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
-
   const navigate = useNavigate();
   const [activeMarketTab, setActiveMarketTab] = useState('all');
   const [activeNewsTab, setActiveNewsTab] = useState('all');
@@ -628,6 +590,28 @@ export default function DashboardPage() {
 const [showLogoutModal, setShowLogoutModal] = useState(false);
 const [isLoggingOut, setIsLoggingOut] = useState(false);
 const [fadeOut, setFadeOut] = useState(false);
+
+  const activeSectionId = sections[currentSection]?.id;
+
+  const navigateToSection = (sectionId: string) => {
+    const targetIndex = sections.findIndex(section => section.id === sectionId);
+    if (targetIndex !== -1) {
+      scrollToSection(targetIndex);
+    } else {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleNavClick = (event: ReactMouseEvent<HTMLAnchorElement>, sectionId: string) => {
+    event.preventDefault();
+    navigateToSection(sectionId);
+  };
+
+  const handleMobileNavClick = (event: ReactMouseEvent<HTMLAnchorElement>, sectionId: string) => {
+    event.preventDefault();
+    navigateToSection(sectionId);
+    setMobileMenuOpen(false);
+  };
 
 const languages = [
   { code: 'EN-US', name: 'English (US)', flag: 'https://flagcdn.com/w20/us.png' },
@@ -1295,12 +1279,17 @@ const cancelLogout = () => {
 
             {/* Desktop Nav */}
             <nav className="nav-menu">
-              <a href="#market" className="nav-link">Markets</a>
-              <a href="#news" className="nav-link">News</a>
-              <a href="#echange" className="nav-link">Exchange</a>
-              <a href="#features" className="nav-link">Features</a>
-              <a href="#about" className="nav-link">About</a>
-              <a href="#faq" className="nav-link">FAQ</a>
+              {PRIMARY_NAV_ITEMS.map((item) => (
+                <a
+                  key={item.id}
+                  href={`#${item.id}`}
+                  className={`nav-link ${activeSectionId === item.id ? 'active' : ''}`}
+                  onClick={(event) => handleNavClick(event, item.id)}
+                  aria-current={activeSectionId === item.id ? 'page' : undefined}
+                >
+                  {item.label}
+                </a>
+              ))}
             </nav>
 
             {/* Right Side Actions */}
@@ -1428,41 +1417,16 @@ const cancelLogout = () => {
         {mobileMenuOpen && (
           <div className="mobile-menu">
             <nav className="mobile-nav">
-              <a 
-                href="#market" 
-                className="mobile-nav-link"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Markets
-              </a>
-              <a 
-                href="#news" 
-                className="mobile-nav-link"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                News
-              </a>
-              <a 
-                href="#features" 
-                className="mobile-nav-link"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Features
-              </a>
-              <a 
-                href="#about" 
-                className="mobile-nav-link"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                About
-              </a>
-              <a 
-                href="#faq" 
-                className="mobile-nav-link"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                FAQ
-              </a>
+              {PRIMARY_NAV_ITEMS.map((item) => (
+                <a
+                  key={item.id}
+                  href={`#${item.id}`}
+                  className={`mobile-nav-link ${activeSectionId === item.id ? 'active' : ''}`}
+                  onClick={(event) => handleMobileNavClick(event, item.id)}
+                >
+                  {item.label}
+                </a>
+              ))}
             </nav>
           </div>
         )}
@@ -2160,7 +2124,7 @@ const cancelLogout = () => {
       </section>
 
       {/* One Click Payout Section */}
-          <section className="payout-section" id="payout">
+          <section className="payout-section" id="exchange">
           <div className="container">
           <div className="payout-container">
             {/* Left Side - Trading Card Image */}

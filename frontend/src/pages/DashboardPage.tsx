@@ -738,9 +738,9 @@ useEffect(() => {
     
     if (!ticking) {
       window.requestAnimationFrame(() => {
-        // Add 'scrolled' class when scrolled down more than 150px
-        // This allows the header to scroll with the page first, then stick to top
-        if (scrollTop > 150) {
+        // Add 'scrolled' class when scrolled down more than 10px
+        // Header becomes solid with shadow and reduced padding
+        if (scrollTop > 10) {
           header?.classList.add('scrolled');
         } else {
           header?.classList.remove('scrolled');
@@ -1058,11 +1058,41 @@ useEffect(() => {
         {mobileMenuOpen && (
           <div className="mobile-menu">
             <nav className="mobile-nav">
-              <a href="#market" className="mobile-nav-link">Markets</a>
-              <a href="#news" className="mobile-nav-link">News</a>
-              <a href="#features" className="mobile-nav-link">Features</a>
-              <a href="#about" className="mobile-nav-link">About</a>
-              <a href="#faq" className="mobile-nav-link">FAQ</a>
+              <a 
+                href="#market" 
+                className="mobile-nav-link"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Markets
+              </a>
+              <a 
+                href="#news" 
+                className="mobile-nav-link"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                News
+              </a>
+              <a 
+                href="#features" 
+                className="mobile-nav-link"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Features
+              </a>
+              <a 
+                href="#about" 
+                className="mobile-nav-link"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                About
+              </a>
+              <a 
+                href="#faq" 
+                className="mobile-nav-link"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                FAQ
+              </a>
             </nav>
           </div>
         )}

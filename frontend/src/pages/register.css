@@ -67,6 +67,18 @@ body {
   margin-left: 0;
 }
 
+/* Logo Image Styling */
+.register-page .logo-image-header {
+  height: 44px;
+  width: auto;
+  /* PNG rendering optimization */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
 
 
 .register-page .name-group {

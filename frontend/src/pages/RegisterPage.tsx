@@ -153,7 +153,7 @@ useEffect(() => {
 <div className="register-page">
   <div className="header">
     <Link to="/dashboard" className="logo">
-      <span className="fp">FP</span><span className="markets">Markets</span>
+      <img src="/KrypitalX.png" alt="KrypitalX" className="logo-image-header" />
     </Link>
     <Link to="/login">
       <button className="client-login-btn">Client Login</button>
@@ -165,7 +165,7 @@ useEffect(() => {
       <div className="container">
         <div className="card">
           <h1>Create Account</h1>
-          <p>Join FP Markets and start trading today</p>
+          <p>Join KrypitalX and start trading today</p>
 
           <form id="registerForm" onSubmit={handleSubmit}>
             {/* Country */}

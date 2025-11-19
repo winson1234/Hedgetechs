@@ -70,7 +70,7 @@ export default function LoginPage() {
 
         <div className="login-card">
           <div className="logo">
-            <h1><span className="fp">FP</span><span className="markets">Markets</span></h1>
+            <img src="/KrypitalX.png" alt="KrypitalX" className="logo-image-login" />
           </div>
           <p className="subtitle">Sign in to Secure Client Area</p>
 

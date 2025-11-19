@@ -34,14 +34,13 @@ if (typeof window !== 'undefined') {
     
     headerScrollInitialized = true;
     console.log('✅ Header found:', header);
-    
+
     // Find the actual scroll container
     const scrollContainer = document.querySelector('.dashboard-page') as HTMLElement;
-    const scrollElement = scrollContainer || window;
-    
+
     const handleHeaderScroll = () => {
-      const scrollTop = scrollContainer 
-        ? scrollContainer.scrollTop 
+      const scrollTop = scrollContainer
+        ? scrollContainer.scrollTop
         : window.scrollY;
       
       console.log('🔄 SCROLL! Position:', scrollTop);
@@ -739,7 +738,7 @@ const cancelLogout = () => {
     },
     {
       question: 'How can I contact customer support?',
-      answer: 'You can reach our support team via Live Chat or Email at support@fpmarkets.com. Our team is available 24/7 to assist with any account, trading, or technical inquiries.'
+      answer: 'You can reach our support team via Live Chat or Email at support@krypitalx.com. Our team is available 24/7 to assist with any account, trading, or technical inquiries.'
     },
   ];
 
@@ -779,10 +778,6 @@ const cancelLogout = () => {
   }, [activeNewsTab]);
 // Header scroll detection - add 'scrolled' class when scrolled
 
-  
-  let isMounted = true;
-  
-  
   // Position crypto menu dynamically and close when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -940,7 +935,7 @@ const cancelLogout = () => {
           <div className="nav-wrapper">
             <div className="logo">
               <Link to="/">
-                <span className="logo-text">FP<span className="logo-accent">Markets</span></span>
+                <img src="/KrypitalX.png" alt="KrypitalX" className="logo-image" />
               </Link>
             </div>
 
@@ -1951,7 +1946,7 @@ const cancelLogout = () => {
             {/* Left Side - Content */}
             <div className="features-content">
               <h2 className="features-main-title">The most trusted cryptocurrency platform.</h2>
-              <p className="features-main-desc">FPMarkets has a variety of features that make it the best place to start trading.</p>
+              <p className="features-main-desc">KrypitalX has a variety of features that make it the best place to start trading.</p>
 
               <div className="features-list">
                 <div className="feature-item">
@@ -1992,7 +1987,7 @@ const cancelLogout = () => {
                   </div>
                   <div className="feature-item-text">
                     <h3 className="feature-item-title">Mobile Apps</h3>
-                    <p className="feature-item-desc">Stay on top of the markets with the FPMarkets app for Android or iOS.</p>
+                    <p className="feature-item-desc">Stay on top of the markets with the KrypitalX app for Android or iOS.</p>
                   </div>
                 </div>
               </div>
@@ -2011,7 +2006,7 @@ const cancelLogout = () => {
         <div className="container">
           <div className="section-header" data-gsap-animate="luxe-fade-up" data-gsap-duration="0.4">
             <h2 className="section-title" data-gsap-animate="luxe-fade-up" data-gsap-delay="0.05" data-gsap-duration="0.4">We are the most trusted<br />cryptocurrency platform.</h2>
-            <p className="section-subtitle">There are a few reasons why you should choose FPMarkets as your cryptocurrency platform</p>
+            <p className="section-subtitle">There are a few reasons why you should choose KrypitalX as your cryptocurrency platform</p>
           </div>
 
           <div className="trust-grid">
@@ -2109,7 +2104,7 @@ const cancelLogout = () => {
           <div className="footer-content">
             <div className="footer-brand">
               <div className="logo">
-                <span className="logo-text">FP<span className="logo-accent">Markets</span></span>
+                <img src="/KrypitalX.png" alt="KrypitalX" className="logo-image" />
               </div>
               <p className="footer-tagline">The most trusted cryptocurrency exchange platform.</p>
             </div>
@@ -2136,7 +2131,7 @@ const cancelLogout = () => {
             </div>
           </div>
           <div className="footer-bottom">
-            <p>&copy; 2025 FPMarkets. All rights reserved.</p>
+            <p>&copy; 2025 KrypitalX. All rights reserved.</p>
           </div>
         </div>
       </footer>

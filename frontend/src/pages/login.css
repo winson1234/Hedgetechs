@@ -141,6 +141,18 @@
             font-style: oblique 10deg;
         }
 
+        /* Logo Image Styling */
+        .login-page .logo-image-login {
+            height: 64px;
+            width: auto;
+            /* PNG rendering optimization */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
         .login-page .subtitle {
             text-align: center;
             color: #000000;
@@ -269,6 +281,10 @@
 
             .login-page .logo h1 {
                 font-size: 30px;
+            }
+
+            .login-page .logo-image-login {
+                height: 52px;
             }
 
             .login-page .signup-links {

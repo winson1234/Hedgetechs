@@ -1416,6 +1416,18 @@ body {
     font-style: oblique 10deg;
 }
 
+/* Logo Image Styling */
+.logo-image-header {
+    height: 44px;
+    width: auto;
+    /* PNG rendering optimization */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
 .nav-menu {
     display: flex;
     gap: 30px;

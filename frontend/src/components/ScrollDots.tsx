@@ -32,7 +32,7 @@ export default function ScrollDots() {
       for (let i = SECTIONS.length - 1; i >= 0; i--) {
         const section = document.getElementById(SECTIONS[i].id);
         if (section) {
-          const { offsetTop, offsetHeight } = section;
+          const { offsetTop } = section;
           if (scrollPosition >= offsetTop) {
             setActiveSection(SECTIONS[i].id);
             break;

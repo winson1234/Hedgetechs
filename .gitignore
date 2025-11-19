@@ -43,6 +43,8 @@ server.exe
 build/
 dist/
 data/
+cmd/server/server.exe
+cmd/server/server
 
 # Temp files
 *.tmp

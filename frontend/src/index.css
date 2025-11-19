@@ -52,3 +52,22 @@ body {
 .logo-accent {
   color: #FDDB92;
 }
+
+/* PNG Logo Image Optimization */
+img[src*="KrypitalX"] {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Light mode: Black text with vibrant diamonds */
+body.light-mode img[src*="KrypitalX"] {
+  filter: brightness(0.65) saturate(2.2) contrast(1.2);
+}
+
+/* Dark mode: Keep original (colorful diamonds + light text) */
+body:not(.light-mode) img[src*="KrypitalX"] {
+  filter: none;
+}

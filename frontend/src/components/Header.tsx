@@ -60,7 +60,7 @@ export default function Header() {
             onClick={() => navigate('/dashboard')}
             className="hover:opacity-80 transition-opacity cursor-pointer bg-transparent border-none"
           >
-            <span className="logo-text">FP<span className="logo-accent">Markets</span></span>
+            <img src="/KrypitalX.png" alt="KrypitalX" className="h-12" />
           </button>
         </div>
 

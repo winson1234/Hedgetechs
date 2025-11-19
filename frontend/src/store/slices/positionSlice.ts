@@ -87,6 +87,40 @@ export const closePosition = createAsyncThunk(
   }
 );
 
+// Close a hedged pair (both long and short positions)
+export const closePair = createAsyncThunk(
+  'position/closePair',
+  async (
+    { pairId, closePrice }: { pairId: string; closePrice: number },
+    { getState, rejectWithValue }
+  ) => {
+    try {
+      const token = getAuthToken(getState as () => RootState);
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await apiFetch(`api/v1/contracts/close-pair?pair_id=${pairId}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ close_price: closePrice }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to close pair');
+      }
+
+      const data = await response.json();
+      return { pairId, closedContracts: data.contracts };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to close pair';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // Position slice
 const positionSlice = createSlice({
   name: 'position',
@@ -196,6 +230,22 @@ const positionSlice = createSlice({
         state.positions = state.positions.filter(p => p.id !== action.payload.contractId);
       })
       .addCase(closePosition.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Close pair
+    builder
+      .addCase(closePair.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(closePair.fulfilled, (state, action) => {
+        state.loading = false;
+        // Remove both positions in the pair from the list
+        state.positions = state.positions.filter(p => p.pair_id !== action.payload.pairId);
+      })
+      .addCase(closePair.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });

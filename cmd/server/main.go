@@ -632,6 +632,22 @@ func main() {
 		}
 	})
 
+	// POST /api/v1/contracts/close-pair?pair_id={uuid} - Close both positions in a hedged pair
+	http.HandleFunc("/api/v1/contracts/close-pair", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				api.ClosePair(h, w, r)
+			}))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
 	// GET /api/v1/contracts/history?account_id={uuid} - Get closed/liquidated positions
 	http.HandleFunc("/api/v1/contracts/history", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

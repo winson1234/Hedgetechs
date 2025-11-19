@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { formatCurrency } from '../../utils/formatters';
 import { ProductType } from '../../types';
-import { fetchPositions, closePosition, updateAllPositionsPnL } from '../../store/slices/positionSlice';
+import { fetchPositions, closePosition, closePair, updateAllPositionsPnL } from '../../store/slices/positionSlice';
 import { fetchAccounts } from '../../store/slices/accountSlice';
 import { addToast } from '../../store/slices/uiSlice';
 import ConfirmDialog from '../ConfirmDialog';
@@ -81,25 +81,30 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
     const isHedgedPosition = position.pair_id !== null && position.pair_id !== undefined;
     const pairedPosition = isHedgedPosition ? positions.find(p => p.pair_id === position.pair_id && p.id !== position.id) : null;
 
-    // Show hedged pair warning if applicable
+    // Close hedged pair (both positions) if applicable
     if (isHedgedPosition && pairedPosition && pairedPosition.status === 'open') {
       const pairedPnL = pairedPosition.unrealized_pnl || 0;
       const pairedPnLText = pairedPnL >= 0 ? `+${formatCurrency(pairedPnL, 'USD')}` : formatCurrency(pairedPnL, 'USD');
+      const totalPnL = unrealizedPnL + pairedPnL;
+      const totalPnLText = totalPnL >= 0 ? `+${formatCurrency(totalPnL, 'USD')}` : formatCurrency(totalPnL, 'USD');
 
       setConfirmDialog({
         isOpen: true,
-        title: '⚠️ Hedged Pair Warning',
-        message: `This position is part of a hedged pair. Closing only one leg will break your hedge and expose you to market risk.\n\nAre you sure you want to close ONLY this position?`,
-        variant: 'warning',
+        title: 'Close Hedged Pair',
+        message: 'This will close both positions in the hedged pair at the current market price.',
+        variant: 'default',
         details: [
-          { label: 'Closing Position', value: `${position.side.toUpperCase()} ${position.symbol}`, highlight: true },
+          { label: `${position.side.toUpperCase()} Position`, value: position.symbol, highlight: true },
           { label: 'P&L', value: pnlText },
-          { label: 'Close Price', value: formatCurrency(currentPrice, 'USD') },
-          { label: 'Paired Position', value: `${pairedPosition.side.toUpperCase()} ${pairedPosition.symbol}`, highlight: true },
-          { label: 'Paired P&L', value: pairedPnLText }
+          { label: `${pairedPosition.side.toUpperCase()} Position`, value: pairedPosition.symbol, highlight: true },
+          { label: 'P&L', value: pairedPnLText },
+          { label: 'Combined P&L', value: totalPnLText, highlight: true },
+          { label: 'Close Price', value: formatCurrency(currentPrice, 'USD') }
         ],
         onConfirm: async () => {
-          await executeClosePosition(contractId, currentPrice, pnlText);
+          // Close dialog immediately to prevent double-execution
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          await executeClosePair(position.pair_id!, currentPrice, totalPnL);
         }
       });
     } else {
@@ -114,6 +119,8 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
           { label: 'Close Price', value: formatCurrency(currentPrice, 'USD') }
         ],
         onConfirm: async () => {
+          // Close dialog immediately to prevent double-execution
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
           await executeClosePosition(contractId, currentPrice, pnlText);
         }
       });
@@ -138,6 +145,30 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
       // Error toast is handled by the thunk rejection
       dispatch(addToast({
         message: err instanceof Error ? err.message : 'Failed to close position',
+        type: 'error'
+      }));
+    }
+  };
+
+  // Execute hedged pair close (closes both long and short positions)
+  const executeClosePair = async (pairId: string, closePrice: number, totalPnL: number) => {
+    try {
+      // Dispatch close pair action
+      await dispatch(closePair({ pairId, closePrice })).unwrap();
+
+      // Show success toast with combined P&L
+      const pnlText = totalPnL >= 0 ? `+${formatCurrency(totalPnL, 'USD')}` : formatCurrency(totalPnL, 'USD');
+      dispatch(addToast({
+        message: `Hedged pair closed: ${pnlText}`,
+        type: 'success'
+      }));
+
+      // Refresh account balance
+      dispatch(fetchAccounts());
+    } catch (err) {
+      // Error toast
+      dispatch(addToast({
+        message: err instanceof Error ? err.message : 'Failed to close pair',
         type: 'error'
       }));
     }
@@ -257,9 +288,10 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                   </div>
                   <button
                     onClick={() => handleClosePosition(position.id, position.symbol)}
-                    className="px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
+                    disabled={loading}
+                    className="px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Close
+                    {loading ? 'Closing...' : 'Close'}
                   </button>
                 </div>
 

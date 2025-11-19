@@ -94,6 +94,28 @@ func CreatePendingOrder(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Validate currency balance for SPOT forex pairs ONLY
+	// CFD and Futures only require margin (USD/USDT), not the actual currencies
+	if req.ProductType == models.ProductTypeSpot && len(req.Symbol) >= 6 {
+		// Extract quote currency (last 3 characters for forex pairs)
+		quoteCurrency := req.Symbol[len(req.Symbol)-3:]
+
+		// Check if account has balance in the quote currency
+		var quoteBalance float64
+		err = pool.QueryRow(ctx,
+			`SELECT COALESCE(amount, 0) FROM balances WHERE account_id = $1 AND currency = $2`,
+			req.AccountID, quoteCurrency,
+		).Scan(&quoteBalance)
+
+		// If no balance exists or balance is zero, reject the order
+		if err == pgx.ErrNoRows || quoteBalance <= 0 {
+			msg := fmt.Sprintf("SPOT trading %s requires %s balance in your account. Please deposit %s or trade CFD/Futures instead.",
+				req.Symbol, quoteCurrency, quoteCurrency)
+			respondWithJSONError(w, http.StatusBadRequest, "insufficient_currency", msg)
+			return
+		}
+	}
+
 	// Start a transaction to ensure atomicity
 	tx, err := pool.Begin(ctx)
 	if err != nil {

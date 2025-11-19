@@ -417,6 +417,7 @@ type Contract struct {
 	PnL              *float64       `json:"pnl,omitempty"`
 	Swap             float64        `json:"swap"`
 	Commission       float64        `json:"commission"`
+	PairID           *uuid.UUID     `json:"pair_id,omitempty"` // Links hedged positions (dual-position mode)
 	CreatedAt        time.Time      `json:"created_at"`
 	ClosedAt         *time.Time     `json:"closed_at,omitempty"`
 	UpdatedAt        time.Time      `json:"updated_at"`

@@ -46,7 +46,7 @@ export default function PendingOrdersTab({ filterByProductType, selectedProductT
       // Refresh pending orders to remove any failed orders from UI
       // (Backend filters by status='pending', so failed orders will be excluded)
       if (activeAccountId) {
-        dispatch(fetchPendingOrders({ accountId: activeAccountId }));
+        dispatch(fetchPendingOrders(activeAccountId));
       }
     } finally {
       setCancellingOrderId(null);

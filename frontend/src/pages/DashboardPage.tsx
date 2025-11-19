@@ -428,6 +428,24 @@ export const SectionIndicator = ({
   currentSection: number;
   sections: { id: string; name: string }[];
 }) => {
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    setIsVisible(true);
+
+    const timeoutId = window.setTimeout(() => {
+      setIsVisible(false);
+    }, 4000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [currentSection]);
+
+  if (!isVisible) {
+    return null;
+  }
+
   return (
     <div style={{
       position: 'fixed',

@@ -159,7 +159,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// First, check pending_registrations table for status
 	var (
-		regID          uuid.UUID
+		regID          int64 // pending_registrations.id is bigint
 		status         string
 		reviewedAt     *time.Time
 		hashedPassword string
@@ -174,6 +174,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		FROM pending_registrations
 		WHERE email = $1
 	`
+
 	err = pool.QueryRow(ctx, query, req.Email).Scan(
 		&regID, &status, &reviewedAt, &hashedPassword, &firstName, &lastName, &phoneNumber, &country,
 	)
@@ -221,7 +222,8 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		// User doesn't exist, create from pending_registrations
-		userID = regID // Use the same ID from pending_registrations
+		// Generate a new UUID for the user (users.id is UUID, pending_registrations.id is bigint)
+		userID = uuid.New()
 		createdAt := time.Now()
 		if reviewedAt != nil {
 			createdAt = *reviewedAt

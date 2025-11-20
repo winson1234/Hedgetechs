@@ -280,6 +280,28 @@ func main() {
 		log.Println("Market data service started successfully (Hybrid Engine: Crypto + Forex)")
 	}
 
+	// Start Binance order book depth stream for market activity display
+	// Provides 20-level order book data at 100ms intervals for crypto symbols
+	// Routes through messageBroadcaster to reach both WebSocket clients and order processor
+	go binance.StreamDepth(&hub.Hub{
+		Broadcast:  messageBroadcaster,
+		Register:   make(chan *hub.Client),   // Unused dummy channel
+		Unregister: make(chan *hub.Client),   // Unused dummy channel
+	})
+	log.Println("Binance order book depth stream started (20 levels @ 100ms)")
+
+	// Start Binance trades stream for market activity display
+	// Provides full trade data (price, quantity, time, isBuyerMaker) for crypto symbols
+	// NOTE: BinanceProvider also streams trades but only sends price ticks (onTick callback)
+	//       This separate stream provides complete trade data for market trades tab
+	//       Frontend throttling (100ms) prevents duplicate price updates from causing issues
+	go binance.StreamTrades(&hub.Hub{
+		Broadcast:  messageBroadcaster,
+		Register:   make(chan *hub.Client),   // Unused dummy channel
+		Unregister: make(chan *hub.Client),   // Unused dummy channel
+	})
+	log.Println("Binance trades stream started (for market trades display)")
+
 	// Initialize forex service using Frankfurter API (free, no API key required)
 	forexService := services.NewMassiveService("")
 	analyticsHandler := api.NewAnalyticsHandler(forexService)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { useAppSelector } from '../store';
 import PendingOrdersTab from './market/PendingOrdersTab';
 import TradeHistoryTab from './market/TradeHistoryTab';
@@ -8,7 +8,7 @@ import { formatPrice, formatQuantity } from '../utils/priceUtils';
 
 type TabType = 'orderbook' | 'trades' | 'pending' | 'history' | 'positions' | 'forex';
 
-export default function MarketActivityPanel() {
+function MarketActivityPanel() {
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
   const selectedProductType = useAppSelector(state => state.ui.selectedProductType);
   // Get order book and trades from Redux store (updated by WebSocket middleware)
@@ -394,3 +394,7 @@ export default function MarketActivityPanel() {
     </div>
   );
 }
+
+// Memoize component to prevent unnecessary re-renders
+// Only re-renders when Redux state values from selectors change
+export default memo(MarketActivityPanel);

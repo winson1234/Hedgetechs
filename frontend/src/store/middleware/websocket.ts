@@ -23,6 +23,11 @@ const PRICE_THROTTLE_MS = 100; // Only update prices every 100ms
 const priceThrottleTimers: Record<string, number> = {};
 const pendingPrices: Record<string, { price: number; timestamp: number }> = {};
 
+// Throttling for order book updates to prevent excessive Redux state updates
+const ORDERBOOK_THROTTLE_MS = 100; // Only update order book every 100ms (matches Binance depth@100ms stream)
+const orderbookThrottleTimers: Record<string, number> = {};
+const pendingOrderBooks: Record<string, { bids: Array<{ price: number; quantity: number }>; asks: Array<{ price: number; quantity: number }> }> = {};
+
 // WebSocket middleware for Redux
 export const websocketMiddleware: Middleware = (store) => {
   // Function to connect to WebSocket
@@ -185,13 +190,27 @@ export const websocketMiddleware: Middleware = (store) => {
             quantity: parseFloat(quantity),
           }));
 
-          store.dispatch(
-            updateOrderBook({
-              symbol,
-              bids,
-              asks,
-            })
-          );
+          // Throttle order book updates to prevent excessive Redux state updates
+          // Store the latest order book for this symbol
+          pendingOrderBooks[symbol] = { bids, asks };
+
+          // Only dispatch order book updates every ORDERBOOK_THROTTLE_MS
+          if (!orderbookThrottleTimers[symbol]) {
+            orderbookThrottleTimers[symbol] = window.setTimeout(() => {
+              const orderBook = pendingOrderBooks[symbol];
+              if (orderBook) {
+                store.dispatch(
+                  updateOrderBook({
+                    symbol,
+                    bids: orderBook.bids,
+                    asks: orderBook.asks,
+                  })
+                );
+                delete pendingOrderBooks[symbol];
+              }
+              orderbookThrottleTimers[symbol] = 0;
+            }, ORDERBOOK_THROTTLE_MS);
+          }
         } else if (data.symbol && data.price && data.time) {
           // Trade message: { symbol, price, time, quantity?, isBuyerMaker? }
           const symbol = data.symbol;

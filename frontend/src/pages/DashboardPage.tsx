@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, MouseEvent as ReactMouseEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, MouseEvent as ReactMouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store';
 import { signOut } from '../store/slices/authSlice';
@@ -123,11 +123,10 @@ const PRIMARY_NAV_ITEMS = [
 export const useSectionScroll = () => {
   const [currentSection, setCurrentSection] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const sectionsRef = useRef<HTMLElement[]>([]);
   const lastUpdateRef = useRef(0);
-const wheelTimeoutRef = useRef<number | null>(null);
-const touchStartRef = useRef<number>(0);
-  const sections = [
+  const wheelTimeoutRef = useRef<number | null>(null);
+  const touchStartRef = useRef<number>(0);
+  const sections = useMemo(() => [
     { id: 'home', name: 'Hero' },
     { id: 'market', name: 'Markets' },
     { id: 'news', name: 'News' },
@@ -136,11 +135,10 @@ const touchStartRef = useRef<number>(0);
     { id: 'about', name: 'About' },
     { id: 'faq', name: 'FAQ' },
     { id: 'footer', name: 'Footer' }
-
-  ];
+  ], []);
 
   // Function to update section classes based on current position
-  const updateSectionClasses = (activeIndex: number) => {
+  const updateSectionClasses = useCallback((activeIndex: number) => {
     // Throttle updates to prevent excessive DOM manipulation
     const now = Date.now();
     if (now - lastUpdateRef.current < 100) return;
@@ -162,30 +160,9 @@ const touchStartRef = useRef<number>(0);
         element.classList.add('section-below');
       }
     });
-  };
-  // Wheel event handler for section-by-section scrolling
-const handleWheel = (e: WheelEvent) => {
-  e.preventDefault();
-  
-  if (isTransitioning) return; // Block all scrolling during transition
-  
-  // Clear existing timeout
-  if (wheelTimeoutRef.current) {
-    clearTimeout(wheelTimeoutRef.current);
-  }
-  
-  // Debounce wheel events - only trigger once
-  wheelTimeoutRef.current = setTimeout(() => {
-    if (e.deltaY > 0 && currentSection < sections.length - 1) {
-      // Scroll down
-      scrollToSection(currentSection + 1);
-    } else if (e.deltaY < 0 && currentSection > 0) {
-      // Scroll up
-      scrollToSection(currentSection - 1);
-    }
-  }, 100); // Increased to prevent rapid scrolling
-};
-const scrollToSection = (index: number) => {
+  }, [sections]);
+
+  const scrollToSection = useCallback((index: number) => {
   if (isTransitioning || index < 0 || index >= sections.length) return;
   
   setIsTransitioning(true); // Lock scrolling
@@ -211,11 +188,12 @@ const scrollToSection = (index: number) => {
       }
     }
   }
-  
+
   // Lock for longer to prevent scroll-through (1200ms = 1.2s)
   setTimeout(() => setIsTransitioning(false), 1200);
-};
- useEffect(() => {
+}, [isTransitioning, sections, updateSectionClasses]);
+
+  useEffect(() => {
   // Hide default scrollbar
   document.body.style.overflow = 'hidden';
   document.documentElement.style.overflow = 'hidden';
@@ -314,7 +292,7 @@ const scrollToSection = (index: number) => {
       clearTimeout(wheelTimeoutRef.current);
     }
   };
-}, [currentSection, isTransitioning]);
+}, [currentSection, isTransitioning, scrollToSection, sections.length, updateSectionClasses]);
   return {
     currentSection,
     sections,

@@ -1,8 +1,8 @@
 /* ===========================
-   HERO IMAGE LUXURY ANIMATIONS
+   HERO IMAGE LUXURY ANIMATIONS - FIXED
    =========================== */
 
-/* 1. Base Hero Image - Premium 2026 Style */
+/* 1. Base Hero Image Container - Premium 2026 Style */
 .hero-image {
   position: relative;
   transform-style: preserve-3d;
@@ -11,19 +11,24 @@
   will-change: transform;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  pointer-events: auto;
 }
 
+/* MAIN HERO IMAGE - THIS WAS MISSING! */
 .hero-img {
   width: 100%;
   height: auto;
   display: block;
   position: relative;
-  z-index: 1;
+  z-index: 5;
+  transition: all 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
   filter: drop-shadow(0 20px 60px rgba(0, 0, 0, 0.3));
   transform-style: preserve-3d;
+  transform-origin: center center;
   will-change: transform, opacity;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  pointer-events: auto;
 }
 
 /* Glow Pulse Overlay */
@@ -38,7 +43,7 @@
   );
   border-radius: 20px;
   pointer-events: none;
-  z-index: 2;
+  z-index: 7;
   mix-blend-mode: overlay;
 }
 
@@ -55,10 +60,9 @@
 
 /* 2. 3D Tilt Hover (Subtle Luxury Depth) */
 .hero-image:hover .hero-img {
-  /* Stronger focus + subtle zoom when hovering the hero area */
-  transform: translateZ(30px) scale(1.08);
-  filter: drop-shadow(0 28px 90px rgba(0, 0, 0, 0.6))
-          drop-shadow(0 0 55px rgba(253, 219, 146, 0.45));
+  transform: translateZ(50px) scale(1.25) rotateX(2deg) rotateY(-2deg);
+  filter: drop-shadow(0 30px 100px rgba(0, 0, 0, 0.6))
+          drop-shadow(0 0 60px rgba(253, 219, 146, 0.5));
 }
 
 /* Hero Image Box - Stacked Cards Container */
@@ -83,13 +87,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 3;
+  z-index: 6;
   cursor: pointer;
   will-change: transform;
   transition: all 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
-  /* Ensure 3D spins never disappear when flipping */
   backface-visibility: visible;
   -webkit-backface-visibility: visible;
+  pointer-events: auto;
 }
 
 /* Bitcoin styling and position */
@@ -164,7 +168,6 @@
 
 /* Individual coin hover - orbit on their own axis */
 .coin.btc:hover {
-  /* Use a 2D orbit so the coin never vanishes after a flip */
   animation: coinOrbitBTC 3s cubic-bezier(0.4, 0.0, 0.2, 1) infinite !important;
   box-shadow: 0 16px 56px rgba(247, 147, 26, 0.8),
               0 0 60px rgba(247, 147, 26, 0.5) !important;
@@ -172,14 +175,13 @@
 }
 
 .coin.eth:hover {
-  /* Use a 2D orbit so the coin never vanishes after a flip */
   animation: coinOrbitETH 3s cubic-bezier(0.4, 0.0, 0.2, 1) infinite !important;
   box-shadow: 0 16px 56px rgba(98, 126, 234, 0.8),
               0 0 60px rgba(98, 126, 234, 0.5) !important;
   transform: scale(1.4) !important;
 }
 
-/* Smooth orbital animations for individual coin hover (pure 2D so they never disappear) */
+/* Smooth orbital animations for individual coin hover */
 @keyframes coinOrbitBTC {
   0% { 
     transform: scale(1.4) translate(0px, 0px) rotate(0deg);
@@ -377,7 +379,7 @@
   opacity: 0;
   transition: opacity 0.6s ease;
   pointer-events: none;
-  z-index: 5;
+  z-index: 8;
   mix-blend-mode: overlay;
 }
 
@@ -436,7 +438,7 @@
 }
 
 /* ===========================
-   13. SPOTLIGHT EFFECT
+   9. SPOTLIGHT EFFECT
    =========================== */
 
 .spotlight {
@@ -451,7 +453,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;
-  z-index: 6;
+  z-index: 9;
   mix-blend-mode: overlay;
 }
 
@@ -460,7 +462,7 @@
 }
 
 /* ===========================
-   14. AURORA EFFECT
+   10. AURORA EFFECT
    =========================== */
 
 .aurora {
@@ -492,7 +494,7 @@
 }
 
 /* ===========================
-   15. BREATHING ANIMATION
+   11. BREATHING ANIMATION (Optional)
    =========================== */
 
 .hero-image.breathing .hero-img {
@@ -508,5 +510,22 @@
     transform: scale(1.03);
     filter: drop-shadow(0 25px 70px rgba(0, 0, 0, 0.4))
             drop-shadow(0 0 40px rgba(253, 219, 146, 0.3));
+  }
+}
+
+/* ===========================
+   RESPONSIVE ADJUSTMENTS
+   =========================== */
+
+@media (max-width: 768px) {
+  .hero-image:hover .hero-img {
+    transform: scale(1.15);
+  }
+  
+  .coin.btc,
+  .coin.eth {
+    width: 45px;
+    height: 45px;
+    font-size: 24px;
   }
 }

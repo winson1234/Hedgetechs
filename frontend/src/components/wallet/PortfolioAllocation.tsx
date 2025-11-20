@@ -7,7 +7,7 @@ import { getApiUrl } from '../../config/api';
 // Account type from Redux store
 interface Balance {
   id: string;
-  account_id: string;
+  account_id: string;  // UUID reference to accounts.id
   currency: string;
   amount: number;
   created_at: string;
@@ -17,7 +17,7 @@ interface Balance {
 interface Account {
   id: string;
   user_id: string;
-  account_id: string;
+  account_id: number;
   type: 'live' | 'demo';
   product_type: 'spot' | 'cfd' | 'futures';
   currency: string;

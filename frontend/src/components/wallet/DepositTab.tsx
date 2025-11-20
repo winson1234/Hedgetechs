@@ -229,8 +229,16 @@ function DepositTab() {
           // Mark as processed
           markPaymentAsProcessed(paymentIntentId);
 
+          // Find account and get numeric account_id
+          const account = accounts.find(a => a.id === accountId);
+          if (!account) {
+            showToast('Account not found', 'error');
+            setIsProcessing(false);
+            return;
+          }
+
           // Process deposit
-          processDeposit(accountId, amount, currency);
+          processDeposit(account.id, amount, currency);
           showToast(`Successfully deposited ${formatCurrency(amount, currency)} via Express Checkout`, 'success');
           setIsProcessing(false);
 
@@ -258,7 +266,7 @@ function DepositTab() {
 
     // Cleanup: clear interval when component unmounts or pendingExpressPayment changes
     return () => clearInterval(pollInterval);
-  }, [pendingExpressPayment, processDeposit, showToast, setValue]);
+  }, [pendingExpressPayment, processDeposit, showToast, setValue, accounts]);
 
   // Handle redirect-based payment return (FPX, eWallets)
   useEffect(() => {
@@ -317,7 +325,7 @@ function DepositTab() {
             const amount = originalAmount;
             const accountCurrency = originalCurrency;
 
-            processDeposit(accountId, amount, accountCurrency, paymentIntentId, {
+            processDeposit(account.id, amount, accountCurrency, paymentIntentId, {
               fpxBank: redirectStatus || 'redirect',
             }).then(() => {
               showToast('Payment successful!', 'success');
@@ -594,10 +602,18 @@ function DepositTab() {
               markPaymentAsProcessed(paymentIntent.id);
               clearInterval(pollInterval);
 
+              // Find account and get numeric account_id
+              const account = accounts.find(a => a.id === data.accountId);
+              if (!account) {
+                showToast('Account not found', 'error');
+                setIsProcessing(false);
+                return;
+              }
+
               // Process deposit in account store
               try {
                 await processDeposit(
-                  data.accountId,
+                  account.id,
                   data.amount,
                   account.currency,
                   paymentIntent.id,

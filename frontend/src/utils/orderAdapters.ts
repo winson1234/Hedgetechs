@@ -55,7 +55,7 @@ export function adaptExecutedOrder(order: ReduxOrder): LegacyExecutedOrder {
   return {
     id: order.id,
     orderNumber: order.order_number, // Human-readable number
-    accountId: order.account_id,
+    accountId: order.account_id.toString(),
     symbol: order.symbol,
     side: order.side,
     type: order.type,
@@ -76,7 +76,7 @@ export function adaptPendingOrder(order: ReduxPendingOrder): LegacyPendingOrder 
   return {
     id: order.id,
     orderNumber: order.order_number || order.id, // Use human-readable order_number, fallback to UUID
-    accountId: order.account_id,
+    accountId: order.account_id.toString(),
     symbol: order.symbol,
     side: order.side,
     type: order.type === 'stop_limit' ? 'stop-limit' : 'limit',

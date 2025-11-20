@@ -65,8 +65,8 @@ type User struct {
 type Account struct {
 	ID            uuid.UUID     `json:"id"`
 	UserID        int64         `json:"user_id"`               // bigint user_id for backward compatibility with admin panel
-	AccountID     string        `json:"account_id"`            // Human-readable sequential ID (ACC-1000001)
-	AccountNumber string        `json:"account_number"`        // DEPRECATED: Alias for account_id (backward compatibility)
+	AccountID     int64         `json:"account_id"`            // Auto-incrementing account number
+	AccountNumber int64         `json:"account_number"`        // DEPRECATED: Alias for account_id (backward compatibility)
 	Type          AccountType   `json:"type"`
 	ProductType   *ProductType  `json:"product_type,omitempty"` // NULLABLE: Universal accounts have NULL product_type
 	Currency      string        `json:"currency"`
@@ -82,7 +82,7 @@ type Account struct {
 	AccessCount    int        `json:"access_count"`               // Total number of accesses
 
 	// Balances will be populated when fetching account details
-	Balances []Balance `json:"balances,omitempty"`
+	Balances []Balance `json:"balances"`
 
 	// Transient margin fields (calculated, not stored in DB)
 	Equity        *float64 `json:"equity,omitempty"`

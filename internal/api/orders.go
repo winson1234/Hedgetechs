@@ -47,9 +47,15 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second) // Increased timeout for execution
 	defer cancel()
 
-	// Verify account belongs to user
+	// Verify account belongs to user and get user UUID
 	var accountUserID int64
-	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", req.AccountID).Scan(&accountUserID)
+	var userUUID uuid.UUID
+	err = pool.QueryRow(ctx, `
+		SELECT a.user_id, u.id
+		FROM accounts a
+		JOIN users u ON a.user_id = u.user_id
+		WHERE a.id = $1
+	`, req.AccountID).Scan(&accountUserID, &userUUID)
 	if err != nil {
 		respondWithJSONError(w, http.StatusNotFound, "not_found", "account not found")
 		return
@@ -91,7 +97,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	_, err = pool.Exec(ctx,
 		`INSERT INTO orders (id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, product_type, filled_amount, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 0, NOW(), NOW())`,
-		orderID, userID, req.AccountID, req.Symbol, orderNumber, req.Side, req.Type, models.OrderStatusPending, req.AmountBase, req.LimitPrice, req.StopPrice, leverage, req.ProductType,
+		orderID, userUUID, req.AccountID, req.Symbol, orderNumber, req.Side, req.Type, models.OrderStatusPending, req.AmountBase, req.LimitPrice, req.StopPrice, leverage, req.ProductType,
 	)
 	if err != nil {
 		log.Printf("Failed to insert order: %v", err)
@@ -311,7 +317,10 @@ func CancelOrder(w http.ResponseWriter, r *http.Request) {
 	var orderUserID int64
 	var orderStatus models.OrderStatus
 	err = pool.QueryRow(ctx,
-		"SELECT user_id, status FROM orders WHERE id = $1",
+		`SELECT a.user_id, o.status
+		 FROM orders o
+		 JOIN accounts a ON o.account_id = a.id
+		 WHERE o.id = $1`,
 		orderID,
 	).Scan(&orderUserID, &orderStatus)
 

@@ -33,13 +33,13 @@ const getAuthToken = (getState: () => RootState) => {
 // Backend transaction type (snake_case with time.Time strings)
 interface BackendTransaction {
   id: string;
-  account_id: string;
+  account_id: string; // UUID reference to accounts.id
   transaction_number: string;
   type: string;
   currency: string;
   amount: number;
   status: string;
-  target_account_id?: string;
+  target_account_id?: string; // UUID reference to accounts.id
   description?: string;
   metadata?: Record<string, unknown>;
   created_at: string; // ISO timestamp string
@@ -110,7 +110,7 @@ export const createDeposit = createAsyncThunk(
       paymentIntentId,
       metadata,
     }: {
-      accountId: string;
+      accountId: string;  // UUID of the account
       amount: number;
       currency: string;
       paymentIntentId?: string;
@@ -158,7 +158,7 @@ export const createWithdrawal = createAsyncThunk(
       currency,
       metadata,
     }: {
-      accountId: string;
+      accountId: string;  // UUID of the account
       amount: number;
       currency: string;
       metadata?: PaymentMethodMetadata;
@@ -204,8 +204,8 @@ export const createTransfer = createAsyncThunk(
       amount,
       currency,
     }: {
-      fromAccountId: string;
-      toAccountId: string;
+      fromAccountId: string;  // UUID of the source account
+      toAccountId: string;  // UUID of the target account
       amount: number;
       currency: string;
     },

@@ -325,7 +325,7 @@ export default function HistoryPage() {
           return txn.transactionNumber.toLowerCase().includes(query) ||
                  txn.type.includes(query) ||
                  txn.amount.toString().includes(query) ||
-                 txn.accountId.toLowerCase().includes(query);
+                 txn.accountId.toString().includes(query);
         } else if (item.itemType === 'executedOrder') {
           const order = item as ExecutedOrder;
           return (order.orderNumber && order.orderNumber.toLowerCase().includes(query)) ||

@@ -22,7 +22,7 @@ export default function TradingPanel() {
 
   // Get combined USD + USDT balance (treated as equivalent 1:1)
   const accountBalance = useMemo(() => {
-    if (!activeAccount) return 0;
+    if (!activeAccount || !activeAccount.balances) return 0;
     const usdBal = activeAccount.balances.find((b) => b.currency === 'USD')?.amount || 0;
     const usdtBal = activeAccount.balances.find((b) => b.currency === 'USDT')?.amount || 0;
     return usdBal + usdtBal; // Combine USD + USDT
@@ -32,7 +32,7 @@ export default function TradingPanel() {
 
   // Get crypto holdings from account balances
   const cryptoHoldings: Record<string, number> = useMemo(() => {
-    if (!activeAccount) return {};
+    if (!activeAccount || !activeAccount.balances) return {};
     const holdings: Record<string, number> = {};
     // Extract all non-USD/USDT balances as crypto holdings
     activeAccount.balances.forEach((balance) => {

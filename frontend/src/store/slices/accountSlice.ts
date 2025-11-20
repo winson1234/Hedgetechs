@@ -316,7 +316,25 @@ const accountSlice = createSlice({
       .addCase(toggleAccountStatus.fulfilled, (state, action) => {
         state.loading = false;
         // Backend returns updated list of all accounts
+        const oldAccounts = state.accounts;
         state.accounts = action.payload;
+
+        // If an account was activated (changed from deactivated to active),
+        // automatically set it as the active account
+        const activatedAccount = action.payload.find((newAcc: Account) => {
+          const oldAcc = oldAccounts.find((old: Account) => old.id === newAcc.id);
+          return oldAcc?.status !== 'active' && newAcc.status === 'active';
+        });
+
+        if (activatedAccount) {
+          state.activeAccountId = activatedAccount.id;
+          // Persist to localStorage
+          try {
+            localStorage.setItem('activeAccountId', activatedAccount.id);
+          } catch (error) {
+            console.error('Failed to save active account to localStorage:', error);
+          }
+        }
       })
       .addCase(toggleAccountStatus.rejected, (state, action) => {
         state.loading = false;

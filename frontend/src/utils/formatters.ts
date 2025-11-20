@@ -91,9 +91,10 @@ export const formatDate = (date: string | Date): string => {
  * @returns The amount, or 0 if not found
  */
 export const getBalanceAmount = (
-  balances: Array<{ currency: string; amount: number }>,
+  balances: Array<{ currency: string; amount: number }> | undefined,
   currency: string
 ): number => {
+  if (!balances) return 0;
   const balance = balances.find(b => b.currency === currency);
   return balance ? balance.amount : 0;
 };
@@ -104,9 +105,10 @@ export const getBalanceAmount = (
  * @returns Object with currency as key and amount as value
  */
 export const balancesToRecord = (
-  balances: Array<{ currency: string; amount: number }>
+  balances: Array<{ currency: string; amount: number }> | undefined
 ): Record<string, number> => {
   const record: Record<string, number> = {};
+  if (!balances) return record;
   balances.forEach(b => {
     record[b.currency] = b.amount;
   });
@@ -119,19 +121,21 @@ export const balancesToRecord = (
 
 /**
  * Format account number for display
- * @param accountNumber - Full account number (e.g., "1000001")
+ * @param accountNumber - Full account number (e.g., 1000001)
  * @param obfuscate - Whether to show only last 3 digits (e.g., "****001")
  * @returns Formatted account number string
  */
-export const formatAccountNumber = (accountNumber: string, obfuscate: boolean = false): string => {
+export const formatAccountNumber = (accountNumber: string | number, obfuscate: boolean = false): string => {
   if (!accountNumber) return '';
 
+  const accountStr = accountNumber.toString();
+
   if (obfuscate) {
-    const lastThree = accountNumber.slice(-3);
+    const lastThree = accountStr.slice(-3);
     return `****${lastThree}`;
   }
 
-  return accountNumber;
+  return accountStr;
 };
 
 /**
@@ -141,7 +145,7 @@ export const formatAccountNumber = (accountNumber: string, obfuscate: boolean = 
  * @returns Display-friendly account name
  */
 export const getAccountDisplayName = (account: {
-  account_number: string;
+  account_number: number;
   nickname?: string | null;
 }): string => {
   if (account.nickname) {
@@ -159,7 +163,7 @@ export const getAccountDisplayName = (account: {
  */
 export const getAccountFullDisplay = (
   account: {
-    account_number: string;
+    account_number: number;
     nickname?: string | null;
   },
   showNumber: boolean = true
@@ -231,12 +235,11 @@ export const getAccountStatusColor = (status: 'active' | 'deactivated' | 'suspen
 /**
  * Determine if account is a live account (vs demo)
  * Based on account number range: 1000000-4999999 = live, 5000000-9999999 = demo
- * @param accountNumber - Account number string
+ * @param accountNumber - Account number
  * @returns true if live account
  */
-export const isLiveAccount = (accountNumber: string): boolean => {
-  const num = parseInt(accountNumber, 10);
-  return num >= 1000000 && num < 5000000;
+export const isLiveAccount = (accountNumber: number): boolean => {
+  return accountNumber >= 1000000 && accountNumber < 5000000;
 };
 
 /**
@@ -245,7 +248,7 @@ export const isLiveAccount = (accountNumber: string): boolean => {
  * @param nickname - Optional nickname
  * @returns 2-character initials
  */
-export const getAccountInitials = (accountNumber: string, nickname?: string | null): string => {
+export const getAccountInitials = (accountNumber: number, nickname?: string | null): string => {
   if (nickname) {
     const words = nickname.trim().split(/\s+/);
     if (words.length >= 2) {
@@ -255,5 +258,5 @@ export const getAccountInitials = (accountNumber: string, nickname?: string | nu
   }
 
   // For account numbers, use last 2 digits
-  return accountNumber.slice(-2);
+  return accountNumber.toString().slice(-2);
 };

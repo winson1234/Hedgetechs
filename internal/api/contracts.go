@@ -418,7 +418,10 @@ func CloseContract(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	var contractStatus models.ContractStatus
 
 	err = pool.QueryRow(ctx,
-		"SELECT user_id, status FROM contracts WHERE id = $1",
+		`SELECT a.user_id, c.status
+		 FROM contracts c
+		 JOIN accounts a ON c.account_id = a.id
+		 WHERE c.id = $1`,
 		contractID,
 	).Scan(&contractUserID, &contractStatus)
 
@@ -528,18 +531,19 @@ func ClosePair(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	// Verify both contracts in the pair belong to user and are open
 	var longContractID uuid.UUID
 	var shortContractID uuid.UUID
-	var longUserID int64
-	var shortUserID int64
 	var longStatus models.ContractStatus
 	var shortStatus models.ContractStatus
 	var accountID uuid.UUID
+	var accountUserID int64
 
-	// Get long contract
+	// Get long contract and verify ownership via account
 	err = pool.QueryRow(ctx,
-		`SELECT id, user_id, status, account_id FROM contracts
-		 WHERE pair_id = $1 AND side = 'long'`,
+		`SELECT c.id, c.status, c.account_id, a.user_id
+		 FROM contracts c
+		 JOIN accounts a ON c.account_id = a.id
+		 WHERE c.pair_id = $1 AND c.side = 'long'`,
 		pairID,
-	).Scan(&longContractID, &longUserID, &longStatus, &accountID)
+	).Scan(&longContractID, &longStatus, &accountID, &accountUserID)
 
 	if err != nil {
 		respondWithJSONError(w, http.StatusNotFound, "not_found", "long contract in pair not found")
@@ -547,11 +551,14 @@ func ClosePair(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get short contract
+	var shortAccountUserID int64
 	err = pool.QueryRow(ctx,
-		`SELECT id, user_id, status FROM contracts
-		 WHERE pair_id = $1 AND side = 'short'`,
+		`SELECT c.id, c.status, a.user_id
+		 FROM contracts c
+		 JOIN accounts a ON c.account_id = a.id
+		 WHERE c.pair_id = $1 AND c.side = 'short'`,
 		pairID,
-	).Scan(&shortContractID, &shortUserID, &shortStatus)
+	).Scan(&shortContractID, &shortStatus, &shortAccountUserID)
 
 	if err != nil {
 		respondWithJSONError(w, http.StatusNotFound, "not_found", "short contract in pair not found")
@@ -559,7 +566,7 @@ func ClosePair(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify ownership and status
-	if longUserID != userID || shortUserID != userID {
+	if accountUserID != userID || shortAccountUserID != userID {
 		respondWithJSONError(w, http.StatusForbidden, "forbidden", "pair does not belong to user")
 		return
 	}
@@ -670,7 +677,10 @@ func UpdateContractTPSL(w http.ResponseWriter, r *http.Request) {
 	var contractStatus models.ContractStatus
 
 	err = pool.QueryRow(ctx,
-		"SELECT user_id, status FROM contracts WHERE id = $1",
+		`SELECT a.user_id, c.status
+		 FROM contracts c
+		 JOIN accounts a ON c.account_id = a.id
+		 WHERE c.id = $1`,
 		contractID,
 	).Scan(&contractUserID, &contractStatus)
 

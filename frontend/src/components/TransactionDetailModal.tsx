@@ -41,9 +41,9 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
   const accounts = useAppSelector((state) => state.account.accounts);
 
   // Helper function to get account ID from account UUID
-  const getAccountNumber = (accountId: string): string => {
-    const account = accounts.find(acc => acc.id === accountId);
-    return account?.account_id || 'Unknown Account';
+  const getAccountNumber = (accountId: string | number): string => {
+    const account = accounts.find(acc => acc.id === accountId || acc.account_id === accountId);
+    return account ? account.account_id.toString() : 'Unknown Account';
   };
 
   if (!item) return null;

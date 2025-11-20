@@ -175,8 +175,8 @@ function TransferTab() {
     try {
       // Process transfer
       await processTransfer(
-        data.fromAccountId,
-        data.toAccountId,
+        fromAcc.id,
+        toAcc.id,
         data.amount,
         fromAcc.currency
       );

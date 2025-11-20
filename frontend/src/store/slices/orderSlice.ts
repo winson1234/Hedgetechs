@@ -6,7 +6,7 @@ import type { RootState } from '../index';
 export interface Order {
   id: string;
   user_id: string;
-  account_id: string;
+  account_id: number;
   symbol: string;
   order_number: string;
   side: 'buy' | 'sell';
@@ -25,7 +25,7 @@ export interface Order {
 export interface PendingOrder {
   id: string;
   user_id: string;
-  account_id: string;
+  account_id: number;
   order_number?: string;
   symbol: string;
   type: 'limit' | 'stop_limit';
@@ -120,7 +120,7 @@ export const createPendingOrder = createAsyncThunk(
   'order/createPendingOrder',
   async (
     orderData: {
-      account_id: string;
+      account_id: string;  // UUID of the account
       symbol: string;
       type: 'limit' | 'stop_limit';
       side: 'buy' | 'sell';
@@ -185,7 +185,7 @@ export const executeMarketOrder = createAsyncThunk(
   'order/executeMarketOrder',
   async (
     orderData: {
-      account_id: string;
+      account_id: string;  // UUID of the account
       symbol: string;
       side: 'buy' | 'sell';
       amount_base: number;

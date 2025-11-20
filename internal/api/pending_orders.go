@@ -51,9 +51,15 @@ func CreatePendingOrder(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	// Verify account belongs to user
+	// Verify account belongs to user and get user UUID
 	var accountUserID int64
-	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", req.AccountID).Scan(&accountUserID)
+	var userUUID uuid.UUID
+	err = pool.QueryRow(ctx, `
+		SELECT a.user_id, u.id
+		FROM accounts a
+		JOIN users u ON a.user_id = u.user_id
+		WHERE a.id = $1
+	`, req.AccountID).Scan(&accountUserID, &userUUID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			respondWithJSONError(w, http.StatusNotFound, "not_found", "account not found")
@@ -148,7 +154,7 @@ func CreatePendingOrder(w http.ResponseWriter, r *http.Request) {
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, NOW(), NOW()
 		)`,
-		orderID, userID, req.AccountID, req.Symbol, req.Type, req.Side, req.Quantity, req.TriggerPrice, req.LimitPrice, leverage, orderNumber,
+		orderID, userUUID, req.AccountID, req.Symbol, req.Type, req.Side, req.Quantity, req.TriggerPrice, req.LimitPrice, leverage, orderNumber,
 	)
 	if err != nil {
 		log.Printf("Failed to insert pending order: %v", err)
@@ -335,7 +341,12 @@ func CancelPendingOrder(w http.ResponseWriter, r *http.Request) {
 	// Verify order belongs to user and is still pending
 	var orderUserID int64
 	var orderStatus models.PendingOrderStatus
-	err = pool.QueryRow(ctx, "SELECT user_id, status FROM pending_orders WHERE id = $1", orderID).Scan(&orderUserID, &orderStatus)
+	err = pool.QueryRow(ctx, `
+		SELECT a.user_id, p.status
+		FROM pending_orders p
+		JOIN accounts a ON p.account_id = a.id
+		WHERE p.id = $1
+	`, orderID).Scan(&orderUserID, &orderStatus)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			respondWithJSONError(w, http.StatusNotFound, "not_found", "pending order not found")

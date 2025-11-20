@@ -22,7 +22,7 @@ export type Account = {
 export type BackendAccount = {
   id: string
   user_id: string
-  account_id: string
+  account_id: number
   type: 'live' | 'demo'
   product_type: ProductType
   currency: string
@@ -34,7 +34,7 @@ export type BackendAccount = {
 
 export type BackendBalance = {
   id: string
-  account_id: string
+  account_id: string  // UUID reference to accounts.id, not the numeric account_id
   currency: string
   amount: number
   created_at: string
@@ -74,7 +74,7 @@ export type Transaction = {
   transactionNumber: string  // Human-readable: TXN-00001
   type: TransactionType
   status: TransactionStatus
-  accountId: string
+  accountId: string  // UUID reference to accounts.id
   amount: number
   currency: string
   timestamp: number
@@ -82,9 +82,9 @@ export type Transaction = {
   paymentIntentId?: string // Stripe Payment Intent ID
   metadata?: PaymentMethodMetadata
   // For transfers
-  fromAccountId?: string
-  toAccountId?: string
-  targetAccountId?: string // Backend uses this field for transfers
+  fromAccountId?: string  // UUID reference to accounts.id
+  toAccountId?: string  // UUID reference to accounts.id
+  targetAccountId?: string  // UUID reference to accounts.id - Backend uses this field for transfers
   // Description from backend
   description?: string
   // Error information
@@ -158,7 +158,7 @@ export type ContractStatus = 'open' | 'closed' | 'liquidated'
 export type Position = {
   id: string
   user_id: string
-  account_id: string
+  account_id: string  // UUID reference to accounts.id
   symbol: string
   contract_number: string
   side: ContractSide

@@ -126,7 +126,7 @@ function WithdrawTab() {
     try {
       // Process withdrawal with bank details
       await processWithdrawal(
-        data.accountId,
+        account.id,
         data.amount,
         account.currency,
         {

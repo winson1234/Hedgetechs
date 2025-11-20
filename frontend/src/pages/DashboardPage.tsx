@@ -2111,7 +2111,7 @@ const cancelLogout = () => {
       </section>
 
       {/* One Click Payout Section */}
-          <section className="payout-section" id="exchange" fade-in-up>
+          <section className="payout-section" id="exchange" data-fade-in-up>
           <div className="container">
           <div className="payout-container" data-gsap-animate="fade-up" data-gsap-delay="0.5">
             {/* Left Side - Trading Card Image */}

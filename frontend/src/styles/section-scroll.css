@@ -179,7 +179,7 @@ section {
 }
 /* FAQ - Compact Square Grid */
 #faq {
-  min-height: 125vh;
+  min-height: 130vh;
   padding: 4rem 0;
   margin-top: 60px;
   display: flex;
@@ -209,6 +209,7 @@ section {
 
 #faq .section-subtitle {
   font-size: 1rem;
+  margin-bottom: -30px;
   opacity: 0.7;
 }
 

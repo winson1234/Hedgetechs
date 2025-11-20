@@ -271,10 +271,19 @@ export default function HistoryPage() {
   const allHistory = useMemo<HistoryItem[]>(() => {
     // Filter out position_close transactions as they're already shown as closed positions
     const filteredTransactions = transactions.filter(t => t.type !== 'position_close');
-    
+
+    // Filter out CFD/Futures executed orders since they're shown as contracts
+    // Only show Spot product orders in the history
+    const filteredExecutedOrders = executedOrders.filter((o) => {
+      // Check if order has a product_type field
+      // If product_type is 'cfd' or 'futures', filter it out (shown as contracts instead)
+      // Keep spot orders and orders without product_type
+      return !(o as any).product_type || (o as any).product_type === 'spot';
+    });
+
     const items: HistoryItem[] = [
       ...filteredTransactions.map((t) => ({ ...t, itemType: 'transaction' as const })),
-      ...executedOrders.map((o) => ({ ...o, itemType: 'executedOrder' as const })),
+      ...filteredExecutedOrders.map((o) => ({ ...o, itemType: 'executedOrder' as const })),
       ...pendingOrders.map((o) => ({ ...o, itemType: 'pendingOrder' as const })),
       ...closedPositions.map((p) => ({
         ...p,
@@ -932,7 +941,7 @@ export default function HistoryPage() {
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
               }`}
             >
-              Trades ({executedOrders.length + pendingOrders.length})
+              Trades ({allHistory.filter(item => item.itemType === 'executedOrder' || item.itemType === 'pendingOrder').length})
             </button>
             <button
               onClick={() => setActiveTab('transactions')}

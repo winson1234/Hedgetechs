@@ -40,7 +40,7 @@ export interface Instrument {
   instrument_type: 'crypto' | 'forex' | 'commodity';
   base_currency: string;
   quote_currency: string;
-  is_tradeable: boolean;
+  is_tradable: boolean;
   created_at: string;
   updated_at: string;
 

@@ -411,14 +411,29 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 	fee float64,
 	accountCurrency string,
 ) (*ExecutionResult, error) {
-	// Get instrument leverage cap for validation
-	var leverageCap int
+	// Get instrument type to determine where to find max leverage
+	var instrumentType string
 	err := tx.QueryRow(ctx,
-		`SELECT leverage_cap FROM instruments WHERE symbol = $1`,
+		`SELECT instrument_type FROM instruments WHERE symbol = $1`,
 		order.Symbol,
-	).Scan(&leverageCap)
+	).Scan(&instrumentType)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get leverage cap: %w", err)
+		return nil, fmt.Errorf("failed to get instrument type: %w", err)
+	}
+
+	// Get max leverage from the appropriate configuration table
+	var maxLeverage int
+	if instrumentType == "forex" {
+		err = tx.QueryRow(ctx,
+			`SELECT max_leverage FROM forex_configurations WHERE symbol = $1`,
+			order.Symbol,
+		).Scan(&maxLeverage)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get forex max leverage: %w", err)
+		}
+	} else {
+		// For crypto/spot instruments, default max leverage
+		maxLeverage = 10 // Default max leverage for spot trading
 	}
 
 	// Use user-selected leverage from order (default to 1 if not set)
@@ -428,11 +443,11 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 	}
 
 	// Validate leverage doesn't exceed instrument's cap
-	if leverage > leverageCap {
+	if leverage > maxLeverage {
 		return &ExecutionResult{
 			Order:   *order,
 			Success: false,
-			Message: fmt.Sprintf("leverage %dx exceeds instrument cap of %dx", leverage, leverageCap),
+			Message: fmt.Sprintf("leverage %dx exceeds instrument maximum of %dx", leverage, maxLeverage),
 		}, nil
 	}
 

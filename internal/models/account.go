@@ -247,7 +247,7 @@ type Instrument struct {
 	InstrumentType string    `json:"instrument_type"` // crypto, forex, commodity
 	BaseCurrency   string    `json:"base_currency"`
 	QuoteCurrency  string    `json:"quote_currency"`
-	IsTradeable    bool      `json:"is_tradeable"`
+	IsTradeable    bool      `json:"is_tradable"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 

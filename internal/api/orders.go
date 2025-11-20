@@ -61,7 +61,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	// Verify instrument exists and is tradeable
 	var isTradeable bool
-	err = pool.QueryRow(ctx, "SELECT is_tradeable FROM instruments WHERE symbol = $1", req.Symbol).Scan(&isTradeable)
+	err = pool.QueryRow(ctx, "SELECT is_tradable FROM instruments WHERE symbol = $1", req.Symbol).Scan(&isTradeable)
 	if err != nil {
 		respondWithJSONError(w, http.StatusNotFound, "not_found", "instrument not found")
 		return

@@ -70,11 +70,11 @@ func CreateContract(w http.ResponseWriter, r *http.Request) {
 
 	// Verify instrument and check leverage cap
 	var isTradeable bool
-	var leverageCap int
+	var instrumentType string
 	err = pool.QueryRow(ctx,
-		"SELECT is_tradeable, leverage_cap FROM instruments WHERE symbol = $1",
+		"SELECT is_tradable, instrument_type FROM instruments WHERE symbol = $1",
 		req.Symbol,
-	).Scan(&isTradeable, &leverageCap)
+	).Scan(&isTradeable, &instrumentType)
 
 	if err != nil {
 		respondWithJSONError(w, http.StatusNotFound, "not_found", "instrument not found")
@@ -84,8 +84,27 @@ func CreateContract(w http.ResponseWriter, r *http.Request) {
 		respondWithJSONError(w, http.StatusBadRequest, "validation_error", "instrument is not tradeable")
 		return
 	}
-	if req.Leverage > leverageCap {
-		respondWithJSONError(w, http.StatusBadRequest, "validation_error", "leverage exceeds cap for this instrument")
+
+	// Get max leverage from the appropriate configuration table
+	var maxLeverage int
+	if instrumentType == "forex" {
+		// Query forex_configurations for max_leverage
+		err = pool.QueryRow(ctx,
+			"SELECT max_leverage FROM forex_configurations WHERE symbol = $1",
+			req.Symbol,
+		).Scan(&maxLeverage)
+		if err != nil {
+			respondWithJSONError(w, http.StatusNotFound, "not_found", "forex configuration not found for this instrument")
+			return
+		}
+	} else {
+		// For crypto/spot instruments, default max leverage is typically 1-10x
+		// Since spot_configurations doesn't have leverage, we'll set a default
+		maxLeverage = 10 // Default max leverage for spot trading
+	}
+
+	if req.Leverage > maxLeverage {
+		respondWithJSONError(w, http.StatusBadRequest, "validation_error", fmt.Sprintf("leverage exceeds maximum of %dx for this instrument", maxLeverage))
 		return
 	}
 

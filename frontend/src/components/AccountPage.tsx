@@ -325,9 +325,6 @@ export default function AccountPage() {
                                 <span className={`font-medium px-2 py-0.5 rounded text-[10px] ${selectedAccount.status === 'active' ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300'}`}>{selectedAccount.status.toUpperCase()}</span>
                             </div>
 
-                            <div className="text-slate-500 dark:text-slate-400">Product Type:</div>
-                            <div className="font-medium text-slate-700 dark:text-slate-300 text-right capitalize">{selectedAccount.product_type || 'N/A'}</div>
-
                             <div className="text-slate-500 dark:text-slate-400">Status:</div>
                             <div className="font-medium text-slate-700 dark:text-slate-300 text-right capitalize">{selectedAccount.status || 'N/A'}</div>
 

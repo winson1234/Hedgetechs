@@ -419,74 +419,46 @@ export const ScrollProgressBar = ({
   );
 };
 
-// Section indicator badge (auto-hides after a short delay on each section)
-export const SectionIndicator = ({
-  currentSection,
-  sections
-}: {
+// Section indicator badge
+export const SectionIndicator = ({ 
+  currentSection, 
+  sections 
+}:
+ {
   currentSection: number;
   sections: { id: string; name: string }[];
 }) => {
-  const indicatorRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = indicatorRef.current;
-    if (!el) return;
-
-    // Reset visibility & animate in
-    gsap.killTweensOf(el);
-    gsap.set(el, { opacity: 0, y: 10, display: 'flex' });
-    gsap.to(el, { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out' });
-
-    // Fade out after 2.5s
-    const timeout = setTimeout(() => {
-      gsap.to(el, { 
-        opacity: 0, 
-        y: -10, 
-        duration: 0.3, 
-        ease: 'power2.in', 
-        onComplete: () => {
-          gsap.set(el, { display: 'none' });
-        }
-      });
-    }, 2500);
-
-    return () => clearTimeout(timeout);
-  }, [currentSection]);
-
   return (
-    <div
-      ref={indicatorRef}
-      style={{
-        position: 'fixed',
-        bottom: '2rem',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 1000,
-        background: 'rgba(0, 0, 0, 0.8)',
-        backdropFilter: 'blur(10px)',
-        padding: '0.75rem 1.5rem',
-        borderRadius: '50px',
-        color: '#fff',
-        fontSize: '0.875rem',
-        fontWeight: '600',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        opacity: 0
-      }}
-    >
+    <div style={{
+      position: 'fixed',
+      bottom: '2rem',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 1000,
+      background: 'rgba(0, 0, 0, 0.8)',
+      backdropFilter: 'blur(10px)',
+      padding: '0.75rem 1.5rem',
+      borderRadius: '50px',
+      color: '#fff',
+      fontSize: '0.875rem',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      border: '1px solid rgba(255, 255, 255, 0.1)'
+    }}>
       <span style={{ color: '#FDDB92' }}>{currentSection + 1}</span>
       <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>/</span>
       <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>{sections.length}</span>
-      <span style={{ marginLeft: '0.5rem', color: '#fff' }}>
+      <span style={{ 
+        marginLeft: '0.5rem',
+        color: '#fff'
+      }}>
         {sections[currentSection].name}
       </span>
     </div>
   );
 };
-
 export default function DashboardPage() {
   const dispatch = useAppDispatch();
   const isLoggedIn = useAppSelector(state => !!state.auth.token);
@@ -710,7 +682,6 @@ const cancelLogout = () => {
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ USD: 1 });
   const [heroEmail, setHeroEmail] = useState('');
   const [heroEmailError, setHeroEmailError] = useState('');
-  const heroEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const [cryptoMenuOpen, setCryptoMenuOpen] = useState(false);
   const cryptoMenuRef = useRef<HTMLDivElement>(null);
   const cryptoMenuListRef = useRef<HTMLUListElement>(null);
@@ -1245,8 +1216,8 @@ const cancelLogout = () => {
       return;
     }
     
-    if (!heroEmailRegex.test(email)) {
-      setHeroEmailError('Please enter a valid email address (e.g. name@example.com)');
+    if (!email.includes('@') || !email.includes('.')) {
+      setHeroEmailError('Please enter a valid email address');
       return;
     }
     
@@ -1266,6 +1237,7 @@ const cancelLogout = () => {
   return (
     <>
       <div className="dashboard-page">
+        
         {/* Header */}
         <header 
           className="header"
@@ -1447,6 +1419,7 @@ const cancelLogout = () => {
       {/* Hero Section */}
       <section className="hero" id="home">
         <div className="container hero-container">
+          
           <div className="hero-content">
             {/* Trust Badge */}
             <div className="hero-badge" data-scroll-animate="fade-down" data-scroll-delay="0">
@@ -1474,16 +1447,6 @@ const cancelLogout = () => {
                     onChange={(e) => {
                       setHeroEmail(e.target.value);
                       if (heroEmailError) setHeroEmailError('');
-                    }}
-                    onBlur={() => {
-                      const email = heroEmail.trim();
-                      if (!email) {
-                        setHeroEmailError('');
-                        return;
-                      }
-                      if (!heroEmailRegex.test(email)) {
-                        setHeroEmailError('Please enter a valid email address');
-                      }
                     }}
                   />
                   {heroEmailError && <span className="email-error-message">{heroEmailError}</span>}
@@ -1806,8 +1769,8 @@ const cancelLogout = () => {
       </section>
 
       {/* News Section */}
-      <section className="news-section" id="news">
-        <div className="container">
+      <section id="news" className="news-section fade-in-left">
+      <div className="container">
           {/* Section Header */}
           <div className="section-header" style={{ textAlign: 'center' }}>
             <h2 className="section-title" style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '2rem' }} data-animate="slide-left" data-delay="7">
@@ -2148,7 +2111,7 @@ const cancelLogout = () => {
       </section>
 
       {/* One Click Payout Section */}
-          <section className="payout-section" id="exchange">
+          <section className="payout-section" id="exchange" fade-in-up>
           <div className="container">
           <div className="payout-container" data-gsap-animate="fade-up" data-gsap-delay="0.5">
             {/* Left Side - Trading Card Image */}

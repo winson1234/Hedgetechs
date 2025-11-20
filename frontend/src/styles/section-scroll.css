@@ -38,8 +38,12 @@ section:not(#home) {
 
 /* --- MARKETS --- */
 #market {
-  min-height: 100vh;
-  padding: 2rem 0;
+  min-height: 120vh;
+  padding: 3rem 0;
+  display: flex;
+  transform: scale(0.9);
+  align-items: center; /* Center vertically */
+  justify-content: center;
 }
 
 #market .container {
@@ -73,9 +77,14 @@ section:not(#home) {
 
 /* --- NEWS --- */
 #news {
-  min-height: 100vh;
-  padding: 2rem 0;
-  /* Removed negative margin */
+  min-height: 80vh;
+  padding: 1.5rem 0;
+  display: flex;
+  transform: scale(0.9);
+  align-items: center;
+  margin-top: -160px;
+  justify-content: center;
+
 }
 
 #news .news-grid {
@@ -106,9 +115,14 @@ section:not(#home) {
 
 /* --- FAQ --- */
 #faq {
-  min-height: 100vh;
-  padding: 2rem 0;
-  /* Removed negative margin */
+  min-height: 130vh;
+  padding: 4rem 0;
+  margin-top: 60px;
+  display: flex;
+  transform: scale(0.85);
+
+  align-items: center;
+  justify-content: center;
 }
 
 #faq .container {
@@ -301,7 +315,7 @@ section:not(#home) {
   transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
               transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
-
+/* Side navigation - Visible with fade-in */
 /* Side navigation visibility */
 .section-nav-dots {
   opacity: 1;

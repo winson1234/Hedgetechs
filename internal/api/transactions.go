@@ -60,7 +60,7 @@ func CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify account belongs to user
-	var accountUserID uuid.UUID
+	var accountUserID int64
 	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", req.AccountID).Scan(&accountUserID)
 	if err != nil {
 		respondWithJSONError(w, http.StatusNotFound, "not_found", "account not found")
@@ -237,7 +237,7 @@ func GetTransactions(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify account belongs to user
-	var accountUserID uuid.UUID
+	var accountUserID int64
 	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", accountID).Scan(&accountUserID)
 	if err != nil || accountUserID != userID {
 		respondWithJSONError(w, http.StatusForbidden, "forbidden", "account does not belong to user")

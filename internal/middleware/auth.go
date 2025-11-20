@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"brokerageProject/internal/database"
 	"brokerageProject/internal/utils"
 	"context"
 	"encoding/json"
@@ -59,11 +60,27 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Parse user ID from claims
-		userID, err := uuid.Parse(claims.UserID)
+		// Parse user UUID from claims
+		userUUID, err := uuid.Parse(claims.UserID)
 		if err != nil {
 			log.Printf("Invalid user ID in token: %v", err)
 			respondWithError(w, http.StatusUnauthorized, "invalid user ID in token")
+			return
+		}
+
+		// Look up bigint user_id from users table (for backward compatibility with admin panel)
+		pool, err := database.GetPool()
+		if err != nil {
+			log.Printf("Database pool error: %v", err)
+			respondWithError(w, http.StatusInternalServerError, "database connection error")
+			return
+		}
+
+		var userBigIntID int64
+		err = pool.QueryRow(r.Context(), "SELECT user_id FROM users WHERE id = $1", userUUID).Scan(&userBigIntID)
+		if err != nil {
+			log.Printf("Failed to lookup user_id for UUID %s: %v", userUUID, err)
+			respondWithError(w, http.StatusUnauthorized, "user not found")
 			return
 		}
 
@@ -72,7 +89,8 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		userAgent := r.UserAgent()
 
 		// Inject user information and request metadata into the request context
-		ctx := context.WithValue(r.Context(), UserIDKey, userID)
+		// Store bigint user_id for database queries (backward compatibility)
+		ctx := context.WithValue(r.Context(), UserIDKey, userBigIntID)
 		ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
 		ctx = context.WithValue(ctx, IPAddressKey, ipAddress)
 		ctx = context.WithValue(ctx, UserAgentKey, userAgent)
@@ -82,11 +100,11 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// GetUserIDFromContext extracts the user ID from the request context
-func GetUserIDFromContext(ctx context.Context) (uuid.UUID, error) {
-	userID, ok := ctx.Value(UserIDKey).(uuid.UUID)
+// GetUserIDFromContext extracts the user ID (bigint) from the request context
+func GetUserIDFromContext(ctx context.Context) (int64, error) {
+	userID, ok := ctx.Value(UserIDKey).(int64)
 	if !ok {
-		return uuid.Nil, fmt.Errorf("user ID not found in context")
+		return 0, fmt.Errorf("user ID not found in context")
 	}
 	return userID, nil
 }
@@ -140,10 +158,16 @@ func OptionalAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			if len(parts) == 2 && parts[0] == "Bearer" {
 				tokenString := parts[1]
 				if claims, err := utils.ValidateJWT(tokenString); err == nil {
-					if userID, parseErr := uuid.Parse(claims.UserID); parseErr == nil {
-						ctx := context.WithValue(r.Context(), UserIDKey, userID)
-						ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
-						r = r.WithContext(ctx)
+					if userUUID, parseErr := uuid.Parse(claims.UserID); parseErr == nil {
+						// Look up bigint user_id from users table
+						if pool, dbErr := database.GetPool(); dbErr == nil {
+							var userBigIntID int64
+							if scanErr := pool.QueryRow(r.Context(), "SELECT user_id FROM users WHERE id = $1", userUUID).Scan(&userBigIntID); scanErr == nil {
+								ctx := context.WithValue(r.Context(), UserIDKey, userBigIntID)
+								ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+								r = r.WithContext(ctx)
+							}
+						}
 					}
 				}
 			}

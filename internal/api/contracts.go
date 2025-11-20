@@ -57,7 +57,7 @@ func CreateContract(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify account belongs to user
-	var accountUserID uuid.UUID
+	var accountUserID int64
 	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", req.AccountID).Scan(&accountUserID)
 	if err != nil {
 		respondWithJSONError(w, http.StatusNotFound, "not_found", "account not found")
@@ -197,7 +197,7 @@ func GetContracts(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify account belongs to user
-	var accountUserID uuid.UUID
+	var accountUserID int64
 	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", accountID).Scan(&accountUserID)
 	if err != nil || accountUserID != userID {
 		respondWithJSONError(w, http.StatusForbidden, "forbidden", "account does not belong to user")
@@ -309,7 +309,7 @@ func GetContractHistory(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify account belongs to user
-	var accountUserID uuid.UUID
+	var accountUserID int64
 	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", accountID).Scan(&accountUserID)
 	if err != nil || accountUserID != userID {
 		respondWithJSONError(w, http.StatusForbidden, "forbidden", "account does not belong to user")
@@ -414,7 +414,7 @@ func CloseContract(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify contract belongs to user and is open
-	var contractUserID uuid.UUID
+	var contractUserID int64
 	var contractStatus models.ContractStatus
 
 	err = pool.QueryRow(ctx,
@@ -528,8 +528,8 @@ func ClosePair(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	// Verify both contracts in the pair belong to user and are open
 	var longContractID uuid.UUID
 	var shortContractID uuid.UUID
-	var longUserID uuid.UUID
-	var shortUserID uuid.UUID
+	var longUserID int64
+	var shortUserID int64
 	var longStatus models.ContractStatus
 	var shortStatus models.ContractStatus
 	var accountID uuid.UUID
@@ -666,7 +666,7 @@ func UpdateContractTPSL(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify contract belongs to user and is open
-	var contractUserID uuid.UUID
+	var contractUserID int64
 	var contractStatus models.ContractStatus
 
 	err = pool.QueryRow(ctx,

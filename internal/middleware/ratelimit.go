@@ -8,13 +8,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 )
 
 // RateLimiter stores rate limiters for each user
 type RateLimiter struct {
-	limiters map[uuid.UUID]*rate.Limiter
+	limiters map[int64]*rate.Limiter
 	mu       sync.RWMutex
 	// Rate limit configuration
 	requestsPerMinute int
@@ -31,7 +30,7 @@ var (
 func InitRateLimiter(requestsPerMinute, burst int) {
 	once.Do(func() {
 		globalRateLimiter = &RateLimiter{
-			limiters:          make(map[uuid.UUID]*rate.Limiter),
+			limiters:          make(map[int64]*rate.Limiter),
 			requestsPerMinute: requestsPerMinute,
 			burst:             burst,
 		}
@@ -42,7 +41,7 @@ func InitRateLimiter(requestsPerMinute, burst int) {
 }
 
 // GetLimiter retrieves or creates a rate limiter for a specific user
-func (rl *RateLimiter) GetLimiter(userID uuid.UUID) *rate.Limiter {
+func (rl *RateLimiter) GetLimiter(userID int64) *rate.Limiter {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
@@ -96,7 +95,7 @@ func RateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		userID, ok := userIDValue.(uuid.UUID)
+		userID, ok := userIDValue.(int64)
 		if !ok {
 			http.Error(w, "invalid user ID", http.StatusInternalServerError)
 			return

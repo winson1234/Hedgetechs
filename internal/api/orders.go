@@ -48,7 +48,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify account belongs to user
-	var accountUserID uuid.UUID
+	var accountUserID int64
 	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", req.AccountID).Scan(&accountUserID)
 	if err != nil {
 		respondWithJSONError(w, http.StatusNotFound, "not_found", "account not found")
@@ -219,7 +219,7 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify account belongs to user
-	var accountUserID uuid.UUID
+	var accountUserID int64
 	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", accountID).Scan(&accountUserID)
 	if err != nil || accountUserID != userID {
 		respondWithJSONError(w, http.StatusForbidden, "forbidden", "account does not belong to user")
@@ -308,7 +308,7 @@ func CancelOrder(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify order belongs to user and is pending
-	var orderUserID uuid.UUID
+	var orderUserID int64
 	var orderStatus models.OrderStatus
 	err = pool.QueryRow(ctx,
 		"SELECT user_id, status FROM orders WHERE id = $1",

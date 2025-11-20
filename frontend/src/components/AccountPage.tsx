@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAssetPrices } from '../hooks/useAssetPrices';
 import { CURRENCIES } from '../config/constants';
 import { useAppDispatch, useAppSelector } from '../store';
-import { setActiveAccount, createAccount, fetchAccounts, type Account } from '../store/slices/accountSlice';
+import { setActiveAccount, createAccount, fetchAccounts, toggleAccountStatus, editDemoBalance, type Account } from '../store/slices/accountSlice';
 import { setActiveWalletTab, addToast } from '../store/slices/uiSlice';
 import OpenAccountModal from './OpenAccountModal';
 import EditBalanceModal from './EditBalanceModal';
@@ -410,30 +410,33 @@ export default function AccountPage() {
                             )}
                         </div>
 
-                        {/* Danger Zone */}
-                        <div className="pt-4 mt-4 border-t-2 border-red-200 dark:border-red-900/50">
-                            <div className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2">Account Management</div>
+                        {/* Account Actions */}
+                        <div className="pt-4 mt-4 border-t-2 border-indigo-200 dark:border-indigo-900/50">
+                            <div className="text-xs font-semibold text-indigo-700 dark:text-indigo-400 mb-2">Account Actions</div>
                             {selectedAccount.status === 'active' ? (
+                                <div className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-md border border-green-200 dark:border-green-800 flex items-center gap-2">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                  <span>This is your active trading account</span>
+                                </div>
+                            ) : selectedAccount.status === 'suspended' ? (
                                 <button
                                     onClick={() => {
-                                      // TODO: Implement toggleAccountStatus in Redux
-                                      dispatch(addToast({ type: 'info', message: 'Account deactivation coming soon', duration: 3000 }));
+                                      dispatch(toggleAccountStatus(selectedAccount.id));
                                     }}
-                                    className="w-full px-3 py-2 text-xs font-medium bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md transition-colors border border-red-200 dark:border-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    disabled={selectedAccount.id === activeAccountId}
-                                    title={selectedAccount.id === activeAccountId ? 'Cannot deactivate the active trading account' : 'Deactivate this account'}
+                                    className="w-full px-3 py-2 text-xs font-medium bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 rounded-md transition-colors border border-green-200 dark:border-green-800"
                                 >
-                                  Deactivate Account
+                                  Reactivate Suspended Account
                                 </button>
                             ) : (
                                 <button
                                     onClick={() => {
-                                      // TODO: Implement toggleAccountStatus in Redux
-                                      dispatch(addToast({ type: 'info', message: 'Account reactivation coming soon', duration: 3000 }));
+                                      dispatch(toggleAccountStatus(selectedAccount.id));
                                     }}
-                                    className="w-full px-3 py-2 text-xs font-medium bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 rounded-md transition-colors border border-green-200 dark:border-green-800"
+                                    className="w-full px-3 py-2 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-md transition-colors border border-indigo-200 dark:border-indigo-800"
                                 >
-                                  Reactivate Account
+                                  Switch to This Account
                                 </button>
                             )}
                         </div>
@@ -477,10 +480,16 @@ export default function AccountPage() {
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
         account={accountToEdit}
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        editDemoBalance={(accountId: string, newBalance: number) => {
-          // TODO: Implement editDemoBalance in Redux
-          return Promise.resolve({ success: true, message: 'Balance updated' });
+        editDemoBalance={async (accountId: string, newBalance: number) => {
+          try {
+            await dispatch(editDemoBalance({ accountId, newBalance })).unwrap();
+            return { success: true, message: 'Balance updated successfully' };
+          } catch (error) {
+            return {
+              success: false,
+              message: error instanceof Error ? error.message : 'Failed to edit balance',
+            };
+          }
         }}
         onBalanceEdited={handleBalanceEdited}
       />

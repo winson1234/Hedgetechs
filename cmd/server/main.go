@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -86,13 +87,16 @@ func main() {
 	defer database.Close()
 
 	// Run database migrations
-	log.Println("Running database migrations...")
-	if err := runMigrations(); err != nil {
-		log.Printf("WARNING: Migration error: %v", err)
-		log.Println("Continuing with existing schema...")
-	} else {
-		log.Println("Database migrations completed successfully")
-	}
+	// DISABLED: Migrations require direct connection (port 5432) which doesn't support IPv4
+	// Run migrations manually using: migrate -path internal/database/migrations -database $DATABASE_MIGRATION_URL up
+	// Or use Supabase CLI: supabase db push
+	log.Println("Database migrations skipped (run manually if needed)")
+	// if err := runMigrations(); err != nil {
+	// 	log.Printf("WARNING: Migration error: %v", err)
+	// 	log.Println("Continuing with existing schema...")
+	// } else {
+	// 	log.Println("Database migrations completed successfully")
+	// }
 
 	// Initialize audit logger (requires database)
 	dbPool, err := database.GetPool()
@@ -308,14 +312,15 @@ func main() {
 	fxRatesHandler := api.NewFXRatesHandler(forexService)
 
 	// Initialize crypto exchange rate service with regular refresh
-	// Supports 40+ cryptocurrencies with updates every 30 seconds
+	// Supports 40+ cryptocurrencies with updates every 5 minutes
+	// Using 5-minute interval to stay within CoinGecko free API rate limits (10-50 calls/min)
 	defaultCryptoSymbols := []string{
 		"BTC", "ETH", "BNB", "SOL", "ADA", "XRP", "AVAX", "MATIC", "LINK", "UNI", "ATOM", "DOT",
 		"ARB", "OP", "APT", "DOGE", "LTC", "SHIB", "NEAR", "ICP", "FIL", "SUI", "STX", "TON",
 		"USDT", "USDC", "DAI", "TRX", "ETC", "XLM", "ALGO", "VET", "THETA", "EOS", "AAVE", "GRT",
 		"AXS", "MANA", "SAND", "ENJ", "CHZ", "HBAR", "FLOW", "EGLD", "ZIL", "WAVES", "XTZ", "BAT",
 	}
-	exchangeRateService := services.NewExchangeRateService(defaultCryptoSymbols, 30*time.Second)
+	exchangeRateService := services.NewExchangeRateService(defaultCryptoSymbols, 5*time.Minute)
 	exchangeRateHandler := api.NewExchangeRateHandler(exchangeRateService)
 
 	// Configure the HTTP server
@@ -499,6 +504,34 @@ func main() {
 		case http.MethodPatch, http.MethodPost:
 			// Apply CORS, Auth, and Rate Limit middleware
 			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.UpdateAccountMetadata)))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/accounts/toggle-status?account_id={uuid} - Toggle account status (active/deactivated/suspended)
+	http.HandleFunc("/api/v1/accounts/toggle-status", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.ToggleAccountStatus)))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/accounts/demo/edit-balance - Edit demo account balance (demo accounts only)
+	http.HandleFunc("/api/v1/accounts/demo/edit-balance", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.EditDemoBalance)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -729,9 +762,19 @@ func main() {
 // runMigrations runs database migrations using golang-migrate
 func runMigrations() error {
 	// Get database URL from environment
-	dbURL := os.Getenv("DATABASE_URL")
+	// Use DATABASE_MIGRATION_URL if available (direct connection), otherwise use DATABASE_URL
+	// This is important because PgBouncer (connection pooler) doesn't support migrations
+	dbURL := os.Getenv("DATABASE_MIGRATION_URL")
 	if dbURL == "" {
-		return fmt.Errorf("DATABASE_URL environment variable is not set")
+		dbURL = os.Getenv("DATABASE_URL")
+		if dbURL == "" {
+			return fmt.Errorf("DATABASE_URL environment variable is not set")
+		}
+		// Remove pgbouncer parameter from URL if present (migrations require direct connection)
+		dbURL = strings.Replace(dbURL, "?pgbouncer=true", "", 1)
+		log.Println("Note: Using DATABASE_URL for migrations. For better performance, set DATABASE_MIGRATION_URL to direct connection (port 5432)")
+	} else {
+		log.Println("Using DATABASE_MIGRATION_URL for migrations (direct connection)")
 	}
 
 	// Construct migrations path

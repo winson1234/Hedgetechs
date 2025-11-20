@@ -144,6 +144,68 @@ export const updateAccountMetadata = createAsyncThunk(
   }
 );
 
+// Toggle account status (activate/deactivate)
+export const toggleAccountStatus = createAsyncThunk(
+  'account/toggleAccountStatus',
+  async (
+    accountId: string,
+    { getState, rejectWithValue }
+  ) => {
+    try {
+      const token = getAuthToken(getState as () => RootState);
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await apiFetch(`api/v1/accounts/toggle-status?account_id=${accountId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to toggle account status');
+      const data = await response.json();
+      return data.accounts; // Backend returns updated list of all accounts
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to toggle account status';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Edit demo account balance
+export const editDemoBalance = createAsyncThunk(
+  'account/editDemoBalance',
+  async (
+    { accountId, newBalance }: { accountId: string; newBalance: number },
+    { getState, rejectWithValue, dispatch }
+  ) => {
+    try {
+      const token = getAuthToken(getState as () => RootState);
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await apiFetch('api/v1/accounts/demo/edit-balance', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ account_id: accountId, new_balance: newBalance }),
+      });
+
+      if (!response.ok) throw new Error('Failed to edit demo balance');
+      const data = await response.json();
+
+      // Refresh accounts list to get updated balances
+      await dispatch(fetchAccounts());
+
+      return data.message;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to edit demo balance';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // Account slice
 const accountSlice = createSlice({
   name: 'account',
@@ -241,6 +303,37 @@ const accountSlice = createSlice({
         }
       })
       .addCase(updateAccountMetadata.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Toggle account status
+    builder
+      .addCase(toggleAccountStatus.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(toggleAccountStatus.fulfilled, (state, action) => {
+        state.loading = false;
+        // Backend returns updated list of all accounts
+        state.accounts = action.payload;
+      })
+      .addCase(toggleAccountStatus.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Edit demo balance
+    builder
+      .addCase(editDemoBalance.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(editDemoBalance.fulfilled, (state) => {
+        state.loading = false;
+        // Accounts refreshed by fetchAccounts() call in thunk
+      })
+      .addCase(editDemoBalance.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });

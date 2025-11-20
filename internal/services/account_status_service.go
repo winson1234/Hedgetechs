@@ -11,7 +11,7 @@ import (
 
 // SwitchAccount activates the specified account and deactivates all other accounts for the user
 // This ensures only ONE account is 'online' per user at a time
-func SwitchAccount(userID uuid.UUID, accountID uuid.UUID) error {
+func SwitchAccount(userID int64, accountID uuid.UUID) error {
 	pool, err := database.GetPool()
 	if err != nil {
 		return fmt.Errorf("failed to get database pool: %w", err)
@@ -26,7 +26,7 @@ func SwitchAccount(userID uuid.UUID, accountID uuid.UUID) error {
 	defer tx.Rollback(ctx)
 
 	// Verify the account belongs to the user
-	var accountUserID uuid.UUID
+	var accountUserID int64
 	checkQuery := `SELECT user_id FROM accounts WHERE id = $1`
 	err = tx.QueryRow(ctx, checkQuery, accountID).Scan(&accountUserID)
 	if err != nil {
@@ -52,7 +52,7 @@ func SwitchAccount(userID uuid.UUID, accountID uuid.UUID) error {
 	}
 
 	// Update users.is_active to true (since we just activated an account)
-	updateUserQuery := `UPDATE users SET is_active = true WHERE id = $1`
+	updateUserQuery := `UPDATE users SET is_active = true WHERE user_id = $1`
 	_, err = tx.Exec(ctx, updateUserQuery, userID)
 	if err != nil {
 		return fmt.Errorf("failed to update user active status: %w", err)
@@ -68,7 +68,7 @@ func SwitchAccount(userID uuid.UUID, accountID uuid.UUID) error {
 
 // UpdateUserActiveStatus updates the users.is_active field based on account statuses
 // is_active = true if ANY account is 'online', false if ALL accounts are 'offline'
-func UpdateUserActiveStatus(userID uuid.UUID) error {
+func UpdateUserActiveStatus(userID int64) error {
 	pool, err := database.GetPool()
 	if err != nil {
 		return fmt.Errorf("failed to get database pool: %w", err)
@@ -85,7 +85,7 @@ func UpdateUserActiveStatus(userID uuid.UUID) error {
 
 	// Update users.is_active
 	isActive := onlineCount > 0
-	updateQuery := `UPDATE users SET is_active = $1 WHERE id = $2`
+	updateQuery := `UPDATE users SET is_active = $1 WHERE user_id = $2`
 	_, err = pool.Exec(ctx, updateQuery, isActive, userID)
 	if err != nil {
 		return fmt.Errorf("failed to update user active status: %w", err)
@@ -95,7 +95,7 @@ func UpdateUserActiveStatus(userID uuid.UUID) error {
 }
 
 // DeactivateAllAccounts sets all accounts of a user to 'offline' and updates users.is_active to false
-func DeactivateAllAccounts(userID uuid.UUID) error {
+func DeactivateAllAccounts(userID int64) error {
 	pool, err := database.GetPool()
 	if err != nil {
 		return fmt.Errorf("failed to get database pool: %w", err)
@@ -117,7 +117,7 @@ func DeactivateAllAccounts(userID uuid.UUID) error {
 	}
 
 	// Update users.is_active to false
-	userQuery := `UPDATE users SET is_active = false WHERE id = $1`
+	userQuery := `UPDATE users SET is_active = false WHERE user_id = $1`
 	_, err = tx.Exec(ctx, userQuery, userID)
 	if err != nil {
 		return fmt.Errorf("failed to update user active status: %w", err)

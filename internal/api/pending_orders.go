@@ -52,7 +52,7 @@ func CreatePendingOrder(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify account belongs to user
-	var accountUserID uuid.UUID
+	var accountUserID int64
 	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", req.AccountID).Scan(&accountUserID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -219,7 +219,7 @@ func GetPendingOrders(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify account belongs to user
-	var accountUserID uuid.UUID
+	var accountUserID int64
 	err = pool.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", accountID).Scan(&accountUserID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -333,7 +333,7 @@ func CancelPendingOrder(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Verify order belongs to user and is still pending
-	var orderUserID uuid.UUID
+	var orderUserID int64
 	var orderStatus models.PendingOrderStatus
 	err = pool.QueryRow(ctx, "SELECT user_id, status FROM pending_orders WHERE id = $1", orderID).Scan(&orderUserID, &orderStatus)
 	if err != nil {
@@ -402,7 +402,7 @@ func CancelPendingOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 // Helper function to get pending order by ID
-func getPendingOrderByID(ctx context.Context, pool DBQuerier, orderID, userID uuid.UUID) (models.PendingOrder, error) {
+func getPendingOrderByID(ctx context.Context, pool DBQuerier, orderID uuid.UUID, userID int64) (models.PendingOrder, error) {
 	var order models.PendingOrder
 	err := pool.QueryRow(ctx,
 		`SELECT id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price,

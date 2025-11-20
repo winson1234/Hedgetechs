@@ -132,12 +132,34 @@ func (s *ExchangeRateService) runRefresher(refreshInterval time.Duration) {
 	ticker := time.NewTicker(refreshInterval)
 	defer ticker.Stop()
 
+	backoffMultiplier := 1
+	maxBackoff := 10
+
 	for range ticker.C {
 		if _, _, err := s.fetchAndCache(s.defaultSymbols); err != nil {
+			// Check if it's a rate limit error (429)
+			if strings.Contains(err.Error(), "429") {
+				backoffMultiplier = min(backoffMultiplier*2, maxBackoff)
+				log.Printf("Rate limit hit, backing off to %dx refresh interval", backoffMultiplier)
+				ticker.Reset(refreshInterval * time.Duration(backoffMultiplier))
+			}
 			// swallow error - fallback will use lastKnown
 			continue
 		}
+		// Success - reset backoff
+		if backoffMultiplier > 1 {
+			backoffMultiplier = 1
+			ticker.Reset(refreshInterval)
+			log.Printf("Exchange rate service recovered, reset to normal refresh interval")
+		}
 	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // GetRates returns exchange rates for the requested symbols.

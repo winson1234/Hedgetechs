@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -81,7 +80,7 @@ func GetBatchHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 // fetchUserTransactions retrieves all transactions for user's accounts in a single query
-func fetchUserTransactions(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID) ([]models.Transaction, error) {
+func fetchUserTransactions(ctx context.Context, pool *pgxpool.Pool, userID int64) ([]models.Transaction, error) {
 	query := `
 		SELECT t.id, t.account_id, t.transaction_number, t.type, t.currency, t.amount,
 		       t.status, t.target_account_id, t.contract_id, t.description, t.metadata,
@@ -117,7 +116,7 @@ func fetchUserTransactions(ctx context.Context, pool *pgxpool.Pool, userID uuid.
 }
 
 // fetchUserOrders retrieves all orders for user's accounts in a single query
-func fetchUserOrders(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID) ([]models.Order, error) {
+func fetchUserOrders(ctx context.Context, pool *pgxpool.Pool, userID int64) ([]models.Order, error) {
 	query := `
 		SELECT id, user_id, account_id, symbol, order_number, side, type, status,
 		       amount_base, limit_price, stop_price, filled_amount, average_fill_price,
@@ -152,7 +151,7 @@ func fetchUserOrders(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID) 
 }
 
 // fetchUserPendingOrders retrieves all pending orders for user's accounts in a single query
-func fetchUserPendingOrders(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID) ([]models.PendingOrder, error) {
+func fetchUserPendingOrders(ctx context.Context, pool *pgxpool.Pool, userID int64) ([]models.PendingOrder, error) {
 	query := `
 		SELECT id, user_id, account_id, symbol, type, side, quantity,
 		       trigger_price, limit_price, status, executed_at, executed_price,

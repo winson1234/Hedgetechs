@@ -542,3 +542,6 @@ section:not(#home) {
 .section-active [data-animate="zoom-in"] {
   transform: scale(1);
 }
+
+
+/* Fade in only */

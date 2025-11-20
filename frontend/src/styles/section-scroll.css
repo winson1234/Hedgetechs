@@ -13,6 +13,10 @@ section {
   align-items: center;
   justify-content: center;
 }
+/* Apply to all sections except the HOME hero */
+section:not(#home) {
+  padding-top: 120px; /* match your header height */
+}
 
 /* CUSTOM HEIGHT FOR EACH SECTION */
 

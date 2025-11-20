@@ -15,7 +15,7 @@ section {
 }
 /* Apply to all sections except the HOME hero */
 section:not(#home) {
-  padding-top: 120px; /* match your header height */
+  padding-top: 130px; /* match your header height */
 }
 
 /* CUSTOM HEIGHT FOR EACH SECTION */
@@ -88,6 +88,8 @@ section:not(#home) {
 /* Smaller pagination */
 #market .pagination {
   margin-top: 1rem;
+  overflow: visible;
+
 }
 /* News - Compact size */
 /* News - Compact size */

@@ -102,19 +102,52 @@ func CreatePendingOrder(w http.ResponseWriter, r *http.Request) {
 
 	// Validate currency balance for SPOT forex pairs ONLY
 	// CFD and Futures only require margin (USD/USDT), not the actual currencies
-	if req.ProductType == models.ProductTypeSpot && len(req.Symbol) >= 6 {
-		// Extract quote currency (last 3 characters for forex pairs)
-		quoteCurrency := req.Symbol[len(req.Symbol)-3:]
+	if req.ProductType == models.ProductTypeSpot {
+		// Look up quote currency from instruments table (more reliable than string parsing)
+		var quoteCurrency string
+		err = pool.QueryRow(ctx,
+			`SELECT quote_currency FROM instruments WHERE symbol = $1`,
+			req.Symbol,
+		).Scan(&quoteCurrency)
+
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				msg := fmt.Sprintf("Symbol %s not found in instruments table", req.Symbol)
+				respondWithJSONError(w, http.StatusBadRequest, "invalid_symbol", msg)
+				return
+			}
+			log.Printf("Failed to lookup quote currency for %s: %v", req.Symbol, err)
+			respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to validate symbol")
+			return
+		}
 
 		// Check if account has balance in the quote currency
+		// IMPORTANT: Treat USD and USDT as equivalent (1:1 peg)
 		var quoteBalance float64
-		err = pool.QueryRow(ctx,
-			`SELECT COALESCE(amount, 0) FROM balances WHERE account_id = $1 AND currency = $2`,
-			req.AccountID, quoteCurrency,
-		).Scan(&quoteBalance)
+		if quoteCurrency == "USD" || quoteCurrency == "USDT" {
+			// Sum both USD and USDT balances
+			err = pool.QueryRow(ctx,
+				`SELECT COALESCE(SUM(amount), 0)
+				 FROM balances
+				 WHERE account_id = $1 AND currency IN ('USD', 'USDT')`,
+				req.AccountID,
+			).Scan(&quoteBalance)
+		} else {
+			// For other currencies, check exact match
+			err = pool.QueryRow(ctx,
+				`SELECT COALESCE(amount, 0) FROM balances WHERE account_id = $1 AND currency = $2`,
+				req.AccountID, quoteCurrency,
+			).Scan(&quoteBalance)
+		}
 
 		// If no balance exists or balance is zero, reject the order
-		if err == pgx.ErrNoRows || quoteBalance <= 0 {
+		if err != nil && err != pgx.ErrNoRows {
+			log.Printf("Failed to check balance: %v", err)
+			respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to check balance")
+			return
+		}
+
+		if quoteBalance <= 0 {
 			msg := fmt.Sprintf("SPOT trading %s requires %s balance in your account. Please deposit %s or trade CFD/Futures instead.",
 				req.Symbol, quoteCurrency, quoteCurrency)
 			respondWithJSONError(w, http.StatusBadRequest, "insufficient_currency", msg)
@@ -170,7 +203,7 @@ func CreatePendingOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch created order
-	createdOrder, err := getPendingOrderByID(ctx, pool, orderID, userID)
+	createdOrder, err := getPendingOrderByID(ctx, pool, orderID, userUUID)
 	if err != nil {
 		log.Printf("Failed to fetch created pending order: %v", err)
 		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "order created but failed to fetch details")
@@ -340,13 +373,15 @@ func CancelPendingOrder(w http.ResponseWriter, r *http.Request) {
 
 	// Verify order belongs to user and is still pending
 	var orderUserID int64
+	var userUUID uuid.UUID
 	var orderStatus models.PendingOrderStatus
 	err = pool.QueryRow(ctx, `
-		SELECT a.user_id, p.status
+		SELECT a.user_id, u.id, p.status
 		FROM pending_orders p
 		JOIN accounts a ON p.account_id = a.id
+		JOIN users u ON a.user_id = u.user_id
 		WHERE p.id = $1
-	`, orderID).Scan(&orderUserID, &orderStatus)
+	`, orderID).Scan(&orderUserID, &userUUID, &orderStatus)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			respondWithJSONError(w, http.StatusNotFound, "not_found", "pending order not found")
@@ -395,7 +430,7 @@ func CancelPendingOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch cancelled order
-	cancelledOrder, err := getPendingOrderByID(ctx, pool, orderID, userID)
+	cancelledOrder, err := getPendingOrderByID(ctx, pool, orderID, userUUID)
 	if err != nil {
 		log.Printf("Failed to fetch cancelled order: %v", err)
 		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "order cancelled but failed to fetch details")
@@ -413,18 +448,19 @@ func CancelPendingOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 // Helper function to get pending order by ID
-func getPendingOrderByID(ctx context.Context, pool DBQuerier, orderID uuid.UUID, userID int64) (models.PendingOrder, error) {
+func getPendingOrderByID(ctx context.Context, pool DBQuerier, orderID uuid.UUID, userUUID uuid.UUID) (models.PendingOrder, error) {
 	var order models.PendingOrder
 	err := pool.QueryRow(ctx,
 		`SELECT id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price,
-		        status, executed_at, executed_price, failure_reason, created_at, updated_at, order_number
+		        leverage, product_type, status, executed_at, executed_price, failure_reason,
+		        created_at, updated_at, order_number
 		 FROM pending_orders
 		 WHERE id = $1 AND user_id = $2`,
-		orderID, userID,
+		orderID, userUUID,
 	).Scan(
 		&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.Type, &order.Side,
-		&order.Quantity, &order.TriggerPrice, &order.LimitPrice, &order.Status,
-		&order.ExecutedAt, &order.ExecutedPrice, &order.FailureReason,
+		&order.Quantity, &order.TriggerPrice, &order.LimitPrice, &order.Leverage, &order.ProductType,
+		&order.Status, &order.ExecutedAt, &order.ExecutedPrice, &order.FailureReason,
 		&order.CreatedAt, &order.UpdatedAt, &order.OrderNumber,
 	)
 	if err != nil {

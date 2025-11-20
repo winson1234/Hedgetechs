@@ -441,46 +441,72 @@ export const ScrollProgressBar = ({
   );
 };
 
-// Section indicator badge
-export const SectionIndicator = ({ 
-  currentSection, 
-  sections 
-}:
- {
+// Section indicator badge (auto-hides after a short delay on each section)
+export const SectionIndicator = ({
+  currentSection,
+  sections
+}: {
   currentSection: number;
   sections: { id: string; name: string }[];
 }) => {
+  const indicatorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = indicatorRef.current;
+    if (!el) return;
+
+    // Reset visibility & animate in
+    gsap.killTweensOf(el);
+    gsap.set(el, { opacity: 0, y: 10, display: 'flex' });
+    gsap.to(el, { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out' });
+
+    // Fade out after 2.5s
+    const timeout = setTimeout(() => {
+      gsap.to(el, { 
+        opacity: 0, 
+        y: -10, 
+        duration: 0.3, 
+        ease: 'power2.in', 
+        onComplete: () => gsap.set(el, { display: 'none' })
+      });
+    }, 2500);
+
+    return () => clearTimeout(timeout);
+  }, [currentSection]);
+
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: '2rem',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      zIndex: 1000,
-      background: 'rgba(0, 0, 0, 0.8)',
-      backdropFilter: 'blur(10px)',
-      padding: '0.75rem 1.5rem',
-      borderRadius: '50px',
-      color: '#fff',
-      fontSize: '0.875rem',
-      fontWeight: '600',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      border: '1px solid rgba(255, 255, 255, 0.1)'
-    }}>
+    <div
+      ref={indicatorRef}
+      style={{
+        position: 'fixed',
+        bottom: '2rem',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 1000,
+        background: 'rgba(0, 0, 0, 0.8)',
+        backdropFilter: 'blur(10px)',
+        padding: '0.75rem 1.5rem',
+        borderRadius: '50px',
+        color: '#fff',
+        fontSize: '0.875rem',
+        fontWeight: '600',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        opacity: 0
+      }}
+    >
       <span style={{ color: '#FDDB92' }}>{currentSection + 1}</span>
       <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>/</span>
       <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>{sections.length}</span>
-      <span style={{ 
-        marginLeft: '0.5rem',
-        color: '#fff'
-      }}>
+      <span style={{ marginLeft: '0.5rem', color: '#fff' }}>
         {sections[currentSection].name}
       </span>
     </div>
   );
 };
+
 export default function DashboardPage() {
   const dispatch = useAppDispatch();
   const isLoggedIn = useAppSelector(state => !!state.auth.token);

@@ -467,7 +467,9 @@ export const SectionIndicator = ({
         y: -10, 
         duration: 0.3, 
         ease: 'power2.in', 
-        onComplete: () => gsap.set(el, { display: 'none' })
+        onComplete: () => {
+          gsap.set(el, { display: 'none' });
+        }
       });
     }, 2500);
 
@@ -730,6 +732,7 @@ const cancelLogout = () => {
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ USD: 1 });
   const [heroEmail, setHeroEmail] = useState('');
   const [heroEmailError, setHeroEmailError] = useState('');
+  const heroEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const [cryptoMenuOpen, setCryptoMenuOpen] = useState(false);
   const cryptoMenuRef = useRef<HTMLDivElement>(null);
   const cryptoMenuListRef = useRef<HTMLUListElement>(null);
@@ -1306,8 +1309,8 @@ const cancelLogout = () => {
       return;
     }
     
-    if (!email.includes('@') || !email.includes('.')) {
-      setHeroEmailError('Please enter a valid email address');
+    if (!heroEmailRegex.test(email)) {
+      setHeroEmailError('Please enter a valid email address (e.g. name@example.com)');
       return;
     }
     
@@ -1535,6 +1538,16 @@ const cancelLogout = () => {
                     onChange={(e) => {
                       setHeroEmail(e.target.value);
                       if (heroEmailError) setHeroEmailError('');
+                    }}
+                    onBlur={() => {
+                      const email = heroEmail.trim();
+                      if (!email) {
+                        setHeroEmailError('');
+                        return;
+                      }
+                      if (!heroEmailRegex.test(email)) {
+                        setHeroEmailError('Please enter a valid email address');
+                      }
                     }}
                   />
                   {heroEmailError && <span className="email-error-message">{heroEmailError}</span>}

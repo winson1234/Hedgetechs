@@ -238,6 +238,26 @@ const accountSlice = createSlice({
         console.error('Failed to clear active account from localStorage:', error);
       }
     },
+
+    // Optimistic balance update (immediate UI update before backend sync)
+    // Used when we KNOW a balance change occurred (e.g., order executed, deposit, withdrawal)
+    updateAccountBalanceOptimistic: (state, action: PayloadAction<{ accountId: string; balanceDelta: number }>) => {
+      const { accountId, balanceDelta } = action.payload;
+      const account = state.accounts.find(acc => acc.id === accountId);
+
+      if (account) {
+        // Update the balance optimistically
+        // BackendAccount uses balances array of BackendBalance objects
+        const currency = account.currency;
+        const balanceRecord = account.balances.find(b => b.currency === currency);
+        
+        if (balanceRecord) {
+          const currentBalance = balanceRecord.amount;
+          const newBalance = currentBalance + balanceDelta;
+          balanceRecord.amount = newBalance;
+        }
+      }
+    },
   },
   extraReducers: (builder) => {
     // Fetch accounts
@@ -358,5 +378,5 @@ const accountSlice = createSlice({
   },
 });
 
-export const { setActiveAccount, clearError, clearAccounts } = accountSlice.actions;
+export const { setActiveAccount, clearError, clearAccounts, updateAccountBalanceOptimistic } = accountSlice.actions;
 export default accountSlice.reducer;

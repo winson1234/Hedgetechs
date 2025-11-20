@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, memo, useMemo } from 'react';
 import { useAppSelector } from '../store';
 import PendingOrdersTab from './market/PendingOrdersTab';
 import TradeHistoryTab from './market/TradeHistoryTab';
@@ -13,7 +13,8 @@ function MarketActivityPanel() {
   const selectedProductType = useAppSelector(state => state.ui.selectedProductType);
   // Get order book and trades from Redux store (updated by WebSocket middleware)
   const orderBook = useAppSelector(state => state.price.orderBooks[activeInstrument]);
-  const trades = useAppSelector(state => state.price.trades[activeInstrument]) || [];
+  const tradesRaw = useAppSelector(state => state.price.trades[activeInstrument]);
+  const trades = useMemo(() => tradesRaw || [], [tradesRaw]);
   // Get forex quotes from Redux store
   const forexQuotes = useAppSelector(state => state.forex.quotes);
 
@@ -57,25 +58,42 @@ function MarketActivityPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProductType, isForex]);
 
-  // Convert Redux order book format to component format
-  const bids: [string, string][] = orderBook?.bids.map(bid => [
-    bid.price.toString(),
-    bid.quantity.toString()
-  ]) || [];
+  // Convert Redux order book format to component format (memoized for performance)
+  const bids: [string, string][] = useMemo(() => {
+    return orderBook?.bids.map(bid => [
+      bid.price.toString(),
+      bid.quantity.toString()
+    ]) || [];
+  }, [orderBook?.bids]);
 
-  const asks: [string, string][] = orderBook?.asks.map(ask => [
-    ask.price.toString(),
-    ask.quantity.toString()
-  ]) || [];
+  const asks: [string, string][] = useMemo(() => {
+    return orderBook?.asks.map(ask => [
+      ask.price.toString(),
+      ask.quantity.toString()
+    ]) || [];
+  }, [orderBook?.asks]);
 
-  // Calculate total for each level
-  const calculateTotal = (orders: [string, string][], index: number): string => {
-    let total = 0;
-    for (let i = 0; i <= index; i++) {
-      total += parseFloat(orders[i][1]);
-    }
-    return total.toFixed(4);
-  };
+  // Pre-calculate cumulative totals for performance (memoized)
+  const bidTotals = useMemo(() => {
+    let cumulative = 0;
+    return bids.map(bid => {
+      cumulative += parseFloat(bid[1]);
+      return cumulative.toFixed(4);
+    });
+  }, [bids]);
+
+  const askTotals = useMemo(() => {
+    let cumulative = 0;
+    return asks.map(ask => {
+      cumulative += parseFloat(ask[1]);
+      return cumulative.toFixed(4);
+    });
+  }, [asks]);
+
+  // Memoize filtered valid trades for performance
+  const validTrades = useMemo(() => {
+    return trades.filter(t => t.quantity > 0 && t.price > 0);
+  }, [trades]);
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 h-full flex flex-col">
@@ -195,7 +213,7 @@ function MarketActivityPanel() {
                     >
                       <div className="text-green-600 dark:text-green-500 font-medium">{formatPrice(parseFloat(bid[0]))}</div>
                       <div className="text-slate-700 dark:text-slate-300 text-right">{formatQuantity(parseFloat(bid[1]))}</div>
-                      <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{calculateTotal(bids, index)}</div>
+                      <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{bidTotals[index]}</div>
                     </div>
                   ))
                 ) : (
@@ -223,7 +241,7 @@ function MarketActivityPanel() {
                     >
                       <div className="text-red-600 dark:text-red-500 font-medium">{formatPrice(parseFloat(ask[0]))}</div>
                       <div className="text-slate-700 dark:text-slate-300 text-right">{formatQuantity(parseFloat(ask[1]))}</div>
-                      <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{calculateTotal(asks, index)}</div>
+                      <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{askTotals[index]}</div>
                     </div>
                   ))
                 ) : (
@@ -245,12 +263,8 @@ function MarketActivityPanel() {
 
             {/* Market Trades List */}
             <div className="flex-1 overflow-y-auto space-y-1">
-              {(() => {
-                // Filter out invalid trades first
-                const validTrades = trades.filter(t => t.quantity > 0 && t.price > 0);
-
-                if (validTrades.length > 0) {
-                  return validTrades.map((trade, index) => {
+              {validTrades.length > 0 ? (
+                validTrades.map((trade, index) => {
                     const tradeTime = new Date(trade.time);
                     const timeStr = tradeTime.toLocaleTimeString('en-US', {
                       hour: '2-digit',
@@ -272,15 +286,12 @@ function MarketActivityPanel() {
                         <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{timeStr}</div>
                       </div>
                     );
-                  });
-                } else {
-                  return (
-                    <div className="text-slate-400 dark:text-slate-500 text-sm text-center mt-4">
-                      {trades.length > 0 ? 'Trade data not available for this instrument' : 'No recent trades'}
-                    </div>
-                  );
-                }
-              })()}
+                  })
+                ) : (
+                  <div className="text-slate-400 dark:text-slate-500 text-sm text-center mt-4">
+                    {trades.length > 0 ? 'Trade data not available for this instrument' : 'No recent trades'}
+                  </div>
+                )}
             </div>
           </div>
         )}

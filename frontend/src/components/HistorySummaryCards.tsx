@@ -4,9 +4,10 @@ import type { Transaction } from '../types';
 interface HistorySummaryCardsProps {
   transactions: Transaction[];
   totalItems: number;
+  pendingOrdersCount: number;
 }
 
-export default function HistorySummaryCards({ transactions, totalItems }: HistorySummaryCardsProps) {
+export default function HistorySummaryCards({ transactions, totalItems, pendingOrdersCount }: HistorySummaryCardsProps) {
   // Calculate statistics
   const stats = transactions.reduce(
     (acc, txn) => {
@@ -16,12 +17,9 @@ export default function HistorySummaryCards({ transactions, totalItems }: Histor
       if (txn.type === 'withdraw' && txn.status === 'completed') {
         acc.totalWithdrawn += txn.amount;
       }
-      if (txn.status === 'pending' || txn.status === 'processing') {
-        acc.pendingCount += 1;
-      }
       return acc;
     },
-    { totalDeposited: 0, totalWithdrawn: 0, pendingCount: 0 }
+    { totalDeposited: 0, totalWithdrawn: 0 }
   );
 
   const cards = [
@@ -57,7 +55,7 @@ export default function HistorySummaryCards({ transactions, totalItems }: Histor
     },
     {
       title: 'Pending',
-      value: stats.pendingCount.toString(),
+      value: pendingOrdersCount.toString(),
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

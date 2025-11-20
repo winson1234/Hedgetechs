@@ -37,6 +37,11 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Normalize symbol for database compatibility
+	// Forex pairs (e.g., AUDJPYUSDT → AUDJPY) are stored without USDT suffix
+	// Crypto pairs (e.g., BTCUSDT) keep the USDT suffix
+	normalizedSymbol := normalizeSymbol(req.Symbol)
+
 	pool, err := database.GetPool()
 	if err != nil {
 		log.Printf("Database pool error: %v", err)
@@ -67,7 +72,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	// Verify instrument exists and is tradeable
 	var isTradeable bool
-	err = pool.QueryRow(ctx, "SELECT is_tradable FROM instruments WHERE symbol = $1", req.Symbol).Scan(&isTradeable)
+	err = pool.QueryRow(ctx, "SELECT is_tradable FROM instruments WHERE symbol = $1", normalizedSymbol).Scan(&isTradeable)
 	if err != nil {
 		respondWithJSONError(w, http.StatusNotFound, "not_found", "instrument not found")
 		return
@@ -97,7 +102,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	_, err = pool.Exec(ctx,
 		`INSERT INTO orders (id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, product_type, filled_amount, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 0, NOW(), NOW())`,
-		orderID, userUUID, req.AccountID, req.Symbol, orderNumber, req.Side, req.Type, models.OrderStatusPending, req.AmountBase, req.LimitPrice, req.StopPrice, leverage, req.ProductType,
+		orderID, userUUID, req.AccountID, normalizedSymbol, orderNumber, req.Side, req.Type, models.OrderStatusPending, req.AmountBase, req.LimitPrice, req.StopPrice, leverage, req.ProductType,
 	)
 	if err != nil {
 		log.Printf("Failed to insert order: %v", err)

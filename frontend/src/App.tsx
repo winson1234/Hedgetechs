@@ -61,11 +61,25 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instruments.length])
 
-  // Fetch accounts when user is logged in
+  // Fetch accounts when user is logged in (initial fetch)
   useEffect(() => {
     if (isLoggedIn && !authLoading) {
       dispatch(fetchAccounts())
     }
+  }, [isLoggedIn, authLoading, dispatch])
+
+  // Auto-refresh account balances every 30 seconds (safety sync for pending orders executed by backend)
+  // Note: Market orders use optimistic updates for instant UI feedback
+  useEffect(() => {
+    if (!isLoggedIn || authLoading) return
+
+    // Set up polling interval for account balance refresh
+    const intervalId = setInterval(() => {
+      dispatch(fetchAccounts())
+    }, 30000) // Refresh every 30 seconds (reduced from 15s since we have optimistic updates)
+
+    // Cleanup interval on unmount or logout
+    return () => clearInterval(intervalId)
   }, [isLoggedIn, authLoading, dispatch])
 
   return (

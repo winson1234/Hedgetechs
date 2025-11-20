@@ -342,7 +342,7 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                 <div className="pt-2 border-t border-slate-200 dark:border-slate-700/50">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-xs text-slate-600 dark:text-slate-400">Unrealized P&L:</span>
+                      <span className="text-xs text-slate-600 dark:text-slate-400">P&L:</span>
                       <span
                         className={`ml-2 text-sm font-bold ${
                           (position.unrealized_pnl || 0) >= 0

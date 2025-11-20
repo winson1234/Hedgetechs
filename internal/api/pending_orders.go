@@ -40,6 +40,11 @@ func CreatePendingOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Normalize symbol for database compatibility
+	// Forex pairs (e.g., AUDJPYUSDT → AUDJPY) are stored without USDT suffix
+	// Crypto pairs (e.g., BTCUSDT) keep the USDT suffix
+	normalizedSymbol := normalizeSymbol(req.Symbol)
+
 	// Get database pool
 	pool, err := database.GetPool()
 	if err != nil {
@@ -107,7 +112,7 @@ func CreatePendingOrder(w http.ResponseWriter, r *http.Request) {
 		var quoteCurrency string
 		err = pool.QueryRow(ctx,
 			`SELECT quote_currency FROM instruments WHERE symbol = $1`,
-			req.Symbol,
+			normalizedSymbol,
 		).Scan(&quoteCurrency)
 
 		if err != nil {
@@ -187,7 +192,7 @@ func CreatePendingOrder(w http.ResponseWriter, r *http.Request) {
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, NOW(), NOW()
 		)`,
-		orderID, userUUID, req.AccountID, req.Symbol, req.Type, req.Side, req.Quantity, req.TriggerPrice, req.LimitPrice, leverage, orderNumber,
+		orderID, userUUID, req.AccountID, normalizedSymbol, req.Type, req.Side, req.Quantity, req.TriggerPrice, req.LimitPrice, leverage, orderNumber,
 	)
 	if err != nil {
 		log.Printf("Failed to insert pending order: %v", err)

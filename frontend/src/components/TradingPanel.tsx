@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
-import { setActiveAccount, fetchAccounts } from '../store/slices/accountSlice';
+import { setActiveAccount, fetchAccounts, updateAccountBalanceOptimistic } from '../store/slices/accountSlice';
 import { createPendingOrder, executeMarketOrder, fetchOrders, fetchPendingOrders } from '../store/slices/orderSlice';
 import { addToast, setSelectedProductType, triggerPositionsRefresh } from '../store/slices/uiSlice';
 import { formatPrice } from '../utils/priceUtils';
@@ -109,6 +109,8 @@ export default function TradingPanel() {
   // Initialize limit price when instrument changes or when first price is received
   useEffect(() => {
     // Set limit price only if it's currently empty AND we have a valid current price
+    // This runs when currentPrice updates (on mount or instrument change)
+    // By excluding limitPrice from dependencies, we allow users to clear the field without it auto-resetting
     if (currentPrice > 0 && limitPrice === '') {
       setLimitPrice(formatPrice(currentPrice));
     }
@@ -389,6 +391,24 @@ export default function TradingPanel() {
         }));
         return;
       }
+
+      // Calculate balance delta for optimistic update
+      let balanceDelta = 0;
+      if (isSpot) {
+        // SPOT: Full order value affects balance
+        const orderValue = qty * currentPrice;
+        balanceDelta = side === 'buy' ? -orderValue : orderValue;
+      } else {
+        // CFD/Futures: Only margin affects balance
+        const margin = (qty * currentPrice) / leverage;
+        balanceDelta = -margin; // Margin is locked (deducted) for both buy and sell
+      }
+
+      // Optimistic update: Update UI immediately for instant feedback
+      dispatch(updateAccountBalanceOptimistic({
+        accountId: activeAccountId,
+        balanceDelta: balanceDelta,
+      }));
 
       // Execute market order via backend
       dispatch(executeMarketOrder({

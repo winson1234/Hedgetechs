@@ -488,6 +488,32 @@ export default function DashboardPage() {
   const isDarkMode = useAppSelector(selectIsDarkMode);
   const currentPrices = useAppSelector(state => state.price.currentPrices);
   const { currentSection, sections, scrollToSection } = useSectionScroll();
+useEffect(() => {
+    const header = document.querySelector("header.header");
+    const homeSection = document.querySelector<HTMLElement>("#home");
+
+    if (!header || !homeSection) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          // Home section visible → transparent
+          header.classList.remove("scrolled");
+        } else {
+          // Home section NOT visible → solid background
+          header.classList.add("scrolled");
+        }
+      },
+      {
+        threshold: 0.3,  // 30% of home section must be visible
+      }
+    );
+
+    observer.observe(homeSection);
+
+    return () => observer.disconnect();
+  }, []);
+
 
   // Initialize scroll animations
   useGSAPScrollAnimations();

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppDispatch } from '../store';
 import { signUp } from '../store/slices/authSlice';
 import './register.css';
@@ -8,6 +8,7 @@ import './register.css';
 export default function RegisterPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const [searchParams] = useSearchParams();
 
   const [formData, setFormData] = useState({
     country: '',
@@ -27,6 +28,14 @@ export default function RegisterPage() {
 
   const passwordRef = useRef<HTMLInputElement>(null);
   const retypePasswordRef = useRef<HTMLInputElement>(null);
+
+  // Pre-fill email when redirected with query param
+  useEffect(() => {
+    const emailParam = searchParams.get('email');
+    if (emailParam) {
+      setFormData(prev => ({ ...prev, email: emailParam }));
+    }
+  }, [searchParams]);
 
   // Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

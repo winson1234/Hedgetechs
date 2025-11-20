@@ -13,6 +13,10 @@ section {
   align-items: center;
   justify-content: center;
 }
+/* Apply to all sections except the HOME hero */
+section:not(#home) {
+  padding-top: 130px; /* match your header height */
+}
 
 /* CUSTOM HEIGHT FOR EACH SECTION */
 
@@ -84,6 +88,8 @@ section {
 /* Smaller pagination */
 #market .pagination {
   margin-top: 1rem;
+  overflow: visible;
+
 }
 /* News - Compact size */
 /* News - Compact size */
@@ -179,7 +185,7 @@ section {
 }
 /* FAQ - Compact Square Grid */
 #faq {
-  min-height: 125vh;
+  min-height: 130vh;
   padding: 4rem 0;
   margin-top: 60px;
   display: flex;
@@ -209,6 +215,7 @@ section {
 
 #faq .section-subtitle {
   font-size: 1rem;
+  margin-bottom: -30px;
   opacity: 0.7;
 }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, MouseEvent as ReactMouseEvent } from 'react';
+import { useState, useEffect, useRef, MouseEvent as ReactMouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store';
 import { signOut } from '../store/slices/authSlice';
@@ -6,15 +6,13 @@ import { setTheme, selectIsDarkMode, setActiveInstrument } from '../store/slices
 import { clearAccounts } from '../store/slices/accountSlice';
 import { clearOrders } from '../store/slices/orderSlice';
 import MiniSparklineChart from '../components/MiniSparklineChart';
+import { getApiUrl } from '../config/api';
 import { useScrollAnimations } from '../hooks/useScrollAnimations';
 import { useGSAPScrollAnimations } from '../hooks/useGSAPScrollAnimations';
 import { useMicroParallax } from '../hooks/useMicroParallax';
 import { useCursorParallax } from '../hooks/useCursorParallax';
 import { useFloatingAnimation } from '../hooks/useFloatingAnimation';
 import { useGlowPulse } from '../hooks/useGlowPulse';
-import { useExchangeRates } from '../hooks/useExchangeRates';
-import { useTickerData } from '../hooks/useTickerData';
-import { useNewsData } from '../hooks/useNewsData';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -125,10 +123,11 @@ const PRIMARY_NAV_ITEMS = [
 export const useSectionScroll = () => {
   const [currentSection, setCurrentSection] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const sectionsRef = useRef<HTMLElement[]>([]);
   const lastUpdateRef = useRef(0);
 const wheelTimeoutRef = useRef<number | null>(null);
 const touchStartRef = useRef<number>(0);
-  const sections = useMemo(() => [
+  const sections = [
     { id: 'home', name: 'Hero' },
     { id: 'market', name: 'Markets' },
     { id: 'news', name: 'News' },
@@ -137,10 +136,11 @@ const touchStartRef = useRef<number>(0);
     { id: 'about', name: 'About' },
     { id: 'faq', name: 'FAQ' },
     { id: 'footer', name: 'Footer' }
-  ], []);
+
+  ];
 
   // Function to update section classes based on current position
-  const updateSectionClasses = useCallback((activeIndex: number) => {
+  const updateSectionClasses = (activeIndex: number) => {
     // Throttle updates to prevent excessive DOM manipulation
     const now = Date.now();
     if (now - lastUpdateRef.current < 100) return;
@@ -162,21 +162,42 @@ const touchStartRef = useRef<number>(0);
         element.classList.add('section-below');
       }
     });
-  }, [sections]);
-
-const scrollToSection = useCallback((index: number) => {
+  };
+  // Wheel event handler for section-by-section scrolling
+const handleWheel = (e: WheelEvent) => {
+  e.preventDefault();
+  
+  if (isTransitioning) return; // Block all scrolling during transition
+  
+  // Clear existing timeout
+  if (wheelTimeoutRef.current) {
+    clearTimeout(wheelTimeoutRef.current);
+  }
+  
+  // Debounce wheel events - only trigger once
+  wheelTimeoutRef.current = setTimeout(() => {
+    if (e.deltaY > 0 && currentSection < sections.length - 1) {
+      // Scroll down
+      scrollToSection(currentSection + 1);
+    } else if (e.deltaY < 0 && currentSection > 0) {
+      // Scroll up
+      scrollToSection(currentSection - 1);
+    }
+  }, 100); // Increased to prevent rapid scrolling
+};
+const scrollToSection = (index: number) => {
   if (isTransitioning || index < 0 || index >= sections.length) return;
-
+  
   setIsTransitioning(true); // Lock scrolling
-
+  
   // IMMEDIATELY update state and classes BEFORE scrolling
   setCurrentSection(index);
   updateSectionClasses(index);
-
+  
   const section = document.getElementById(sections[index].id);
   if (section) {
     // Use instant scroll
-    section.scrollIntoView({
+    section.scrollIntoView({ 
       behavior: 'auto',
       block: 'center',
       inline: 'nearest'
@@ -190,10 +211,10 @@ const scrollToSection = useCallback((index: number) => {
       }
     }
   }
-
+  
   // Lock for longer to prevent scroll-through (1200ms = 1.2s)
   setTimeout(() => setIsTransitioning(false), 1200);
-}, [isTransitioning, sections, updateSectionClasses]);
+};
  useEffect(() => {
   // Hide default scrollbar
   document.body.style.overflow = 'hidden';
@@ -293,7 +314,7 @@ const scrollToSection = useCallback((index: number) => {
       clearTimeout(wheelTimeoutRef.current);
     }
   };
-}, [currentSection, isTransitioning, scrollToSection, sections.length, updateSectionClasses]);
+}, [currentSection, isTransitioning]);
   return {
     currentSection,
     sections,
@@ -424,28 +445,11 @@ export const ScrollProgressBar = ({
 export const SectionIndicator = ({ 
   currentSection, 
   sections 
-}: {
+}:
+ {
   currentSection: number;
   sections: { id: string; name: string }[];
 }) => {
-  const [isVisible, setIsVisible] = useState(true);
-
-  useEffect(() => {
-    setIsVisible(true);
-
-    const timeoutId = window.setTimeout(() => {
-      setIsVisible(false);
-    }, 4000);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [currentSection]);
-
-  if (!isVisible) {
-    return null;
-  }
-
   return (
     <div style={{
       position: 'fixed',
@@ -596,14 +600,24 @@ const [fadeOut, setFadeOut] = useState(false);
       scrollToSection(targetIndex);
     } else {
       document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
+      
     }
   };
 
-  const handleNavClick = (event: ReactMouseEvent<HTMLAnchorElement>, sectionId: string) => {
-    event.preventDefault();
-    navigateToSection(sectionId);
-  };
+const handleNavClick = (event: React.MouseEvent, id: string) => {
+  event.preventDefault();
 
+  const element = document.getElementById(id);
+  if (!element) return;
+
+  // Smooth scroll to section
+  element.scrollIntoView({ behavior: "smooth" });
+
+  // Force ScrollTrigger to recalc positions after smooth scroll
+  setTimeout(() => {
+    ScrollTrigger.refresh();
+  }, 300);
+};
   const handleMobileNavClick = (event: ReactMouseEvent<HTMLAnchorElement>, sectionId: string) => {
     event.preventDefault();
     navigateToSection(sectionId);
@@ -661,26 +675,17 @@ const cancelLogout = () => {
 
   const [selectedCrypto, setSelectedCrypto] = useState<string>(PAYOUT_CRYPTOS[0].symbol);
   const [fiatInput, setFiatInput] = useState('5000');
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ USD: 1 });
   const [heroEmail, setHeroEmail] = useState('');
   const [heroEmailError, setHeroEmailError] = useState('');
   const [cryptoMenuOpen, setCryptoMenuOpen] = useState(false);
   const cryptoMenuRef = useRef<HTMLDivElement>(null);
   const cryptoMenuListRef = useRef<HTMLUListElement>(null);
   const cryptoSelectorBtnRef = useRef<HTMLButtonElement>(null);
-
-  // Fetch exchange rates using React Query
-  const {
-    data: exchangeRatesData,
-    isLoading: ratesLoading,
-    error: rateError,
-  } = useExchangeRates({
-    symbols: PAYOUT_CRYPTOS.map(c => c.symbol),
-    refetchInterval: 30000,
-  });
-
-  const exchangeRates = exchangeRatesData?.rates ?? { USD: 1 };
-  const rateLastUpdated = exchangeRatesData?.lastUpdated ?? null;
-  const rateSource = exchangeRatesData?.source ?? 'live';
+  const [rateLastUpdated, setRateLastUpdated] = useState<string | null>(null);
+  const [rateSource, setRateSource] = useState<'live' | 'cache'>('live');
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [rateError, setRateError] = useState<string | null>(null);
 
   const fiatAmount = Number(fiatInput.replace(/[^0-9.]/g, '')) || 0;
   const selectedRate = exchangeRates[selectedCrypto] ?? 0;
@@ -698,6 +703,50 @@ const cancelLogout = () => {
     const normalized = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : numericOnly;
     setFiatInput(normalized);
   };
+
+  // Fetch exchange rates for cryptocurrencies
+  useEffect(() => {
+    const fetchExchangeRates = async () => {
+      try {
+        setRatesLoading(true);
+        setRateError(null);
+
+        // Get list of crypto symbols to fetch
+        const symbols = PAYOUT_CRYPTOS.map(c => c.symbol).join(',');
+        const response = await fetch(getApiUrl(`/api/v1/exchange-rate?symbols=${symbols}`));
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: Failed to fetch exchange rates`);
+        }
+
+        const rates = await response.json() as Record<string, number>;
+        
+        // Extract timestamp and source from headers
+        const timestamp = response.headers.get('X-Rates-Timestamp');
+        const source = response.headers.get('X-Rate-Source') as 'live' | 'cache' | null;
+
+        setExchangeRates(rates);
+        if (timestamp) {
+          setRateLastUpdated(timestamp);
+        }
+        if (source) {
+          setRateSource(source);
+        }
+      } catch (err) {
+        console.error('Error fetching exchange rates:', err);
+        setRateError(err instanceof Error ? err.message : 'Failed to fetch rates');
+        // Keep existing rates if available
+      } finally {
+        setRatesLoading(false);
+      }
+    };
+
+    fetchExchangeRates();
+    
+    // Refresh rates every 30 seconds
+    const interval = setInterval(fetchExchangeRates, 30000);
+    return () => clearInterval(interval);
+  }, []);
   // Real-time cryptocurrency data from WebSocket (all 24 instruments)
   const [cryptoData, setCryptoData] = useState<CryptoData[]>([
     // Major (7)
@@ -771,39 +820,63 @@ const cancelLogout = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPrices]);
 
-  // Fetch initial 24h ticker data using React Query
-  const cryptoSymbols = useMemo(() => cryptoData.map(c => c.symbol), [cryptoData]);
-  const { data: tickerData } = useTickerData({
-    symbols: cryptoSymbols,
-    enabled: cryptoSymbols.length > 0,
-  });
-
-  // Update crypto data when ticker data changes
+  // Fetch initial 24h ticker data with retry logic
   useEffect(() => {
-    if (tickerData && tickerData.length > 0) {
-      setCryptoData(prevData =>
-        prevData.map(crypto => {
-          const ticker = tickerData.find((t) => t.symbol === crypto.symbol);
-          if (ticker) {
-            const price = parseFloat(ticker.lastPrice);
-            const change = parseFloat(ticker.priceChangePercent);
-            const volume24h = parseFloat(ticker.volume);
+    const fetchInitialData = async (retries = 3): Promise<void> => {
+      try {
+        const symbols = cryptoData.map(c => c.symbol).join(',');
+        const response = await fetch(getApiUrl(`/api/v1/ticker?symbols=${symbols}`));
 
-            return {
-              ...crypto,
-              price,
-              change,
-              volume24h,
-            };
-          }
-          return crypto;
-        })
-      );
-    }
-  }, [tickerData]);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: Failed to fetch ticker data`);
+        }
+
+        const tickerData = await response.json() as Array<{
+          symbol: string;
+          lastPrice: string;
+          priceChangePercent: string;
+          volume: string;  // 24h trading volume
+        }>;
+
+        // Update crypto data with 24h statistics including volume
+        setCryptoData(prevData =>
+          prevData.map(crypto => {
+            const ticker = tickerData.find((t) => t.symbol === crypto.symbol);
+            if (ticker) {
+              const price = parseFloat(ticker.lastPrice);
+              const change = parseFloat(ticker.priceChangePercent);
+              const volume24h = parseFloat(ticker.volume);
+
+              return {
+                ...crypto,
+                price,
+                change,
+                volume24h,
+              };
+            }
+            return crypto;
+          })
+        );
+      } catch (err) {
+        console.error(`Error fetching initial ticker data (${4 - retries}/3):`, err);
+
+        // Retry with exponential backoff
+        if (retries > 1) {
+          const delay = (4 - retries) * 2000; // 2s, 4s
+          console.log(`Retrying in ${delay / 1000}s...`);
+          setTimeout(() => fetchInitialData(retries - 1), delay);
+        } else {
+          console.error('All retries failed. Prices may not be displayed correctly.');
+        }
+      }
+    };
+
+    fetchInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   interface NewsItem {
-    id: number | string;
+    id: number;
     title: string;
     excerpt: string;
     source: string;
@@ -814,6 +887,9 @@ const cancelLogout = () => {
     link: string;
   }
 
+  // Live news data from API
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -821,101 +897,172 @@ const cancelLogout = () => {
   const [cryptoCurrentPage, setCryptoCurrentPage] = useState(1);
   const cryptoItemsPerPage = 6;
 
-  // Fetch live news using React Query
-  const { data: newsData, isLoading: newsLoading } = useNewsData(120000); // 2 minutes
+  // Fetch live news from backend API
+  useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        setNewsLoading(true);
 
-  // Helper function to get placeholder image based on category with more variety
-  const getPlaceholderImage = useCallback((category: string, index: number) => {
-    const cryptoImages = [
-      'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1622630998477-20aa696ecb05?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1640826514546-7d2d259a2f6c?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1605792657660-596af9009e82?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1644088379091-d574269d422f?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1609554496796-c345a5335ceb?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1622707304787-b244e3d55c75?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1634704784915-aacf363b021f?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1563986768494-4dee2763ff3f?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1607799279861-4dd421887fb3?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1623497421753-44869a9fc23c?w=800&q=80&fit=crop',
-    ];
+        const response = await fetch(getApiUrl('/api/v1/news'));
 
-    const marketImages = [
-      'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1559526324-593bc073d938?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1560221328-12fe60f83ab8?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1579532537598-459ecdaf39cc?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1543286386-2e659306cd6c?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1553729459-efe14ef6055d?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&q=80&fit=crop',
-    ];
+        if (!response.ok) {
+          console.error('Failed to fetch news');
+          return;
+        }
 
-    const techImages = [
-      'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80&fit=crop',
-    ];
+        const newsData = await response.json() as {
+          articles: Array<{
+            title: string;
+            description: string;
+            source: string;
+            pubDate: string;
+            publishedAt?: string;
+            link: string;
+          }>;
+        };
 
-    const regulationImages = [
-      'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1561911341-7a293e0e5b92?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=800&q=80&fit=crop',
-      'https://images.unsplash.com/photo-1453945619913-79ec89a82c51?w=800&q=80&fit=crop',
-    ];
+        // Extract articles array from response
+        const articles = newsData.articles || [];
 
-    let images = cryptoImages;
-    if (category === 'markets') images = marketImages;
-    else if (category === 'technology') images = techImages;
-    else if (category === 'regulation') images = regulationImages;
-    else if (category === 'forex') images = marketImages;
+        // Transform API response to match component structure
+        const transformedNews = articles.map((article, index: number) => {
+          const category = getCategoryFromArticle(article);
+          return {
+            id: index + 1,
+            title: article.title,
+            excerpt: article.description || article.title,
+            source: article.source,
+            category: category,
+            timestamp: formatTimestamp(article.pubDate || article.publishedAt || ''),
+            featured: index === 0, // Make first article featured
+            image: getPlaceholderImage(category, index), // Use placeholder images
+            link: article.link,
+          };
+        });
 
-    return images[index % images.length];
+        setNewsItems(transformedNews);
+      } catch (err) {
+        console.error('Error fetching news:', err);
+      } finally {
+        setNewsLoading(false);
+      }
+    };
+
+    // Helper function to determine category from title and description
+    const getCategoryFromArticle = (article: { title: string; description: string; source: string }) => {
+      const title = (article.title || '').toLowerCase();
+      const description = (article.description || '').toLowerCase();
+      const source = (article.source || '').toLowerCase();
+      const text = `${title} ${description}`;
+
+      // Check for regulation keywords
+      const regulationKeywords = ['regulation', 'regulatory', 'sec', 'compliance', 'law', 'legal', 'government', 'policy', 'ban', 'lawsuit'];
+      if (regulationKeywords.some(keyword => text.includes(keyword))) {
+        return 'regulation';
+      }
+
+      // Check for technology keywords
+      const techKeywords = ['blockchain', 'technology', 'protocol', 'layer 2', 'defi', 'nft', 'smart contract', 'upgrade', 'network', 'infrastructure'];
+      if (techKeywords.some(keyword => text.includes(keyword))) {
+        return 'technology';
+      }
+
+      // Check for crypto sources/keywords
+      if (source.includes('coindesk') || source.includes('cryptonews') || source.includes('cointelegraph') ||
+          text.includes('bitcoin') || text.includes('ethereum') || text.includes('crypto')) {
+        return 'crypto';
+      }
+
+      // Check for market sources
+      if (source.includes('fxstreet') || source.includes('investing') || source.includes('yahoo')) {
+        return 'markets';
+      }
+
+      return 'crypto'; // default
+    };
+
+    // Helper function to get placeholder image based on category with more variety
+    const getPlaceholderImage = (category: string, index: number) => {
+      const cryptoImages = [
+        'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1622630998477-20aa696ecb05?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1640826514546-7d2d259a2f6c?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1605792657660-596af9009e82?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1644088379091-d574269d422f?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1609554496796-c345a5335ceb?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1622707304787-b244e3d55c75?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1634704784915-aacf363b021f?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1563986768494-4dee2763ff3f?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1607799279861-4dd421887fb3?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1623497421753-44869a9fc23c?w=800&q=80&fit=crop',
+      ];
+
+      const marketImages = [
+        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1559526324-593bc073d938?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1560221328-12fe60f83ab8?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1579532537598-459ecdaf39cc?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1543286386-2e659306cd6c?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1553729459-efe14ef6055d?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&q=80&fit=crop',
+      ];
+
+      const techImages = [
+        'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80&fit=crop',
+      ];
+
+      const regulationImages = [
+        'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1561911341-7a293e0e5b92?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=800&q=80&fit=crop',
+        'https://images.unsplash.com/photo-1453945619913-79ec89a82c51?w=800&q=80&fit=crop',
+      ];
+
+      let images = cryptoImages;
+      if (category === 'markets') images = marketImages;
+      else if (category === 'technology') images = techImages;
+      else if (category === 'regulation') images = regulationImages;
+
+      return images[index % images.length];
+    };
+
+    // Helper function to format timestamp
+    const formatTimestamp = (timestamp: string) => {
+      if (!timestamp) return 'Recently';
+
+      const publishedDate = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now.getTime() - publishedDate.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+      if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+      if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+      return publishedDate.toLocaleDateString();
+    };
+
+    fetchNews();
+
+    // Refresh news every 2 minutes (matching backend cache TTL)
+    const interval = setInterval(fetchNews, 2 * 60 * 1000);
+
+    return () => clearInterval(interval);
   }, []);
-
-  // Helper function to format timestamp
-  const formatTimestamp = useCallback((timestamp: string) => {
-    if (!timestamp) return 'Recently';
-
-    const publishedDate = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - publishedDate.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-    return publishedDate.toLocaleDateString();
-  }, []);
-
-  // Transform news data to match component structure
-  const newsItems: NewsItem[] = useMemo(() => {
-    if (!newsData || newsData.length === 0) return [];
-
-    return newsData.map((article, index) => ({
-      id: article.id,
-      title: article.title,
-      excerpt: article.description,
-      source: article.source,
-      category: article.category,
-      timestamp: formatTimestamp(article.published_at),
-      featured: article.featured ?? false,
-      image: article.image_url || getPlaceholderImage(article.category, index),
-      link: article.link,
-    }));
-  }, [newsData, formatTimestamp, getPlaceholderImage]);
 
   const faqItems = [
     {
@@ -1135,11 +1282,21 @@ const cancelLogout = () => {
         >
         <div className="container">
           <div className="nav-wrapper">
-            <div className="logo">
-              <Link to="/">
-                <img src="/KrypitalX.png" alt="KrypitalX" className="logo-image" />
-              </Link>
-            </div>
+         <div className="logo">
+  <a
+    href="#home"
+    onClick={(e) => {
+      e.preventDefault();
+      const section = document.querySelector("#home");
+      section?.scrollIntoView({ behavior: "smooth" });
+    }}
+  >
+    <img src="/KrypitalX.png" alt="KrypitalX" className="logo-image" />
+  </a>
+</div>
+
+
+
 
             {/* Desktop Nav */}
             <nav className="nav-menu">
@@ -1696,11 +1853,8 @@ const cancelLogout = () => {
             <>
               <div className="news-grid">
                 {displayedNews.map((news, index) => (
-                <a 
-                  key={news.id}
-                  href={news.link || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <div 
+                  key={news.id} 
                   className="news-item card-3d" 
                   data-gsap-animate="fade-up"
                   data-gsap-stagger={index * 0.1}
@@ -1712,18 +1866,7 @@ const cancelLogout = () => {
                   border: '1px solid rgba(255, 255, 255, 0.1)',
                   display: 'flex',
                   flexDirection: 'column',
-                  height: '100%',
-                  textDecoration: 'none',
-                  color: 'inherit',
-                  transition: 'transform 0.3s ease, box-shadow 0.3s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.3)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
+                  height: '100%'
                 }}>
                   <div className="news-badge" style={{
                     position: 'absolute',
@@ -1824,7 +1967,10 @@ const cancelLogout = () => {
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden'
                     }}>{news.excerpt}</p>
-                    <div
+                    <a
+                      href={news.link || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       style={{
                         color: '#FDDB92',
                         fontSize: '10px',
@@ -1832,13 +1978,20 @@ const cancelLogout = () => {
                         textDecoration: 'none',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '0.3rem'
+                        gap: '0.3rem',
+                        transition: 'gap 0.3s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.gap = '0.6rem';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.gap = '0.3rem';
                       }}
                     >
                       Read More <span>→</span>
-                    </div>
+                    </a>
                   </div>
-                </a>
+                </div>
               ))}
               </div>
 

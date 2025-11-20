@@ -1156,64 +1156,22 @@ const cancelLogout = () => {
   }, [activeNewsTab]);
 // Header scroll detection - add 'scrolled' class when scrolled
 
-  // Position crypto menu dynamically and close when clicking outside
+  // Close crypto menu when clicking outside the selector
   useEffect(() => {
+    if (!cryptoMenuOpen) {
+      return;
+    }
+
     const handleClickOutside = (event: MouseEvent) => {
       if (cryptoMenuRef.current && !cryptoMenuRef.current.contains(event.target as Node)) {
         setCryptoMenuOpen(false);
       }
     };
 
-    const positionMenu = () => {
-      if (cryptoMenuOpen && cryptoSelectorBtnRef.current && cryptoMenuListRef.current) {
-        const buttonRect = cryptoSelectorBtnRef.current.getBoundingClientRect();
-        const menu = cryptoMenuListRef.current;
-        
-        // For position: fixed, use viewport coordinates (no scrollY/scrollX)
-        const top = buttonRect.bottom + 8;
-        const left = buttonRect.left;
-        const width = buttonRect.width;
-        
-        // Set position
-        menu.style.top = `${top}px`;
-        menu.style.left = `${left}px`;
-        menu.style.width = `${width}px`;
-        
-        // Check if menu would go off screen and adjust
-        // Use actual height or max-height (250px) as fallback
-        const menuHeight = Math.min(menu.scrollHeight, 250);
-        const viewportHeight = window.innerHeight;
-        const spaceBelow = viewportHeight - buttonRect.bottom;
-        
-        // If not enough space below, show above
-        if (spaceBelow < menuHeight && buttonRect.top > menuHeight) {
-          menu.style.top = `${buttonRect.top - menuHeight - 8}px`;
-        }
-      }
-    };
-
-    if (cryptoMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      
-      // Position menu after a small delay to ensure it's rendered
-      // Use requestAnimationFrame for better timing
-      requestAnimationFrame(() => {
-        positionMenu();
-        // Also position again after a short delay to ensure DOM is ready
-        setTimeout(() => {
-          positionMenu();
-        }, 10);
-      });
-      
-      // Reposition on scroll and resize
-      window.addEventListener('scroll', positionMenu, true);
-      window.addEventListener('resize', positionMenu);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      window.removeEventListener('scroll', positionMenu, true);
-      window.removeEventListener('resize', positionMenu);
     };
   }, [cryptoMenuOpen]);
 

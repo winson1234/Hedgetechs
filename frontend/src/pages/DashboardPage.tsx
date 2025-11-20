@@ -215,7 +215,7 @@ const scrollToSection = useCallback((index: number) => {
     
            // Debounce wheel events
           // Debounce wheel events - REDUCE from 50ms to 10ms
-          wheelTimeoutRef.current = setTimeout(() => {
+          wheelTimeoutRef.current = window.setTimeout(() => {
          if (e.deltaY > 0 && currentSection < sections.length - 1) {
              // Scroll down
             scrollToSection(currentSection + 1);

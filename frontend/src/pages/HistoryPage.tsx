@@ -278,7 +278,8 @@ export default function HistoryPage() {
       // Check if order has a product_type field
       // If product_type is 'cfd' or 'futures', filter it out (shown as contracts instead)
       // Keep spot orders and orders without product_type
-      return !(o as any).product_type || (o as any).product_type === 'spot';
+      const orderWithProductType = o as ExecutedOrder & { product_type?: string };
+      return !orderWithProductType.product_type || orderWithProductType.product_type === 'spot';
     });
 
     const items: HistoryItem[] = [

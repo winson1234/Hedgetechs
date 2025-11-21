@@ -411,7 +411,7 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 	fee float64,
 	accountCurrency string,
 ) (*ExecutionResult, error) {
-	// Get instrument type to determine where to find max leverage
+	// Get instrument type and max leverage from appropriate configuration table
 	var instrumentType string
 	err := tx.QueryRow(ctx,
 		`SELECT instrument_type FROM instruments WHERE symbol = $1`,
@@ -424,6 +424,7 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 	// Get max leverage from the appropriate configuration table
 	var maxLeverage int
 	if instrumentType == "forex" {
+		// Forex instruments: read from forex_configurations.max_leverage
 		err = tx.QueryRow(ctx,
 			`SELECT max_leverage FROM forex_configurations WHERE symbol = $1`,
 			order.Symbol,
@@ -432,8 +433,14 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 			return nil, fmt.Errorf("failed to get forex max leverage: %w", err)
 		}
 	} else {
-		// For crypto/spot instruments, default max leverage
-		maxLeverage = 10 // Default max leverage for spot trading
+		// Crypto/Commodity instruments: read from spot_configurations or use high default
+		// TODO: Add max_leverage column to spot_configurations table
+		// For now, use generous limits: 100x for commodities, 50x for crypto
+		if instrumentType == "commodity" {
+			maxLeverage = 100
+		} else {
+			maxLeverage = 50 // Crypto default
+		}
 	}
 
 	// Use user-selected leverage from order (default to 1 if not set)

@@ -161,7 +161,7 @@ func (op *OrderProcessor) processPendingOrdersForSymbol(symbol string, currentPr
 	// Query pending orders for this symbol
 	// CRITICAL INDEX: This query uses idx_pending_orders_symbol_status for O(1) lookup
 	rows, err := op.db.Query(ctx,
-		`SELECT id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price, status, order_number
+		`SELECT id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price, leverage, product_type, status, order_number
 		 FROM pending_orders
 		 WHERE symbol = $1 AND status = 'pending'`,
 		symbol,
@@ -178,7 +178,7 @@ func (op *OrderProcessor) processPendingOrdersForSymbol(symbol string, currentPr
 		var order models.PendingOrder
 		err := rows.Scan(
 			&order.ID, &order.UserID, &order.AccountID, &order.Symbol,
-			&order.Type, &order.Side, &order.Quantity, &order.TriggerPrice, &order.LimitPrice, &order.Status, &order.OrderNumber,
+			&order.Type, &order.Side, &order.Quantity, &order.TriggerPrice, &order.LimitPrice, &order.Leverage, &order.ProductType, &order.Status, &order.OrderNumber,
 		)
 		if err != nil {
 			log.Printf("ERROR: Failed to scan pending order: %v", err)
@@ -214,16 +214,16 @@ func (op *OrderProcessor) executePendingOrder(ctx context.Context, order models.
 	newOrderID := uuid.New()
 	_, err := op.db.Exec(ctx,
 		`INSERT INTO orders (
-			id, user_id, account_id, symbol, order_number, side, type, status,
+			id, user_id, account_id, symbol, order_number, side, type, product_type, status,
 			amount_base, limit_price, stop_price, leverage, filled_amount, average_fill_price,
 			created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, 'pending',
-			$8, NULL, NULL, $9, 0, NULL,
+			$1, $2, $3, $4, $5, $6, $7, $8, 'pending',
+			$9, NULL, NULL, $10, 0, NULL,
 			NOW(), NOW()
 		)`,
 		newOrderID, order.UserID, order.AccountID, order.Symbol,
-		orderNumber, order.Side, "market", // Pending orders execute as market orders
+		orderNumber, order.Side, "market", order.ProductType, // Pending orders execute as market orders
 		order.Quantity, order.Leverage,
 	)
 	if err != nil {

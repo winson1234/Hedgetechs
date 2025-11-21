@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { apiFetch } from '../../utils/api';
 
 // Types
 interface PriceData {
@@ -72,7 +73,7 @@ export const fetchHistoricalPrices = createAsyncThunk(
   'price/fetchHistoricalPrices',
   async ({ symbol, interval = '1h', limit = 100 }: { symbol: string; interval?: string; limit?: number }, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/v1/klines?symbols=${symbol}&interval=${interval}&limit=${limit}`);
+      const response = await apiFetch(`api/v1/klines?symbols=${symbol}&interval=${interval}&limit=${limit}`);
       if (!response.ok) throw new Error('Failed to fetch historical prices');
       const data = await response.json();
       return { symbol, klines: data.klines };

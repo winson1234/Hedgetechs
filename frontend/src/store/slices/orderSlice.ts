@@ -75,7 +75,7 @@ export const fetchOrders = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch(`/api/v1/orders?account_id=${accountId}`, {
+      const response = await apiFetch(`api/v1/orders?account_id=${accountId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -99,7 +99,7 @@ export const fetchPendingOrders = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch(`/api/v1/pending-orders?account_id=${accountId}`, {
+      const response = await apiFetch(`api/v1/pending-orders?account_id=${accountId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -163,7 +163,7 @@ export const cancelPendingOrder = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch(`/api/v1/pending-orders/cancel?id=${orderId}`, {
+      const response = await apiFetch(`api/v1/pending-orders/cancel?id=${orderId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

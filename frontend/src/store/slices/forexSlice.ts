@@ -64,7 +64,7 @@ export const fetchForexKlines = createAsyncThunk(
   'forex/fetchKlines',
   async ({ symbol, interval = '1h', limit = 100 }: { symbol: string; interval?: string; limit?: number }, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/v1/forex/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+      const response = await apiFetch(`api/v1/forex/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
       if (!response.ok) throw new Error('Failed to fetch forex klines');
       const data = await response.json();
       return { symbol, klines: data as ForexKline[] };

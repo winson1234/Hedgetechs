@@ -125,7 +125,7 @@ export const updateAccountMetadata = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch(`/api/v1/accounts/metadata?id=${id}`, {
+      const response = await apiFetch(`api/v1/accounts/metadata?id=${id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,

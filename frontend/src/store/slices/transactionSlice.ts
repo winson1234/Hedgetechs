@@ -77,7 +77,7 @@ export const fetchTransactions = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch(`/api/v1/transactions?account_id=${accountId}`, {
+      const response = await apiFetch(`api/v1/transactions?account_id=${accountId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

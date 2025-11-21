@@ -98,7 +98,7 @@ section:not(#home) {
   min-height: 80vh;
   padding: 1.5rem 0;
   display: flex;
-  transform: scale(0.9);
+  transform: scale(0.8);
   align-items: center;
   margin-top: -160px;
   justify-content: center;

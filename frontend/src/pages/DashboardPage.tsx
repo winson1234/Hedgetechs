@@ -1839,12 +1839,13 @@ const cancelLogout = () => {
             <>
               <div className="news-grid">
                 {displayedNews.map((news, index) => (
-                <div 
-                  key={news.id} 
-                  className="news-item card-3d" 
+                <div
+                  key={news.id}
+                  className="news-item card-3d"
                   data-animate="slide-right"
                   data-delay={9}
                   data-stagger={index * 0.1}
+                  onClick={() => window.open(news.link || '#', '_blank', 'noopener,noreferrer')}
                   style={{
                   background: 'var(--card-bg, #1a1f3a)',
                   borderRadius: '16px',

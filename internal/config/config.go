@@ -82,8 +82,8 @@ const CryptoNewsRSSURL = "https://cryptonews.com/news/feed/"
 const CoinTelegraphRSSURL = "https://cointelegraph.com/rss"
 
 // Forex sources
-const FXStreetRSSURL = "https://www.fxstreet.com/rss/news"
-const InvestingComForexRSSURL = "https://www.investing.com/rss/news_285.rss"
+// const FXStreetRSSURL = "https://www.fxstreet.com/rss/news"
+// const InvestingComForexRSSURL = "https://www.investing.com/rss/news_285.rss"
 const YahooFinanceForexRSSURL = "https://finance.yahoo.com/rss/forex"
 
 // Local server settings

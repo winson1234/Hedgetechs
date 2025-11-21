@@ -542,8 +542,8 @@ func HandleNews(w http.ResponseWriter, r *http.Request) {
 		{config.CoinDeskRSSURL, "CoinDesk"},
 		{config.CryptoNewsRSSURL, "CryptoNews"},
 		{config.CoinTelegraphRSSURL, "CoinTelegraph"},
-		{config.FXStreetRSSURL, "FXStreet"},
-		{config.InvestingComForexRSSURL, "Investing.com"},
+		// {config.FXStreetRSSURL, "FXStreet"},
+		// {config.InvestingComForexRSSURL, "Investing.com"},
 		{config.YahooFinanceForexRSSURL, "Yahoo Finance"},
 	}
 

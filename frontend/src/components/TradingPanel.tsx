@@ -2,9 +2,9 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { setActiveAccount, fetchAccounts, updateAccountBalanceOptimistic } from '../store/slices/accountSlice';
 import { createPendingOrder, executeMarketOrder, fetchOrders, fetchPendingOrders } from '../store/slices/orderSlice';
-import { addToast, setSelectedProductType, triggerPositionsRefresh } from '../store/slices/uiSlice';
+import { addToast, /* setSelectedProductType, */ triggerPositionsRefresh } from '../store/slices/uiSlice';
 import { formatPrice } from '../utils/priceUtils';
-import { ProductType } from '../types';
+// import { ProductType } from '../types'; // Commented out - not used when CFD is disabled
 
 type OrderType = 'limit' | 'market' | 'stop-limit';
 
@@ -545,8 +545,8 @@ export default function TradingPanel() {
         </div>
       </div>
 
-      {/* NEW: Product Type Selector (Universal Accounts) */}
-      <div className="mb-4">
+      {/* NEW: Product Type Selector (Universal Accounts) - DISABLED */}
+      {/* <div className="mb-4">
         <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
           Product Type
         </label>
@@ -574,7 +574,7 @@ export default function TradingPanel() {
             ⚠ Hedged Position: Opens both Long and Short positions simultaneously
           </p>
         )}
-      </div>
+      </div> */}
 
       {/* Order Type Tabs */}
       <div className="flex gap-1.5 mb-4 bg-slate-100 dark:bg-slate-800 rounded-lg p-1.5">

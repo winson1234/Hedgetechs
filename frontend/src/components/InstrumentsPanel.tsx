@@ -316,8 +316,8 @@ function InstrumentsPanel() {
         </button>
       </div>
 
-      {/* Category Filter Tabs - Row 2: CFD */}
-      <div className="flex gap-1 mb-3 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+      {/* Category Filter Tabs - Row 2: CFD - DISABLED */}
+      {/* <div className="flex gap-1 mb-3 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
         <button
           onClick={() => setCategoryFilter('forex')}
           className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition ${
@@ -338,7 +338,7 @@ function InstrumentsPanel() {
         >
           Commodity ({categoryCounts.commodity})
         </button>
-      </div>
+      </div> */}
 
       {/* Search Bar */}
       <div className="relative mb-3">

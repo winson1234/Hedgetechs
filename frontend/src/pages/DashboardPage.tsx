@@ -2118,14 +2118,14 @@ const cancelLogout = () => {
               )}
 
               {/* Show current page info */}
-              <div style={{
+              {/* <div style={{
                 textAlign: 'center',
                 color: 'var(--text-secondary)',
                 fontSize: '0.9rem',
                 marginBottom: '2rem'
               }}>
                 Page {currentPage} of {totalPages} • Showing {displayedNews.length} of {filteredNews.length} articles
-              </div>
+              </div> */}
             </>
           )}
         </div>

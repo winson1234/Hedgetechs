@@ -514,9 +514,10 @@ func ToggleAccountStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Determine new status
 	var newStatus string
-	if currentStatus == "active" {
+	switch currentStatus {
+	case "active":
 		newStatus = "deactivated"
-	} else if currentStatus == "deactivated" {
+	case "deactivated":
 		// Activating this account - deactivate all other accounts first
 		_, err = tx.Exec(ctx,
 			`UPDATE accounts SET status = $1, last_updated = NOW()
@@ -529,7 +530,7 @@ func ToggleAccountStatus(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		newStatus = "active"
-	} else if currentStatus == "suspended" {
+	case "suspended":
 		// Reactivating suspended account - deactivate all other accounts first
 		_, err = tx.Exec(ctx,
 			`UPDATE accounts SET status = $1, last_updated = NOW()
@@ -542,7 +543,7 @@ func ToggleAccountStatus(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		newStatus = "active"
-	} else {
+	default:
 		respondWithJSONError(w, http.StatusBadRequest, "validation_error", "invalid account status")
 		return
 	}

@@ -32,7 +32,7 @@ WORKDIR /root/
 COPY --from=builder /app/cmd/server/server .
 
 # Copy migrations for database setup
-COPY --from=builder /app/internal/database/migrations ./internal/database/migrations
+COPY --from=builder /app/sql-scripts/migrations ./sql-scripts/migrations
 
 # Expose port (Fly.io will use PORT env var)
 EXPOSE 8080

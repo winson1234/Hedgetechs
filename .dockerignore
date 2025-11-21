@@ -62,5 +62,11 @@ mt5-publisher/
 # Frontend (React app, deployed separately to Cloudflare Pages)
 frontend/
 
-# SQL scripts (migrations are in internal/database/migrations)
-sql-scripts/
+# SQL scripts - include migrations folder for database setup
+# Exclude other sql-scripts subfolders that aren't needed at runtime
+sql-scripts/schema/
+sql-scripts/functions/
+sql-scripts/triggers/
+sql-scripts/seed/
+sql-scripts/indexes/
+sql-scripts/views/

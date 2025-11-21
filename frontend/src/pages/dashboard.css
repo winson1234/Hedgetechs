@@ -15,10 +15,18 @@ html {
 
 /* Reduce overall size of sections (except hero) - More zoomed out */
 .market-section,
-.news-section,
 .payout-section,
-.features-section,
-.trust-section,
+.trust-section {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  transform: scale(0.8);
+  transform-origin: center center;
+  width: 100%;
+  box-sizing: border-box;
+
+}
+
+/* FAQ section - with padding to prevent header overlap */
 .faq-section {
   font-size: 0.88rem;
   line-height: 1.5;
@@ -26,7 +34,28 @@ html {
   transform-origin: center center;
   width: 100%;
   box-sizing: border-box;
-  
+  padding-top: 140px;
+  margin-top: 60px;
+}
+
+/* News section - smaller */
+.news-section {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  transform: scale(0.7);
+  transform-origin: center center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Features section - slightly smaller */
+.features-section {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  transform: scale(0.75);
+  transform-origin: center center;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 
@@ -1135,7 +1164,7 @@ body.light-mode .header.scrolled .btn-secondary {
    =========================== */
 .hero {
   margin-top: -150px;
-  padding: 200px 0 40px;
+  padding: 120px 0 30px;
   background: var(--bg-primary);
   position: relative;
   overflow: visible;

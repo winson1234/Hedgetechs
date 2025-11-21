@@ -29,13 +29,14 @@ React-based multi-page application providing comprehensive CFD and forex trading
   - `/` and `/dashboard` - Public landing page with market overview
 
 **State Management (Redux Toolkit slices):**
-- `authSlice` - Supabase authentication state, login/register/logout, user session
+- `authSlice` - Authentication state, login/register/logout, user session
 - `uiSlice` - Theme, navigation, active instrument, timeframe, toast notifications
 - `priceSlice` - Real-time price data hydration from WebSocket (crypto + forex)
 - `accountSlice` - Multi-account management, balances, currency conversion
 - `orderSlice` - Pending orders fetched from database, order history
 - `positionSlice` - Open CFD positions with margin tracking
 - `transactionSlice` - Transaction history from database
+- `forexSlice` - Forex-specific state and market data
 
 **Features:**
 - React Router with protected and public routes

@@ -80,6 +80,7 @@ func (p *Provider) Subscribe(symbols []string, onTick func(string, float64)) err
 		WriteTimeout: 3 * time.Second,
 		PoolSize:     10,
 		MaxRetries:   3,
+		Protocol:     2, // Use RESP2 protocol to avoid maint_notifications warning
 	})
 
 	// Test connection

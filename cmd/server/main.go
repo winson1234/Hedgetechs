@@ -86,17 +86,20 @@ func main() {
 	// Ensure database connection is closed on shutdown
 	defer database.Close()
 
-	// Run database migrations
-	// DISABLED: Migrations require direct connection (port 5432) which doesn't support IPv4
-	// Run migrations manually using: migrate -path internal/database/migrations -database $DATABASE_MIGRATION_URL up
-	// Or use Supabase CLI: supabase db push
-	log.Println("Database migrations skipped (run manually if needed)")
-	// if err := runMigrations(); err != nil {
-	// 	log.Printf("WARNING: Migration error: %v", err)
-	// 	log.Println("Continuing with existing schema...")
-	// } else {
-	// 	log.Println("Database migrations completed successfully")
-	// }
+	// Run database migrations (optional - enable if DATABASE_MIGRATION_URL is set)
+	// Use DATABASE_MIGRATION_URL for session-mode connection (port 5432 on pooler.supabase.com)
+	// This is IPv4 compatible and supports migrations
+	if os.Getenv("DATABASE_MIGRATION_URL") != "" {
+		if err := runMigrations(); err != nil {
+			log.Printf("WARNING: Migration error: %v", err)
+			log.Println("Continuing with existing schema...")
+		} else {
+			log.Println("Database migrations completed successfully")
+		}
+	} else {
+		log.Println("DATABASE_MIGRATION_URL not set - skipping automatic migrations")
+		log.Println("To enable: Set DATABASE_MIGRATION_URL to session pooler (port 5432)")
+	}
 
 	// Initialize audit logger (requires database)
 	dbPool, err := database.GetPool()
@@ -120,6 +123,7 @@ func main() {
 		Addr:     redisAddr,
 		Password: redisPassword,
 		DB:       0,
+		Protocol: 2, // Use RESP2 protocol to avoid maint_notifications warning
 	})
 	// Test Redis connection
 	if err := redisClient.Ping(context.Background()).Err(); err != nil {
@@ -762,27 +766,27 @@ func main() {
 // runMigrations runs database migrations using golang-migrate
 func runMigrations() error {
 	// Get database URL from environment
-	// Use DATABASE_MIGRATION_URL if available (direct connection), otherwise use DATABASE_URL
-	// This is important because PgBouncer (connection pooler) doesn't support migrations
+	// Use DATABASE_MIGRATION_URL if available (session pooler), otherwise use DATABASE_URL
+	// Session pooler (port 5432) is required for migrations (not transaction pooler on port 6543)
 	dbURL := os.Getenv("DATABASE_MIGRATION_URL")
 	if dbURL == "" {
 		dbURL = os.Getenv("DATABASE_URL")
 		if dbURL == "" {
 			return fmt.Errorf("DATABASE_URL environment variable is not set")
 		}
-		// Remove pgbouncer parameter from URL if present (migrations require direct connection)
+		// Remove pgbouncer parameter from URL if present (migrations need session mode)
 		dbURL = strings.Replace(dbURL, "?pgbouncer=true", "", 1)
-		log.Println("Note: Using DATABASE_URL for migrations. For better performance, set DATABASE_MIGRATION_URL to direct connection (port 5432)")
+		log.Println("Note: Using DATABASE_URL for migrations. For best results, set DATABASE_MIGRATION_URL to session pooler (port 5432)")
 	} else {
-		log.Println("Using DATABASE_MIGRATION_URL for migrations (direct connection)")
+		log.Println("Using DATABASE_MIGRATION_URL for migrations (session pooler mode)")
 	}
 
 	// Construct migrations path
-	migrationsPath := "file://internal/database/migrations"
+	migrationsPath := "file://sql-scripts/migrations"
 
 	// Check if running from cmd/server directory
-	if _, err := os.Stat("../../internal/database/migrations"); err == nil {
-		migrationsPath = "file://../../internal/database/migrations"
+	if _, err := os.Stat("../../sql-scripts/migrations"); err == nil {
+		migrationsPath = "file://../../sql-scripts/migrations"
 	}
 
 	// Create migration instance

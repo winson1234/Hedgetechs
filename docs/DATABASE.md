@@ -53,10 +53,23 @@ config.MaxConnIdleTime = 5 * time.Minute  // Idle connection timeout
 - Connection pooling at database level
 - Lower latency for frequent queries
 
-**Connection String Format:**
-```
-postgresql://postgres.project:password@aws-0-region.pooler.supabase.com:5432/postgres
-```
+**Two Modes:**
+
+1. **Transaction Mode (Port 6543)** - For application queries
+   - Used with `?pgbouncer=true` parameter
+   - Optimized for short transactions
+   - Use for: Regular application queries
+   ```
+   DATABASE_URL=postgresql://postgres.project:password@aws-0-region.pooler.supabase.com:6543/postgres?pgbouncer=true
+   ```
+
+2. **Session Mode (Port 5432)** - For migrations and long sessions
+   - Holds connection for entire session
+   - Supports prepared statements, locks, schema changes
+   - Use for: Database migrations
+   ```
+   DATABASE_MIGRATION_URL=postgresql://postgres.project:password@aws-0-region.pooler.supabase.com:5432/postgres
+   ```
 
 **Not:**
 ```
@@ -279,47 +292,49 @@ Queue for reconciling A-Book orders with LP confirmations.
 
 ---
 
-## Migration Workflow
+## SQL Scripts Organization
 
-### golang-migrate
+The database schema is organized into modular SQL files under `sql-scripts/` for better maintainability and development workflow.
 
-**Installation:**
-```bash
-# Windows
-choco install golang-migrate
+### Directory Structure
 
-# Or download from GitHub releases
+```
+sql-scripts/
+├── migrations/          # Version-controlled migrations (golang-migrate)
+├── schema/
+│   ├── extensions/      # PostgreSQL extensions
+│   ├── sequences/       # ID sequence generators
+│   ├── tables/          # Individual table definitions (20+ files)
+│   └── types/           # ENUM type definitions (15+ files)
+├── functions/           # Stored procedures and functions
+├── triggers/            # Database triggers
+├── seed/                # Initial data population
+├── indexes/             # Performance optimization indexes
+└── views/               # Database views
 ```
 
-**Commands:**
+### migrations/
+
+**Purpose:** Version-controlled migrations using golang-migrate
+
+**Contents:** 15 migrations (30 files total: `.up.sql` and `.down.sql` pairs)
+
+**Usage:**
 ```bash
-# Apply all pending migrations
-migrate -path internal/database/migrations -database $DATABASE_URL up
+# Apply all pending migrations (use DATABASE_MIGRATION_URL for session mode)
+migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL up
 
 # Rollback last migration
-migrate -path internal/database/migrations -database $DATABASE_URL down 1
+migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL down 1
 
 # Check current version
-migrate -path internal/database/migrations -database $DATABASE_URL version
+migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL version
 
 # Force version (if dirty state)
-migrate -path internal/database/migrations -database $DATABASE_URL force VERSION
-
-# Create new migration
-migrate create -ext sql -dir internal/database/migrations -seq add_new_table
+migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL force VERSION
 ```
 
-### Migration Files
-
-Located in `internal/database/migrations/`:
-
-```
-0001_create_accounts.up.sql      # Create accounts table
-0001_create_accounts.down.sql    # Drop accounts table
-0002_create_contracts.up.sql     # Create contracts table
-0002_create_contracts.down.sql   # Drop contracts table
-...
-```
+**Important:** Always use `DATABASE_MIGRATION_URL` (session pooler on port 5432) for migrations, not `DATABASE_URL` (transaction pooler with `?pgbouncer=true`).
 
 **Best Practices:**
 - Always provide both `.up.sql` and `.down.sql` files
@@ -327,6 +342,224 @@ Located in `internal/database/migrations/`:
 - Use transactions for complex migrations
 - Never modify existing migration files (create new ones instead)
 - Keep migrations small and focused
+
+### schema/tables/
+
+**Purpose:** Individual table definitions for easy drop/recreate during development
+
+**Contents:** 20 table files (accounts.sql, contracts.sql, orders.sql, etc.)
+
+**Usage:**
+```bash
+# Drop and recreate a single table
+psql $DATABASE_URL -c "DROP TABLE IF EXISTS orders CASCADE;"
+psql $DATABASE_URL -f sql-scripts/schema/tables/orders.sql
+
+# Create all tables (fresh database)
+for file in sql-scripts/schema/tables/*.sql; do
+  psql $DATABASE_URL -f "$file"
+done
+```
+
+**Files:**
+- `accounts.sql` - Trading accounts with balances
+- `contracts.sql` - Open CFD positions
+- `orders.sql` - Executed orders history
+- `pending_orders.sql` - Limit/stop-limit orders waiting execution
+- `transactions.sql` - Deposit/withdrawal/transfer history
+- `audit_logs.sql` - Compliance and security audit trail
+- `lp_routes.sql` - A-Book LP routing configuration
+- `reconciliation_queue.sql` - LP order reconciliation queue
+- `instruments.sql` - Tradeable symbols (crypto, forex, commodities)
+- `kyc_documents.sql` - KYC verification documents
+- `users.sql` - User account information
+- `balances.sql` - Account balance tracking
+- `admins.sql` - Admin users
+- `pending_registrations.sql` - Registration approval queue
+- `forex_configurations.sql` - Forex pair configurations
+- `spot_configurations.sql` - Spot market configurations
+- `lp_routing_config.sql` - LP routing rules
+- `order_history.sql` - Historical order data
+- `forex_klines_1m.sql` - Partitioned forex 1-minute candle data
+- `partition_archive_log.sql` - Partition management log
+
+### schema/types/
+
+**Purpose:** ENUM type definitions for type safety and data validation
+
+**Contents:** 15 ENUM type files
+
+**Usage:**
+```bash
+# Create all types (must be created before tables)
+for file in sql-scripts/schema/types/*.sql; do
+  psql $DATABASE_URL -f "$file"
+done
+```
+
+**Files:**
+- `account_type_enum.sql` - live, demo
+- `account_status_enum.sql` - active, deactivated
+- `admin_role_enum.sql` - superadmin, admin, support, developer
+- `contract_side.sql` - long, short
+- `contract_status.sql` - open, closed, liquidated
+- `execution_strategy.sql` - b_book, a_book
+- `kyc_document_type.sql` - passport, drivers_license, national_id, proof_of_address, selfie
+- `kyc_status_enum.sql` - pending, approved, rejected
+- `order_execution_type.sql` - limit, stop_limit
+- `order_side.sql` - buy, sell
+- `order_status.sql` - pending, filled, partially_filled, cancelled, rejected
+- `order_type.sql` - market, limit, stop, stop_limit
+- `pending_order_status.sql` - pending, executed, cancelled, expired, failed
+- `product_type.sql` - spot, cfd, futures
+- `registration_status_enum.sql` - pending, approved, rejected
+- `transaction_status.sql` - pending, completed, failed
+- `transaction_type.sql` - deposit, withdrawal, transfer, position_close
+
+### schema/sequences/
+
+**Purpose:** ID sequence generators for readable display numbers
+
+**Contents:** 3 sequence group files
+
+**Files:**
+- `account_sequences.sql` - Account number sequences (live: 1000000-4999999, demo: 5000000-9999999)
+- `trading_sequences.sql` - Order, contract, transaction number sequences
+- `system_sequences.sql` - User ID, admin ID, and system sequences
+
+**Usage:**
+```bash
+psql $DATABASE_URL -f sql-scripts/schema/sequences/account_sequences.sql
+psql $DATABASE_URL -f sql-scripts/schema/sequences/trading_sequences.sql
+psql $DATABASE_URL -f sql-scripts/schema/sequences/system_sequences.sql
+```
+
+### schema/extensions/
+
+**Purpose:** PostgreSQL extensions required by the application
+
+**Contents:** `uuid-ossp.sql` - UUID generation functions
+
+**Usage:**
+```bash
+psql $DATABASE_URL -f sql-scripts/schema/extensions/uuid-ossp.sql
+```
+
+### functions/
+
+**Purpose:** Reusable SQL functions for business logic
+
+**Contents:** 6 function files
+
+**Files:**
+- `generate_account_number.sql` - Generates account display numbers (ACC-#######)
+- `generate_order_number.sql` - Generates order numbers (ORD-########)
+- `generate_contract_number.sql` - Generates contract numbers (CNT-#####)
+- `generate_transaction_number.sql` - Generates transaction numbers (TXN-#####)
+- `log_audit_event.sql` - Logs events to audit_logs table
+- `update_updated_at_column.sql` - Trigger function for timestamp updates
+
+**Usage:**
+```bash
+# Create all functions
+for file in sql-scripts/functions/*.sql; do
+  psql $DATABASE_URL -f "$file"
+done
+```
+
+### triggers/
+
+**Purpose:** Database triggers for automatic operations
+
+**Contents:** 4 trigger files
+
+**Files:**
+- `handle_new_user.sql` - Auto-create public.users from auth.users (Supabase Auth)
+- `handle_user_delete.sql` - Auto-delete auth.users when public.users deleted
+- `handle_auth_user_delete.sql` - Auto-delete public.users when auth.users deleted
+- `update_timestamps.sql` - Auto-update updated_at columns on table changes
+
+**Usage:**
+```bash
+for file in sql-scripts/triggers/*.sql; do
+  psql $DATABASE_URL -f "$file"
+done
+```
+
+### seed/
+
+**Purpose:** Initial data population for testing and development
+
+**Contents:** 2 seed data files
+
+**Files:**
+- `crypto_instruments.sql` - 23 cryptocurrency pairs (BTCUSDT, ETHUSDT, etc.)
+- `forex_instruments.sql` - 12 major forex pairs (EURUSD, GBPUSD, etc.)
+
+**Usage:**
+```bash
+psql $DATABASE_URL -f sql-scripts/seed/crypto_instruments.sql
+psql $DATABASE_URL -f sql-scripts/seed/forex_instruments.sql
+```
+
+### indexes/
+
+**Purpose:** Performance optimization indexes for frequently queried tables
+
+**Contents:** `performance_indexes.sql` - Indexes for contracts, pending_orders, orders, transactions
+
+**Usage:**
+```bash
+psql $DATABASE_URL -f sql-scripts/indexes/performance_indexes.sql
+```
+
+### views/
+
+**Purpose:** Database views for aggregated data and reporting
+
+**Contents:** `account_stats.sql` - Aggregated account statistics view
+
+**Usage:**
+```bash
+psql $DATABASE_URL -f sql-scripts/views/account_stats.sql
+```
+
+### Complete Setup Example
+
+**For a fresh database:**
+```bash
+# 1. Create extensions
+psql $DATABASE_URL -f sql-scripts/schema/extensions/uuid-ossp.sql
+
+# 2. Create types (must be before tables)
+for file in sql-scripts/schema/types/*.sql; do psql $DATABASE_URL -f "$file"; done
+
+# 3. Create sequences
+for file in sql-scripts/schema/sequences/*.sql; do psql $DATABASE_URL -f "$file"; done
+
+# 4. Create tables
+for file in sql-scripts/schema/tables/*.sql; do psql $DATABASE_URL -f "$file"; done
+
+# 5. Create functions
+for file in sql-scripts/functions/*.sql; do psql $DATABASE_URL -f "$file"; done
+
+# 6. Create triggers
+for file in sql-scripts/triggers/*.sql; do psql $DATABASE_URL -f "$file"; done
+
+# 7. Create indexes
+psql $DATABASE_URL -f sql-scripts/indexes/performance_indexes.sql
+
+# 8. Create views
+psql $DATABASE_URL -f sql-scripts/views/account_stats.sql
+
+# 9. Seed initial data
+for file in sql-scripts/seed/*.sql; do psql $DATABASE_URL -f "$file"; done
+```
+
+**For production (use migrations):**
+```bash
+migrate -path sql-scripts/migrations -database $DATABASE_URL up
+```
 
 ---
 
@@ -485,15 +718,15 @@ Supabase provides automatic backups:
 **Solutions:**
 ```bash
 # Check what migration failed
-migrate -path internal/database/migrations -database $DATABASE_URL version
+migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL version
 
 # Manually fix the database issue (rollback partial changes)
 
 # Force to previous version
-migrate -path internal/database/migrations -database $DATABASE_URL force X-1
+migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL force X-1
 
 # Re-run migrations
-migrate -path internal/database/migrations -database $DATABASE_URL up
+migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL up
 ```
 
 ### Slow Queries

@@ -89,17 +89,38 @@ Frontend environment variables are set in Cloudflare Pages dashboard:
    - Go to Project Settings → JWT Settings
    - Copy `JWT Secret` → `SUPABASE_JWT_SECRET`
 
-3. **Get Database URL:**
+3. **Get Database Connection Strings:**
+
+   You need **TWO connection strings** from Supabase:
+
+   **a) For Application Queries (Transaction Mode):**
    - Go to Project Settings → Database
-   - Scroll to "Connection pooling" (Session mode)
-   - Copy connection string → `DATABASE_URL`
-   - **Important:** Use Session Pooler (port 5432) for IPv4 compatibility
-   - Format: `postgresql://postgres.project:password@host.pooler.supabase.com:5432/postgres`
+   - Scroll to "Connection pooling" (Transaction mode)
+   - Use port **6543** and add `?pgbouncer=true`
+   ```bash
+   DATABASE_URL=postgresql://postgres.project:password@host.pooler.supabase.com:6543/postgres?pgbouncer=true
+   ```
+
+   **b) For Database Migrations (Session Mode):**
+   - Same connection string but use port **5432** (no pgbouncer parameter)
+   ```bash
+   DATABASE_MIGRATION_URL=postgresql://postgres.project:password@host.pooler.supabase.com:5432/postgres
+   ```
+
+   **Why two URLs?**
+   - Port 6543 with `?pgbouncer=true` = Transaction pooling (fast for queries, but can't run migrations)
+   - Port 5432 without parameter = Session pooling (supports migrations, locks, prepared statements)
+   - Both are IPv4 compatible ✅
 
 4. **Run Migrations:**
    ```bash
-   migrate -path internal/database/migrations -database $DATABASE_URL up
+   # Use DATABASE_MIGRATION_URL (session mode on port 5432)
+   migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL up
    ```
+
+   **Note:** Migrations will run automatically on server startup if `DATABASE_MIGRATION_URL` is set in .env
+
+   See `docs/DATABASE.md` for detailed database schema documentation and sql-scripts/ organization.
 
 ---
 
@@ -158,21 +179,31 @@ choco install golang-migrate
 **Run Migrations:**
 ```bash
 # Apply all migrations
-migrate -path internal/database/migrations -database $DATABASE_URL up
+migrate -path sql-scripts/migrations -database $DATABASE_URL up
 
 # Rollback last migration
-migrate -path internal/database/migrations -database $DATABASE_URL down 1
+migrate -path sql-scripts/migrations -database $DATABASE_URL down 1
 
 # Check current version
-migrate -path internal/database/migrations -database $DATABASE_URL version
+migrate -path sql-scripts/migrations -database $DATABASE_URL version
 
 # Force version (if dirty state)
-migrate -path internal/database/migrations -database $DATABASE_URL force VERSION
+migrate -path sql-scripts/migrations -database $DATABASE_URL force VERSION
 ```
+
+**Database Structure:**
+
+The project uses a modular sql-scripts/ organization:
+- `sql-scripts/migrations/` - Version-controlled migrations (golang-migrate)
+- `sql-scripts/schema/tables/` - Individual table definitions for development
+- `sql-scripts/schema/types/` - ENUM type definitions
+- `sql-scripts/functions/`, `triggers/`, `seed/`, etc. - Modular SQL components
+
+See `docs/DATABASE.md` for complete documentation.
 
 **Create New Migration:**
 ```bash
-migrate create -ext sql -dir internal/database/migrations -seq description_here
+migrate create -ext sql -dir sql-scripts/migrations -seq description_here
 ```
 
 This creates two files:

@@ -17,14 +17,6 @@ Comprehensive CFD and forex trading platform with cryptocurrency support, featur
 go mod tidy                     # Install dependencies
 go build                        # Build binary
 cd cmd/server; go run main.go   # Run server (stops when terminal closes)
-
-# Auto-start on Windows (BEST - starts automatically when Windows boots):
-.\scripts\install-auto-start.bat        # Install auto-start (run once)
-
-# Run in background (manual):
-.\scripts\start-server-background.bat   # Windows: Runs hidden (no window)
-.\scripts\start-server.bat              # Windows: Runs in minimized window
-.\scripts\stop-server.bat               # Stop the background server
 go test ./...                   # Run tests
 ```
 
@@ -84,8 +76,7 @@ internal/
   │   ├── payment_handler.go              # Stripe payment processing
   │   └── middleware.go                   # CORS middleware
   ├── database/
-  │   ├── database.go                     # PostgreSQL connection (pgx pool)
-  │   └── migrations/                     # SQL schema migrations
+  │   └── database.go                     # PostgreSQL connection (pgx pool)
   ├── market_data/
   │   ├── provider.go                     # Provider interface
   │   ├── binance/provider.go             # Binance WebSocket provider
@@ -106,6 +97,14 @@ mt5-publisher/
   ├── linux-bridge-service.py             # Redis publisher (Docker)
   ├── Dockerfile.bridge                   # Docker image
   └── requirements-*.txt                  # Python dependencies
+sql-scripts/                              # Database schema organization
+  ├── migrations/                         # Version-controlled migrations (golang-migrate)
+  ├── schema/                             # Modular schema (tables, types, sequences, extensions)
+  ├── functions/                          # SQL functions
+  ├── triggers/                           # Database triggers
+  ├── seed/                               # Initial data (crypto/forex instruments)
+  ├── indexes/                            # Performance indexes
+  └── views/                              # Database views
 frontend/src/
   ├── components/
   │   ├── ChartComponent.tsx              # Advanced chart with drawings
@@ -250,7 +249,7 @@ frontend/src/
 
 ### Backend
 - PostgreSQL database with pgx connection pool (25 max connections)
-- Database migrations with golang-migrate
+- Modular database organization (sql-scripts/) with golang-migrate
 - Redis Pub/Sub for real-time forex data distribution
 - Hybrid market data service with provider interface pattern
 - Margin service for leverage and margin calculations

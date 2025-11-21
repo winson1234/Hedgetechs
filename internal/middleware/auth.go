@@ -68,7 +68,7 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Look up bigint user_id from users table (for backward compatibility with admin panel)
+		// Look up bigint user_id from users table
 		pool, err := database.GetPool()
 		if err != nil {
 			log.Printf("Database pool error: %v", err)
@@ -88,8 +88,7 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		ipAddress := utils.GetClientIP(r)
 		userAgent := r.UserAgent()
 
-		// Inject user information and request metadata into the request context
-		// Store bigint user_id for database queries (backward compatibility)
+		// Inject bigint user_id into the request context
 		ctx := context.WithValue(r.Context(), UserIDKey, userBigIntID)
 		ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
 		ctx = context.WithValue(ctx, IPAddressKey, ipAddress)

@@ -72,11 +72,12 @@ HTTP Handlers → CORS Middleware → Database/Cache → External APIs
 - Health check ping
 - Graceful shutdown with context cancellation
 
-**Migrations:**
-- Located in `internal/database/migrations/`
-- Uses golang-migrate for schema management
-- Run migrations: `migrate -path internal/database/migrations -database $DATABASE_URL up`
-- Migration files follow `NNNN_description.up.sql` naming convention
+**Database Organization:**
+- Connection pool: `internal/database/` (pgx)
+- Migrations: `sql-scripts/migrations/` (golang-migrate)
+- Schema: `sql-scripts/schema/` (modular table/type definitions)
+- Run migrations: `migrate -path sql-scripts/migrations -database $DATABASE_URL up`
+- See `docs/DATABASE.md` for complete schema documentation
 
 ### market_data/provider.go
 **Purpose:** Provider interface for extensible market data sources
@@ -295,11 +296,11 @@ type Provider interface {
 # Start Docker services (Redis + MT5 bridge)
 docker-compose up -d
 
-# Run database migrations
-migrate -path internal/database/migrations -database $DATABASE_URL up
+# Run database migrations (use DATABASE_MIGRATION_URL for session mode)
+migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL up
 
 # Check migration version
-migrate -path internal/database/migrations -database $DATABASE_URL version
+migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL version
 ```
 
 ### Backend Commands
@@ -315,17 +316,23 @@ go test -cover ./...            # Run with coverage report
 ### Database Migrations
 ```bash
 # Create new migration
-migrate create -ext sql -dir internal/database/migrations -seq description_here
+migrate create -ext sql -dir sql-scripts/migrations -seq description_here
 
-# Run migrations up
-migrate -path internal/database/migrations -database $DATABASE_URL up
+# Run migrations up (use DATABASE_MIGRATION_URL for session pooler on port 5432)
+migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL up
 
 # Rollback last migration
-migrate -path internal/database/migrations -database $DATABASE_URL down 1
+migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL down 1
 
 # Force version (if dirty)
-migrate -path internal/database/migrations -database $DATABASE_URL force VERSION
+migrate -path sql-scripts/migrations -database $DATABASE_MIGRATION_URL force VERSION
 ```
+
+**Connection Modes:**
+- `DATABASE_URL` (port 6543 + `?pgbouncer=true`) = Transaction pooling for application queries
+- `DATABASE_MIGRATION_URL` (port 5432, no parameters) = Session pooling for migrations
+
+**Database Organization:** See `docs/DATABASE.md` for complete schema documentation and modular sql-scripts/ structure.
 
 **HTTPS Setup:** Server automatically detects `localhost+2.pem` and `localhost+2-key.pem` in project root and starts HTTPS server. See [SETUP.md](../SETUP.md) for certificate generation.
 

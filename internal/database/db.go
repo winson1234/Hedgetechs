@@ -42,6 +42,13 @@ func InitDB() error {
 	// Supabase uses PgBouncer in session mode which doesn't support prepared statements
 	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
+	// Set search_path to public schema for all connections
+	// This ensures tables are found even when using transaction pooler
+	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, "SET search_path TO public")
+		return err
+	}
+
 	// Create the connection pool
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

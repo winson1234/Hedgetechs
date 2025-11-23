@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -11,7 +12,9 @@ import (
 	"time"
 
 	"brokerageProject/internal/database"
+	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/models"
+	"brokerageProject/internal/services"
 	"brokerageProject/internal/utils"
 
 	"github.com/google/uuid"
@@ -314,18 +317,6 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// OTP storage (in production, use Redis with expiry)
-var otpStore = make(map[string]struct {
-	OTP       string
-	ExpiresAt time.Time
-})
-
-// Reset token storage (in production, use Redis with expiry)
-var resetTokenStore = make(map[string]struct {
-	Email     string
-	ExpiresAt time.Time
-})
-
 // generateOTP generates a random 6-digit OTP
 func generateOTP() (string, error) {
 	max := big.NewInt(1000000)
@@ -346,290 +337,356 @@ func generateResetToken() (string, error) {
 	return fmt.Sprintf("%x", b), nil
 }
 
-// HandleForgotPassword handles forgot password requests
-func HandleForgotPassword(w http.ResponseWriter, r *http.Request) {
-	var req models.ForgotPasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.RespondWithJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid request body")
-		return
-	}
-
-	if req.Email == "" {
-		utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Email is required")
-		return
-	}
-
-	pool, err := database.GetPool()
-	if err != nil {
-		utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to connect to database")
-		return
-	}
-	ctx := context.Background()
-
-	// Check if user exists in pending_registrations table
-	var status string
-	query := `SELECT status FROM pending_registrations WHERE email = $1`
-	err = pool.QueryRow(ctx, query, req.Email).Scan(&status)
-
-	if err != nil {
-		response := models.ForgotPasswordResponse{
-			Message: "No account found with this email address",
-			Status:  "not_found",
-			Success: false,
+// HandleForgotPassword returns a handler that processes forgot password requests with rate limiting
+func HandleForgotPassword(authStorage *services.AuthStorageService, emailSender services.EmailSender) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req models.ForgotPasswordRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid request body")
+			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
 
-	// Check registration status
-	if status == "pending" {
-		response := models.ForgotPasswordResponse{
-			Message: "Your registration is still pending admin approval. Password reset is not available.",
-			Status:  "pending",
-			Success: false,
+		if req.Email == "" {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Email is required")
+			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
 
-	if status == "rejected" {
-		response := models.ForgotPasswordResponse{
-			Message: "Your registration has been rejected. Password reset is not available. Please contact support.",
-			Status:  "rejected",
-			Success: false,
+		ctx := r.Context()
+
+		// CRITICAL: Check rate limit FIRST (3 attempts per hour per email)
+		allowed, remaining, err := authStorage.CheckRateLimit(ctx, "forgot_password", req.Email, 3, 1*time.Hour)
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to check rate limit")
+			return
 		}
+
+		if !allowed {
+			response := map[string]interface{}{
+				"error":               "rate_limit_exceeded",
+				"message":             "Too many password reset attempts. Please try again later.",
+				"retry_after_seconds": 3600,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		pool, err := database.GetPool()
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to connect to database")
+			return
+		}
+
+		// Constant-time user lookup (prevent timing attacks)
+		// CRITICAL: Check users table, not pending_registrations
+		// Only allow password reset for registered, active users
+		var isActive bool
+		var userFound bool
+		query := `SELECT is_active FROM users WHERE email = $1`
+		err = pool.QueryRow(ctx, query, req.Email).Scan(&isActive)
+
+		if err == nil && isActive {
+			userFound = true
+		}
+
+		// Always sleep to prevent timing attacks (even if user not found)
+		time.Sleep(200 * time.Millisecond)
+
+		// Generic response regardless of user existence (prevent email enumeration)
+		response := models.ForgotPasswordResponse{
+			Message: "If your email is registered and approved, you will receive a verification code shortly.",
+			Status:  "success",
+			Success: true,
+		}
+
+		// Only actually send OTP if user was found and approved
+		if userFound {
+			// Generate OTP
+			otp, err := generateOTP()
+			if err != nil {
+				utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to generate OTP")
+				return
+			}
+
+			// Store OTP in Redis with 10-minute TTL
+			if err := authStorage.StoreOTP(ctx, req.Email, otp); err != nil {
+				utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to store OTP")
+				return
+			}
+
+			// Send OTP via email service (Console in dev, Resend in prod)
+			if err := emailSender.SendOTP(ctx, req.Email, otp); err != nil {
+				utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to send OTP email")
+				return
+			}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
+		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining-1))
 		json.NewEncoder(w).Encode(response)
-		return
 	}
-
-	// Status is approved - generate OTP
-	otp, err := generateOTP()
-	if err != nil {
-		utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to generate OTP")
-		return
-	}
-
-	// Store OTP with 10-minute expiry (in production, use Redis)
-	otpStore[req.Email] = struct {
-		OTP       string
-		ExpiresAt time.Time
-	}{
-		OTP:       otp,
-		ExpiresAt: time.Now().Add(10 * time.Minute),
-	}
-
-	// In production, send OTP via email
-	// For development, log OTP to console AND include in response
-	fmt.Printf("\n=================================\n")
-	fmt.Printf("🔐 PASSWORD RESET OTP\n")
-	fmt.Printf("=================================\n")
-	fmt.Printf("Email: %s\n", req.Email)
-	fmt.Printf("OTP: %s\n", otp)
-	fmt.Printf("Expires: %s\n", time.Now().Add(10*time.Minute).Format(time.RFC3339))
-	fmt.Printf("=================================\n\n")
-
-	response := models.ForgotPasswordResponse{
-		Message: "OTP has been sent! For development, check the response or backend console.",
-		Status:  "success",
-		Success: true,
-		OTP:     otp, // Include OTP in response for development (remove in production)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
 }
 
-// HandleVerifyOTP handles OTP verification requests
-func HandleVerifyOTP(w http.ResponseWriter, r *http.Request) {
-	var req models.VerifyOTPRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.RespondWithJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid request body")
-		return
-	}
-
-	if req.Email == "" || req.OTP == "" {
-		utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Email and OTP are required")
-		return
-	}
-
-	// Check if OTP exists and is valid
-	stored, exists := otpStore[req.Email]
-	if !exists {
-		response := models.VerifyOTPResponse{
-			Message: "No OTP found for this email. Please request a new OTP.",
-			Success: false,
+// HandleVerifyOTP returns a handler that processes OTP verification requests
+func HandleVerifyOTP(authStorage *services.AuthStorageService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req models.VerifyOTPRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid request body")
+			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
 
-	// Check if OTP is expired
-	if time.Now().After(stored.ExpiresAt) {
-		delete(otpStore, req.Email)
-		response := models.VerifyOTPResponse{
-			Message: "OTP has expired. Please request a new OTP.",
-			Success: false,
+		if req.Email == "" || req.OTP == "" {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Email and OTP are required")
+			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusGone)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
 
-	// Verify OTP
-	if stored.OTP != req.OTP {
-		response := models.VerifyOTPResponse{
-			Message: "Invalid OTP. Please check and try again.",
-			Success: false,
+		ctx := r.Context()
+
+		// Validate OTP from Redis (auto-deletes on success - one-time use)
+		valid := authStorage.ValidateOTP(ctx, req.Email, req.OTP)
+		if !valid {
+			response := models.VerifyOTPResponse{
+				Message: "Invalid or expired OTP. Please request a new one.",
+				Success: false,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(response)
+			return
 		}
+
+		// OTP is valid - generate reset token
+		resetToken, err := generateResetToken()
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to generate reset token")
+			return
+		}
+
+		// Store reset token in Redis with 15-minute TTL
+		if err := authStorage.StoreResetToken(ctx, resetToken, req.Email); err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to store reset token")
+			return
+		}
+
+		response := models.VerifyOTPResponse{
+			Message:    "OTP verified successfully. You can now reset your password.",
+			Success:    true,
+			ResetToken: resetToken,
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
-		return
 	}
-
-	// OTP is valid - generate reset token
-	resetToken, err := generateResetToken()
-	if err != nil {
-		utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to generate reset token")
-		return
-	}
-
-	// Store reset token with 15-minute expiry
-	resetTokenStore[resetToken] = struct {
-		Email     string
-		ExpiresAt time.Time
-	}{
-		Email:     req.Email,
-		ExpiresAt: time.Now().Add(15 * time.Minute),
-	}
-
-	// Remove OTP from store (one-time use)
-	delete(otpStore, req.Email)
-
-	response := models.VerifyOTPResponse{
-		Message:    "OTP verified successfully. You can now reset your password.",
-		Success:    true,
-		ResetToken: resetToken,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
 }
 
-// HandleResetPassword handles password reset requests
-func HandleResetPassword(w http.ResponseWriter, r *http.Request) {
-	var req models.ResetPasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.RespondWithJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid request body")
-		return
-	}
-
-	if req.Email == "" || req.ResetToken == "" || req.NewPassword == "" {
-		utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Email, reset token, and new password are required")
-		return
-	}
-
-	// Validate password strength
-	if len(req.NewPassword) < 8 {
-		utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Password must be at least 8 characters")
-		return
-	}
-
-	// Check if reset token exists and is valid
-	stored, exists := resetTokenStore[req.ResetToken]
-	if !exists {
-		response := models.ResetPasswordResponse{
-			Message: "Invalid or expired reset token. Please request a new OTP.",
-			Success: false,
+// HandleResetPassword returns a handler that processes password reset requests with session revocation
+func HandleResetPassword(authStorage *services.AuthStorageService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req models.ResetPasswordRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid request body")
+			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
 
-	// Check if token is expired
-	if time.Now().After(stored.ExpiresAt) {
-		delete(resetTokenStore, req.ResetToken)
-		response := models.ResetPasswordResponse{
-			Message: "Reset token has expired. Please request a new OTP.",
-			Success: false,
+		if req.ResetToken == "" || req.NewPassword == "" {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Reset token and new password are required")
+			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusGone)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
 
-	// Verify email matches
-	if stored.Email != req.Email {
-		response := models.ResetPasswordResponse{
-			Message: "Email does not match reset token.",
-			Success: false,
+		// Validate password strength
+		if len(req.NewPassword) < 8 {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Password must be at least 8 characters")
+			return
 		}
+
+		ctx := r.Context()
+
+		// Validate reset token from Redis (auto-deletes on success - one-time use)
+		email, err := authStorage.ValidateResetToken(ctx, req.ResetToken)
+		if err != nil {
+			response := models.ResetPasswordResponse{
+				Message: "Invalid or expired reset token. Please request a new OTP.",
+				Success: false,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Hash new password
+		hashedPassword, err := utils.HashPassword(req.NewPassword)
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to process password")
+			return
+		}
+
+		pool, err := database.GetPool()
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to connect to database")
+			return
+		}
+
+		// CRITICAL: Update password in BOTH tables to keep them in sync
+		// (Login checks pending_registrations, so both tables must match)
+
+		// First, update users table and get UUID
+		var userUUID string
+		updateUsersQuery := `
+			UPDATE users
+			SET hash_password = $1, last_updated_at = NOW()
+			WHERE email = $2 AND is_active = true
+			RETURNING id
+		`
+		err = pool.QueryRow(ctx, updateUsersQuery, hashedPassword, email).Scan(&userUUID)
+
+		if err == sql.ErrNoRows {
+			// User not found or not active
+			utils.RespondWithJSONError(w, http.StatusNotFound, "not_found", "User not found or account inactive")
+			return
+		}
+
+		if err != nil {
+			// Database error
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to update password in users table")
+			return
+		}
+
+		// Second, update pending_registrations table (where login authenticates)
+		updatePendingQuery := `
+			UPDATE pending_registrations
+			SET hash_password = $1, updated_at = NOW()
+			WHERE email = $2 AND status = 'approved'
+		`
+		_, err = pool.Exec(ctx, updatePendingQuery, hashedPassword, email)
+		if err != nil {
+			// Log warning but don't fail (users table was already updated)
+			fmt.Printf("[AUTH WARNING] Failed to update password in pending_registrations for %s: %v\n", email, err)
+		}
+
+		// CRITICAL: Revoke all sessions for this user (invalidate existing JWTs)
+		if err := authStorage.RevokeSessions(ctx, userUUID); err != nil {
+			// Log error but don't fail the request (password was already reset)
+			fmt.Printf("[AUTH WARNING] Failed to revoke sessions for user %s: %v\n", userUUID, err)
+		}
+
+		response := models.ResetPasswordResponse{
+			Message: "Password reset successfully. You can now log in with your new password.",
+			Success: true,
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
-		return
 	}
+}
 
-	// Hash new password
-	hashedPassword, err := utils.HashPassword(req.NewPassword)
-	if err != nil {
-		utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to process password")
-		return
+// HandleChangePassword returns a handler that processes authenticated password change requests with session revocation
+func HandleChangePassword(authStorage *services.AuthStorageService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req models.ChangePasswordRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid request body")
+			return
+		}
+
+		if req.CurrentPassword == "" || req.NewPassword == "" {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Current password and new password are required")
+			return
+		}
+
+		// Validate new password strength
+		if len(req.NewPassword) < 8 {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "New password must be at least 8 characters")
+			return
+		}
+
+		// Check that new password is different from current
+		if req.CurrentPassword == req.NewPassword {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "New password must be different from current password")
+			return
+		}
+
+		ctx := r.Context()
+
+		// Extract user email from JWT context (injected by AuthMiddleware)
+		email, err := middleware.GetUserEmailFromContext(ctx)
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusUnauthorized, "authentication_error", "User email not found in context")
+			return
+		}
+
+		pool, err := database.GetPool()
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to connect to database")
+			return
+		}
+
+		// Get current password hash and UUID from database
+		var currentHashedPassword string
+		var userUUID string
+		// Check pending_registrations first (where login authenticates)
+		pendingQuery := `SELECT hash_password FROM pending_registrations WHERE email = $1 AND status = 'approved'`
+		err = pool.QueryRow(ctx, pendingQuery, email).Scan(&currentHashedPassword)
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to retrieve user information from pending_registrations")
+			return
+		}
+
+		// Get user UUID from users table for session revocation
+		userQuery := `SELECT id FROM users WHERE email = $1`
+		err = pool.QueryRow(ctx, userQuery, email).Scan(&userUUID)
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to retrieve user information")
+			return
+		}
+
+		// Verify current password
+		if err := utils.VerifyPassword(currentHashedPassword, req.CurrentPassword); err != nil {
+			utils.RespondWithJSONError(w, http.StatusUnauthorized, "authentication_error", "Current password is incorrect")
+			return
+		}
+
+		// Hash new password
+		newHashedPassword, err := utils.HashPassword(req.NewPassword)
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to process new password")
+			return
+		}
+
+		// CRITICAL: Update password in BOTH tables to keep them in sync
+		// Update users table
+		updateUsersQuery := `UPDATE users SET hash_password = $1, last_updated_at = NOW() WHERE email = $2`
+		_, err = pool.Exec(ctx, updateUsersQuery, newHashedPassword, email)
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to update password in users table")
+			return
+		}
+
+		// Update pending_registrations table
+		updatePendingQuery := `UPDATE pending_registrations SET hash_password = $1, updated_at = NOW() WHERE email = $2 AND status = 'approved'`
+		_, err = pool.Exec(ctx, updatePendingQuery, newHashedPassword, email)
+		if err != nil {
+			// Log warning but don't fail (users table was already updated)
+			fmt.Printf("[AUTH WARNING] Failed to update password in pending_registrations for %s: %v\n", email, err)
+		}
+
+		// Use userUUID for session revocation
+		confirmedUserUUID := userUUID
+
+		// CRITICAL: Revoke all sessions for this user (invalidate all existing JWTs including current one)
+		if err := authStorage.RevokeSessions(ctx, confirmedUserUUID); err != nil {
+			// Log error but don't fail the request (password was already changed)
+			fmt.Printf("[AUTH WARNING] Failed to revoke sessions for user %s: %v\n", confirmedUserUUID, err)
+		}
+
+		response := map[string]interface{}{
+			"message": "Password changed successfully. Please log in again with your new password.",
+			"success": true,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
 	}
-
-	pool, err := database.GetPool()
-	if err != nil {
-		utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to connect to database")
-		return
-	}
-	ctx := context.Background()
-
-	// Update password in pending_registrations table
-	updateQuery := `
-		UPDATE pending_registrations
-		SET hash_password = $1
-		WHERE email = $2 AND status = 'approved'
-	`
-	result, err := pool.Exec(ctx, updateQuery, hashedPassword, req.Email)
-	if err != nil {
-		utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", fmt.Sprintf("Failed to update password: %v", err))
-		return
-	}
-
-	rowsAffected := result.RowsAffected()
-	if rowsAffected == 0 {
-		utils.RespondWithJSONError(w, http.StatusNotFound, "not_found", "User not found or not approved")
-		return
-	}
-
-	// Also update password in users table if user exists
-	updateUserQuery := `
-		UPDATE users
-		SET hash_password = $1, last_updated_at = NOW()
-		WHERE email = $2
-	`
-	pool.Exec(ctx, updateUserQuery, hashedPassword, req.Email)
-
-	// Remove reset token from store (one-time use)
-	delete(resetTokenStore, req.ResetToken)
-
-	response := models.ResetPasswordResponse{
-		Message: "Password reset successfully. You can now log in with your new password.",
-		Success: true,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
 }

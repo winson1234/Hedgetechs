@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -26,7 +27,9 @@ func GenerateJWT(userID uuid.UUID, email string) (string, error) {
 	// Get expiry hours from env or default to 24 hours
 	expiryHours := 24
 	if envExpiry := os.Getenv("JWT_EXPIRY_HOURS"); envExpiry != "" {
-		// You can parse the env value if needed, for now use default
+		if parsed, err := strconv.Atoi(envExpiry); err == nil && parsed > 0 {
+			expiryHours = parsed
+		}
 	}
 
 	// Create claims

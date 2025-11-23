@@ -13,13 +13,15 @@ func CORSMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		// List of allowed origins (exact match)
 		allowedOrigins := map[string]bool{
-			"http://localhost:5173": true, // Vite dev server
-			"http://localhost:4173": true, // Vite preview
-			"http://127.0.0.1:5173": true,
-			"http://127.0.0.1:4173": true,
-		}
-
-		// Check exact match first
+			"http://localhost:5173":  true, // Vite dev server (HTTP)
+			"https://localhost:5173": true, // Vite dev server (HTTPS)
+			"http://localhost:4173":  true, // Vite preview (HTTP)
+			"https://localhost:4173": true, // Vite preview (HTTPS)
+			"http://127.0.0.1:5173":  true,
+			"https://127.0.0.1:5173": true,
+			"http://127.0.0.1:4173":  true,
+			"https://127.0.0.1:4173": true,
+		} // Check exact match first
 		if allowedOrigins[origin] {
 			allowed = true
 		} else if strings.HasSuffix(origin, ".pages.dev") {

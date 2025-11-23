@@ -3,15 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store';
 import { signOut } from '../store/slices/authSlice';
 
-// Password hashing utility using Web Crypto API
-const hashPassword = async (password: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-};
-
 type ProfileDropdownProps = {
   isOpen: boolean;
   closeDropdown: () => void;
@@ -98,37 +89,21 @@ const confirmLogout = async () => {
       return;
     }
 
-    // Verify current password against stored hash
-    const storedHash = localStorage.getItem(`userPasswordHash_${user?.email}`);
-    if (!storedHash) {
-      setPasswordMessage({
-        text: 'Password validation unavailable. Please logout and login again to enable password changes.',
-        type: 'error'
-      });
-      return;
-    }
-
-    try {
-      const currentHash = await hashPassword(currentPassword);
-      if (currentHash !== storedHash) {
-        setPasswordMessage({ text: 'Current password is incorrect.', type: 'error' });
-        return;
-      }
-    } catch (error) {
-      console.error('Password hashing error:', error);
-      setPasswordMessage({ text: 'An error occurred while validating password.', type: 'error' });
-      return;
-    }
-
     // Match validation
     if (newPassword !== confirmPassword) {
       setPasswordMessage({ text: 'New passwords do not match.', type: 'error' });
       return;
     }
 
-    // Length validation
-    if (newPassword.length < 6) {
-      setPasswordMessage({ text: 'Password must be at least 6 characters long.', type: 'error' });
+    // Length validation (backend requires 8+ chars)
+    if (newPassword.length < 8) {
+      setPasswordMessage({ text: 'Password must be at least 8 characters long.', type: 'error' });
+      return;
+    }
+
+    // Same password check
+    if (currentPassword === newPassword) {
+      setPasswordMessage({ text: 'New password must be different from current password.', type: 'error' });
       return;
     }
 
@@ -138,29 +113,58 @@ const confirmLogout = async () => {
       return;
     }
 
-    // Hash and save new password
+    // Call backend API to change password
     try {
-      const newHash = await hashPassword(newPassword);
-      localStorage.setItem(`userPasswordHash_${user?.email}`, newHash);
-
-      // Update registered users database
-      const registeredUsersData = localStorage.getItem('registeredUsers');
-      if (registeredUsersData && user?.email) {
-        const registeredUsers = JSON.parse(registeredUsersData);
-        if (registeredUsers[user.email]) {
-          registeredUsers[user.email].passwordHash = newHash;
-          localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
-        }
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        setPasswordMessage({ text: 'Please log in again to change your password.', type: 'error' });
+        return;
       }
 
-      // Show success and close
-      setPasswordMessage({ text: 'Password changed successfully!', type: 'success' });
-      setTimeout(() => {
-        handleCancelChangePassword();
-      }, 1500);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://localhost:8080'}/api/v1/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle specific error cases
+        if (data.error === 'session_revoked') {
+          setPasswordMessage({ text: 'Your session expired. Please log in again.', type: 'error' });
+          // Optionally trigger logout
+        } else if (data.error === 'authentication_error') {
+          setPasswordMessage({ text: 'Current password is incorrect.', type: 'error' });
+        } else {
+          setPasswordMessage({ text: data.message || 'Failed to change password.', type: 'error' });
+        }
+        return;
+      }
+
+      // Success! Show message and prompt re-login
+      setPasswordMessage({
+        text: 'Password changed successfully! Please log in again with your new password.',
+        type: 'success'
+      });
+
+      // Wait 2 seconds then logout (since session was revoked)
+      setTimeout(async () => {
+        // Properly logout using Redux action to clear all auth state
+        await dispatch(signOut());
+        // Redirect to login page
+        navigate('/login');
+      }, 2000);
+
     } catch (error) {
-      console.error('Password update error:', error);
-      setPasswordMessage({ text: 'An error occurred while updating password.', type: 'error' });
+      console.error('Password change error:', error);
+      setPasswordMessage({ text: 'Network error. Please try again.', type: 'error' });
     }
   };
 

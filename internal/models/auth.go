@@ -93,3 +93,9 @@ type ResetPasswordResponse struct {
 	Message string `json:"message"`
 	Success bool   `json:"success"`
 }
+
+// ChangePasswordRequest represents the change password request payload for authenticated users
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}

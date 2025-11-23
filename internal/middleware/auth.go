@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"brokerageProject/internal/database"
+	"brokerageProject/internal/services"
 	"brokerageProject/internal/utils"
 	"context"
 	"encoding/json"
@@ -27,10 +28,99 @@ const (
 	UserAgentKey ContextKey = "user_agent"
 )
 
-// AuthMiddleware validates the custom JWT token and extracts user information
-// It requires the Authorization header with format: "Bearer <jwt_token>"
-// On success, it injects the user_id and email into the request context
+// NewAuthMiddleware creates a middleware factory with dependency injection for session revocation
+// This factory pattern allows us to inject AuthStorageService without using global variables
+func NewAuthMiddleware(authStorage *services.AuthStorageService) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			// Get the Authorization header
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				respondWithError(w, http.StatusUnauthorized, "missing authorization header")
+				return
+			}
+
+			// Extract the token (format: "Bearer <token>")
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				respondWithError(w, http.StatusUnauthorized, "invalid authorization header format")
+				return
+			}
+
+			tokenString := parts[1]
+			if tokenString == "" {
+				respondWithError(w, http.StatusUnauthorized, "missing token")
+				return
+			}
+
+			// Validate and parse the JWT token using custom JWT validator
+			claims, err := utils.ValidateJWT(tokenString)
+			if err != nil {
+				log.Printf("JWT validation error: %v", err)
+				respondWithError(w, http.StatusUnauthorized, "invalid or expired token")
+				return
+			}
+
+			// Parse user UUID from claims
+			userUUID, err := uuid.Parse(claims.UserID)
+			if err != nil {
+				log.Printf("Invalid user ID in token: %v", err)
+				respondWithError(w, http.StatusUnauthorized, "invalid user ID in token")
+				return
+			}
+
+			// CRITICAL: Check session revocation (Kill Switch)
+			// If password was changed after this token was issued, reject it
+			tokenIssuedAt := claims.IssuedAt.Unix()
+			isRevoked, err := authStorage.IsSessionRevoked(r.Context(), userUUID.String(), tokenIssuedAt)
+			if err != nil {
+				// Log error but don't fail the request (fail open for availability)
+				log.Printf("[AUTH ERROR] Failed to check session revocation for user %s: %v", userUUID, err)
+			}
+			if isRevoked {
+				respondWithJSON(w, http.StatusUnauthorized, map[string]interface{}{
+					"error":   "session_revoked",
+					"message": "Your session was invalidated due to a security update. Please log in again.",
+				})
+				return
+			}
+
+			// Look up bigint user_id from users table
+			pool, err := database.GetPool()
+			if err != nil {
+				log.Printf("Database pool error: %v", err)
+				respondWithError(w, http.StatusInternalServerError, "database connection error")
+				return
+			}
+
+			var userBigIntID int64
+			err = pool.QueryRow(r.Context(), "SELECT user_id FROM users WHERE id = $1", userUUID).Scan(&userBigIntID)
+			if err != nil {
+				log.Printf("Failed to lookup user_id for UUID %s: %v", userUUID, err)
+				respondWithError(w, http.StatusUnauthorized, "user not found")
+				return
+			}
+
+			// Extract IP address and user agent from request
+			ipAddress := utils.GetClientIP(r)
+			userAgent := r.UserAgent()
+
+			// Inject bigint user_id into the request context
+			ctx := context.WithValue(r.Context(), UserIDKey, userBigIntID)
+			ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+			ctx = context.WithValue(ctx, IPAddressKey, ipAddress)
+			ctx = context.WithValue(ctx, UserAgentKey, userAgent)
+
+			// Call the next handler with the updated context
+			next.ServeHTTP(w, r.WithContext(ctx))
+		}
+	}
+}
+
+// AuthMiddleware is the legacy function signature kept for backward compatibility
+// DEPRECATED: Use NewAuthMiddleware instead for proper dependency injection
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	log.Println("[WARN] Using deprecated AuthMiddleware without session revocation check. Use NewAuthMiddleware instead.")
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the Authorization header
 		authHeader := r.Header.Get("Authorization")
@@ -144,6 +234,13 @@ func respondWithError(w http.ResponseWriter, statusCode int, message string) {
 		"message": message,
 		"code":    statusCode,
 	})
+}
+
+// respondWithJSON sends a custom JSON response
+func respondWithJSON(w http.ResponseWriter, statusCode int, payload map[string]interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(payload)
 }
 
 // OptionalAuthMiddleware is like AuthMiddleware but doesn't require authentication

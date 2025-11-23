@@ -6,6 +6,7 @@ import (
 	"brokerageProject/internal/config"
 	"brokerageProject/internal/database"
 	"brokerageProject/internal/hub"
+	redisInfra "brokerageProject/internal/infrastructure/redis"
 	redisProvider "brokerageProject/internal/market_data/redis"
 	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/mt5client"
@@ -25,7 +26,6 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -113,25 +113,35 @@ func main() {
 	marginService.InitMarginService(dbPool)
 	log.Println("Margin service initialized successfully")
 
-	// Initialize Redis client for forex services
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379"
+	// Initialize Redis client using centralized infrastructure
+	if err := redisInfra.InitClientFromEnv(); err != nil {
+		log.Fatalf("FATAL: Failed to initialize Redis: %v", err)
 	}
-	redisPassword := os.Getenv("REDIS_PASSWORD")
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     redisAddr,
-		Password: redisPassword,
-		DB:       0,
-		Protocol: 2, // Use RESP2 protocol to avoid maint_notifications warning
-	})
-	// Test Redis connection
-	if err := redisClient.Ping(context.Background()).Err(); err != nil {
-		log.Printf("WARNING: Redis connection failed: %v (forex services will be disabled)", err)
-		redisClient = nil
+	redisClient := redisInfra.GetClient()
+	defer redisInfra.CloseClient()
+
+	// Initialize auth storage service (Redis-backed OTP, reset tokens, rate limiting, session revocation)
+	authStorage := services.NewAuthStorageService(redisClient)
+	log.Println("Auth storage service initialized (Redis-backed)")
+
+	// Initialize email sender based on environment
+	var emailSender services.EmailSender
+	environment := os.Getenv("ENVIRONMENT")
+	if environment == "production" {
+		resendAPIKey := os.Getenv("RESEND_API_KEY")
+		emailFromAddress := os.Getenv("EMAIL_FROM_ADDRESS")
+		if resendAPIKey == "" || emailFromAddress == "" {
+			log.Fatal("FATAL: RESEND_API_KEY and EMAIL_FROM_ADDRESS must be set in production environment")
+		}
+		var err error
+		emailSender, err = services.NewResendSender(resendAPIKey, emailFromAddress)
+		if err != nil {
+			log.Fatalf("FATAL: Failed to initialize Resend email sender: %v", err)
+		}
 	} else {
-		log.Printf("Redis client initialized successfully (addr=%s)", redisAddr)
+		emailSender = services.NewConsoleSender()
 	}
+	log.Printf("Email sender initialized (Environment: %s)", environment)
 
 	// Define forex symbols (used by multiple services)
 	forexSymbols := []string{"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCHF", "CADJPY", "AUDNZD", "EURGBP", "USDCAD", "EURJPY", "GBPJPY"}
@@ -273,7 +283,12 @@ func main() {
 	log.Println("Registered Binance Provider (real-time crypto WebSocket)")
 
 	// Provider 2: Redis Pub/Sub (Real-Time Forex from MT5)
-	// Reuse redisAddr and redisPassword already declared above
+	// Get Redis connection details from environment for forex provider
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	redisPassword := os.Getenv("REDIS_PASSWORD")
 	redisForexProvider := redisProvider.NewProvider(redisAddr, redisPassword)
 	marketDataService.AddProvider(redisForexProvider)
 	log.Printf("Registered Redis Provider (real-time forex from MT5, addr=%s)", redisAddr)
@@ -403,11 +418,11 @@ func main() {
 		}
 	})
 
-	// POST /api/v1/auth/forgot-password - Request password reset OTP
+	// POST /api/v1/auth/forgot-password - Request password reset OTP (with rate limiting)
 	http.HandleFunc("/api/v1/auth/forgot-password", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleForgotPassword))(w, r)
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleForgotPassword(authStorage, emailSender)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -421,7 +436,7 @@ func main() {
 	http.HandleFunc("/api/v1/auth/verify-otp", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleVerifyOTP))(w, r)
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleVerifyOTP(authStorage)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -431,11 +446,28 @@ func main() {
 		}
 	})
 
-	// POST /api/v1/auth/reset-password - Reset password with token
+	// POST /api/v1/auth/reset-password - Reset password with token (with session revocation)
 	http.HandleFunc("/api/v1/auth/reset-password", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleResetPassword))(w, r)
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleResetPassword(authStorage)))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Create auth middleware factory with session revocation
+	authMiddleware := middleware.NewAuthMiddleware(authStorage)
+
+	// POST /api/v1/auth/change-password - Change password (authenticated, with session revocation)
+	http.HandleFunc("/api/v1/auth/change-password", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(authMiddleware(api.HandleChangePassword(authStorage)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -453,7 +485,7 @@ func main() {
 		if r.Method == http.MethodPost && len(r.URL.Path) > len("/api/v1/accounts/") {
 			// This handles /api/v1/accounts/{account_id}/activate
 			if r.URL.Path[len(r.URL.Path)-9:] == "/activate" {
-				api.CORSMiddleware(middleware.AuthMiddleware(api.HandleActivateAccount))(w, r)
+				api.CORSMiddleware(authMiddleware(api.HandleActivateAccount))(w, r)
 				return
 			}
 		}
@@ -470,7 +502,7 @@ func main() {
 	http.HandleFunc("/api/v1/accounts/deactivate-all", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.HandleDeactivateAllAccounts))(w, r)
+			api.CORSMiddleware(authMiddleware(api.HandleDeactivateAllAccounts))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -487,10 +519,10 @@ func main() {
 		switch r.Method {
 		case http.MethodPost:
 			// Apply CORS and Auth middleware for POST requests
-			api.CORSMiddleware(middleware.AuthMiddleware(api.CreateAccount))(w, r)
+			api.CORSMiddleware(authMiddleware(api.CreateAccount))(w, r)
 		case http.MethodGet:
 			// Apply CORS and Auth middleware for GET requests
-			api.CORSMiddleware(middleware.AuthMiddleware(api.GetAccounts))(w, r)
+			api.CORSMiddleware(authMiddleware(api.GetAccounts))(w, r)
 		case http.MethodOptions:
 			// Handle preflight CORS requests
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
@@ -507,7 +539,7 @@ func main() {
 		switch r.Method {
 		case http.MethodPatch, http.MethodPost:
 			// Apply CORS, Auth, and Rate Limit middleware
-			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.UpdateAccountMetadata)))(w, r)
+			api.CORSMiddleware(authMiddleware(middleware.RateLimitMiddleware(api.UpdateAccountMetadata)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -521,7 +553,7 @@ func main() {
 	http.HandleFunc("/api/v1/accounts/toggle-status", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.ToggleAccountStatus)))(w, r)
+			api.CORSMiddleware(authMiddleware(middleware.RateLimitMiddleware(api.ToggleAccountStatus)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -535,7 +567,7 @@ func main() {
 	http.HandleFunc("/api/v1/accounts/demo/edit-balance", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.EditDemoBalance)))(w, r)
+			api.CORSMiddleware(authMiddleware(middleware.RateLimitMiddleware(api.EditDemoBalance)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -551,9 +583,9 @@ func main() {
 	http.HandleFunc("/api/v1/pending-orders", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.CreatePendingOrder)))(w, r)
+			api.CORSMiddleware(authMiddleware(middleware.RateLimitMiddleware(api.CreatePendingOrder)))(w, r)
 		case http.MethodGet:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.GetPendingOrders))(w, r)
+			api.CORSMiddleware(authMiddleware(api.GetPendingOrders))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -567,7 +599,7 @@ func main() {
 	http.HandleFunc("/api/v1/pending-orders/cancel", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodDelete, http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(middleware.RateLimitMiddleware(api.CancelPendingOrder)))(w, r)
+			api.CORSMiddleware(authMiddleware(middleware.RateLimitMiddleware(api.CancelPendingOrder)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -598,9 +630,9 @@ func main() {
 	http.HandleFunc("/api/v1/transactions", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.CreateTransaction))(w, r)
+			api.CORSMiddleware(authMiddleware(api.CreateTransaction))(w, r)
 		case http.MethodGet:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.GetTransactions))(w, r)
+			api.CORSMiddleware(authMiddleware(api.GetTransactions))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -616,9 +648,9 @@ func main() {
 	http.HandleFunc("/api/v1/orders", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.CreateOrder))(w, r)
+			api.CORSMiddleware(authMiddleware(api.CreateOrder))(w, r)
 		case http.MethodGet:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.GetOrders))(w, r)
+			api.CORSMiddleware(authMiddleware(api.GetOrders))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -632,7 +664,7 @@ func main() {
 	http.HandleFunc("/api/v1/orders/cancel", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.CancelOrder))(w, r)
+			api.CORSMiddleware(authMiddleware(api.CancelOrder))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -647,7 +679,7 @@ func main() {
 	http.HandleFunc("/api/v1/history", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.GetBatchHistory))(w, r)
+			api.CORSMiddleware(authMiddleware(api.GetBatchHistory))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -663,9 +695,9 @@ func main() {
 	http.HandleFunc("/api/v1/contracts", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.CreateContract))(w, r)
+			api.CORSMiddleware(authMiddleware(api.CreateContract))(w, r)
 		case http.MethodGet:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.GetContracts))(w, r)
+			api.CORSMiddleware(authMiddleware(api.GetContracts))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -679,7 +711,7 @@ func main() {
 	http.HandleFunc("/api/v1/contracts/close", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+			api.CORSMiddleware(authMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				api.CloseContract(h, w, r)
 			}))(w, r)
 		case http.MethodOptions:
@@ -695,7 +727,7 @@ func main() {
 	http.HandleFunc("/api/v1/contracts/close-pair", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+			api.CORSMiddleware(authMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				api.ClosePair(h, w, r)
 			}))(w, r)
 		case http.MethodOptions:
@@ -711,7 +743,7 @@ func main() {
 	http.HandleFunc("/api/v1/contracts/history", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.GetContractHistory))(w, r)
+			api.CORSMiddleware(authMiddleware(api.GetContractHistory))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -725,7 +757,7 @@ func main() {
 	http.HandleFunc("/api/v1/contracts/tpsl", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPatch, http.MethodPost:
-			api.CORSMiddleware(middleware.AuthMiddleware(api.UpdateContractTPSL))(w, r)
+			api.CORSMiddleware(authMiddleware(api.UpdateContractTPSL))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)

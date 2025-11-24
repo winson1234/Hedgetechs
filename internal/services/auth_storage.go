@@ -39,27 +39,21 @@ func (s *AuthStorageService) StoreOTP(ctx context.Context, email, otp string) er
 	return nil
 }
 
-// ValidateOTP validates the OTP for the given email and deletes it immediately on success
-// This ensures one-time use and prevents replay attacks
+// ValidateOTP validates the OTP for the given email and deletes it immediately on success.
+// Uses a Lua script to ensure atomicity and prevent race conditions (replay attacks).
+// This ensures one-time use even under concurrent requests.
 func (s *AuthStorageService) ValidateOTP(ctx context.Context, email, otp string) bool {
 	key := fmt.Sprintf("auth:otp:%s", email)
 
-	// First, get the OTP without deleting
-	storedOTP, err := s.client.Get(ctx, key).Result()
+	// Execute Lua script: Check value and delete in one atomic step
+	// Result is 1 (success/deleted) or 0 (failure/not found/mismatch)
+	result, err := validateOTPScript.Run(ctx, s.client, []string{key}, otp).Int()
 	if err != nil {
-		// OTP doesn't exist or Redis error
+		// Log error if needed, but return false safely
 		return false
 	}
 
-	// Check if OTP matches
-	if storedOTP != otp {
-		// Wrong OTP - don't delete, allow retry
-		return false
-	}
-
-	// OTP is correct - delete it immediately (one-time use)
-	s.client.Del(ctx, key)
-	return true
+	return result == 1
 }
 
 // DeleteOTP manually deletes an OTP (for cleanup if needed)
@@ -86,23 +80,21 @@ func (s *AuthStorageService) StoreResetToken(ctx context.Context, token, email s
 	return nil
 }
 
-// ValidateResetToken validates the reset token and returns the associated email
-// Deletes the token immediately on success to ensure one-time use
+// ValidateResetToken validates the reset token and returns the associated email.
+// Uses a Lua script to ensure atomicity and prevent race conditions.
+// Deletes the token immediately on success to ensure one-time use.
 func (s *AuthStorageService) ValidateResetToken(ctx context.Context, token string) (string, error) {
 	key := fmt.Sprintf("auth:reset:%s", token)
 
-	// Use pipeline for atomic GET + DELETE
-	pipe := s.client.Pipeline()
-	getCmd := pipe.Get(ctx, key)
-	pipe.Del(ctx, key)
-
-	_, err := pipe.Exec(ctx)
+	// Execute Lua script: Get email and delete token in one atomic step
+	// Returns the email if token is valid, empty string otherwise
+	result, err := validateResetTokenScript.Run(ctx, s.client, []string{key}).Result()
 	if err != nil {
 		return "", fmt.Errorf("invalid or expired reset token")
 	}
 
-	email, err := getCmd.Result()
-	if err != nil {
+	email, ok := result.(string)
+	if !ok || email == "" {
 		return "", fmt.Errorf("invalid or expired reset token")
 	}
 
@@ -129,6 +121,30 @@ if count == 1 then
     redis.call('EXPIRE', key, ttl)
 end
 return count
+`)
+
+// Lua script for atomic OTP validation (check and delete)
+// Prevents race conditions and replay attacks by ensuring atomicity
+// Returns 1 if matched and deleted, 0 otherwise
+var validateOTPScript = redis.NewScript(`
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("DEL", KEYS[1])
+else
+    return 0
+end
+`)
+
+// Lua script for atomic reset token validation (get and delete)
+// Prevents race conditions by ensuring atomicity
+// Returns the email if token is valid, empty string otherwise
+var validateResetTokenScript = redis.NewScript(`
+local email = redis.call("GET", KEYS[1])
+if email then
+    redis.call("DEL", KEYS[1])
+    return email
+else
+    return ""
+end
 `)
 
 // CheckRateLimit checks if the action is allowed based on rate limiting rules

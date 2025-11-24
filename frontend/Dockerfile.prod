@@ -11,19 +11,28 @@ WORKDIR /app
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies with cache mount
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
-# Build arguments for environment variables
+# Build arguments for all VITE environment variables
 ARG VITE_STRIPE_PUBLISHABLE_KEY
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_API_URL
+ARG VITE_DOCKER_BACKEND_URL
 ARG APP_URL
 ARG WEBHOOK_URL
 
 # Set environment variables for build
 ENV VITE_STRIPE_PUBLISHABLE_KEY=${VITE_STRIPE_PUBLISHABLE_KEY}
+ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_DOCKER_BACKEND_URL=${VITE_DOCKER_BACKEND_URL}
 ENV APP_URL=${APP_URL}
 ENV WEBHOOK_URL=${WEBHOOK_URL}
 
@@ -33,14 +42,32 @@ RUN pnpm run build
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
 
-# Copy custom nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Install bash for startup script
+RUN apk add --no-cache bash
+
+# Create directories for SSL certificates
+RUN mkdir -p /etc/nginx/certs
+
+# Copy custom nginx configuration template
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Expose port 80
-EXPOSE 80
+# Create startup script for SSL detection
+RUN echo '#!/bin/bash' > /docker-entrypoint.d/40-ssl-setup.sh && \
+    echo 'set -e' >> /docker-entrypoint.d/40-ssl-setup.sh && \
+    echo 'if [ -f /etc/nginx/certs/fullchain.pem ] && [ -f /etc/nginx/certs/privkey.pem ]; then' >> /docker-entrypoint.d/40-ssl-setup.sh && \
+    echo '  echo "SSL certificates found - enabling HTTPS"' >> /docker-entrypoint.d/40-ssl-setup.sh && \
+    echo '  export SSL_ENABLED=true' >> /docker-entrypoint.d/40-ssl-setup.sh && \
+    echo 'else' >> /docker-entrypoint.d/40-ssl-setup.sh && \
+    echo '  echo "No SSL certificates - running HTTP only"' >> /docker-entrypoint.d/40-ssl-setup.sh && \
+    echo '  export SSL_ENABLED=false' >> /docker-entrypoint.d/40-ssl-setup.sh && \
+    echo 'fi' >> /docker-entrypoint.d/40-ssl-setup.sh && \
+    chmod +x /docker-entrypoint.d/40-ssl-setup.sh
 
-# Start nginx
+# Expose both HTTP and HTTPS ports
+EXPOSE 80 443
+
+# Start nginx (entrypoint scripts run automatically)
 CMD ["nginx", "-g", "daemon off;"]

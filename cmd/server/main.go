@@ -776,14 +776,32 @@ func main() {
 
 	// Start the HTTP/HTTPS server on the configured port
 	// Check for mkcert-generated SSL certificates for local HTTPS development
-	certFile := filepath.Join("..", "..", "localhost+2.pem")    // From cmd/server, look at project root
-	keyFile := filepath.Join("..", "..", "localhost+2-key.pem") // From cmd/server, look at project root
+	// Support both Docker and local development environments
+
+	var certFile, keyFile string
+
+	// Check if running in Docker (DOCKER_ENV or HTTPS_ENABLED set)
+	dockerEnv := os.Getenv("DOCKER_ENV")
+	httpsEnabled := os.Getenv("HTTPS_ENABLED")
+
+	if dockerEnv != "" || httpsEnabled != "" {
+		// Docker environment - check /app/certs/ directory
+		certFile = "/app/certs/localhost+2.pem"
+		keyFile = "/app/certs/localhost+2-key.pem"
+		log.Println("Docker environment detected - looking for certificates in /app/certs/")
+	} else {
+		// Local development - check project root (../../ from cmd/server)
+		certFile = filepath.Join("..", "..", "localhost+2.pem")
+		keyFile = filepath.Join("..", "..", "localhost+2-key.pem")
+		log.Println("Local environment detected - looking for certificates in project root")
+	}
 
 	// Check if certificate files exist
 	if _, certErr := os.Stat(certFile); certErr == nil {
 		if _, keyErr := os.Stat(keyFile); keyErr == nil {
 			// Certificates found - start HTTPS server
-			log.Printf("SSL certificates found - starting HTTPS server on https://localhost%s", serverAddress)
+			log.Printf("✓ SSL certificates found at %s", certFile)
+			log.Printf("Starting HTTPS server on https://localhost%s", serverAddress)
 			log.Println("Note: These are mkcert-generated certificates for local development")
 			log.Fatal(http.ListenAndServeTLS(serverAddress, certFile, keyFile, nil))
 		}
@@ -791,7 +809,7 @@ func main() {
 
 	// No certificates found - start HTTP server (backward compatible)
 	log.Printf("No SSL certificates found - starting HTTP server on http://localhost%s", serverAddress)
-	log.Println("Tip: For HTTPS in development, generate certificates with mkcert (see HTTPS_SETUP.md)")
+	log.Println("Tip: For HTTPS in development, generate certificates with mkcert")
 	log.Fatal(http.ListenAndServe(serverAddress, nil))
 }
 

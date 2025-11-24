@@ -23,8 +23,14 @@ services:
     volumes:
       # Persist Redis data (optional - for durability)
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
-  # Backend service (Go with Air hot-reloading)
+  # Backend service (Go with Air hot-reloading + HTTPS)
   backend:
     build:
       context: .
@@ -35,24 +41,34 @@ services:
     volumes:
       # Mount entire project for hot-reloading
       - ./:/app
-      # Mount SSL certificates (if they exist)
-      - ./localhost+2.pem:/app/localhost+2.pem:ro
-      - ./localhost+2-key.pem:/app/localhost+2-key.pem:ro
+      # Mount SSL certificates to /app/certs/ for Docker-aware detection
+      - ./localhost+2.pem:/app/certs/localhost+2.pem:ro
+      - ./localhost+2-key.pem:/app/certs/localhost+2-key.pem:ro
       # Exclude tmp directory to avoid conflicts
       - /app/tmp
     env_file:
       - .env
     environment:
       - DOCKER_ENV=development
+      - HTTPS_ENABLED=true
       - REDIS_ADDR=redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
+      # Skip auto-migrations in Docker (run manually when needed)
+      - DATABASE_MIGRATION_URL=
     networks:
       - brokerage-network
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--no-check-certificate", "https://localhost:8080/api/v1/ticker?symbol=BTCUSDT"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
-  # Frontend service (React + Vite with hot-reloading)
+  # Frontend service (React + Vite with hot-reloading + HTTPS)
   frontend:
     build:
       context: ./frontend
@@ -63,13 +79,17 @@ services:
     volumes:
       # Mount frontend directory for hot-reloading
       - ./frontend:/app
+      # Mount SSL certificates to /app/certs/ for HTTPS
+      - ./localhost+2.pem:/app/certs/localhost+2.pem:ro
+      - ./localhost+2-key.pem:/app/certs/localhost+2-key.pem:ro
       # Anonymous volume to protect node_modules
       - /app/node_modules
     env_file:
       - .env
     environment:
       - DOCKER_ENV=development
-      - VITE_DOCKER_BACKEND_URL=http://backend:8080
+      - VITE_DOCKER_BACKEND_URL=https://backend:8080
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
     networks:
       - brokerage-network
     depends_on:

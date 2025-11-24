@@ -7,12 +7,23 @@ import fs from 'fs'
 const isDev = process.env.NODE_ENV !== 'production'
 
 // Check if running in Docker (via environment variable)
-const isDockerEnv = !!process.env.VITE_DOCKER_BACKEND_URL
+const isDockerEnv = !!process.env.VITE_DOCKER_BACKEND_URL || !!process.env.DOCKER_ENV
 
 // Check for mkcert-generated SSL certificates (for local HTTPS development)
-const certPath = path.resolve(__dirname, '..', 'localhost+2.pem')
-const keyPath = path.resolve(__dirname, '..', 'localhost+2-key.pem')
-const hasCertificates = fs.existsSync(certPath) && fs.existsSync(keyPath)
+// Support both Docker and local development environments
+let certPath: string, keyPath: string, hasCertificates: boolean
+
+if (isDockerEnv) {
+  // Docker environment - check /app/certs/ directory
+  certPath = '/app/certs/localhost+2.pem'
+  keyPath = '/app/certs/localhost+2-key.pem'
+  hasCertificates = fs.existsSync(certPath) && fs.existsSync(keyPath)
+} else {
+  // Local development - check project root
+  certPath = path.resolve(__dirname, '..', 'localhost+2.pem')
+  keyPath = path.resolve(__dirname, '..', 'localhost+2-key.pem')
+  hasCertificates = fs.existsSync(certPath) && fs.existsSync(keyPath)
+}
 
 // Determine backend URL based on environment
 let BACKEND_URL: string
@@ -28,7 +39,12 @@ if (isDockerEnv) {
 }
 
 // Log configuration for developer visibility
-if (isDockerEnv) {
+if (isDockerEnv && hasCertificates) {
+  console.log('🐳 Running in Docker environment with HTTPS')
+  console.log('   Frontend: https://localhost:5173')
+  console.log('   Backend:  ' + BACKEND_URL)
+  console.log('   Certificates: ' + certPath)
+} else if (isDockerEnv) {
   console.log('🐳 Running in Docker environment')
   console.log('   Frontend: http://localhost:5173')
   console.log('   Backend:  ' + BACKEND_URL)
@@ -70,8 +86,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    // Enable HTTPS if certificates are available and not in Docker
-    ...(!isDockerEnv && hasCertificates && {
+    // Enable HTTPS if certificates are available (both Docker and local)
+    ...(hasCertificates && {
       https: {
         key: fs.readFileSync(keyPath),
         cert: fs.readFileSync(certPath),

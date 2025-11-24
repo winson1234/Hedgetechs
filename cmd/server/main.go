@@ -160,11 +160,11 @@ func main() {
 		// Initialize forex analytics (24h stats calculator)
 		forexAnalytics = services.NewForexAnalyticsService(dbPool, redisClient)
 		go forexAnalytics.StartAnalyticsWorker(context.Background())
-		log.Println("Forex analytics worker started (calculating 24h stats every 1 minute)")
+		log.Println("Forex analytics worker started (Redis-based calculations every 5 minutes)")
 
 		// Initialize forex klines service (historical data provider)
-		forexKlines = services.NewForexKlinesService(dbPool)
-		log.Println("Forex klines service initialized")
+		forexKlines = services.NewForexKlinesService(dbPool, redisClient)
+		log.Println("Forex klines service initialized (with Redis caching for aggregated intervals)")
 	} else {
 		log.Println("WARNING: Forex services disabled (Redis unavailable)")
 	}
@@ -198,6 +198,23 @@ func main() {
 		}
 	} else {
 		log.Println("WARNING: Data Integrity Service disabled (MT5 API or Redis unavailable)")
+	}
+
+	// Initialize Partition Manager Service (automated partition lifecycle management)
+	// OPTIMIZATION: Automatically manages 3-month retention policy for forex_klines_1m
+	// This prevents long-term data accumulation and reduces storage/egress costs
+	partitionManager := services.NewPartitionManagerService(services.PartitionManagerConfig{
+		DB:              dbPool,
+		Archiver:        nil, // Optional: Configure S3/Supabase Storage archiver if needed
+		RetentionMonths: 3,   // Keep last 3 months of data (user-selected)
+		PreCreateMonths: 1,   // Pre-create 1 month ahead
+		Schedule:        "0 0 * * *", // Run daily at midnight UTC (more aggressive than default monthly)
+	})
+
+	if err := partitionManager.Start(context.Background()); err != nil {
+		log.Printf("WARNING: Partition Manager failed to start: %v", err)
+	} else {
+		log.Println("Partition Manager Service started (3-month retention, daily checks)")
 	}
 
 	// Initialize rate limiter (100 requests per minute per user, burst of 20)

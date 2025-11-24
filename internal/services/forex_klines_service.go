@@ -2,10 +2,13 @@ package services
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 // Kline represents a single candlestick/K-line
@@ -19,19 +22,23 @@ type Kline struct {
 }
 
 // ForexKlinesService provides historical kline data
+// OPTIMIZED: Added Redis caching layer to reduce database egress
 type ForexKlinesService struct {
-	db *pgxpool.Pool
+	db          *pgxpool.Pool
+	redisClient *redis.Client
 }
 
 // NewForexKlinesService creates a new forex klines service
-func NewForexKlinesService(db *pgxpool.Pool) *ForexKlinesService {
+func NewForexKlinesService(db *pgxpool.Pool, redisClient *redis.Client) *ForexKlinesService {
 	return &ForexKlinesService{
-		db: db,
+		db:          db,
+		redisClient: redisClient,
 	}
 }
 
 // GetHistoricalKlines retrieves aggregated klines for a symbol and interval
-// Aggregates 1m bars into higher timeframes using PostgreSQL floor division
+// OPTIMIZED: Uses Redis cache-first strategy to reduce database egress
+// Cache hit rate expected: >90% for chart requests
 func (s *ForexKlinesService) GetHistoricalKlines(ctx context.Context, symbol, interval string, limit int) ([]Kline, error) {
 	bucketSeconds := intervalToSeconds(interval)
 
@@ -40,6 +47,43 @@ func (s *ForexKlinesService) GetHistoricalKlines(ctx context.Context, symbol, in
 		return []Kline{}, nil
 	}
 
+	// OPTIMIZATION: Try Redis cache first (for aggregated intervals: 5m, 15m, 1h, 1d)
+	// 1m interval is cached by ForexAggregatorService in ZSET format
+	if s.redisClient != nil && interval != "1m" {
+		cacheKey := fmt.Sprintf("forex:klines:agg:%s:%s:%d", interval, symbol, limit)
+
+		cachedData, err := s.redisClient.Get(ctx, cacheKey).Result()
+		if err == nil && cachedData != "" {
+			// Cache hit - deserialize and return
+			var klines []Kline
+			if err := json.Unmarshal([]byte(cachedData), &klines); err == nil {
+				log.Printf("[Forex Klines] CACHE HIT for %s (%s) - %d bars", symbol, interval, len(klines))
+				return klines, nil
+			}
+		}
+
+		// Cache miss - query database and cache result
+		log.Printf("[Forex Klines] Cache miss for %s (%s), querying database...", symbol, interval)
+		klines, err := s.queryDatabase(ctx, bucketSeconds, symbol, limit)
+		if err != nil {
+			return nil, err
+		}
+
+		// Cache the result with appropriate TTL
+		cacheTTL := getCacheTTL(interval)
+		klinesJSON, _ := json.Marshal(klines)
+		s.redisClient.Set(ctx, cacheKey, klinesJSON, cacheTTL)
+		log.Printf("[Forex Klines] Cached %d bars for %s (%s) with TTL %v", len(klines), symbol, interval, cacheTTL)
+
+		return klines, nil
+	}
+
+	// Fallback: No Redis or 1m interval (1m uses ZSET cache from ForexAggregatorService)
+	return s.queryDatabase(ctx, bucketSeconds, symbol, limit)
+}
+
+// queryDatabase performs the actual PostgreSQL query
+func (s *ForexKlinesService) queryDatabase(ctx context.Context, bucketSeconds int, symbol string, limit int) ([]Kline, error) {
 	// Use floor division to bucket timestamps into intervals
 	// FLOOR(EXTRACT(EPOCH FROM timestamp) / bucket_size) * bucket_size
 	query := `
@@ -72,7 +116,7 @@ func (s *ForexKlinesService) GetHistoricalKlines(ctx context.Context, symbol, in
 
 	rows, err := s.db.Query(ctx, query, bucketSeconds, symbol, limit)
 	if err != nil {
-		log.Printf("[Forex Klines] ERROR querying klines for %s (%s): %v", symbol, interval, err)
+		log.Printf("[Forex Klines] ERROR querying klines for %s: %v", symbol, err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -95,8 +139,24 @@ func (s *ForexKlinesService) GetHistoricalKlines(ctx context.Context, symbol, in
 		klines = append(klines, k)
 	}
 
-	log.Printf("[Forex Klines] Returned %d klines for %s (%s)", len(klines), symbol, interval)
+	log.Printf("[Forex Klines] Returned %d klines from database", len(klines))
 	return klines, nil
+}
+
+// getCacheTTL returns appropriate cache TTL based on interval
+func getCacheTTL(interval string) time.Duration {
+	switch interval {
+	case "5m", "15m":
+		return 5 * time.Minute // Frequent updates
+	case "30m", "1h", "2h":
+		return 15 * time.Minute // Medium updates
+	case "4h", "6h", "12h", "1d":
+		return 1 * time.Hour // Infrequent updates
+	case "1w":
+		return 6 * time.Hour // Very infrequent
+	default:
+		return 5 * time.Minute
+	}
 }
 
 // intervalToSeconds maps API interval to seconds for bucketing

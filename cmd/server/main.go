@@ -775,23 +775,26 @@ func main() {
 	}
 
 	// Start the HTTP/HTTPS server on the configured port
-	// Production: Always use HTTP on 0.0.0.0 (SSL handled by reverse proxy: Nginx/Caddy/Fly.io)
-	// Local Development: Use HTTPS with mkcert certificates on localhost
+	// Cloud Deployment: Always use HTTP on 0.0.0.0 (SSL handled by reverse proxy: Nginx/Caddy/Fly.io)
+	// Local Docker Dev: Use HTTPS with mkcert certificates on 0.0.0.0
 
-	// Check if running in production (any cloud provider: Fly.io, Contabo, AWS, etc.)
-	// Set ENVIRONMENT=production in your deployment
-	isProduction := os.Getenv("ENVIRONMENT") == "production" || os.Getenv("FLY_APP_NAME") != ""
+	// Check if running in local Docker development (docker-compose.yml sets DOCKER_ENV=development)
+	// In cloud deployments (Fly.io, Contabo, etc.), this variable is NOT set
+	isLocalDockerDev := os.Getenv("DOCKER_ENV") == "development"
 
-	if isProduction {
-		// Production: Use HTTP on 0.0.0.0 (required for Docker/VPS deployments)
-		// SSL should be handled by reverse proxy (Nginx, Caddy, Traefik, or cloud provider)
+	// Check if running in cloud deployment (Fly.io sets FLY_APP_NAME)
+	isCloudDeployment := os.Getenv("FLY_APP_NAME") != ""
+
+	if isCloudDeployment {
+		// Cloud Deployment: Use HTTP on 0.0.0.0 (required by cloud providers)
+		// SSL is handled by reverse proxy (Fly.io edge, Nginx, Caddy, etc.)
 		bindAddr := "0.0.0.0" + serverAddress
-		log.Printf("Production environment detected - starting HTTP server on %s", bindAddr)
-		log.Println("Note: SSL should be handled by reverse proxy (Nginx/Caddy) or cloud provider")
+		log.Printf("Cloud deployment detected - starting HTTP server on %s", bindAddr)
+		log.Println("Note: SSL is handled by cloud provider or reverse proxy")
 		log.Fatal(http.ListenAndServe(bindAddr, nil))
 	}
 
-	// Local Development: Check for HTTPS certificates
+	// Local Development (Docker or native): Check for HTTPS certificates
 	var certFile, keyFile string
 
 	// Check if running in Docker (DOCKER_ENV or HTTPS_ENABLED set)
@@ -813,18 +816,37 @@ func main() {
 	// Check if certificate files exist
 	if _, certErr := os.Stat(certFile); certErr == nil {
 		if _, keyErr := os.Stat(keyFile); keyErr == nil {
-			// Certificates found - start HTTPS server (local development only)
+			// Certificates found - start HTTPS server
 			log.Printf("✓ SSL certificates found at %s", certFile)
-			log.Printf("Starting HTTPS server on https://localhost%s", serverAddress)
-			log.Println("Note: These are mkcert-generated certificates for local development")
-			log.Fatal(http.ListenAndServeTLS(serverAddress, certFile, keyFile, nil))
+
+			// Bind to 0.0.0.0 in Docker (required for inter-container communication)
+			// Bind to localhost for native development (more secure)
+			var bindAddr string
+			if isLocalDockerDev {
+				bindAddr = "0.0.0.0" + serverAddress
+				log.Printf("Starting HTTPS server on https://0.0.0.0%s (Docker mode)", serverAddress)
+				log.Println("Note: Accessible via https://backend:8080 from other containers")
+			} else {
+				bindAddr = serverAddress // defaults to localhost
+				log.Printf("Starting HTTPS server on https://localhost%s", serverAddress)
+				log.Println("Note: These are mkcert-generated certificates for local development")
+			}
+			log.Fatal(http.ListenAndServeTLS(bindAddr, certFile, keyFile, nil))
 		}
 	}
 
-	// No certificates found - start HTTP server on localhost (local development)
-	log.Printf("No SSL certificates found - starting HTTP server on http://localhost%s", serverAddress)
-	log.Println("Tip: For HTTPS in development, generate certificates with mkcert")
-	log.Fatal(http.ListenAndServe(serverAddress, nil))
+	// No certificates found - start HTTP server
+	if isLocalDockerDev {
+		// Docker dev without certificates - bind to 0.0.0.0
+		bindAddr := "0.0.0.0" + serverAddress
+		log.Printf("No SSL certificates found - starting HTTP server on http://0.0.0.0%s (Docker mode)", serverAddress)
+		log.Fatal(http.ListenAndServe(bindAddr, nil))
+	} else {
+		// Native development - bind to localhost
+		log.Printf("No SSL certificates found - starting HTTP server on http://localhost%s", serverAddress)
+		log.Println("Tip: For HTTPS in development, generate certificates with mkcert")
+		log.Fatal(http.ListenAndServe(serverAddress, nil))
+	}
 }
 
 // runMigrations runs database migrations using golang-migrate

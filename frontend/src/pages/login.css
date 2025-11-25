@@ -113,14 +113,14 @@
                 transform: translateY(0);
             }
         }
-.login-page .logo {
-  margin-top: 30px;
-  margin-bottom: 10px;
-  width: 100%;
-  display: flex;
-  justify-content: center; /* centers the logo horizontally */
-}
 
+        .login-page .logo {
+        margin-top: 30px;
+        margin-bottom: 10px;
+        width: 100%;
+        display: flex;
+        justify-content: center; /* centers the logo horizontally */
+        }
 
         .login-page .logo h1 {
             font-size: 36px;

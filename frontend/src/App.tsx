@@ -15,7 +15,7 @@ import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 
 // Public Pages
-import DashboardPage from './pages/DashboardPage'
+import DashboardPage from './pages/Dashboard/DashboardPage'
 
 // Protected Pages
 import TradingPage from './pages/TradingPage'

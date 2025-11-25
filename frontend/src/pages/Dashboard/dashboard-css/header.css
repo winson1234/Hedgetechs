@@ -1,0 +1,158 @@
+/* ===========================
+   HEADER - Sticky Positioning
+   =========================== */
+
+   header.header,
+   .dashboard-page header.header,
+   .dashboard-page .header,
+   .header,
+   .dashboard-page > header.header,
+   .dashboard-page > header.header.header {
+     position: sticky !important;
+     top: 0 !important;
+     width: 100% !important;
+     backdrop-filter: none !important;
+     border-bottom: none !important;
+     z-index: 1000;
+     background: rgba(4, 6, 18, 0) !important;
+     transition: background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+                 border-color 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+                 box-shadow 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+     box-shadow: none;
+     transform: none !important;
+     margin: 0 !important;
+     padding: 0 !important;
+     opacity: 1 !important;
+     visibility: visible !important;
+   }
+   
+   /* Override any scroll animation effects on header */
+   header.header[data-scroll],
+   header.header[data-scroll-animate],
+   header.header[data-gsap-animate] {
+     opacity: 1 !important;
+     visibility: visible !important;
+     transform: none !important;
+   }
+   
+   /* Hide header pseudo-elements when scrolled */
+   .header.scrolled::before {
+     opacity: 0;
+   }
+   
+   .header.scrolled::after {
+     opacity: 0;
+   }
+   
+   /* Header gets dark background when scrolled - STAYS STICKY */
+   header.header.scrolled,
+   .dashboard-page header.header.scrolled,
+   .dashboard-page .header.scrolled,
+   .header.scrolled,
+   #main-header.scrolled {
+     position: sticky !important;
+     top: 0 !important;
+     background: #050813 !important;
+     backdrop-filter: none !important;
+     -webkit-backdrop-filter: none !important;
+     background: rgba(4, 6, 18, 0.95) !important;
+     border-bottom: 1px solid rgba(253, 219, 146, 0.2) !important;
+     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(253, 219, 146, 0.15) !important;
+   }
+   
+   /* Light mode header - transparent by default */
+   body.light-mode header.header,
+   body.light-mode .dashboard-page header.header,
+   body.light-mode .dashboard-page .header,
+   body.light-mode .header {
+     background: transparent !important;
+     border-bottom: none !important;
+     box-shadow: none !important;
+   }
+   
+   /* Light mode header - background when scrolled */
+   body.light-mode header.header.scrolled,
+   body.light-mode .dashboard-page header.header.scrolled,
+   body.light-mode .dashboard-page .header.scrolled,
+   body.light-mode .header.scrolled {
+     position: sticky !important;
+     top: 0 !important;
+     background: #f4f4f4 !important;
+     backdrop-filter: none !important;
+     -webkit-backdrop-filter: none !important;
+     border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(255, 255, 255, 0.1) !important;
+   }
+   
+   /* FINAL OVERRIDE - ALWAYS sticky */
+   .dashboard-page > header.header,
+   .dashboard-page header.header,
+   .dashboard-page .header,
+   header.header.header,
+   .header.header,
+   header.header.header.header,
+   .dashboard-page > header.header.scrolled,
+   .dashboard-page header.header.scrolled,
+   .dashboard-page .header.scrolled,
+   header.header.header.scrolled,
+   .header.header.scrolled {
+     position: sticky !important;
+     top: 0 !important;
+     left: auto !important;
+     right: auto !important;
+     bottom: auto !important;
+     transform: none !important;
+     will-change: background-color, border-color, box-shadow !important;
+   }
+   
+   .nav-wrapper {
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+     padding: 36px 0;
+     gap: 48px;
+     transition: padding 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+   }
+   
+   .header.scrolled .nav-wrapper {
+     padding: 16px 0;
+   }
+   
+   /* Mobile Menu */
+   .mobile-menu-btn {
+     display: none;
+     background: transparent;
+     border: none;
+     color: var(--text-primary);
+     cursor: pointer;
+     padding: 8px;
+   }
+   
+   .mobile-menu {
+     display: none;
+     background: var(--bg-secondary);
+     border-bottom: 1px solid var(--border-color);
+     padding: 16px 0;
+   }
+   
+   .mobile-nav {
+     display: flex;
+     flex-direction: column;
+     gap: 16px;
+   }
+   
+   .mobile-nav-link {
+     color: var(--text-secondary);
+     text-decoration: none;
+     padding: 8px 0;
+     font-weight: 500;
+     transition: color 0.3s ease;
+   }
+   
+   .mobile-nav-link.active {
+     color: var(--primary-color);
+   }
+   
+   .mobile-nav-link:hover {
+     color: var(--text-primary);
+   }

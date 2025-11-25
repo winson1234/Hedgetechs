@@ -1,0 +1,13 @@
+/* ===========================
+   DASHBOARD - Main Import File
+   Imports all modular CSS files
+   =========================== */
+
+   @import './dashboard-css/base.css';
+   @import './dashboard-css/header.css';
+   @import './dashboard-css/navigation.css';
+   @import './dashboard-css/buttons.css';
+   @import './dashboard-css/dropdowns.css';
+   @import './dashboard-css/hero.css';
+   @import './dashboard-css/modals.css';
+   @import './dashboard-css/animations.css';

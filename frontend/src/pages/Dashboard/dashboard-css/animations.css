@@ -1,0 +1,167 @@
+/* ===========================
+   ANIMATIONS
+   All @keyframes
+   =========================== */
+
+/* Header & Nav */
+@keyframes navGlow {
+    0%, 100% { transform: scale(0.95); }
+    50% { transform: scale(1.05); }
+  }
+  
+  @keyframes iconSpin {
+    0% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(180deg) scale(1.2); }
+    100% { transform: rotate(360deg) scale(1); }
+  }
+  
+  /* Dropdowns */
+  @keyframes dropdownAppear {
+    0% { 
+      opacity: 0; 
+      transform: translateY(-10px) scale(0.95);
+    }
+    100% { 
+      opacity: 1; 
+      transform: translateY(0) scale(1);
+    }
+  }
+  
+  /* Profile */
+  @keyframes rotateBorder {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  
+  /* Hero */
+  @keyframes heroGlow {
+    0%, 100% { 
+      transform: scale(1) translate(0, 0); 
+      opacity: 0.4; 
+    }
+    50% { 
+      transform: scale(1.2) translate(-50px, 50px); 
+      opacity: 0.8; 
+    }
+  }
+  
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes badgeFloat {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-5px); }
+  }
+  
+  @keyframes badgeShimmer {
+    0% { transform: translateX(-100%); }
+    50%, 100% { transform: translateX(200%); }
+  }
+  
+  @keyframes iconPulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(253, 219, 146, 0.7); }
+    50% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(253, 219, 146, 0); }
+  }
+  
+  @keyframes titleAppear {
+    0% { 
+      opacity: 0; 
+      transform: translateY(30px) scale(0.95);
+      filter: blur(10px);
+    }
+    100% { 
+      opacity: 1; 
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+  
+  @keyframes subtitleFade {
+    from { 
+      opacity: 0; 
+      transform: translateY(20px);
+    }
+    to { 
+      opacity: 0.95; 
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes ctaSlide {
+    from { 
+      opacity: 0; 
+      transform: translateX(-30px);
+    }
+    to { 
+      opacity: 1; 
+      transform: translateX(0);
+    }
+  }
+  
+  @keyframes badgesAppear {
+    from { 
+      opacity: 0; 
+      transform: translateY(20px);
+    }
+    to { 
+      opacity: 1; 
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes imageFloat {
+    from { 
+      opacity: 0; 
+      transform: translateX(40px) scale(0.95);
+    }
+    to { 
+      opacity: 1; 
+      transform: translateX(0) scale(1);
+    }
+  }
+  
+  @keyframes cardFloat {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    33% { transform: translateY(-25px) rotate(-2deg); }
+    66% { transform: translateY(-15px) rotate(2deg); }
+  }
+  
+  /* Modals */
+  @keyframes overlayFadeIn {
+    from { opacity: 0; backdrop-filter: blur(0); }
+    to { opacity: 1; backdrop-filter: blur(8px); }
+  }
+  
+  @keyframes overlayFadeOut {
+    from { opacity: 1; backdrop-filter: blur(8px); }
+    to { opacity: 0; backdrop-filter: blur(0); }
+  }
+  
+  @keyframes modalSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(40px) scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  
+  @keyframes modalSlideDown {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(40px) scale(0.9);
+    }
+  }

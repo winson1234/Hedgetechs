@@ -70,7 +70,7 @@ export default function LoginPage() {
 
         <div className="login-card">
           <div className="logo">
-            <img src="/KrypitalX.png" alt="KrypitalX" className="logo-image-login" />
+            <img src="/hedgetech logo-02.png" alt="Hedgetech.co" className="logo-image-login" />
           </div>
           <p className="subtitle">Sign in to Secure Client Area</p>
 

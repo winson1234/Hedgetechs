@@ -162,7 +162,7 @@ useEffect(() => {
 <div className="register-page">
   <div className="header">
     <Link to="/dashboard" className="logo">
-      <img src="/KrypitalX.png" alt="KrypitalX" className="logo-image-header" />
+      <img src="/hedgetech logo-02.png" alt="Hedgetechs.co" className="logo-image-header" />
     </Link>
     <Link to="/login">
       <button className="client-login-btn">Client Login</button>
@@ -174,7 +174,7 @@ useEffect(() => {
       <div className="container">
         <div className="card">
           <h1>Create Account</h1>
-          <p>Join KrypitalX and start trading today</p>
+          <p>Join Hedgetechs and start trading today</p>
 
           <form id="registerForm" onSubmit={handleSubmit}>
             {/* Country */}

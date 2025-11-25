@@ -26,6 +26,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -114,15 +115,33 @@ func main() {
 	log.Println("Margin service initialized successfully")
 
 	// Initialize Redis client using centralized infrastructure
+	// Redis is optional - app can run without it (with limited functionality)
+	var redisClient *redis.Client
 	if err := redisInfra.InitClientFromEnv(); err != nil {
-		log.Fatalf("FATAL: Failed to initialize Redis: %v", err)
+		log.Printf("WARNING: Failed to initialize Redis: %v", err)
+		log.Println("WARNING: Running without Redis - some features will be disabled:")
+		log.Println("  - OTP verification for password reset will not work")
+		log.Println("  - Rate limiting will be disabled")
+		log.Println("  - Session revocation will be disabled")
+		log.Println("  - Forex real-time data streaming will be disabled")
+		log.Println("To fix: Start Redis with 'docker compose up -d redis' or install Redis locally")
+		redisClient = nil
+	} else {
+		redisClient = redisInfra.GetClient()
+		defer redisInfra.CloseClient()
+		log.Println("Redis client initialized successfully")
 	}
-	redisClient := redisInfra.GetClient()
-	defer redisInfra.CloseClient()
 
 	// Initialize auth storage service (Redis-backed OTP, reset tokens, rate limiting, session revocation)
-	authStorage := services.NewAuthStorageService(redisClient)
-	log.Println("Auth storage service initialized (Redis-backed)")
+	// Will be nil if Redis is unavailable - auth handlers will need to handle this
+	var authStorage *services.AuthStorageService
+	if redisClient != nil {
+		authStorage = services.NewAuthStorageService(redisClient)
+		log.Println("Auth storage service initialized (Redis-backed)")
+	} else {
+		authStorage = nil
+		log.Println("WARNING: Auth storage service disabled (Redis unavailable)")
+	}
 
 	// Initialize email sender based on environment
 	var emailSender services.EmailSender
@@ -205,9 +224,9 @@ func main() {
 	// This prevents long-term data accumulation and reduces storage/egress costs
 	partitionManager := services.NewPartitionManagerService(services.PartitionManagerConfig{
 		DB:              dbPool,
-		Archiver:        nil, // Optional: Configure S3/Supabase Storage archiver if needed
-		RetentionMonths: 3,   // Keep last 3 months of data (user-selected)
-		PreCreateMonths: 1,   // Pre-create 1 month ahead
+		Archiver:        nil,         // Optional: Configure S3/Supabase Storage archiver if needed
+		RetentionMonths: 3,           // Keep last 3 months of data (user-selected)
+		PreCreateMonths: 1,           // Pre-create 1 month ahead
 		Schedule:        "0 0 * * *", // Run daily at midnight UTC (more aggressive than default monthly)
 	})
 
@@ -325,8 +344,8 @@ func main() {
 	// Routes through messageBroadcaster to reach both WebSocket clients and order processor
 	go binance.StreamDepth(&hub.Hub{
 		Broadcast:  messageBroadcaster,
-		Register:   make(chan *hub.Client),   // Unused dummy channel
-		Unregister: make(chan *hub.Client),   // Unused dummy channel
+		Register:   make(chan *hub.Client), // Unused dummy channel
+		Unregister: make(chan *hub.Client), // Unused dummy channel
 	})
 	log.Println("Binance order book depth stream started (20 levels @ 100ms)")
 
@@ -337,8 +356,8 @@ func main() {
 	//       Frontend throttling (100ms) prevents duplicate price updates from causing issues
 	go binance.StreamTrades(&hub.Hub{
 		Broadcast:  messageBroadcaster,
-		Register:   make(chan *hub.Client),   // Unused dummy channel
-		Unregister: make(chan *hub.Client),   // Unused dummy channel
+		Register:   make(chan *hub.Client), // Unused dummy channel
+		Unregister: make(chan *hub.Client), // Unused dummy channel
 	})
 	log.Println("Binance trades stream started (for market trades display)")
 

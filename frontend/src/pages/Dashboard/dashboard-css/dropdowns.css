@@ -1,0 +1,448 @@
+/* ===========================
+   DROPDOWNS - Language, Crypto, Profile
+   =========================== */
+
+/* LANGUAGE DROPDOWN */
+.language-selector {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .flag-label {
+    font-size: 16px;
+    line-height: 1;
+  }
+  
+  .language-menu {
+    position: absolute;
+    top: 54px;
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    list-style: none;
+    padding: 8px 0;
+    margin: 0;
+    display: none;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(253, 219, 146, 0.1);
+    z-index: 100;
+    min-width: 140px;
+    backdrop-filter: blur(20px);
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  
+  .language-menu.show {
+    display: block;
+  }
+  
+  #languageToggle img {
+    width: 22px;
+    height: 16px;
+    border-radius: 4px;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+  }
+  
+  #languageToggle:hover img {
+    transform: scale(1.1);
+  }
+  
+  .language-menu li img {
+    width: 22px;
+    height: 16px;
+    border-radius: 4px;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+  }
+  
+  .language-menu li {
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+  }
+  
+  .language-menu li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 3px;
+    height: 0;
+    background: var(--primary-color);
+    transition: height 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 0 2px 2px 0;
+  }
+  
+  .language-menu li:hover::before {
+    height: 100%;
+  }
+  
+  .language-menu li:hover {
+    background: rgba(253, 219, 146, 0.1);
+    color: var(--primary-color);
+    padding-left: 20px;
+  }
+  
+  .language-menu li:hover img {
+    transform: scale(1.15);
+  }
+  
+  .language-menu li.selected {
+    color: #FFD700;
+    font-weight: bold;
+  }
+  
+  /* Custom scrollbar for language menu */
+  .language-menu::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .language-menu::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+  }
+  
+  .language-menu::-webkit-scrollbar-thumb {
+    background: rgba(253, 219, 146, 0.3);
+    border-radius: 10px;
+    transition: background 0.3s ease;
+  }
+  
+  .language-menu::-webkit-scrollbar-thumb:hover {
+    background: rgba(253, 219, 146, 0.5);
+  }
+  
+  /* CRYPTO SELECTOR */
+  .crypto-selector {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .crypto-selector-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    min-width: 180px;
+    justify-content: space-between;
+  }
+  
+  .crypto-selector-btn:hover {
+    border-color: var(--primary-color);
+    background: rgba(253, 219, 146, 0.05);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(253, 219, 146, 0.15);
+  }
+  
+  .crypto-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  
+  .crypto-label {
+    flex: 1;
+    text-align: left;
+  }
+  
+  .crypto-selector-btn svg {
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+    color: var(--text-secondary);
+  }
+  
+  .crypto-selector-btn:hover svg {
+    color: var(--primary-color);
+  }
+  
+  .crypto-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 100%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    list-style: none;
+    padding: 8px 0;
+    margin: 0;
+    display: none;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(253, 219, 146, 0.1);
+    z-index: 10000;
+    backdrop-filter: blur(20px);
+    max-height: 250px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+  }
+  
+  .crypto-menu.show {
+    display: block;
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  .crypto-menu li {
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+  }
+  
+  .crypto-menu li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 3px;
+    height: 0;
+    background: var(--primary-color);
+    transition: height 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 0 2px 2px 0;
+  }
+  
+  .crypto-menu li:hover::before {
+    height: 100%;
+  }
+  
+  .crypto-menu li:hover {
+    background: rgba(253, 219, 146, 0.1);
+    color: var(--primary-color);
+    padding-left: 20px;
+  }
+  
+  .crypto-menu li.selected {
+    color: #FFD700;
+    font-weight: bold;
+  }
+  
+  .crypto-menu li .crypto-icon {
+    font-size: 18px;
+    transition: transform 0.3s ease;
+  }
+  
+  .crypto-menu li:hover .crypto-icon {
+    transform: scale(1.15);
+  }
+  
+  /* Custom scrollbar for crypto menu */
+  .crypto-menu::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .crypto-menu::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+  }
+  
+  .crypto-menu::-webkit-scrollbar-thumb {
+    background: rgba(253, 219, 146, 0.3);
+    border-radius: 10px;
+    transition: background 0.3s ease;
+  }
+  
+  .crypto-menu::-webkit-scrollbar-thumb:hover {
+    background: rgba(253, 219, 146, 0.5);
+  }
+  
+  /* PROFILE DROPDOWN */
+  .profile-container {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .profile-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #C76D00, #FDDB92);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+    border: 3px solid rgba(253, 219, 146, 0.5);
+    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 6px 20px rgba(199, 109, 0, 0.4);
+    position: relative;
+  }
+  
+  /* Rotating border effect */
+  .profile-icon::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    background: conic-gradient(from 0deg, transparent, #FDDB92, transparent);
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  
+  .profile-icon:hover::before {
+    opacity: 1;
+  }
+  
+  .header.scrolled .profile-icon {
+    width: 46px;
+    height: 46px;
+    font-size: 17px;
+    border: 2px solid var(--bg-tertiary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  .profile-icon:hover {
+    transform: scale(1.12) rotate(5deg);
+    border-color: #FDDB92;
+    box-shadow: 0 12px 36px rgba(199, 109, 0, 0.6), 0 0 40px rgba(253, 219, 146, 0.4);
+  }
+  
+  .profile-dropdown {
+    position: absolute;
+    top: 65px;
+    right: 0;
+    background: var(--bg-card);
+    border-radius: 16px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(253, 219, 146, 0.1);
+    width: 260px;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-15px) scale(0.95);
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+    backdrop-filter: blur(20px);
+  }
+  
+  .profile-dropdown.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  
+  .dropdown-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .dropdown-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(253, 219, 146, 0.1), transparent);
+  }
+  
+  body.light-mode .dropdown-header {
+    background: linear-gradient(135deg, #f8f9fa, #ffffff);
+  }
+  
+  body.dark-mode .dropdown-header {
+    background: var(--bg-secondary);
+  }
+  
+  .dropdown-username {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+  
+  .dropdown-email {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  
+  .dropdown-menu {
+    padding: 8px 0;
+  }
+  
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    font-size: 14px;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    width: 100%;
+    text-align: left;
+    position: relative;
+  }
+  
+  .dropdown-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 4px;
+    height: 0;
+    background: var(--primary-color);
+    transition: height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 0 4px 4px 0;
+  }
+  
+  .dropdown-item:hover::before {
+    height: 100%;
+  }
+  
+  .dropdown-item:hover {
+    background: rgba(253, 219, 146, 0.08);
+    color: var(--primary-color);
+    padding-left: 28px;
+    transform: translateX(2px);
+  }
+  
+  .dropdown-item svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  
+  .dropdown-item:hover svg {
+    transform: scale(1.2) rotate(5deg);
+  }
+  
+  .dropdown-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 8px 0;
+  }

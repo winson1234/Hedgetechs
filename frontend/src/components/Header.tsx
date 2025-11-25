@@ -60,7 +60,11 @@ export default function Header() {
             onClick={() => navigate('/dashboard')}
             className="hover:opacity-80 transition-opacity cursor-pointer bg-transparent border-none"
           >
-            <img src="/KrypitalX.png" alt="KrypitalX" className="h-12" />
+             <img 
+              src={isDarkMode ? "/Hedgetech logo dark mode.png" : "/hedgetech logo-02.png"} 
+              alt="Hedgetechs" 
+              className="h-12" 
+            />
           </button>
         </div>
 

@@ -108,7 +108,12 @@ const Header: React.FC<HeaderProps> = ({
                   section?.scrollIntoView({ behavior: "smooth" });
                 }}
               >
-                <img src="/hedgetech logo-02.png" alt="Hedgetechs.co" className="logo-image" />
+                <img 
+                  key={isDarkMode ? 'dark' : 'light'} // ✅ Forces re-render with animation
+                  src={isDarkMode ? "/Hedgetech logo dark mode.png" : "/hedgetech logo-02.png"} 
+                  alt="Hedgetechs.co" 
+                  className="logo-image" 
+                />
               </a>
             </div>
 

@@ -1,9 +1,15 @@
 import React from 'react';
 
-const Footer: React.FC = () => {
+// ✅ Add interface with isDarkMode prop
+interface FooterProps {
+  isDarkMode: boolean;
+}
+
+// ✅ Update component to accept props
+const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
   return (
     <footer className="footer" id="footer">
-      {/* ✅ Support CTA Section - Now at top of footer */}
+      {/* Support CTA Section */}
       <div className="footer-support-cta" style={{ 
         padding: '4rem 0', 
         background: 'var(--bg-primary)',
@@ -26,7 +32,12 @@ const Footer: React.FC = () => {
         <div className="footer-content">
           <div className="footer-brand">
             <div className="logo">
-              <img src="/hedgetech logo-02.png" alt="Hedgetechs.co" className="logo-image" />
+              {/* ✅ Dynamic logo based on theme */}
+              <img 
+                src={isDarkMode ? "/Hedgetech logo dark mode.png" : "/hedgetech logo-02.png"} 
+                alt="Hedgetechs.co" 
+                className="logo-image" 
+              />
             </div>
             <p className="footer-tagline">The most trusted cryptocurrency exchange platform.</p>
           </div>
@@ -53,7 +64,7 @@ const Footer: React.FC = () => {
           </div>
         </div>
         <div className="footer-bottom">
-          <p>&copy; 2025 Hedgetechs. All rights reserved.</p>
+          <p>&copy; 2025 KrypitalX. All rights reserved.</p>
         </div>
       </div>
     </footer>

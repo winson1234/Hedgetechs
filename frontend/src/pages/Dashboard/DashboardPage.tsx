@@ -176,7 +176,7 @@ export default function DashboardPage() {
         <FAQSection />
 
         {/* Footer */}
-        <Footer />
+        <Footer isDarkMode={isDarkMode} />
 
         {/* Scroll UI Components */}
         <ScrollProgressBar 

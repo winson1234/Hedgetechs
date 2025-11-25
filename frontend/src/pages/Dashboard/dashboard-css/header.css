@@ -156,3 +156,24 @@
    .mobile-nav-link:hover {
      color: var(--text-primary);
    }
+
+   /* Smooth logo transition when theme changes */
+  .logo-image {
+    transition: opacity 0.3s ease-in-out;
+  }
+
+  /* Fade animation when logo changes */
+  .logo-image {
+    animation: logoFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  @keyframes logoFadeIn {
+    0% {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }

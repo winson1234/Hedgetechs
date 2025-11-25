@@ -1,5 +1,5 @@
 # Environment
-.env
+# .env
 .env.dev
 
 # SSL Certificates (mkcert-generated for local HTTPS development)

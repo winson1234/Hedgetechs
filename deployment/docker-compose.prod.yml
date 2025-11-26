@@ -1,8 +1,4 @@
-# Production Docker Compose for Contabo VPS
-# Deploy with: docker compose -f deployment/docker-compose.prod.yml up -d
-
 services:
-  # Redis service
   redis:
     image: redis:7-alpine
     container_name: brokerage-redis-prod
@@ -20,7 +16,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend service
   backend:
     build:
       context: ..
@@ -28,12 +23,35 @@ services:
     container_name: brokerage-backend-prod
     restart: always
     ports:
-      - "127.0.0.1:8080:8080"  # Only expose to localhost (Nginx will proxy)
-    env_file:
-      - ../.env.prod
+      - "127.0.0.1:8080:8080"
     environment:
-      - DOCKER_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_MIGRATION_URL=${DATABASE_MIGRATION_URL:-${DATABASE_URL}}
       - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_STORAGE_URL=${SUPABASE_STORAGE_URL}
+      - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-kyc-documents}
+      - SUPABASE_STORAGE_REGION=${SUPABASE_STORAGE_REGION:-ap-south-1}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - NOWPAYMENTS_API_KEY=${NOWPAYMENTS_API_KEY}
+      - MARKET_DATA_PROVIDER=${MARKET_DATA_PROVIDER:-hybrid}
+      - TWELVE_DATA_API_KEY=${TWELVE_DATA_API_KEY}
+      - TWELVE_DATA_POLL_INTERVAL=${TWELVE_DATA_POLL_INTERVAL:-15m}
+      - ENABLE_EXTERNAL_FETCH=${ENABLE_EXTERNAL_FETCH:-true}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-onboarding@resend.dev}
+      - AWS_AI_ACCESS_KEY=${AWS_AI_ACCESS_KEY}
+      - AWS_AI_SECRET_KEY=${AWS_AI_SECRET_KEY}
+      - AWS_AI_REGION=${AWS_AI_REGION:-us-east-1}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DOCKER_ENV=production
+      - PORT=8080
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
     networks:
       - brokerage-network
     depends_on:
@@ -46,7 +64,6 @@ services:
       retries: 3
       start_period: 60s
 
-  # Frontend service
   frontend:
     build:
       context: ../frontend
@@ -62,7 +79,7 @@ services:
     container_name: brokerage-frontend-prod
     restart: always
     ports:
-      - "127.0.0.1:3000:80"  # Only expose to localhost (Nginx will proxy)
+      - "127.0.0.1:3000:80"
     networks:
       - brokerage-network
     depends_on:

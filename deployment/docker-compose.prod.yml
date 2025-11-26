@@ -1,0 +1,83 @@
+# Production Docker Compose for Contabo VPS
+# Deploy with: docker compose -f deployment/docker-compose.prod.yml up -d
+
+services:
+  # Redis service
+  redis:
+    image: redis:7-alpine
+    container_name: brokerage-redis-prod
+    restart: always
+    command: sh -c "redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    networks:
+      - brokerage-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend service
+  backend:
+    build:
+      context: ..
+      dockerfile: cmd/server/Dockerfile
+    container_name: brokerage-backend-prod
+    restart: always
+    ports:
+      - "127.0.0.1:8080:8080"  # Only expose to localhost (Nginx will proxy)
+    env_file:
+      - ../.env.prod
+    environment:
+      - DOCKER_ENV=production
+      - REDIS_ADDR=redis:6379
+    networks:
+      - brokerage-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v1/ticker?symbols=BTCUSDT"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Frontend service
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_STRIPE_PUBLISHABLE_KEY=${VITE_STRIPE_PUBLISHABLE_KEY}
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+        - VITE_API_URL=${VITE_API_URL}
+        - VITE_DOCKER_BACKEND_URL=http://backend:8080
+        - APP_URL=${APP_URL}
+        - WEBHOOK_URL=${WEBHOOK_URL}
+    container_name: brokerage-frontend-prod
+    restart: always
+    ports:
+      - "127.0.0.1:3000:80"  # Only expose to localhost (Nginx will proxy)
+    networks:
+      - brokerage-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  brokerage-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local

@@ -64,7 +64,7 @@ const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
           </div>
         </div>
         <div className="footer-bottom">
-          <p>&copy; 2025 KrypitalX. All rights reserved.</p>
+          <p>&copy; 2025 Hedgetechs. All rights reserved.</p>
         </div>
       </div>
     </footer>

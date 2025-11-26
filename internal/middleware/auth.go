@@ -71,19 +71,23 @@ func NewAuthMiddleware(authStorage *services.AuthStorageService) func(http.Handl
 
 			// CRITICAL: Check session revocation (Kill Switch)
 			// If password was changed after this token was issued, reject it
-			tokenIssuedAt := claims.IssuedAt.Unix()
-			isRevoked, err := authStorage.IsSessionRevoked(r.Context(), userUUID.String(), tokenIssuedAt)
-			if err != nil {
-				// Log error but don't fail the request (fail open for availability)
-				log.Printf("[AUTH ERROR] Failed to check session revocation for user %s: %v", userUUID, err)
+			// NOTE: This feature requires Redis. If Redis is unavailable, skip the check (fail-open for availability)
+			if authStorage != nil {
+				tokenIssuedAt := claims.IssuedAt.Unix()
+				isRevoked, err := authStorage.IsSessionRevoked(r.Context(), userUUID.String(), tokenIssuedAt)
+				if err != nil {
+					// Log error but don't fail the request (fail open for availability)
+					log.Printf("[AUTH ERROR] Failed to check session revocation for user %s: %v", userUUID, err)
+				}
+				if isRevoked {
+					respondWithJSON(w, http.StatusUnauthorized, map[string]interface{}{
+						"error":   "session_revoked",
+						"message": "Your session was invalidated due to a security update. Please log in again.",
+					})
+					return
+				}
 			}
-			if isRevoked {
-				respondWithJSON(w, http.StatusUnauthorized, map[string]interface{}{
-					"error":   "session_revoked",
-					"message": "Your session was invalidated due to a security update. Please log in again.",
-				})
-				return
-			}
+			// If authStorage is nil, session revocation is disabled (logged at startup)
 
 			// Look up bigint user_id from users table
 			pool, err := database.GetPool()

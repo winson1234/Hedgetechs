@@ -59,7 +59,7 @@ Set environment variables via Fly.io CLI:
 ```bash
 # Backend secrets
 fly secrets set STRIPE_SECRET_KEY=sk_live_your_live_key
-fly secrets set APP_URL=https://brokerageproject.fly.dev
+fly secrets set APP_URL=https://127.0.0.1:8080
 fly secrets set NOWPAYMENTS_API_KEY=your_api_key
 
 # View current secrets
@@ -335,7 +335,7 @@ fly deploy
 - **Platform:** Fly.io
 - **Region:** Frankfurt, Germany (fra)
 - **VM:** 256MB RAM, 1 shared CPU
-- **Live URL:** https://brokerageproject.fly.dev
+- **Live URL:** https://127.0.01:8080
 - **Build:** Multi-stage Dockerfile (Go 1.23-alpine)
 
 **Deployment workflow:**

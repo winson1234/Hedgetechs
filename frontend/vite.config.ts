@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
 
-// Use localhost for development, Fly.io for production preview
 const isDev = process.env.NODE_ENV !== 'production'
 
 // Check if running in Docker (via environment variable)
@@ -34,28 +33,28 @@ if (isDockerEnv) {
   // Local development: use HTTPS if certificates are available
   BACKEND_URL = hasCertificates ? 'https://localhost:8080' : 'http://localhost:8080'
 } else {
-  // Production: use Fly.io URL
-  BACKEND_URL = 'https://brokerageproject.fly.dev'
+  // Production: use environment variable or default
+  BACKEND_URL = process.env.VITE_BACKEND_URL || 'http://localhost:8080'
 }
 
 // Log configuration for developer visibility
 if (isDockerEnv && hasCertificates) {
   console.log('🐳 Running in Docker environment with HTTPS')
   console.log('   Frontend: https://localhost:5173')
-  console.log('   Backend:  ' + BACKEND_URL)
+  console.log('   Backend: ' + BACKEND_URL)
   console.log('   Certificates: ' + certPath)
 } else if (isDockerEnv) {
   console.log('🐳 Running in Docker environment')
   console.log('   Frontend: http://localhost:5173')
-  console.log('   Backend:  ' + BACKEND_URL)
+  console.log('   Backend: ' + BACKEND_URL)
 } else if (isDev && hasCertificates) {
   console.log('✅ mkcert certificates found - using HTTPS for local development')
   console.log('   Frontend: https://localhost:5173')
-  console.log('   Backend:  https://localhost:8080')
+  console.log('   Backend: https://localhost:8080')
 } else if (isDev) {
   console.log('ℹ️  No mkcert certificates found - using HTTP for local development')
   console.log('   Frontend: http://localhost:5173')
-  console.log('   Backend:  http://localhost:8080')
+  console.log('   Backend: http://localhost:8080')
   console.log('   Tip: Run "mkcert localhost 127.0.0.1 ::1" in project root for HTTPS')
 }
 

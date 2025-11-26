@@ -9,7 +9,7 @@ const isDev = import.meta.env.DEV
 // Backend API base URL
 export const API_BASE_URL = isDev
   ? '' // In dev, use relative paths (Vite proxy handles routing to localhost:8080)
-  : 'https://brokerageproject.fly.dev' // In production, point directly to Fly.io
+  : import.meta.env.VITE_API_URL || '' // In production, use environment variable or relative path
 
 /**
  * Helper function to construct full API URLs

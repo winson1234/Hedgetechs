@@ -5,8 +5,8 @@ Comprehensive CFD and forex trading platform with cryptocurrency support, featur
 
 ## Live Deployment
 
-**Frontend:** [https://brokerageproject.pages.dev](https://brokerageproject.pages.dev) (Cloudflare Pages)
-**Backend:** [https://brokerageproject.fly.dev](https://brokerageproject.fly.dev) (Fly.io)
+**Frontend:** [https://127.0.0.1:3000](https://127.0.0.1:3000) (Frontend port)
+**Backend:** [https://127.0.0.1:8080](https://127.0.0.1:8080) (Backend port)
 
 ---
 

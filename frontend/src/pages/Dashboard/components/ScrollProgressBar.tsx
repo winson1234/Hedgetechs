@@ -24,7 +24,7 @@ export const ScrollProgressBar: React.FC<ScrollProgressBarProps> = ({
       <div style={{
         height: '100%',
         width: `${progress}%`,
-        background: 'linear-gradient(90deg, #C76D00, #FDDB92)',
+        background: 'linear-gradient(90deg,  #00C0A2, #009b82)',
         transition: 'width 0.5s ease'
       }} />
     </div>

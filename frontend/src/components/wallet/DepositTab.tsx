@@ -818,7 +818,7 @@ function DepositTab() {
                 onClick={() => setSelectedTab('card')}
                 className={`px-4 py-3 text-sm font-semibold rounded-lg transition-all ${
                   selectedTab === 'card'
-                    ? 'bg-indigo-600 text-white shadow-md'
+                    ? 'bg-[#00C0A2] text-white shadow-md'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
@@ -829,7 +829,7 @@ function DepositTab() {
                 onClick={() => setSelectedTab('banking')}
                 className={`px-4 py-3 text-sm font-semibold rounded-lg transition-all ${
                   selectedTab === 'banking'
-                    ? 'bg-indigo-600 text-white shadow-md'
+                    ? 'bg-[#00C0A2] text-white shadow-md'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
@@ -840,7 +840,7 @@ function DepositTab() {
                 onClick={() => setSelectedTab('crypto')}
                 className={`px-4 py-3 text-sm font-semibold rounded-lg transition-all ${
                   selectedTab === 'crypto'
-                    ? 'bg-indigo-600 text-white shadow-md'
+                    ? 'bg-[#00C0A2] text-white shadow-md'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
@@ -982,7 +982,7 @@ function DepositTab() {
           <button
             type="submit"
             disabled={isProcessing || !stripe}
-            className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
+            className="w-full px-6 py-4 text-base font-semibold bg-[#00C0A2] hover:bg-[#00a085] text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
           >
             {isProcessing ? 'Processing Payment...' : 'Pay with Card'}
           </button>
@@ -1079,7 +1079,7 @@ function DepositTab() {
           <button
             type="submit"
             disabled={isProcessing || !stripe || !elements}
-            className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
+            className="w-full px-6 py-4 text-base font-semibold bg-[#00C0A2] hover:bg-[#00a085] text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
           >
             {isProcessing ? 'Processing...' : 'Pay with FPX'}
           </button>
@@ -1190,7 +1190,7 @@ function DepositTab() {
           <button
             type="submit"
             disabled={isProcessing}
-            className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
+            className="w-full px-6 py-4 text-base font-semibold bg-[#00C0A2] hover:bg-[#00a085] text-white rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
           >
             {isProcessing ? 'Redirecting...' : 'Pay with Cryptocurrency'}
           </button>

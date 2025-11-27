@@ -162,7 +162,7 @@ useEffect(() => {
 <div className="register-page">
   <div className="header">
     <Link to="/dashboard" className="logo">
-      <img src="/hedgetech logo-02.png" alt="Hedgetechs.co" className="logo-image-header" />
+      <img src="/Hedgetech logo dark mode.png" alt="Hedgetechs.co" className="logo-image-header" />
     </Link>
     <Link to="/login">
       <button className="client-login-btn">Client Login</button>

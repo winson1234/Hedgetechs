@@ -181,7 +181,13 @@ const Hero: React.FC = () => {
         </div>
 
         {/* Hero Image */}
-        <div className="hero-image" ref={heroImageParallaxRef}>
+        <div 
+          className="hero-image" 
+          ref={heroImageParallaxRef}
+          style={{
+            marginTop: '45px',
+          }}
+        >
           {/* Floating Crypto Icons */}
           <div 
             className="coin btc" 

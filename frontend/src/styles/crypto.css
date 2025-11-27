@@ -130,13 +130,15 @@
 }
 
 .market-tab:hover {
-  background: rgba(253, 219, 146, 0.1);
-  border-color: var(--primary-color);
+  /* Changed to a subtle tint of #213B34 */
+  background: rgba(33, 59, 52, 0.1);
+  border-color: #213B34;
   color: var(--text-primary);
 }
 
 .market-tab.active {
-  background: var(--gradient-gold);
+  /* Changed from Gold to Dark Green #213B34 Gradient */
+  background: linear-gradient(135deg, #213B34, #1c302a);
   border-color: transparent;
   color: white;
 }
@@ -270,7 +272,7 @@
 
 .btn-trade {
   padding: 10px 28px;
-  background: var(--gradient-gold);
+  background: linear-gradient(90deg,  #00C0A2, #009b82);
   color: white;
   border: none;
   border-radius: 8px;
@@ -279,10 +281,10 @@
   cursor: pointer;
   transition: all 0.2s ease;
   letter-spacing: 0.3px;
-  box-shadow: 0 2px 8px rgba(253, 219, 146, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 192, 162, 0.15);
 }
 
 .btn-trade:hover {
   transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 6px 20px rgba(253, 219, 146, 0.35);
+  box-shadow: 0 6px 20px rgba(0, 192, 162, 0.35);
 }

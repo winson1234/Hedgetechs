@@ -282,7 +282,7 @@ function WithdrawTab() {
         <button
           type="submit"
           disabled={isProcessing}
-          className="w-full px-4 py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full px-4 py-2.5 text-sm font-medium bg-[#00C0A2] hover:bg-[#00a085] text-white rounded-md transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isProcessing ? 'Processing...' : 'Confirm Withdrawal'}
         </button>

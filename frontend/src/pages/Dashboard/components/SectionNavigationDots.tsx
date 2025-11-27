@@ -35,7 +35,7 @@ export const SectionNavigationDots: React.FC<SectionNavigationDotsProps> = ({
             borderRadius: '50%',
             border: 'none',
             background: currentSection === index 
-              ? 'linear-gradient(135deg, #C76D00, #FDDB92)'
+              ? 'linear-gradient(135deg, #00C0A2, #009b82)'
               : 'rgba(255, 255, 255, 0.3)',
             cursor: 'pointer',
             transition: 'all 0.3s ease',

@@ -226,7 +226,7 @@ function TransferTab() {
             onClick={() => setTransferType('live')}
             className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
               transferType === 'live'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-[#00C0A2] text-white'
                 : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
             }`}
           >
@@ -237,7 +237,7 @@ function TransferTab() {
             onClick={() => setTransferType('demo')}
             className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
               transferType === 'demo'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-[#00C0A2] text-white'
                 : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
             }`}
           >
@@ -366,7 +366,7 @@ function TransferTab() {
         <button
           type="submit"
           disabled={isProcessing || toAccounts.length === 0}
-          className="w-full px-4 py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full px-4 py-2.5 text-sm font-medium bg-[#00C0A2] hover:bg-[#00a085] text-white rounded-md transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isProcessing ? 'Processing...' : 'Confirm Transfer'}
         </button>

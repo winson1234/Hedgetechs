@@ -85,7 +85,7 @@ export default function Header() {
               dispatch(setActiveWalletTab('deposit'));
               navigate('/wallet');
             }}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded text-sm font-medium transition"
+            className="bg-[#00C0A2] hover:bg-[#00a085] text-white px-4 py-1.5 rounded text-sm font-medium transition"
           >
             Funds
           </button>

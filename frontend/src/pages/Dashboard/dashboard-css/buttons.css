@@ -1,202 +1,209 @@
 /* ===========================
-   BUTTONS
+   BUTTONS (TEAL THEME #00C0A2)
    =========================== */
 
 /* ICON BUTTONS with magnetic effect */
 .icon-btn {
-    border-radius: 12px !important;
-    width: 46px;
-    height: 46px;
-    min-width: 46px;
-    min-height: 46px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    cursor: pointer;
-    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-    padding: 0;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(12px);
-    position: relative;
-    overflow: hidden;
-  }
-  
-  /* Ripple effect */
-  .icon-btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at center, rgba(253, 219, 146, 0.3), transparent 70%);
-    opacity: 0;
-    transform: scale(0);
-    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-    border-radius: 12px;
-  }
-  
-  .icon-btn:hover::before {
-    opacity: 1;
-    transform: scale(1);
-  }
-  
-  .header.scrolled .icon-btn {
-    background: transparent;
-    border: 1px solid var(--border-color);
-    box-shadow: none;
-    backdrop-filter: none;
-  }
-  
-  body.light-mode .icon-btn {
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  }
-  
-  body.light-mode .header.scrolled .icon-btn {
-    background: transparent;
-    border: 1px solid var(--border-color);
-    box-shadow: none;
-  }
-  
-  /* Hover effect with rotation */
-  .icon-btn:hover {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    color: #1a1f3a;
-    box-shadow: 0 8px 24px rgba(253, 219, 146, 0.6), 0 0 40px rgba(253, 219, 146, 0.3);
-    transform: translateY(-4px) rotate(5deg) scale(1.1);
-  }
-  
-  .icon-btn:hover svg {
-    color: #1a1f3a !important;
-    stroke: #1a1f3a !important;
-  }
-  
-  /* SVG colors */
-  .icon-btn svg {
-    color: #ffffff !important;
-    stroke: #ffffff !important;
-    transition: all 0.4s ease;
-  }
-  
-  body.light-mode .icon-btn svg {
-    color: #1a1f3a !important;
-    stroke: #1a1f3a !important;
-    transition: all 0.4s ease;
-  }
-  
-  /* Language Button Text */
-  #languageToggle span {
-    line-height: 1;
-    font-weight: 600;
-    font-size: 14px;
-    text-transform: uppercase;
-    color: #ffffff !important;
-    transition: all 0.4s ease;
-  }
-  
-  body.light-mode #languageToggle span {
-    color: rgba(26, 31, 58, 0.9) !important;
-  }
-  
-  /* General Button Styles */
-  .btn {
-    padding: 12px 28px;
-    border: none;
-    border-radius: 10px;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-    text-decoration: none;
-    display: inline-block;
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.3), transparent 70%);
-    opacity: 0;
-    transform: scale(0);
-    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  
-  .btn:hover::before {
-    opacity: 1;
-    transform: scale(2);
-  }
-  
-  .btn-secondary {
-    background: rgba(255, 255, 255, 0.15);
-    color: rgba(255, 255, 255, 0.98);
-    border: 1.5px solid rgba(255, 255, 255, 0.3);
-    backdrop-filter: blur(12px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-  }
-  
-  body.light-mode .btn-secondary {
-    background: rgba(255, 255, 255, 0.7);
-    color: rgba(26, 31, 58, 0.95);
-    border: 1.5px solid rgba(0, 0, 0, 0.12);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  }
-  
-  .header.scrolled .btn-secondary {
-    background: transparent;
-    color: #ffffff !important;
-    border: 1.5px solid var(--border-color);
-    box-shadow: none;
-    backdrop-filter: none;
-  }
-  
-  body.light-mode .header.scrolled .btn-secondary {
-    color: rgba(26, 31, 58, 0.9) !important;
-  }
-  
-  .btn-secondary:hover {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    color: #1a1f3a;
-    transform: translateY(-4px) scale(1.05);
-    box-shadow: 0 8px 28px rgba(253, 219, 146, 0.6), 0 0 40px rgba(253, 219, 146, 0.3);
-  }
-  
-  .btn-gradient {
-    background: var(--gradient-gold);
-    border: none;
-    color: white;
-    font-weight: 700;
-    box-shadow: 0 6px 24px rgba(253, 219, 146, 0.5);
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .btn-gradient::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    transform: translateX(-100%);
-    transition: transform 0.8s ease;
-  }
-  
-  .btn-gradient:hover::after {
-    transform: translateX(100%);
-  }
-  
-  .btn-gradient:hover {
-    transform: translateY(-4px) scale(1.05);
-    box-shadow: 0 12px 40px rgba(253, 219, 146, 0.7), 0 0 60px rgba(253, 219, 146, 0.4);
-  }
-  
-  .btn-large {
-    margin-top: -20px;
-    padding: 12px 32px;
-    font-size: 15px;
-    border-radius: 12px;
-    color: white;
-  }
+  border-radius: 12px !important;
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  padding: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ripple effect - Changed to Teal RGB (0, 192, 162) */
+.icon-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(0, 192, 162, 0.3), transparent 70%);
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border-radius: 12px;
+}
+
+.icon-btn:hover::before {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.header.scrolled .icon-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body.light-mode .icon-btn {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode .header.scrolled .icon-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  box-shadow: none;
+}
+
+/* Hover effect with rotation - TEAL */
+.icon-btn:hover {
+  background: #00C0A2;
+  border-color: #00C0A2;
+  color: #ffffff; /* White text on Teal background */
+  /* Teal Shadows */
+  box-shadow: 0 8px 24px rgba(0, 192, 162, 0.6), 0 0 40px rgba(0, 192, 162, 0.3);
+  transform: translateY(-4px) rotate(5deg) scale(1.1);
+}
+
+.icon-btn:hover svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* SVG colors */
+.icon-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+  transition: all 0.4s ease;
+}
+
+body.light-mode .icon-btn svg {
+  color: #1a1f3a !important;
+  stroke: #1a1f3a !important;
+  transition: all 0.4s ease;
+}
+
+/* Language Button Text */
+#languageToggle span {
+  line-height: 1;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  color: #ffffff !important;
+  transition: all 0.4s ease;
+}
+
+body.light-mode #languageToggle span {
+  color: rgba(26, 31, 58, 0.9) !important;
+}
+
+/* General Button Styles */
+.btn {
+  padding: 12px 28px;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  text-decoration: none;
+  display: inline-block;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.3), transparent 70%);
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn:hover::before {
+  opacity: 1;
+  transform: scale(2);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.98);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+body.light-mode .btn-secondary {
+  background: rgba(255, 255, 255, 0.7);
+  color: rgba(26, 31, 58, 0.95);
+  border: 1.5px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.header.scrolled .btn-secondary {
+  background: transparent;
+  color: #ffffff !important;
+  border: 1.5px solid var(--border-color);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body.light-mode .header.scrolled .btn-secondary {
+  color: rgba(26, 31, 58, 0.9) !important;
+}
+
+/* Secondary Button Hover - TEAL */
+.btn-secondary:hover {
+  background: #00C0A2;
+  border-color: #00C0A2;
+  color: #ffffff;
+  transform: translateY(-4px) scale(1.05);
+  /* Teal Glows */
+  box-shadow: 0 8px 28px rgba(0, 192, 162, 0.6), 0 0 40px rgba(0, 192, 162, 0.3);
+}
+
+/* Gradient Button (The main CTA) - TEAL */
+.btn-gradient {
+  /* Replaced Gold gradient with Teal gradient */
+  background: linear-gradient(90deg, #00C0A2 0%, #00A085 100%);
+  border: none;
+  color: white;
+  font-weight: 700;
+  /* Teal Shadow */
+  box-shadow: 0 6px 24px rgba(0, 192, 162, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-gradient::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.8s ease;
+}
+
+.btn-gradient:hover::after {
+  transform: translateX(100%);
+}
+
+.btn-gradient:hover {
+  transform: translateY(-4px) scale(1.05);
+  /* Intense Teal Glow */
+  box-shadow: 0 12px 40px rgba(0, 192, 162, 0.7), 0 0 60px rgba(0, 192, 162, 0.4);
+}
+
+.btn-large {
+  margin-top: -20px;
+  padding: 12px 32px;
+  font-size: 15px;
+  border-radius: 12px;
+  color: white;
+}

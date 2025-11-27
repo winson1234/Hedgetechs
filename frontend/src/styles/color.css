@@ -9,7 +9,7 @@
 
 :root {
   /* Colors */
-  --primary-color: #FDDB92;
+  --primary-color: #00C0A2;
   --secondary-color: #00d4aa;
   --accent-color: #a855f7;
 
@@ -23,7 +23,7 @@
   --border-color: #2a2f4a;
 
   /* Gradients */
-  --gradient-gold: linear-gradient(135deg, #C76D00, #FDDB92);
+  --gradient-gold: linear-gradient(135deg, #00C0A2, #00a085);
   --gradient-green: linear-gradient(135deg, #00d4aa, #00f5cc);
   --gradient-purple: linear-gradient(135deg, #a855f7, #c084fc);
 }

@@ -298,7 +298,16 @@ export default function AccountPage() {
              </div>
              <div className="p-5 md:p-6 lg:p-8">
                 <div className="flex justify-end mb-6">
-                    <button onClick={() => handleOpenCreateModal(activeTab)} className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm ${activeTab === 'live'? 'bg-indigo-600 hover:bg-indigo-700 text-white': 'bg-green-600 hover:bg-green-700 text-white'}`}><PlusIcon /> Open New Account</button>
+                <button 
+                    onClick={() => handleOpenCreateModal(activeTab)} 
+                    className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm text-white ${
+                        activeTab === 'live' 
+                        ? 'bg-[#213B34] hover:bg-gray-800'       // Color for LIVE tab
+                        : 'bg-[#55bca1] hover:bg-[#44a088]'  // Color for DEMO tab
+                    }`}
+                >
+                    <PlusIcon /> Open New Account
+                </button>
                 </div>
                 {activeTab === 'live' && (<div>{liveAccounts.length === 0 ? (<div className="text-center py-10 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/30"><p className="text-slate-500 dark:text-slate-400">You haven&apos;t opened any live accounts yet.</p></div>) : (<div className="grid grid-cols-1 md:grid-cols-2 gap-5">{liveAccounts.map(renderAccountCard)}</div>)}</div>)}
                 {activeTab === 'demo' && (<div>{demoAccounts.length === 0 ? (<div className="text-center py-10 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/30"><p className="text-slate-500 dark:text-slate-400">You haven&apos;t opened any demo accounts yet.</p></div>) : (<div className="grid grid-cols-1 md:grid-cols-2 gap-5">{demoAccounts.map(renderAccountCard)}</div>)}</div>)}

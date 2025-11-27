@@ -13,7 +13,7 @@ import {
   adaptPendingOrder
 } from '../utils/orderAdapters';
 import TransactionDetailModal from '../components/TransactionDetailModal';
-import HistorySummaryCards from '../components/HistorySummaryCards';
+// import HistorySummaryCards from '../components/HistorySummaryCards'; // Replaced with inline cards to match PNG
 
 type HistoryTab = 'all' | 'open-orders' | 'trades' | 'transactions' | 'positions' | 'demo';
 type ClosedPosition = Position & { timestamp: number; itemType: 'closedPosition' };
@@ -881,470 +881,211 @@ export default function HistoryPage() {
     exportToCSV(sortedHistory, `transaction-history-${Date.now()}.csv`);
   }, [sortedHistory]);
 
+  // Stats for Summary Cards (matching PNG)
+  const cardStats = useMemo(() => {
+    const totalTxn = tabCounts.all; // or use transactions.length if specifically for wallet
+    
+    const totalDeposited = transactions
+      .filter(t => t.type === 'deposit' && t.status === 'completed')
+      .reduce((sum, t) => sum + t.amount, 0);
+      
+    const totalWithdrawn = transactions
+      .filter(t => t.type === 'withdraw' && t.status === 'completed')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    // Pending items count (from pending orders + pending transactions)
+    const pendingTxn = transactions.filter(t => t.status === 'pending').length;
+    const pendingOrdersCount = tabCounts.openOrders;
+    const totalPending = pendingTxn + pendingOrdersCount;
+
+    return {
+      totalTxn,
+      totalDeposited,
+      totalWithdrawn,
+      totalPending
+    };
+  }, [transactions, tabCounts]);
+
   return (
-    <div className="px-4 pb-4 md:px-6 md:pb-6 lg:px-8 lg:pb-8 bg-slate-50 dark:bg-slate-950 min-h-[calc(100vh-61px)]">
+    <div className="px-4 py-6 md:px-6 lg:px-8 bg-slate-50 dark:bg-slate-950 min-h-[calc(100vh-61px)]">
       {/* Page Header */}
-      <div className="mb-4">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
           Transaction History
         </h1>
-        <p className="text-slate-600 dark:text-slate-400">
+        <p className="text-slate-600 dark:text-slate-400 mt-1">
           View and manage all your trades, deposits, withdrawals, and transfers
         </p>
       </div>
 
-      {/* Summary Cards */}
-      <HistorySummaryCards 
-        transactions={transactions} 
-        totalItems={tabCounts.all} 
-        pendingOrdersCount={tabCounts.openOrders}
-      />
-
-      {/* Search and Controls */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm p-4 mb-4">
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search Bar */}
-          <div className="flex-1">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search by symbol, ID, amount, or account..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <svg className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Left Column: Vertical Summary Cards (Matching PNG) */}
+        <div className="space-y-4">
+          {/* Card 1: Total Transactions */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex justify-between items-center">
+            <div>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Transactions</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{cardStats.totalTxn}</p>
+            </div>
+            <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             </div>
           </div>
 
-          {/* Filter Toggle Button */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 py-2 border rounded-md transition-colors flex items-center gap-2 ${
-              showFilters
-                ? 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300'
-                : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            Filters
-            {hasActiveFilters && (
-              <span className="bg-indigo-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                !
-              </span>
-            )}
-          </button>
-
-          {/* Export Button */}
-          <button
-            onClick={handleExportCSV}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors flex items-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export CSV
-          </button>
-        </div>
-
-        {/* Advanced Filters */}
-        {showFilters && (
-          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Date Range */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Date Range
-                </label>
-                <select
-                  value={dateRange}
-                  onChange={(e) => setDateRange(e.target.value as DateRangeOption)}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 Days</option>
-                  <option value="month">Last 30 Days</option>
-                  <option value="custom">Custom Range</option>
-                </select>
-              </div>
-
-              {/* Status Filter */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Status
-                </label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as TransactionStatus | 'all')}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="pending">Pending</option>
-                  <option value="processing">Processing</option>
-                  <option value="completed">Completed</option>
-                  <option value="failed">Failed</option>
-                </select>
-              </div>
-
-              {/* Type Filter */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Type
-                </label>
-                <select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value as TransactionType | 'all')}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All Types</option>
-                  <option value="deposit">Deposits</option>
-                  <option value="withdraw">Withdrawals</option>
-                  <option value="transfer">Transfers</option>
-                </select>
-              </div>
-
-              {/* Sort */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Sort By
-                </label>
-                <select
-                  value={sortOption}
-                  onChange={(e) => setSortOption(e.target.value as SortOption)}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="date-desc">Date (Newest)</option>
-                  <option value="date-asc">Date (Oldest)</option>
-                  <option value="amount-desc">Amount (High to Low)</option>
-                  <option value="amount-asc">Amount (Low to High)</option>
-                </select>
-              </div>
+          {/* Card 2: Total Deposited */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex justify-between items-center">
+            <div>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Deposited</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{formatCurrency(cardStats.totalDeposited, 'USD')}</p>
             </div>
-
-            {/* Custom Date Range */}
-            {dateRange === 'custom' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={customDateStart}
-                    onChange={(e) => setCustomDateStart(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={customDateEnd}
-                    onChange={(e) => setCustomDateEnd(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Amount Range */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Min Amount
-                </label>
-                <input
-                  type="number"
-                  placeholder="0.00"
-                  value={minAmount}
-                  onChange={(e) => setMinAmount(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Max Amount
-                </label>
-                <input
-                  type="number"
-                  placeholder="10000.00"
-                  value={maxAmount}
-                  onChange={(e) => setMaxAmount(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
+            <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             </div>
-
-            {/* Clear Filters Button */}
-            {hasActiveFilters && (
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={clearFilters}
-                  className="px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Clear All Filters
-                </button>
-              </div>
-            )}
           </div>
-        )}
-      </div>
 
-      {/* Tabs */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm">
-        <div className="border-b border-slate-200 dark:border-slate-700 px-5 md:px-6 lg:px-8 pt-3">
-          <nav className="flex -mb-px space-x-8" aria-label="Tabs">
-            <button
-              onClick={() => setActiveTab('all')}
-              className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'all'
-                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-              }`}
-            >
-              All ({tabCounts.all})
-            </button>
-            <button
-              onClick={() => setActiveTab('trades')}
-              className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'trades'
-                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-              }`}
-            >
-              Trades ({tabCounts.trades})
-            </button>
-            <button
-              onClick={() => setActiveTab('transactions')}
-              className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'transactions'
-                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-              }`}
-            >
-              Wallet ({tabCounts.transactions})
-            </button>
-            <button
-              onClick={() => setActiveTab('positions')}
-              className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'positions'
-                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-              }`}
-            >
-              Positions ({tabCounts.positions})
-            </button>
-            <button
-              onClick={() => setActiveTab('open-orders')}
-              className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'open-orders'
-                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-              }`}
-            >
-              Open Orders ({tabCounts.openOrders})
-            </button>
-            <button
-              onClick={() => setActiveTab('demo')}
-              className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'demo'
-                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-              }`}
-            >
-              Demo ({tabCounts.demo})
-            </button>
-          </nav>
+          {/* Card 3: Total Withdrawn */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex justify-between items-center">
+            <div>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Withdrawn</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{formatCurrency(cardStats.totalWithdrawn, 'USD')}</p>
+            </div>
+            <div className="h-10 w-10 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-rose-600 dark:text-rose-400">
+               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
+            </div>
+          </div>
+
+          {/* Card 4: Pending */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex justify-between items-center">
+            <div>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Pending</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{cardStats.totalPending}</p>
+            </div>
+            <div className="h-10 w-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center text-yellow-600 dark:text-yellow-400">
+               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+          </div>
         </div>
 
-        {/* History List */}
-        <div className="p-5 md:p-6 lg:p-8">
-          {liveAccounts.length === 0 && activeTab !== 'demo' ? (
-            <div className="text-center py-16">
-              <svg className="mx-auto h-16 w-16 text-purple-400 dark:text-purple-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
-                No Live Accounts
-              </h3>
-              <p className="text-slate-500 dark:text-slate-400 mb-2">
-                Transaction history shows only <span className="font-semibold">Live Account</span> transactions.
-              </p>
-              <p className="text-slate-500 dark:text-slate-400">
-                Demo account transactions are not tracked. Create a Live Account to see real transaction history.
-              </p>
+        {/* Right Column: Main Panel with Tabs & List */}
+        <div className="lg:col-span-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 h-fit">
+          
+          {/* Top Toolbar: Search & Actions */}
+          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 items-center justify-between">
+             {/* Search Input */}
+             <div className="relative w-full sm:max-w-md">
+               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                 <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+               </div>
+               <input
+                  type="text"
+                  placeholder="Search instruments..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg leading-5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+               />
+             </div>
+
+             {/* Buttons */}
+             <div className="flex items-center gap-3 w-full sm:w-auto">
+               <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="flex items-center justify-center px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-1/2 sm:w-auto"
+               >
+                  <svg className="w-4 h-4 mr-2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                  Filters
+               </button>
+               <button
+                  onClick={handleExportCSV}
+                  className="flex items-center justify-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#00C0A2] hover:bg-[#00a085] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-1/2 sm:w-auto"
+               >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                  Export CSV
+               </button>
+             </div>
+          </div>
+
+          {/* Filter Expansion (conditionally rendered) */}
+          {showFilters && (
+            <div className="p-5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+               {/* Reused filter logic from previous code */}
+               <div>
+                  <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Date Range</label>
+                  <select value={dateRange} onChange={(e) => setDateRange(e.target.value as DateRangeOption)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-sm"><option value="all">All Time</option><option value="today">Today</option><option value="week">Last 7 Days</option><option value="month">Last 30 Days</option></select>
+               </div>
+               <div>
+                  <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Status</label>
+                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as TransactionStatus | 'all')} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-sm"><option value="all">All Statuses</option><option value="completed">Completed</option><option value="pending">Pending</option></select>
+               </div>
+               <div>
+                  <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Type</label>
+                  <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as TransactionType | 'all')} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-sm"><option value="all">All Types</option><option value="deposit">Deposits</option><option value="withdraw">Withdrawals</option></select>
+               </div>
+               <div className="flex items-end">
+                   <button onClick={clearFilters} className="text-sm text-indigo-600 hover:text-indigo-800">Clear Filters</button>
+               </div>
             </div>
-          ) : paginatedHistory.length === 0 ? (
-            <div className="text-center py-16">
-              <svg className="mx-auto h-16 w-16 text-slate-400 dark:text-slate-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
-                {hasActiveFilters ? 'No results found' : 'No history yet'}
-              </h3>
-              <p className="text-slate-500 dark:text-slate-400 mb-6">
-                {hasActiveFilters
-                  ? 'Try adjusting your filters to see more results'
-                  : activeTab === 'open-orders'
-                    ? "You don't have any pending orders. Create a limit or stop-limit order to see it here."
-                    : activeTab === 'trades'
-                      ? "You haven't made any trades yet. Start trading to see your order history here."
-                      : activeTab === 'transactions'
-                        ? "You haven't made any deposits, withdrawals, or transfers yet."
-                        : activeTab === 'positions'
-                          ? "You don't have any closed positions yet. Close a CFD position to see it here."
-                          : 'Your transaction history will appear here.'}
-              </p>
-              {hasActiveFilters && (
-                <button
-                  onClick={clearFilters}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors"
-                >
-                  Clear Filters
-                </button>
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="space-y-3">
-                {paginatedHistory.map((item, index) => {
-                  const key = `${item.itemType}-${item.id}-${index}`;
-
-                  if (item.itemType === 'transaction') {
-                    return (
-                      <TransactionRow
-                        key={key}
-                        transaction={item as Transaction}
-                        accounts={accounts}
-                        onClick={() => handleItemClick(item)}
-                      />
-                    );
-                  } else if (item.itemType === 'executedOrder') {
-                    return (
-                      <ExecutedOrderRow
-                        key={key}
-                        order={item as ExecutedOrder}
-                        onClick={() => handleItemClick(item)}
-                      />
-                    );
-                  } else if (item.itemType === 'pendingOrder') {
-                    return (
-                      <PendingOrderRow
-                        key={key}
-                        order={item as PendingOrder}
-                        onClick={() => handleItemClick(item)}
-                      />
-                    );
-                  } else {
-                    return (
-                      <ClosedPositionRow
-                        key={key}
-                        position={item as ClosedPosition}
-                        onClick={() => handleItemClick(item)}
-                      />
-                    );
-                  }
-                })}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  {/* Items per page */}
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-slate-600 dark:text-slate-400">Items per page:</label>
-                    <select
-                      value={itemsPerPage}
-                      onChange={(e) => {
-                        setItemsPerPage(Number(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                      className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
-
-                  {/* Page info */}
-                  <div className="text-sm text-slate-600 dark:text-slate-400">
-                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, sortedHistory.length)} of {sortedHistory.length} results
-                  </div>
-
-                  {/* Page navigation */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Previous
-                    </button>
-
-                    {/* Page numbers */}
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                        let pageNum;
-                        if (totalPages <= 5) {
-                          pageNum = i + 1;
-                        } else if (currentPage <= 3) {
-                          pageNum = i + 1;
-                        } else if (currentPage >= totalPages - 2) {
-                          pageNum = totalPages - 4 + i;
-                        } else {
-                          pageNum = currentPage - 2 + i;
-                        }
-
-                        return (
-                          <button
-                            key={pageNum}
-                            onClick={() => setCurrentPage(pageNum)}
-                            className={`w-8 h-8 rounded-md transition-colors ${
-                              currentPage === pageNum
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                            }`}
-                          >
-                            {pageNum}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
           )}
+
+          {/* Tabs Navigation (Border Bottom Style) */}
+          <div className="border-b border-slate-200 dark:border-slate-800">
+            <nav className="flex -mb-px" aria-label="Tabs">
+               {[
+                 { id: 'all', label: 'All', count: tabCounts.all },
+                 { id: 'trades', label: 'Trades', count: tabCounts.trades },
+                 { id: 'transactions', label: 'Transactions', count: tabCounts.transactions },
+                 { id: 'positions', label: 'Positions', count: tabCounts.positions },
+                 { id: 'open-orders', label: 'Open Orders', count: tabCounts.openOrders },
+                 { id: 'demo', label: 'Demo', count: tabCounts.demo },
+               ].map((tab) => (
+                 <button
+                   key={tab.id}
+                   onClick={() => setActiveTab(tab.id as HistoryTab)}
+                   className={`whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
+                     activeTab === tab.id
+                       ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                       : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200'
+                   }`}
+                 >
+                   {tab.label} ({tab.count})
+                 </button>
+               ))}
+            </nav>
+          </div>
+
+          {/* Main Content / List */}
+          <div className="min-h-[400px]">
+             {paginatedHistory.length === 0 ? (
+                /* Empty State Matching PNG */
+                <div className="flex flex-col items-center justify-center h-[400px] text-center">
+                   <div className="w-16 h-16 text-slate-300 dark:text-slate-600 mb-4">
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                   </div>
+                   <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">No history yet</h3>
+                   <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Your transaction history will appear here.</p>
+                </div>
+             ) : (
+                <div className="p-4 space-y-2">
+                  {paginatedHistory.map((item, index) => {
+                     const key = `${item.itemType}-${item.id}-${index}`;
+                     if (item.itemType === 'transaction') return <TransactionRow key={key} transaction={item as Transaction} accounts={accounts} onClick={() => handleItemClick(item)} />;
+                     if (item.itemType === 'executedOrder') return <ExecutedOrderRow key={key} order={item as ExecutedOrder} onClick={() => handleItemClick(item)} />;
+                     if (item.itemType === 'pendingOrder') return <PendingOrderRow key={key} order={item as PendingOrder} onClick={() => handleItemClick(item)} />;
+                     return <ClosedPositionRow key={key} position={item as ClosedPosition} onClick={() => handleItemClick(item)} />;
+                  })}
+
+                  {/* Pagination Logic preserved inside the panel */}
+                  {totalPages > 1 && (
+                    <div className="flex justify-between items-center pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+                       <span className="text-sm text-slate-500">Page {currentPage} of {totalPages}</span>
+                       <div className="flex gap-2">
+                          <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1} className="px-3 py-1 border rounded text-sm hover:bg-slate-50 disabled:opacity-50">Prev</button>
+                          <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage === totalPages} className="px-3 py-1 border rounded text-sm hover:bg-slate-50 disabled:opacity-50">Next</button>
+                       </div>
+                    </div>
+                  )}
+                </div>
+             )}
+          </div>
         </div>
       </div>
 

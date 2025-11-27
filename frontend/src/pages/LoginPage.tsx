@@ -65,8 +65,6 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="container">
         <div className="background"></div>
-        <div className="chart-overlay"></div>
-        <div className="candlestick-pattern" ref={candlesticksRef}></div>
 
         <div className="login-card">
           <div className="logo">
@@ -136,9 +134,8 @@ export default function LoginPage() {
           <div className="signup-section">
             <p className="signup-text">Don&apos;t have an account?</p>
             <div className="signup-links">
-              <Link to="/register">Open a Demo Account</Link>
-              <span>|</span>
-              <Link to="/register">Open a Real Account</Link>
+              <Link to="/register" className='demo-signup-btn'>Open a Demo Account</Link>
+              <Link to="/register" className='real-signup-btn'>Open a Real Account</Link>
             </div>
           </div>
         </div>

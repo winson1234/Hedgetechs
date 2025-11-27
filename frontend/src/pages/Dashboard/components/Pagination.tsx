@@ -34,9 +34,10 @@ export const Pagination: React.FC<PaginationProps> = ({
           fontSize: '0.9rem',
           fontWeight: '600',
           color: currentPage === 1 ? '#64748b' : '#ffffff',
+          /* CHANGED: Dark Green #213B34 */
           background: currentPage === 1
             ? 'rgba(100, 116, 139, 0.2)'
-            : 'linear-gradient(135deg, #C76D00, #FDDB92)',
+            : 'linear-gradient(135deg, #213B34, #1c302a)',
           border: 'none',
           borderRadius: '8px',
           cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
@@ -82,8 +83,9 @@ export const Pagination: React.FC<PaginationProps> = ({
                 : isDarkMode 
                   ? '#ffffff' 
                   : '#1a1f3a',
+              /* CHANGED: Dark Green #213B34 for active page */
               background: page === currentPage
-                ? 'linear-gradient(135deg, #C76D00, #FDDB92)'
+                ? 'linear-gradient(135deg, #213B34, #1c302a)'
                 : isDarkMode
                   ? 'rgba(255, 255, 255, 0.1)'
                   : 'rgba(255, 255, 255, 0.2)',
@@ -126,9 +128,10 @@ export const Pagination: React.FC<PaginationProps> = ({
           fontSize: '0.9rem',
           fontWeight: '600',
           color: currentPage === totalPages ? '#64748b' : '#ffffff',
+          /* CHANGED: Dark Green #213B34 */
           background: currentPage === totalPages
             ? 'rgba(100, 116, 139, 0.2)'
-            : 'linear-gradient(135deg, #C76D00, #FDDB92)',
+            : 'linear-gradient(135deg, #213B34, #1c302a)',
           border: 'none',
           borderRadius: '8px',
           cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',

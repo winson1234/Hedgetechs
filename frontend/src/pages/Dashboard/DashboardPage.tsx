@@ -92,7 +92,7 @@ export default function DashboardPage() {
   const isDarkMode = useAppSelector(selectIsDarkMode);
   const { currentSection, sections, scrollToSection } = useSectionScroll();
 
-  // Initialize scroll animations
+  // Initialize scroll animations (now using IntersectionObserver)
   useGSAPScrollAnimations();
   useMicroParallax();
   useScrollAnimations({
@@ -100,6 +100,41 @@ export default function DashboardPage() {
     rootMargin: '0px',
     parallaxSpeed: 0,
   });
+
+  // ✅ Force animations to show when section becomes active
+  useEffect(() => {
+    const activeSection = document.querySelector('.section-active');
+    if (!activeSection) return;
+
+    // Small delay to ensure section transition is complete
+    const timer = setTimeout(() => {
+      // Find all animated elements in the active section
+      const animatedElements = activeSection.querySelectorAll(
+        '[data-gsap-animate], [data-scroll-animate], .crypto-table, .news-grid, .market-tabs, .trust-grid, .faq-container'
+      );
+
+      animatedElements.forEach((el, index) => {
+        // Trigger animation with stagger
+        setTimeout(() => {
+          el.classList.add('animate-in', 'is-visible');
+          
+          // Use GSAP for smooth animation
+          gsap.fromTo(
+            el,
+            { opacity: 0, y: 20 },
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.6,
+              ease: 'power2.out',
+            }
+          );
+        }, index * 50); // Stagger by 50ms
+      });
+    }, 300); // Wait for section transition
+
+    return () => clearTimeout(timer);
+  }, [currentSection]);
 
   // Intersection Observer for header background
   useEffect(() => {
@@ -111,31 +146,25 @@ export default function DashboardPage() {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          // Home section visible → transparent
           header.classList.remove("scrolled");
         } else {
-          // Home section NOT visible → solid background
           header.classList.add("scrolled");
         }
       },
-      {
-        threshold: 0.3,  // 30% of home section must be visible
-      }
+      { threshold: 0.3 }
     );
 
     observer.observe(homeSection);
-
     return () => observer.disconnect();
   }, []);
 
-  // Apply theme class to body element when theme changes
+  // Apply theme
   useEffect(() => {
     document.body.classList.toggle('dark-mode', isDarkMode);
     document.body.classList.toggle('light-mode', !isDarkMode);
 
     return () => {
-      document.body.classList.remove('dark-mode');
-      document.body.classList.remove('light-mode');
+      document.body.classList.remove('dark-mode', 'light-mode');
     };
   }, [isDarkMode]);
 
@@ -146,7 +175,6 @@ export default function DashboardPage() {
   return (
     <>
       <div className="dashboard-page">
-        {/* Header */}
         <Header 
           isDarkMode={isDarkMode}
           toggleTheme={toggleTheme}
@@ -154,31 +182,15 @@ export default function DashboardPage() {
           scrollToSection={scrollToSection}
         />
 
-        {/* Hero Section */}
         <Hero />
-      
-        {/* Market Overview Section */}
         <MarketSection isDarkMode={isDarkMode} />
-
-        {/* News Section */}
         <NewsSection isDarkMode={isDarkMode} />
-
-        {/* One Click Payout Section */}
         <PayoutSection />
-
-        {/* Features Section */}
         <FeaturesSection />
-
-        {/* Trust Section */}
         <TrustSection />
-
-        {/* FAQ Section */}
         <FAQSection />
-
-        {/* Footer */}
         <Footer isDarkMode={isDarkMode} />
 
-        {/* Scroll UI Components */}
         <ScrollProgressBar 
           currentSection={currentSection} 
           totalSections={sections.length} 

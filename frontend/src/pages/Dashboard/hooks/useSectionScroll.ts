@@ -5,7 +5,8 @@ export const useSectionScroll = () => {
   const [currentSection, setCurrentSection] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const lastUpdateRef = useRef(0);
-  const wheelTimeoutRef = useRef<number | null>(null);
+  const accumulatedDeltaRef = useRef(0);
+  const resetTimeoutRef = useRef<number | null>(null);
   const touchStartRef = useRef<number>(0);
   const sections = useMemo(() => SECTIONS, []);
 
@@ -22,6 +23,14 @@ export const useSectionScroll = () => {
 
       if (index === activeIndex) {
         element.classList.add('section-active');
+        
+        // ✅ CRITICAL: Trigger animations when section becomes active
+        requestAnimationFrame(() => {
+          const animatedElements = element.querySelectorAll('[data-gsap-animate], [data-scroll-animate]');
+          animatedElements.forEach((el) => {
+            el.classList.add('animate-in', 'is-visible');
+          });
+        });
       } else if (index < activeIndex) {
         element.classList.add('section-above');
       } else {
@@ -54,7 +63,7 @@ export const useSectionScroll = () => {
       }
     }
 
-    setTimeout(() => setIsTransitioning(false), 1200);
+    setTimeout(() => setIsTransitioning(false), 1000);
   }, [isTransitioning, sections, updateSectionClasses]);
 
   useEffect(() => {
@@ -62,21 +71,38 @@ export const useSectionScroll = () => {
     document.documentElement.style.overflow = 'hidden';
     updateSectionClasses(0);
 
+    // ✅ FIXED: Delta accumulation for consistent mouse/trackpad behavior
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (isTransitioning) return;
-      
-      if (wheelTimeoutRef.current) {
-        clearTimeout(wheelTimeoutRef.current);
+
+      // Clear previous reset timeout
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
       }
-      
-      wheelTimeoutRef.current = window.setTimeout(() => {
-        if (e.deltaY > 0 && currentSection < sections.length - 1) {
+
+      // Accumulate scroll delta
+      accumulatedDeltaRef.current += e.deltaY;
+
+      // Threshold to trigger section change
+      const threshold = 50;
+
+      if (Math.abs(accumulatedDeltaRef.current) >= threshold) {
+        if (accumulatedDeltaRef.current > 0 && currentSection < sections.length - 1) {
           scrollToSection(currentSection + 1);
-        } else if (e.deltaY < 0 && currentSection > 0) {
+          accumulatedDeltaRef.current = 0;
+        } else if (accumulatedDeltaRef.current < 0 && currentSection > 0) {
           scrollToSection(currentSection - 1);
+          accumulatedDeltaRef.current = 0;
+        } else {
+          accumulatedDeltaRef.current = 0;
         }
-      }, 10);
+      }
+
+      // Auto-reset if no scrolling for 200ms
+      resetTimeoutRef.current = window.setTimeout(() => {
+        accumulatedDeltaRef.current = 0;
+      }, 200);
     };
 
     const handleTouchStart = (e: TouchEvent) => {
@@ -133,9 +159,10 @@ export const useSectionScroll = () => {
       window.removeEventListener('touchend', handleTouchEnd);
       window.removeEventListener('keydown', handleKeyDown);
       
-      if (wheelTimeoutRef.current) {
-        clearTimeout(wheelTimeoutRef.current);
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
       }
+      accumulatedDeltaRef.current = 0;
     };
   }, [currentSection, isTransitioning, scrollToSection, sections.length, updateSectionClasses]);
 

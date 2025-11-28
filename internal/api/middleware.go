@@ -21,7 +21,14 @@ func CORSMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			"https://127.0.0.1:5173": true,
 			"http://127.0.0.1:4173":  true,
 			"https://127.0.0.1:4173": true,
+
+			// Production origins
+			"https://hedgetechs.com":     true, // ✅ ADDED
+			"https://www.hedgetechs.com": true, // ✅ ADDED
+			"http://hedgetechs.com":      true, // HTTP fallback (will redirect to HTTPS)
+			"http://www.hedgetechs.com":  true,
 		} // Check exact match first
+
 		if allowedOrigins[origin] {
 			allowed = true
 		} else if strings.HasSuffix(origin, ".pages.dev") {

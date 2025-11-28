@@ -410,6 +410,14 @@ func main() {
 	// REST handler for crypto exchange rates (with CORS and HEAD support)
 	http.HandleFunc(config.ExchangeRateAPIPath, api.CORSMiddleware(allowHEAD(exchangeRateHandler.HandleGetRates)))
 
+	// ========== EXTERNAL API PROXY ENDPOINTS ==========
+
+	// Binance klines proxy (for chart candlestick data)
+	http.HandleFunc("/api/v1/proxy/binance/klines", api.CORSMiddleware(allowHEAD(api.ProxyBinanceKlines)))
+
+	// Exchange rates proxy (backup for ExchangeRateService)
+	http.HandleFunc("/api/v1/proxy/exchange-rates", api.CORSMiddleware(allowHEAD(api.ProxyExchangeRates)))
+
 	// ========== AUTHENTICATION ENDPOINTS (Public - No Auth Required) ==========
 
 	// POST /api/v1/auth/register - User registration (creates pending_registrations record)

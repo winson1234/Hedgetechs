@@ -35,7 +35,7 @@ const initialState: UIState = {
   theme: 'dark', // Default theme
   currentPage: 'trading',
   activeInstrument: 'BTCUSDT', // Default to Bitcoin
-  selectedProductType: 'spot', // Default to SPOT trading
+  selectedProductType: 'cfd', // Default to CFD trading
   activeWalletTab: 'overview',
   showAnalyticsPanel: false,
   isSidebarExpanded: false, // Default to collapsed

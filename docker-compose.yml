@@ -5,7 +5,7 @@ services:
   # Redis service
   redis:
     image: redis:7-alpine
-    container_name: brokerage-redis
+    container_name: hedgetech-redis
     ports:
       - "6379:6379"
     networks:

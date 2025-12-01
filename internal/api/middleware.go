@@ -23,10 +23,10 @@ func CORSMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			"https://127.0.0.1:4173": true,
 
 			// Production origins
-			"https://hedgetechs.com":     true, // ✅ ADDED
-			"https://www.hedgetechs.com": true, // ✅ ADDED
-			"http://hedgetechs.com":      true, // HTTP fallback (will redirect to HTTPS)
-			"http://www.hedgetechs.com":  true,
+			"https://trade.hedgetechs.com":     true,
+			"https://www.trade.hedgetechs.com": true,
+			"http://trade.hedgetechs.com":      true, // HTTP fallback (will redirect to HTTPS)
+			"http://www.trade.hedgetechs.com":  true,
 		} // Check exact match first
 
 		if allowedOrigins[origin] {

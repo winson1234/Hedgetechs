@@ -368,7 +368,6 @@ func HandleTicker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Separate symbols into Binance-supported and non-Binance symbols
-	// Forex instruments from TwelveData (no ticker/volume data available)
 	nonBinanceSymbols := map[string]bool{
 		"CADJPY": true,
 		"AUDNZD": true,
@@ -377,13 +376,19 @@ func HandleTicker(w http.ResponseWriter, r *http.Request) {
 
 	requestedSymbols := strings.Split(symbolsParam, ",")
 	var binanceSymbols []string
+	binanceSymbolsMap := make(map[string]bool) // For quick lookup
 	var nonBinanceList []string
 
 	for _, sym := range requestedSymbols {
+		sym = strings.TrimSpace(sym)
+		if sym == "" {
+			continue
+		}
 		if nonBinanceSymbols[sym] {
 			nonBinanceList = append(nonBinanceList, sym)
 		} else {
 			binanceSymbols = append(binanceSymbols, sym)
+			binanceSymbolsMap[sym] = true
 		}
 	}
 
@@ -391,14 +396,50 @@ func HandleTicker(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch from Binance only for supported symbols
 	if len(binanceSymbols) > 0 {
-		binanceURL := fmt.Sprintf("%s?symbols=[\"%s\"]", config.BinanceTicker24hURL,
-			strings.Join(binanceSymbols, "\",\""))
+		// Strategy: For large symbol lists (>10), fetch ALL tickers and filter
+		// For small lists, use the symbols parameter
+		var binanceURL string
 
-		log.Printf("Fetching tickers from Binance: %s", binanceURL)
+		if len(binanceSymbols) > 10 {
+			// Fetch all tickers (no symbols parameter) - more efficient for large lists
+			binanceURL = config.BinanceTicker24hURL
+			log.Printf("Fetching ALL tickers from Binance (filtering %d symbols)", len(binanceSymbols))
+		} else {
+			// Use symbols parameter for small lists
+			symbolsJSON := "[\"" + strings.Join(binanceSymbols, "\",\"") + "\"]"
+			u, err := url.Parse(config.BinanceTicker24hURL)
+			if err != nil {
+				log.Printf("Error parsing Binance ticker URL: %v", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			q := u.Query()
+			q.Set("symbols", symbolsJSON)
+			u.RawQuery = q.Encode()
+			binanceURL = u.String()
+			log.Printf("Fetching tickers from Binance: %s", binanceURL)
+		}
 
-		resp, err := http.Get(binanceURL)
+		// Retry logic for network errors
+		var resp *http.Response
+		var err error
+		maxRetries := 3
+
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			resp, err = http.Get(binanceURL)
+			if err == nil {
+				break // Success
+			}
+
+			// Log retry attempt
+			if attempt < maxRetries {
+				log.Printf("Binance API request failed (attempt %d/%d): %v. Retrying...", attempt, maxRetries, err)
+				time.Sleep(time.Duration(attempt) * 500 * time.Millisecond) // Exponential backoff: 500ms, 1s, 1.5s
+			}
+		}
+
 		if err != nil {
-			log.Printf("Error fetching tickers from Binance API: %v", err)
+			log.Printf("Error fetching tickers from Binance API after %d attempts: %v", maxRetries, err)
 			http.Error(w, "Failed to fetch data from upstream provider", http.StatusBadGateway)
 			return
 		}
@@ -428,17 +469,22 @@ func HandleTicker(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Transform to TickerResponse format
+		// Transform to TickerResponse format and filter to requested symbols
 		for _, bt := range binanceTickers {
-			tickers = append(tickers, models.TickerResponse{
-				Symbol:             bt.Symbol,
-				LastPrice:          bt.LastPrice,
-				PriceChangePercent: bt.PriceChangePercent,
-				HighPrice:          bt.HighPrice,
-				LowPrice:           bt.LowPrice,
-				Volume:             bt.QuoteVolume, // Use quoteVolume (USDT volume)
-			})
+			// Only include if it was requested
+			if binanceSymbolsMap[bt.Symbol] {
+				tickers = append(tickers, models.TickerResponse{
+					Symbol:             bt.Symbol,
+					LastPrice:          bt.LastPrice,
+					PriceChangePercent: bt.PriceChangePercent,
+					HighPrice:          bt.HighPrice,
+					LowPrice:           bt.LowPrice,
+					Volume:             bt.QuoteVolume, // Use quoteVolume (USDT volume)
+				})
+			}
 		}
+
+		log.Printf("Filtered %d tickers from Binance response", len(tickers))
 	}
 
 	// Add tickers for non-Binance symbols using price cache

@@ -60,16 +60,22 @@ func (h *ExchangeRateHandler) HandleGetRates(w http.ResponseWriter, r *http.Requ
 		timestamp = time.Now().UTC()
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "public, max-age=30")
-	w.Header().Set("X-Rates-Timestamp", timestamp.Format(time.RFC3339Nano))
+	// 🔧 NEW: Wrap response to match frontend expected format
+	source := "live"
 	if stale {
-		w.Header().Set("X-Rate-Source", "cache")
-	} else {
-		w.Header().Set("X-Rate-Source", "live")
+		source = "cache"
 	}
 
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
+	response := map[string]interface{}{
+		"rates":        payload,
+		"last_updated": timestamp.Format(time.RFC3339),
+		"source":       source,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=30")
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		sendJSONError(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }

@@ -1,0 +1,34 @@
+FROM golang:1.25-alpine
+
+# Install dev tools
+RUN apk add --no-cache \
+    git \
+    ca-certificates \
+    tzdata \
+    curl \
+    bash
+
+# Install Air for hot reloading (pinned version compatible with Go 1.25)
+RUN go install github.com/cosmtrek/air@v1.49.0
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files first (better caching)
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy Air configuration
+COPY .air.toml ./
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Run Air for hot reload
+CMD ["air", "-c", ".air.toml"]

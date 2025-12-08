@@ -88,8 +88,8 @@ func main() {
 	defer database.Close()
 
 	// Run database migrations (optional - enable if DATABASE_MIGRATION_URL is set)
-	// Use DATABASE_MIGRATION_URL for session-mode connection (port 5432 on pooler.supabase.com)
-	// This is IPv4 compatible and supports migrations
+	// Use DATABASE_MIGRATION_URL for direct PostgreSQL connection (port 5432)
+	// Supports both local PostgreSQL and cloud-hosted instances
 	if os.Getenv("DATABASE_MIGRATION_URL") != "" {
 		if err := runMigrations(); err != nil {
 			log.Printf("WARNING: Migration error: %v", err)
@@ -190,11 +190,16 @@ func main() {
 
 	// Initialize Data Integrity Service (gap detection and automatic backfill)
 	windowsAPIURL := os.Getenv("WINDOWS_API_URL")
-	if windowsAPIURL == "" {
+
+	// Only use default in local non-Docker development
+	if windowsAPIURL == "" && os.Getenv("DOCKER_ENV") == "" && os.Getenv("ENVIRONMENT") != "production" {
+		log.Println("WARNING: WINDOWS_API_URL not set, using default http://localhost:5000 for local development")
 		windowsAPIURL = "http://localhost:5000"
 	}
 
 	if windowsAPIURL != "" && redisClient != nil {
+		log.Printf("Initializing Data Integrity Service with MT5 API at %s", windowsAPIURL)
+
 		mt5Client := mt5client.NewClient(mt5client.Config{
 			BaseURL:    windowsAPIURL,
 			Timeout:    30 * time.Second,
@@ -216,7 +221,11 @@ func main() {
 			log.Println("Data Integrity Service started (gap detection every hour)")
 		}
 	} else {
-		log.Println("WARNING: Data Integrity Service disabled (MT5 API or Redis unavailable)")
+		if windowsAPIURL == "" {
+			log.Println("INFO: Data Integrity Service disabled (WINDOWS_API_URL not configured)")
+		} else {
+			log.Println("WARNING: Data Integrity Service disabled (Redis unavailable)")
+		}
 	}
 
 	// Initialize Partition Manager Service (automated partition lifecycle management)
@@ -224,7 +233,7 @@ func main() {
 	// This prevents long-term data accumulation and reduces storage/egress costs
 	partitionManager := services.NewPartitionManagerService(services.PartitionManagerConfig{
 		DB:              dbPool,
-		Archiver:        nil,         // Optional: Configure S3/Supabase Storage archiver if needed
+		Archiver:        nil,         // Optional: Configure S3/MinIO archiver if needed for partition archival
 		RetentionMonths: 3,           // Keep last 3 months of data (user-selected)
 		PreCreateMonths: 1,           // Pre-create 1 month ahead
 		Schedule:        "0 0 * * *", // Run daily at midnight UTC (more aggressive than default monthly)

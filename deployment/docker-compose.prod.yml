@@ -1,9 +1,68 @@
 services:
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: brokerage-postgres-prod
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-brokerage}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks:
+      - brokerage-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-brokerage}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=1GB"
+      - "-c"
+      - "maintenance_work_mem=64MB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "default_statistics_target=100"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "effective_io_concurrency=200"
+      - "-c"
+      - "work_mem=1310kB"
+      - "-c"
+      - "min_wal_size=1GB"
+      - "-c"
+      - "max_wal_size=4GB"
+
+  # ============================================
+  # Redis Cache
+  # ============================================
   redis:
     image: redis:7-alpine
     container_name: brokerage-redis-prod
     restart: always
-    command: sh -c "redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"
+    command: >
+      redis-server
+      --requirepass "${REDIS_PASSWORD}"
+      --appendonly yes
+      --appendfilename "appendonly.aof"
+      --appenddirname "appendonlydir"
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
@@ -16,6 +75,9 @@ services:
       timeout: 5s
       retries: 5
 
+  # ============================================
+  # Backend (Go API)
+  # ============================================
   backend:
     build:
       context: ..
@@ -25,38 +87,72 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - DATABASE_MIGRATION_URL=${DATABASE_MIGRATION_URL:-${DATABASE_URL}}
+      # ============================================
+      # DATABASE (Local PostgreSQL)
+      # ============================================
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-brokerage}?sslmode=disable
+      - DATABASE_MIGRATION_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-brokerage}?sslmode=disable
+      
+      # ============================================
+      # REDIS
+      # ============================================
       - REDIS_ADDR=redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - SUPABASE_STORAGE_URL=${SUPABASE_STORAGE_URL}
-      - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-kyc-documents}
-      - SUPABASE_STORAGE_REGION=${SUPABASE_STORAGE_REGION:-ap-south-1}
+      
+      # ============================================
+      # JWT
+      # ============================================
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
+      
+      # ============================================
+      # PAYMENT PROCESSING
+      # ============================================
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - NOWPAYMENTS_API_KEY=${NOWPAYMENTS_API_KEY}
+      
+      # ============================================
+      # MARKET DATA
+      # ============================================
       - MARKET_DATA_PROVIDER=${MARKET_DATA_PROVIDER:-hybrid}
       - TWELVE_DATA_API_KEY=${TWELVE_DATA_API_KEY}
       - TWELVE_DATA_POLL_INTERVAL=${TWELVE_DATA_POLL_INTERVAL:-15m}
       - ENABLE_EXTERNAL_FETCH=${ENABLE_EXTERNAL_FETCH:-true}
+      
+      # ============================================
+      # EMAIL
+      # ============================================
       - RESEND_API_KEY=${RESEND_API_KEY}
       - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-onboarding@resend.dev}
+      
+      # ============================================
+      # AWS FACE LIVENESS
+      # ============================================
       - AWS_AI_ACCESS_KEY=${AWS_AI_ACCESS_KEY}
       - AWS_AI_SECRET_KEY=${AWS_AI_SECRET_KEY}
       - AWS_AI_REGION=${AWS_AI_REGION:-us-east-1}
+      
+      # ============================================
+      # ENVIRONMENT
+      # ============================================
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - DOCKER_ENV=production
       - PORT=8080
+      
+      # ============================================
+      # CORS
+      # ============================================
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+    
     networks:
       - brokerage-network
+    
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
+    
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v1/ticker?symbols=BTCUSDT"]
       interval: 30s
@@ -64,16 +160,16 @@ services:
       retries: 3
       start_period: 60s
 
+  # ============================================
+  # Frontend (React/Vite)
+  # ============================================
   frontend:
     build:
       context: ../frontend
       dockerfile: Dockerfile
       args:
         - VITE_STRIPE_PUBLISHABLE_KEY=${VITE_STRIPE_PUBLISHABLE_KEY}
-        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
         - VITE_API_URL=${VITE_API_URL}
-        - VITE_DOCKER_BACKEND_URL=http://backend:8080
         - APP_URL=${APP_URL}
         - WEBHOOK_URL=${WEBHOOK_URL}
     container_name: brokerage-frontend-prod
@@ -86,7 +182,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -97,5 +193,7 @@ networks:
     driver: bridge
 
 volumes:
+  postgres-data:
+    driver: local
   redis-data:
     driver: local

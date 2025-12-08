@@ -17,6 +17,7 @@ func CORSMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			"https://localhost:5173": true, // Vite dev server (HTTPS)
 			"http://localhost:4173":  true, // Vite preview (HTTP)
 			"https://localhost:4173": true, // Vite preview (HTTPS)
+
 			"http://127.0.0.1:5173":  true,
 			"https://127.0.0.1:5173": true,
 			"http://127.0.0.1:4173":  true,

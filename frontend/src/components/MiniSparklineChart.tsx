@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { getApiUrl } from '../config/api';
+import { klineQueue } from '../utils/requestQueue';
 
 interface MiniSparklineChartProps {
   symbol: string;
@@ -9,7 +10,7 @@ interface MiniSparklineChartProps {
 }
 
 interface KlineData {
-  time: number;
+  openTime: number; // Changed from 'time' to match backend response
   open: string;
   high: string;
   low: string;
@@ -33,16 +34,19 @@ const MiniSparklineChart: React.FC<MiniSparklineChartProps> = ({
         setLoading(true);
         setError(false);
 
-        // Fetch 24h data with 15-minute intervals (96 data points)
-        const response = await fetch(
-          getApiUrl(`/api/v1/klines?symbol=${symbol}&interval=15m&limit=96`)
-        );
+        // Use request queue to prevent overwhelming the proxy
+        const klineData = await klineQueue.add(async () => {
+          const response = await fetch(
+            getApiUrl(`/api/v1/klines?symbol=${symbol}&interval=15m&limit=96`)
+          );
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch kline data');
-        }
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Failed to fetch kline data`);
+          }
 
-        const klineData: KlineData[] = await response.json();
+          return response.json();
+        });
+
         setData(klineData);
       } catch (err) {
         console.error(`Error fetching kline data for ${symbol}:`, err);
@@ -52,12 +56,17 @@ const MiniSparklineChart: React.FC<MiniSparklineChartProps> = ({
       }
     };
 
-    fetchKlineData();
+    // Add small random delay to stagger initial requests
+    const randomDelay = Math.random() * 500;
+    const timeoutId = setTimeout(fetchKlineData, randomDelay);
 
     // Refresh every 5 minutes to keep data fresh
     const interval = setInterval(fetchKlineData, 5 * 60 * 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(interval);
+    };
   }, [symbol]);
 
   // Generate SVG path from kline data
@@ -89,7 +98,6 @@ const MiniSparklineChart: React.FC<MiniSparklineChartProps> = ({
     return `M ${pathPoints.join(' L ')}`;
   }, [data, width, height]);
 
-  // Use the color prop directly from parent (based on real-time 24h change)
   const lineColor = color;
 
   if (loading) {

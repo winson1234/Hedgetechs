@@ -110,7 +110,7 @@ const Header: React.FC<HeaderProps> = ({
               >
                 <img 
                   key={isDarkMode ? 'dark' : 'light'} // ✅ Forces re-render with animation
-                  src={isDarkMode ? "/Hedgetech logo dark mode.png" : "/hedgetech logo-02.png"} 
+                  src={isDarkMode ? "/new-02.png" : "/new-02.png"} 
                   alt="Hedgetechs.co" 
                   className="logo-image" 
                 />

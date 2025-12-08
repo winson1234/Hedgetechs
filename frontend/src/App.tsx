@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import PublicRoute from './components/PublicRoute'
 import AppLayout from './components/AppLayout'
@@ -15,7 +15,8 @@ import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 
 // Public Pages
-import DashboardPage from './pages/Dashboard/DashboardPage'
+// Public Pages
+// import DashboardPage from './pages/Dashboard/DashboardPage'
 
 // Protected Pages
 import TradingPage from './pages/TradingPage'
@@ -103,9 +104,8 @@ export default function App() {
         </Route>
       </Route>
 
-      {/* Public Dashboard - Accessible to everyone */}
-      <Route path="/" element={<DashboardPage />} />
-      <Route path="/dashboard" element={<DashboardPage />} />
+      {/* Redirect root to login */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }

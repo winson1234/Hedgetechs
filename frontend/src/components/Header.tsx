@@ -57,11 +57,11 @@ export default function Header() {
         {/* Left Side: Title */}
         <div>
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/trading')}
             className="hover:opacity-80 transition-opacity cursor-pointer bg-transparent border-none"
           >
              <img 
-              src={isDarkMode ? "/Hedgetech logo dark mode.png" : "/hedgetech logo-02.png"} 
+              src={isDarkMode ? "/new-02.png" : "/new-02.png"} 
               alt="Hedgetechs" 
               className="h-12" 
             />

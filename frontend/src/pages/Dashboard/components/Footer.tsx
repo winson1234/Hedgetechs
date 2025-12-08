@@ -34,7 +34,7 @@ const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
             <div className="logo">
               {/* ✅ Dynamic logo based on theme */}
               <img 
-                src={isDarkMode ? "/Hedgetech logo dark mode.png" : "/hedgetech logo-02.png"} 
+                src={isDarkMode ? "/new-02" : "/new-02.png"} 
                 alt="Hedgetechs.co" 
                 className="logo-image" 
               />

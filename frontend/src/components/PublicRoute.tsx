@@ -20,7 +20,7 @@ export default function PublicRoute() {
 
   // Redirect to dashboard if already authenticated
   if (isLoggedIn) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/trading" replace />;
   }
 
   // Render child routes if not authenticated

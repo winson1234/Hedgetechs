@@ -52,7 +52,7 @@ const confirmLogout = async () => {
 
   // 3. Close modal and redirect directly to dashboard
   setShowLogoutModal(false);
-  navigate('/dashboard', { replace: true });
+  navigate('/login', { replace: true });
 };
 
 

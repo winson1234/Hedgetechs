@@ -222,8 +222,8 @@ export default function ForgotPasswordPage() {
   return (
     <div className="forgotpassword-page">
     <div className="header">
-    <Link to="/dashboard" className="logo">
-      <img src="/KrypitalX.png" alt="KrypitalX" className="logo-image-header" />
+    <Link to="/trading" className="logo">
+      <img src="/new-02.png" alt="KrypitalX" className="logo-image-header" />
     </Link>
     <Link to="/login">
       <button className="client-login-btn">Client Login</button>

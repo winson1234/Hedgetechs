@@ -168,7 +168,7 @@
 
         .login-page .form-input:focus {
             outline: none;
-            border-color: #d4915d;
+            border-color: #00C0A2;
             background: white;
             box-shadow: 0 0 0 3px rgba(212, 145, 93, 0.1);
         }
@@ -183,14 +183,14 @@
         }
 
         .login-page .forgot-password a {
-            color: #d4915d;
+            color: #00C0A2;
             text-decoration: none;
             font-size: 13px;
             transition: color 0.3s ease;
         }
 
         .login-page .forgot-password a:hover {
-            color: #b87a4a;
+            color: #00d4aa;
             text-decoration: underline;
         }
 

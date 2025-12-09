@@ -46,7 +46,7 @@ export default function ChartHeader({
             onClick={() => handleTimeframeClick(tf)}
             className={`px-2.5 py-1.5 text-xs sm:text-sm font-medium rounded transition-colors ${
               activeTimeframe === tf && !showCustomInterval
-                ? 'bg-blue-600 text-white'
+                ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
@@ -57,7 +57,7 @@ export default function ChartHeader({
           onClick={() => handleTimeframeClick('Custom')}
           className={`px-2.5 py-1.5 text-xs sm:text-sm font-medium rounded transition-colors ${
             showCustomInterval
-              ? 'bg-blue-600 text-white'
+              ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
               : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
           }`}
         >
@@ -78,11 +78,11 @@ export default function ChartHeader({
               }
             }}
             placeholder="e.g., 2h, 3d, 1w"
-            className="flex-1 sm:flex-none px-3 py-1.5 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 sm:flex-none px-3 py-1.5 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#00C0A2]"
           />
           <button
             onClick={handleCustomIntervalSubmit}
-            className="px-3 py-1.5 text-xs sm:text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors whitespace-nowrap"
+            className="px-3 py-1.5 text-xs sm:text-sm font-medium bg-[#00C0A2] text-white rounded hover:bg-[#00a085] transition-colors whitespace-nowrap"
           >
             Apply
           </button>

@@ -18,13 +18,18 @@ export default function AppLayout() {
   // Determine if we're on the trading page
   const isTradingPage = location.pathname === '/trading';
 
-  // Initialize dark mode from localStorage theme
+  // Initialize theme from localStorage on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme) {
       dispatch(setTheme(savedTheme as 'light' | 'dark'));
     }
   }, [dispatch]);
+
+  // Save theme to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+  }, [isDarkMode]);
 
   return (
     <div className={isDarkMode ? 'dark' : ''}>
@@ -41,7 +46,7 @@ export default function AppLayout() {
         {isTradingPage && <AnalyticsPanel />}
 
         {/* Main Content Area */}
-        <div className={`pt-8 pb-16 md:pb-8 transition-all duration-150 ${
+        <div className={`${isTradingPage ? 'pt-0' : 'pt-8'} pb-16 md:pb-8 transition-all duration-150 ${
           isSidebarExpanded ? 'md:ml-44' : 'md:ml-14'
         }`}>
           <Outlet />

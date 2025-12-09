@@ -188,7 +188,7 @@ const AnalyticsPanel: React.FC = () => {
                 onClick={() => setActiveTab(tab)}
                 className={`px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition ${
                   activeTab === tab
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                    ? 'border-[#00C0A2] text-[#00C0A2]'
                     : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
@@ -208,7 +208,7 @@ const AnalyticsPanel: React.FC = () => {
 
           {loading && forexRates.length === 0 && !indicatorData ? (
             <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00C0A2]"></div>
             </div>
           ) : activeTab !== 'forex' ? (
             /* Indicator Display */
@@ -221,7 +221,7 @@ const AnalyticsPanel: React.FC = () => {
                 <select
                   value={selectedSymbol}
                   onChange={(e) => setSelectedSymbol(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#00C0A2]"
                 >
                   <option value="BTCUSDT">BTC/USDT</option>
                   <option value="ETHUSDT">ETH/USDT</option>
@@ -242,7 +242,7 @@ const AnalyticsPanel: React.FC = () => {
                     onChange={(e) => setPeriod(parseInt(e.target.value) || 14)}
                     min="1"
                     max="200"
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#00C0A2]"
                   />
                 </div>
               )}
@@ -304,7 +304,7 @@ const AnalyticsPanel: React.FC = () => {
               <button
                 onClick={() => fetchIndicator(activeTab, selectedSymbol, period)}
                 disabled={loading}
-                className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white rounded font-medium text-sm transition"
+                className="w-full py-2 px-4 bg-[#00C0A2] hover:bg-[#00a085] disabled:bg-slate-400 text-white rounded font-medium text-sm transition"
               >
                 {loading ? 'Loading...' : 'Refresh'}
               </button>
@@ -338,7 +338,7 @@ const AnalyticsPanel: React.FC = () => {
                 </button>
               </div>
 
-              <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-600 dark:text-blue-400">
+              <div className="mb-3 p-2 bg-[#00C0A2]/10 dark:bg-[#00C0A2]/20 border border-[#00C0A2]/30 dark:border-[#00C0A2]/50 rounded text-xs text-[#00C0A2]">
                 Powered by Frankfurter API (European Central Bank)
               </div>
 

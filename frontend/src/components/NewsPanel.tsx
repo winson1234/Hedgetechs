@@ -169,7 +169,7 @@ export default function NewsPanel() {
         <div className="flex items-center gap-2">
           <div className="text-xl font-bold text-slate-900 dark:text-slate-100">News</div>
           {unreadCount > 0 && (
-            <span className="px-2 py-0.5 text-xs font-semibold bg-indigo-500 text-white rounded-full">
+            <span className="px-2 py-0.5 text-xs font-semibold bg-[#00A085] text-white rounded-full">
               {unreadCount}
             </span>
           )}
@@ -182,7 +182,7 @@ export default function NewsPanel() {
             onClick={() => setFilter(filter === 'unread' ? 'all' : 'unread')}
             className={`p-1.5 rounded transition-colors ${
               filter === 'unread'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-[#00A085] text-white'
                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
             title={filter === 'unread' ? 'Show all news' : 'Show unread only'}
@@ -214,7 +214,7 @@ export default function NewsPanel() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search news..."
-          className="w-full px-3 py-2 pl-9 pr-9 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition"
+          className="w-full px-3 py-2 pl-9 pr-9 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#00A085] dark:focus:ring-[#00A085] transition"
         />
         {/* Search Icon */}
         <svg
@@ -335,14 +335,14 @@ export default function NewsPanel() {
                   {unread && (
                     <div className="absolute top-3 right-3">
                       <span className="flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00A085] opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00A085]"></span>
                       </span>
                     </div>
                   )}
                   
                   {/* Headline */}
-                  <h3 className={`text-sm font-semibold pr-4 mb-1.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors ${
+                  <h3 className={`text-sm font-semibold pr-4 mb-1.5 group-hover:text-[#00A085] dark:group-hover:text-[#00A085] transition-colors ${
                     unread ? 'text-slate-900 dark:text-slate-100' : 'text-slate-700 dark:text-slate-300'
                   }`}>
                     {truncateHeadline(article.title)}
@@ -409,8 +409,8 @@ export default function NewsPanel() {
             <div className="border-b border-slate-200 dark:border-slate-700 p-4 flex items-start justify-between">
               <div className="flex-1 pr-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded">
-                    {selectedArticle.source}
+                <span className="text-xs font-medium px-2 py-1 bg-[#00A085] dark:bg-[#00A085] text-white dark:text-white rounded-lg">
+                {selectedArticle.source}
                   </span>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
                     {formatTimeAgo(selectedArticle.pubDate)}
@@ -440,7 +440,7 @@ export default function NewsPanel() {
                 href={selectedArticle.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#00A085] hover:bg-[#3fdfbf] text-white font-medium rounded-lg transition-colors"
               >
                 Read Full Article
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

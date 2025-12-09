@@ -105,68 +105,70 @@ function LivePriceDisplay({ symbol }: LivePriceDisplayProps) {
   }
 
   return (
-    <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-slate-50 dark:bg-slate-800/50">
-      <div className="flex items-center gap-2 mb-3">
-        {/* Icon */}
-        <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-          {iconInfo.isForexPair && iconInfo.forexPair ? (
-            (() => {
-              // Currency code to country code mapping
-              const currencyToCountry: Record<string, string> = {
-                'CAD': 'ca', 'AUD': 'au', 'JPY': 'jp', 'NZD': 'nz',
-                'EUR': 'eu', 'GBP': 'gb', 'USD': 'us', 'CHF': 'ch'
-              };
-              const baseCountry = currencyToCountry[iconInfo.forexPair.base] || iconInfo.forexPair.base.toLowerCase();
-              const quoteCountry = currencyToCountry[iconInfo.forexPair.quote] || iconInfo.forexPair.quote.toLowerCase();
-
-              return (
-                <div className="flex -space-x-2">
-                  <img
-                    src={`https://hatscripts.github.io/circle-flags/flags/${baseCountry}.svg`}
-                    alt={iconInfo.forexPair.base}
-                    className="w-5 h-5 rounded-full border border-white dark:border-slate-900"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.style.display = 'none'
-                    }}
-                  />
-                  <img
-                    src={`https://hatscripts.github.io/circle-flags/flags/${quoteCountry}.svg`}
-                    alt={iconInfo.forexPair.quote}
-                    className="w-5 h-5 rounded-full border border-white dark:border-slate-900"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.style.display = 'none'
-                    }}
-                  />
-                </div>
-              );
-            })()
-          ) : iconInfo.iconUrl ? (
-            <img
-              src={iconInfo.iconUrl}
-              alt={iconInfo.baseCurrency}
-              className="w-6 h-6 object-cover"
-              onError={(e) => {
-                // Fallback to text badge if image fails to load
-                const target = e.target as HTMLImageElement
-                target.style.display = 'none'
-                const parent = target.parentElement
-                if (parent) {
-                  parent.innerHTML = `<span class="text-base font-bold text-slate-600 dark:text-slate-400">${iconInfo.baseCurrency}</span>`
-                }
-              }}
-            />
-          ) : (
-            <span className="text-base font-bold text-slate-600 dark:text-slate-400">{iconInfo.baseCurrency}</span>
-          )}
+    <div className="border-[0.5px] border-slate-200 dark:border-slate-800 rounded-lg p-1.5 sm:p-2 bg-slate-100 dark:bg-slate-800/50">
+      <div className="flex items-center justify-between">
+        {/* Left: Icon + Symbol */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Icon */}
+          <div className="flex-shrink-0 w-5 sm:w-6 h-5 sm:h-6 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+            {iconInfo.isForexPair && iconInfo.forexPair ? (
+              (() => {
+                const currencyToCountry: Record<string, string> = {
+                  'CAD': 'ca', 'AUD': 'au', 'JPY': 'jp', 'NZD': 'nz',
+                  'EUR': 'eu', 'GBP': 'gb', 'USD': 'us', 'CHF': 'ch'
+                };
+                const baseCountry = currencyToCountry[iconInfo.forexPair.base] || iconInfo.forexPair.base.toLowerCase();
+                const quoteCountry = currencyToCountry[iconInfo.forexPair.quote] || iconInfo.forexPair.quote.toLowerCase();
+  
+                return (
+                  <div className="flex -space-x-1.5 sm:-space-x-2">
+                    <img
+                      src={`https://hatscripts.github.io/circle-flags/flags/${baseCountry}.svg`}
+                      alt={iconInfo.forexPair.base}
+                      className="w-4.5 h-4.5 sm:w-5 sm:h-5 rounded-full border border-slate-900"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                    <img
+                      src={`https://hatscripts.github.io/circle-flags/flags/${quoteCountry}.svg`}
+                      alt={iconInfo.forexPair.quote}
+                      className="w-4.5 h-4.5 sm:w-5 sm:h-5 rounded-full border border-slate-900"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                  </div>
+                );
+              })()
+            ) : iconInfo.iconUrl ? (
+              <img
+                src={iconInfo.iconUrl}
+                alt={iconInfo.baseCurrency}
+                className="w-5 h-5 sm:w-6 sm:h-6 object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.style.display = 'none'
+                  const parent = target.parentElement
+                  if (parent) {
+                    parent.innerHTML = `<span class="text-sm sm:text-base font-bold text-slate-600 dark:text-slate-400">${iconInfo.baseCurrency}</span>`
+                  }
+                }}
+              />
+            ) : (
+              <span className="text-sm sm:text-base font-bold text-slate-600 dark:text-slate-400">{iconInfo.baseCurrency}</span>
+            )}
+          </div>
+  
+          {/* Symbol */}
+          <div className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300">
+            {displaySymbol}
+          </div>
         </div>
-        <div className="text-sm font-medium text-slate-600 dark:text-slate-400">{displaySymbol}</div>
-      </div>
-      <div className={`text-5xl font-mono font-bold ${color}`}>
-        {price != null ? formatPrice(price) : '—'}
+  
+        {/* Right: Price */}
+        <div className={`text-xl sm:text-2xl lg:text-3xl font-mono font-bold ${color}`}>
+          {price != null ? formatPrice(price) : '—'}
+        </div>
       </div>
     </div>
+    
   )
 }
 

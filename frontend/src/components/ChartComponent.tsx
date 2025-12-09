@@ -62,12 +62,12 @@ function ChartComponent() {
   const [activeDrawingColor, setActiveDrawingColor] = useState('#3b82f6');
   const [activeLineWidth, setActiveLineWidth] = useState(2);
   const [activeLineStyle, setActiveLineStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid');
-  
+
   // Helper functions for drawing management
   const addDrawing = useCallback((drawing: Drawing) => {
     setDrawings(prev => [...prev, drawing]);
   }, []);
-  
+
   const removeDrawing = useCallback((id: string) => {
     setDrawings(prev => prev.filter(d => d.id !== id));
   }, []);
@@ -89,7 +89,7 @@ function ChartComponent() {
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; drawingId: string } | null>(null)
-  
+
   // Map timeframe to seconds for candle grouping
   const getTimeframeSeconds = (tf: string): number => {
     const timeframeSecondsMap: Record<string, number> = {
@@ -131,12 +131,12 @@ function ChartComponent() {
 
   useEffect(() => {
     if (!ref.current) return
-    
+
     const isDark = document.documentElement.classList.contains('dark')
-    
+
     chartRef.current = createChart(ref.current, {
       width: ref.current.clientWidth,
-      height: 500,
+      height: ref.current.clientHeight,
       layout: {
         background: { color: 'transparent' },
         textColor: isDark ? '#94a3b8' : '#64748b',
@@ -161,7 +161,7 @@ function ChartComponent() {
         dateFormat: 'dd MMM',
       },
     })
-    
+
     seriesRef.current = chartRef.current.addCandlestickSeries({
       upColor: '#10b981',
       downColor: '#ef4444',
@@ -173,14 +173,17 @@ function ChartComponent() {
 
     const onResize = () => {
       if (chartRef.current && ref.current) {
-        chartRef.current.applyOptions({ width: ref.current.clientWidth })
+        chartRef.current.applyOptions({
+          width: ref.current.clientWidth,
+          height: ref.current.clientHeight
+        })
       }
     }
     window.addEventListener('resize', onResize)
 
     // Trigger loading effect before fetching data
     setIsLoading(true)
-    
+
     // Clear any existing timeout
     if (loadingTimeoutRef.current) {
       clearTimeout(loadingTimeoutRef.current)
@@ -213,7 +216,7 @@ function ChartComponent() {
         if (isForex) {
           // Handle forex klines (ISO timestamp string -> Unix seconds)
           const forexKlines = klines as ForexKline[];
-          
+
           formatted = forexKlines.map((k) => {
             const time = Math.floor(new Date(k.timestamp).getTime() / 1000) as UTCTimestamp;
             volumeDataRef.current.set(time, k.volume);
@@ -231,7 +234,7 @@ function ChartComponent() {
         } else {
           // Handle crypto klines (Unix milliseconds -> Unix seconds)
           const cryptoKlines = klines as Kline[];
-          
+
           formatted = cryptoKlines.map((k) => {
             const time = Math.floor(k.openTime / 1000) as UTCTimestamp;
             volumeDataRef.current.set(time, parseFloat(k.volume));
@@ -260,7 +263,7 @@ function ChartComponent() {
             volume: volume
           })
         }
-        
+
         // Clear loading state after data is loaded
         setIsLoading(false);
         if (loadingTimeoutRef.current) {
@@ -523,23 +526,23 @@ function ChartComponent() {
           // Second click
           const newDrawing: Drawing = activeDrawingTool === 'trendline'
             ? {
-                id: crypto.randomUUID(),
-                type: 'trendline',
-                point1: drawingState.point1,
-                point2: { time: Number(timeNum), price: priceNum },
-                color: activeDrawingColor,
-                lineWidth: activeLineWidth,
-                lineStyle: activeLineStyle
-              }
+              id: crypto.randomUUID(),
+              type: 'trendline',
+              point1: drawingState.point1,
+              point2: { time: Number(timeNum), price: priceNum },
+              color: activeDrawingColor,
+              lineWidth: activeLineWidth,
+              lineStyle: activeLineStyle
+            }
             : {
-                id: crypto.randomUUID(),
-                type: 'rectangle',
-                point1: drawingState.point1,
-                point2: { time: Number(timeNum), price: priceNum },
-                color: activeDrawingColor,
-                lineWidth: activeLineWidth,
-                lineStyle: activeLineStyle
-              }
+              id: crypto.randomUUID(),
+              type: 'rectangle',
+              point1: drawingState.point1,
+              point2: { time: Number(timeNum), price: priceNum },
+              color: activeDrawingColor,
+              lineWidth: activeLineWidth,
+              lineStyle: activeLineStyle
+            }
 
           addDrawing(newDrawing)
           saveDrawingsToLocalStorage([...drawings, newDrawing])
@@ -665,12 +668,12 @@ function ChartComponent() {
     const resizeObserver = new ResizeObserver(() => {
       if (ref.current && canvasRef.current && chartRef.current) {
         const width = ref.current.clientWidth
-        const height = 500
+        const height = ref.current.clientHeight
 
         canvasRef.current.width = width
         canvasRef.current.height = height
 
-        chartRef.current.applyOptions({ width })
+        chartRef.current.applyOptions({ width, height })
         renderDrawings()
       }
     })
@@ -838,20 +841,19 @@ function ChartComponent() {
   }
 
   return (
-    <div className="w-full">
-      <ChartHeader 
+    <div className="w-full h-full flex flex-col">
+      <ChartHeader
         activeTimeframe={timeframe}
         onTimeframeChange={setTimeframe}
-        onAnalyticsClick={handleAnalyticsClick} 
-        onClearDrawings={handleClearDrawings} 
+        onAnalyticsClick={handleAnalyticsClick}
+        onClearDrawings={handleClearDrawings}
       />
-      <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-2 truncate">
+      <div className="text-xs sm:text-sm text-slate-400 mb-2 truncate px-1">
         {displaySymbol} - {timeframe} (last 200)
       </div>
       <div
-        className="relative overflow-hidden w-full"
+        className="relative overflow-hidden w-full flex-1 min-h-0"
         style={{
-          height: '500px',
           cursor: activeDrawingTool ? 'crosshair' : 'default'
         }}
       >
@@ -860,12 +862,11 @@ function ChartComponent() {
         {/* Canvas overlay for drawings */}
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 pointer-events-none"
-          style={{ width: '100%', height: '500px' }}
+          className="absolute inset-0 pointer-events-none w-full h-full"
         />
 
         {/* Floating Drawing Toolbar */}
-        <FloatingDrawingToolbar 
+        <FloatingDrawingToolbar
           activeDrawingTool={activeDrawingTool}
           onToolChange={setActiveDrawingTool}
           activeDrawingColor={activeDrawingColor}
@@ -945,7 +946,7 @@ function ChartComponent() {
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-slate-500 dark:text-slate-400 text-[10px] mb-0.5">Volume</span>
-            <span className="font-semibold text-blue-600 dark:text-blue-400 truncate text-[11px]">
+            <span className="font-semibold text-[#00C0A2] dark:text-[#00C0A2] truncate text-[11px]">
               {formatNumber(ohlcv.volume, 0)}
             </span>
           </div>

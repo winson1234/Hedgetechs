@@ -347,7 +347,7 @@ function InstrumentsPanel() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search instruments..."
-          className="w-full px-3 py-2 pl-9 pr-9 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition"
+          className="w-full px-3 py-2 pl-9 pr-9 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#00C0A2] dark:focus:ring-[#00C0A2] transition"
         />
         {/* Search Icon */}
         <svg
@@ -403,8 +403,8 @@ function InstrumentsPanel() {
                 key={item.symbol}
                 className={`relative py-3 px-3 rounded-lg cursor-pointer transition-all ${
                   isActiveInstrument
-                    ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800'
-                    : 'hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
+                  ? 'bg-[#00C0A2]/10 dark:bg-[#00C0A2]/20 border border-[#00C0A2] dark:border-[#00C0A2]'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-3" onClick={() => dispatch(setActiveInstrument(item.symbol))}>
@@ -445,7 +445,7 @@ function InstrumentsPanel() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className={`text-sm font-semibold ${
-                        isActiveInstrument ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'
+                        isActiveInstrument ? 'text-[#00C0A2] dark:text-[#00C0A2]' : 'text-slate-700 dark:text-slate-300'
                       }`}>
                         {item.displayName}
                       </span>
@@ -456,7 +456,7 @@ function InstrumentsPanel() {
                       </span>
                     </div>
                     <div className={`text-xs mt-1 ${
-                      isActiveInstrument ? 'text-slate-700 dark:text-slate-300' : 'text-slate-500 dark:text-slate-400'
+                      isActiveInstrument ? 'text-slate-600 dark:text-slate-300' : 'text-slate-500 dark:text-slate-400'
                     }`}>
                       ${formatPrice(item.price)}
                     </div>

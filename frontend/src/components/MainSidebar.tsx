@@ -77,11 +77,11 @@ const NavLink = ({ icon, label, to, isActive, isExpanded, disabled = false }: Na
         isExpanded ? 'h-12 px-4' : 'h-14 justify-center'
       } ${
         isActive
-          ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30'
+          ? 'text-[#00C0A2] bg-[#00C0A2]/10 dark:bg-[#00C0A2]/20'
           : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/50'
       }`}
     >
-      {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-600 dark:bg-indigo-400"></div>}
+      {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#00C0A2]"></div>}
       <div className="flex-shrink-0">
         <NavIcon iconName={icon} />
       </div>

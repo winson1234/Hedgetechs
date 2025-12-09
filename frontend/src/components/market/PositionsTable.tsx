@@ -257,49 +257,66 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {positionsWithPnL.map((position) => (
               <div
                 key={position.id}
-                className={`p-3 border rounded-lg transition-colors ${
+                className={`p-3.5 border rounded-lg transition-all hover:shadow-md ${
                   position.side === 'long'
-                    ? 'border-green-200 dark:border-green-900/30 bg-green-50/50 dark:bg-green-900/10'
-                    : 'border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10'
+                    ? 'border-green-500/30 bg-green-500/5 hover:bg-green-500/10'
+                    : 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10'
                 }`}
               >
                 {/* Header Row */}
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold ${
                         position.side === 'long'
-                          ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
-                          : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
+                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
                       }`}
                     >
+                      {position.side === 'long' ? (
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                        </svg>
+                      ) : (
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
                       {position.side.toUpperCase()}
                     </span>
-                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    <span className="text-sm font-bold text-slate-200">
                       {position.symbol}
                     </span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-400 bg-slate-800 border border-slate-700">
                       {position.leverage}x
                     </span>
                   </div>
                   <button
                     onClick={() => handleClosePosition(position.id, position.symbol)}
                     disabled={loading}
-                    className="px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                   >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                     {loading ? 'Closing...' : 'Close'}
                   </button>
                 </div>
 
                 {/* Position Details Grid */}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs mb-2">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400">Size:</span>
-                    <span className="font-medium text-slate-900 dark:text-slate-100">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-3">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                      </svg>
+                      Size:
+                    </span>
+                    <span className="font-semibold text-slate-200">
                       {position.lot_size.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 6,
@@ -307,31 +324,51 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                     </span>
                   </div>
 
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400">Entry:</span>
-                    <span className="font-medium text-slate-900 dark:text-slate-100">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      </svg>
+                      Entry:
+                    </span>
+                    <span className="font-semibold text-slate-200">
                       {formatCurrency(position.entry_price, 'USD')}
                     </span>
                   </div>
 
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400">Current:</span>
-                    <span className="font-medium text-slate-900 dark:text-slate-100">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Current:
+                    </span>
+                    <span className="font-semibold text-slate-200">
                       {formatCurrency(position.current_price || position.entry_price, 'USD')}
                     </span>
                   </div>
 
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400">Margin:</span>
-                    <span className="font-medium text-slate-900 dark:text-slate-100">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Margin:
+                    </span>
+                    <span className="font-semibold text-slate-200">
                       {formatCurrency(position.margin_used, 'USD')}
                     </span>
                   </div>
 
                   {position.liquidation_price && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">Liq. Price:</span>
-                      <span className="font-medium text-orange-600 dark:text-orange-400">
+                    <div className="flex justify-between items-center py-1 col-span-2">
+                      <span className="text-slate-400 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        Liq. Price:
+                      </span>
+                      <span className="font-semibold text-orange-400">
                         {formatCurrency(position.liquidation_price, 'USD')}
                       </span>
                     </div>
@@ -339,28 +376,28 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                 </div>
 
                 {/* P&L and ROE Row */}
-                <div className="pt-2 border-t border-slate-200 dark:border-slate-700/50">
+                <div className="pt-2.5 border-t border-slate-700/50">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs text-slate-600 dark:text-slate-400">P&L:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400">P&L:</span>
                       <span
-                        className={`ml-2 text-sm font-bold ${
+                        className={`text-sm font-bold ${
                           (position.unrealized_pnl || 0) >= 0
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-red-600 dark:text-red-400'
+                            ? 'text-green-400'
+                            : 'text-red-400'
                         }`}
                       >
                         {(position.unrealized_pnl || 0) >= 0 ? '+' : ''}
                         {formatCurrency(position.unrealized_pnl || 0, 'USD')}
                       </span>
                     </div>
-                    <div>
-                      <span className="text-xs text-slate-600 dark:text-slate-400">ROE:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400">ROE:</span>
                       <span
-                        className={`ml-2 text-sm font-bold ${
+                        className={`text-sm font-bold ${
                           (position.roe || 0) >= 0
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-red-600 dark:text-red-400'
+                            ? 'text-green-400'
+                            : 'text-red-400'
                         }`}
                       >
                         {(position.roe || 0) >= 0 ? '+' : ''}
@@ -371,12 +408,18 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                 </div>
 
                 {/* Contract Number (small, bottom) */}
-                <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700/50">
+                <div className="mt-2.5 pt-2 border-t border-slate-700/50">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">
+                    <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
                       ID: {position.contract_number}
                     </span>
-                    <span className="text-xs text-slate-400 dark:text-slate-500">
+                    <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
                       {formatTimestamp(position.created_at)}
                     </span>
                   </div>

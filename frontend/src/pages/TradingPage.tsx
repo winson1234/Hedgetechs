@@ -2,7 +2,6 @@ import LivePriceDisplay from '../components/LivePriceDisplay';
 import ChartComponent from '../components/ChartComponent';
 import TradingPanel from '../components/TradingPanel';
 import InstrumentsPanel from '../components/InstrumentsPanel';
-import NewsPanel from '../components/NewsPanel';
 import MarketActivityPanel from '../components/MarketActivityPanel';
 import { useAppSelector } from '../store';
 
@@ -10,38 +9,49 @@ export default function TradingPage() {
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
 
   return (
-    <div className="px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4">
-        {/* Chart + Market Activity - Takes full width on mobile, left half on tablet, 6 cols on xl */}
-        <div className="md:col-span-2 xl:col-span-6 space-y-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 lg:p-5">
-            <div className="mb-5">
-              <LivePriceDisplay symbol={activeInstrument} />
+    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950">
+
+      {/* TOP SECTION: Responsive Layout */}
+      <div className="flex flex-col lg:flex-row min-h-[400px] lg:min-h-[600px] gap-px">
+
+        {/* LEFT COLUMN: Instruments Panel - Desktop left, Mobile after chart */}
+        <div className="w-full lg:w-[350px] flex flex-col order-3 lg:order-1 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 lg:flex-shrink-0">
+          {/* Instruments Panel - Full height, scrollable */}
+          <div className="h-[600px] sm:h-[700px] lg:h-[calc(100vh-64px)] overflow-y-auto">
+            <div className="p-2 sm:p-3">
+              <InstrumentsPanel />
             </div>
-            <ChartComponent />
-          </div>
-          <div className="h-[300px] md:h-[360px] lg:h-[440px]">
-            <MarketActivityPanel />
           </div>
         </div>
 
-        {/* Trading Panel - Full width on mobile, right half on tablet, 3 cols on xl */}
-        <div className="md:col-span-1 xl:col-span-3">
-          <div className="h-full min-h-[800px] lg:min-h-[1000px] xl:min-h-[1100px]">
+        {/* MIDDLE COLUMN: Chart - Shows FIRST on mobile */}
+        <div className="flex-1 flex flex-col min-w-0 order-1 lg:order-2 bg-white dark:bg-slate-900">
+          {/* Chart Header / Price Display - Compact */}
+          <div className="px-2 sm:px-4 py-2 sm:py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+            <LivePriceDisplay symbol={activeInstrument} />
+          </div>
+          {/* Chart Container - Responsive height */}
+          <div className="h-[400px] sm:h-[500px] lg:h-[700px] bg-white dark:bg-slate-900">
+            <ChartComponent />
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Trading Panel - Shows SECOND on mobile */}
+        <div className="w-full lg:w-[320px] order-2 lg:order-3 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 lg:flex-shrink-0">
+          <div className="p-2 sm:p-4">
             <TradingPanel />
           </div>
         </div>
 
-        {/* Instruments + News - Full width on mobile, spans both on tablet, 3 cols on xl */}
-        <div className="md:col-span-1 xl:col-span-3 space-y-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 lg:p-5 h-[500px] md:h-[600px] lg:h-[600px] overflow-y-auto">
-            <InstrumentsPanel />
-          </div>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 lg:p-5 h-[400px] md:h-[450px] lg:h-[700px]">
-            <NewsPanel />
-          </div>
+      </div>
+
+      {/* BOTTOM SECTION: Market Activity Panel (History, Orders) - Spacious */}
+      <div className="min-h-[300px] lg:min-h-[400px] border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div className="p-2 sm:p-4">
+          <MarketActivityPanel />
         </div>
       </div>
+
     </div>
   );
 }

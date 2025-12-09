@@ -96,96 +96,89 @@ function MarketActivityPanel() {
   }, [trades]);
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 h-full flex flex-col">
+    <div className="bg-white dark:bg-slate-900 h-full flex flex-col">
       {/* Tab Header - Dynamic tabs based on product type */}
-      <div className="flex items-center justify-between gap-4 mb-4 border-b border-slate-200 dark:border-slate-700">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 dark:border-slate-800">
         <div className="flex gap-1 overflow-x-auto">
-        {/* Forex mode tab: Forex Info (show for both SPOT and CFD when forex instrument selected) */}
-        {isForex && (isSpot || isCFD) && (
-          <button
-            onClick={() => setActiveTab('forex')}
-            className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-              activeTab === 'forex'
-                ? 'text-blue-500 border-b-2 border-blue-500'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
-            }`}
-          >
-            Forex Info
-          </button>
-        )}
-
-        {/* SPOT mode tabs: Order Book, Market Trades (hide for forex) */}
-        {isSpot && !isForex && (
-          <>
+          {/* Forex mode tab: Forex Info (show for both SPOT and CFD when forex instrument selected) */}
+          {isForex && (isSpot || isCFD) && (
             <button
-              onClick={() => setActiveTab('orderbook')}
-              className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-                activeTab === 'orderbook'
-                  ? 'text-blue-500 border-b-2 border-blue-500'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
-              }`}
+              onClick={() => setActiveTab('forex')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'forex'
+                ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
+                }`}
             >
-              Order Book
+              Forex Info
             </button>
+          )}
+
+          {/* SPOT mode tabs: Order Book, Market Trades (hide for forex) */}
+          {isSpot && !isForex && (
+            <>
+              <button
+                onClick={() => setActiveTab('orderbook')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'orderbook'
+                  ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
+                  }`}
+              >
+                Order Book
+              </button>
+              <button
+                onClick={() => setActiveTab('trades')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'trades'
+                  ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
+                  }`}
+              >
+                Market Trades
+              </button>
+            </>
+          )}
+
+          {/* CFD mode tabs: Positions (show for both CFD crypto and forex) */}
+          {isCFD && (
             <button
-              onClick={() => setActiveTab('trades')}
-              className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-                activeTab === 'trades'
-                  ? 'text-blue-500 border-b-2 border-blue-500'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
-              }`}
+              onClick={() => setActiveTab('positions')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'positions'
+                ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
+                }`}
             >
-              Market Trades
+              Positions
             </button>
-          </>
-        )}
+          )}
 
-        {/* CFD mode tabs: Positions (show for both CFD crypto and forex) */}
-        {isCFD && (
+          {/* Common tabs for all modes: Pending Orders, Trade History */}
           <button
-            onClick={() => setActiveTab('positions')}
-            className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-              activeTab === 'positions'
-                ? 'text-blue-500 border-b-2 border-blue-500'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
-            }`}
+            onClick={() => setActiveTab('pending')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'pending'
+              ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
+              }`}
           >
-            Positions
+            Pending Orders
           </button>
-        )}
-
-        {/* Common tabs for all modes: Pending Orders, Trade History */}
-        <button
-          onClick={() => setActiveTab('pending')}
-          className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-            activeTab === 'pending'
-              ? 'text-blue-500 border-b-2 border-blue-500'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
-          }`}
-        >
-          Pending Orders
-        </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-            activeTab === 'history'
-              ? 'text-blue-500 border-b-2 border-blue-500'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300'
-          }`}
-        >
-          Trade History
-        </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'history'
+              ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
+              }`}
+          >
+            Trade History
+          </button>
         </div>
 
         {/* Filter Toggle - only show for history and pending tabs */}
         {(activeTab === 'history' || activeTab === 'pending' || activeTab === 'positions') && (
           <button
             onClick={() => setFilterByProductType(!filterByProductType)}
-            className={`px-2 py-1 text-xs font-medium rounded transition-colors whitespace-nowrap ${
-              filterByProductType
-                ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
+            className={`px-2 py-1 text-xs font-medium rounded transition-colors whitespace-nowrap ${filterByProductType
+              ? 'bg-[#00C0A2]/20 dark:bg-[#00C0A2]/30 text-[#00C0A2] dark:text-[#00C0A2] border border-[#00C0A2]/50'
+              : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-300 dark:hover:bg-slate-700'
+              }`}
             title={filterByProductType ? 'Showing current product type only' : 'Showing all orders'}
           >
             {filterByProductType ? `${selectedProductType.toUpperCase()} Only` : 'All'}
@@ -194,58 +187,58 @@ function MarketActivityPanel() {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden px-4 py-2">
         {activeTab === 'orderbook' && (
           <div className="flex gap-4 h-full overflow-hidden">
             {/* Bids (Buy Orders) - Left Side */}
             <div className="flex-1 flex flex-col">
-              <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 px-2">
+              <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-slate-400 mb-2 px-2">
                 <div className="text-left">Price</div>
                 <div className="text-right">Amount</div>
                 <div className="text-right">Total</div>
               </div>
-              <div className="flex-1 overflow-y-auto space-y-1">
+              <div className="flex-1 overflow-y-auto space-y-0.5">
                 {bids.length > 0 ? (
                   bids.map((bid, index) => (
                     <div
                       key={`bid-${index}`}
-                      className="grid grid-cols-3 gap-2 text-sm px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                      className="grid grid-cols-3 gap-2 text-xs px-2 py-1 hover:bg-slate-800 rounded"
                     >
-                      <div className="text-green-600 dark:text-green-500 font-medium">{formatPrice(parseFloat(bid[0]))}</div>
-                      <div className="text-slate-700 dark:text-slate-300 text-right">{formatQuantity(parseFloat(bid[1]))}</div>
-                      <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{bidTotals[index]}</div>
+                      <div className="text-green-500 font-medium">{formatPrice(parseFloat(bid[0]))}</div>
+                      <div className="text-slate-300 text-right">{formatQuantity(parseFloat(bid[1]))}</div>
+                      <div className="text-slate-500 text-right">{bidTotals[index]}</div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-slate-400 dark:text-slate-500 text-sm text-center mt-4">No bid data</div>
+                  <div className="text-slate-500 text-sm text-center mt-4">No bid data</div>
                 )}
               </div>
             </div>
 
             {/* Separator Line */}
-            <div className="w-px bg-slate-200 dark:bg-slate-700 flex-shrink-0"></div>
+            <div className="w-px bg-slate-700 flex-shrink-0"></div>
 
             {/* Asks (Sell Orders) - Right Side */}
             <div className="flex-1 flex flex-col">
-              <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 px-2">
+              <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-slate-400 mb-2 px-2">
                 <div className="text-left">Price</div>
                 <div className="text-right">Amount</div>
                 <div className="text-right">Total</div>
               </div>
-              <div className="flex-1 overflow-y-auto space-y-1">
+              <div className="flex-1 overflow-y-auto space-y-0.5">
                 {asks.length > 0 ? (
                   asks.map((ask, index) => (
                     <div
                       key={`ask-${index}`}
-                      className="grid grid-cols-3 gap-2 text-sm px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                      className="grid grid-cols-3 gap-2 text-xs px-2 py-1 hover:bg-slate-800 rounded"
                     >
-                      <div className="text-red-600 dark:text-red-500 font-medium">{formatPrice(parseFloat(ask[0]))}</div>
-                      <div className="text-slate-700 dark:text-slate-300 text-right">{formatQuantity(parseFloat(ask[1]))}</div>
-                      <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{askTotals[index]}</div>
+                      <div className="text-red-500 font-medium">{formatPrice(parseFloat(ask[0]))}</div>
+                      <div className="text-slate-300 text-right">{formatQuantity(parseFloat(ask[1]))}</div>
+                      <div className="text-slate-500 text-right">{askTotals[index]}</div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-slate-400 dark:text-slate-500 text-sm text-center mt-4">No ask data</div>
+                  <div className="text-slate-500 text-sm text-center mt-4">No ask data</div>
                 )}
               </div>
             </div>
@@ -255,43 +248,43 @@ function MarketActivityPanel() {
         {activeTab === 'trades' && (
           <div className="flex flex-col h-full overflow-hidden">
             {/* Market Trades Header */}
-            <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 px-2">
+            <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-slate-400 mb-2 px-2">
               <div className="text-left">Price</div>
               <div className="text-right">Amount</div>
               <div className="text-right">Time</div>
             </div>
 
             {/* Market Trades List */}
-            <div className="flex-1 overflow-y-auto space-y-1">
+            <div className="flex-1 overflow-y-auto space-y-0.5">
               {validTrades.length > 0 ? (
                 validTrades.map((trade, index) => {
-                    const tradeTime = new Date(trade.time);
-                    const timeStr = tradeTime.toLocaleTimeString('en-US', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit',
-                      hour12: false,
-                    });
-                    const isBuy = !trade.isBuyerMaker; // If buyer is maker, it's a sell; otherwise buy
+                  const tradeTime = new Date(trade.time);
+                  const timeStr = tradeTime.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false,
+                  });
+                  const isBuy = !trade.isBuyerMaker;
 
-                    return (
-                      <div
-                        key={`trade-${trade.time}-${index}`}
-                        className="grid grid-cols-3 gap-2 text-sm px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
-                      >
-                        <div className={`font-medium ${isBuy ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
-                          {formatPrice(trade.price)}
-                        </div>
-                        <div className="text-slate-700 dark:text-slate-300 text-right">{formatQuantity(trade.quantity)}</div>
-                        <div className="text-slate-500 dark:text-slate-400 text-right text-xs">{timeStr}</div>
+                  return (
+                    <div
+                      key={`trade-${trade.time}-${index}`}
+                      className="grid grid-cols-3 gap-2 text-xs px-2 py-1 hover:bg-slate-800 rounded"
+                    >
+                      <div className={`font-medium ${isBuy ? 'text-green-500' : 'text-red-500'}`}>
+                        {formatPrice(trade.price)}
                       </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-slate-400 dark:text-slate-500 text-sm text-center mt-4">
-                    {trades.length > 0 ? 'Trade data not available for this instrument' : 'No recent trades'}
-                  </div>
-                )}
+                      <div className="text-slate-300 text-right">{formatQuantity(trade.quantity)}</div>
+                      <div className="text-slate-500 text-right">{timeStr}</div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-slate-500 text-sm text-center mt-4">
+                  {trades.length > 0 ? 'Trade data not available for this instrument' : 'No recent trades'}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -356,11 +349,10 @@ function MarketActivityPanel() {
                   <div className="space-y-2">
                     <div className="flex items-baseline justify-between">
                       <span className="text-xs text-slate-500 dark:text-slate-400">Change</span>
-                      <div className={`px-1.5 py-0.5 rounded text-xs font-bold ${
-                        forexQuote.change24h >= 0 
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' 
-                          : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                      }`}>
+                      <div className={`px-1.5 py-0.5 rounded text-xs font-bold ${forexQuote.change24h >= 0
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                        : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                        }`}>
                         {forexQuote.change24h >= 0 ? '▲' : '▼'} {Math.abs(forexQuote.change24h).toFixed(2)}%
                       </div>
                     </div>

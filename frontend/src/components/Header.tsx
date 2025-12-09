@@ -52,8 +52,7 @@ export default function Header() {
   }, [isProfileOpen]);
 
   return (
-    <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3">
-      <div className="flex items-center justify-between">
+<header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-2">      <div className="flex items-center justify-between">
         {/* Left Side: Title */}
         <div>
           <button

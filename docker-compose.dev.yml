@@ -184,10 +184,6 @@ services:
     networks:
       - brokerage-network
     
-    depends_on:
-      backend:
-        condition: service_healthy
-    
     restart: "no"
     
     stdin_open: true

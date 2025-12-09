@@ -148,7 +148,7 @@ export function getToken(): string | null {
 export function getStoredUser(): User | null {
   const userData = localStorage.getItem('user_data');
   if (!userData) return null;
-  
+
   try {
     return JSON.parse(userData) as User;
   } catch {

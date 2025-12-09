@@ -70,7 +70,7 @@ body {
 
 /* Logo Image Styling */
 .register-page .logo-image-header {
-  height: 68px;
+  height: 50px;
   width: auto;
   /* PNG rendering optimization */
   image-rendering: -webkit-optimize-contrast;
@@ -93,22 +93,27 @@ body {
   flex-direction: column;
 }
 
-.register-page .client-login-btn {
-  background: #00C0A2;
+.register-page .client-login-btn {  
+  background: linear-gradient(90deg, white -40%, #00d4aa 100%);
   color: white;
   border: none;
   padding: 10px 24px;
   border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
+  background-size: 200% 100%;    /* wide enough to slide */
+  background-position: left;      /* default = original look */
   cursor: pointer;
-  transition: all 0.3s ease;
-  margin-right: 15px;
+  transition: background-position 2s ease, transform 0.3s ease;
+  margin-top: 10px;
+  text-transform: uppercase;
+  letter-spacing: 3px;
 }
 
 .register-page .client-login-btn:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  /* Slide right = flip effect */
+  background-position: right;
 }
 
 .register-page .container {
@@ -280,6 +285,7 @@ body {
 }
 
 .register-page .card button {
+
   width: 100%;
   padding: 14px;
   border: none;
@@ -287,16 +293,26 @@ body {
   color: #fff;
   font-size: 16px;
   font-weight: 600;
-  background: #00C0A2;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-top: 10px;
-  box-shadow: 0 4px 15px rgb(255, 255, 255);
-}
+  font-family: 'Inter', sans-serif;
 
+  /* Your original gradient */
+  background: linear-gradient(95deg, white -40%, #00C0A2 100%);
+  
+  /* Prepare for animation */
+  background-size: 200% 100%;    /* wide enough to slide */
+  background-position: left;      /* default = original look */
+
+  cursor: pointer;
+  transition: background-position 2s ease, transform 0.3s ease;
+  margin-top: 10px;
+  box-shadow: 0 4px 15px #ffffff !important;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+}
 .register-page .card button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(156, 155, 153, 0.80);
+  /* Slide right = flip effect */
+  background-position: right;
 }
 
 .register-page .card button:disabled {
@@ -308,7 +324,7 @@ body {
 .register-page .signin-link {
   display: block;
   margin-top: 20px;
-  color: #1e88e5;
+  color: #00C0A2;
   font-size: 13px;
   text-decoration: none;
   font-weight: 500;
@@ -326,7 +342,7 @@ body {
 }
 
 .register-page .terms-text a {
-  color: #FA2256;
+  color: #a0a0b8;
   text-decoration: none;
 }
 

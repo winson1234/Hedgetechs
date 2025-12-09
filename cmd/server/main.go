@@ -695,6 +695,43 @@ func main() {
 		}
 	})
 
+	// Deposits endpoints (protected with JWT authentication)
+	// POST /api/v1/deposits - Create deposit request
+	// GET /api/v1/deposits?account_id={uuid} - List deposits for account
+	http.HandleFunc("/api/v1/deposits", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(authMiddleware(api.CreateDeposit))(w, r)
+		case http.MethodGet:
+			api.CORSMiddleware(authMiddleware(api.GetDeposits))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/deposits/:id/receipt - Upload payment receipt for deposit
+	http.HandleFunc("/api/v1/deposits/", func(w http.ResponseWriter, r *http.Request) {
+		// Check if this is a receipt upload request
+		if strings.Contains(r.URL.Path, "/receipt") {
+			switch r.Method {
+			case http.MethodPost:
+				api.CORSMiddleware(authMiddleware(api.UploadReceipt))(w, r)
+			case http.MethodOptions:
+				api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				})(w, r)
+			default:
+				w.WriteHeader(http.StatusMethodNotAllowed)
+			}
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
 	// Orders endpoints (protected with JWT authentication)
 	// POST /api/v1/orders - Create a new order
 	// GET /api/v1/orders?account_id={uuid} - List orders for account

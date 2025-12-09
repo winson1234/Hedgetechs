@@ -367,7 +367,7 @@ const confirmLogout = async () => {
       <div className="p-4 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-3">
           {/* User Avatar */}
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00C0A2] flex items-center justify-center text-white font-semibold text-lg">
             {avatarLetter}
           </div>
           <div className="flex-1 min-w-0">

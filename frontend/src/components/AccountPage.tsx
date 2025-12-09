@@ -298,16 +298,30 @@ export default function AccountPage() {
              </div>
              <div className="p-5 md:p-6 lg:p-8">
                 <div className="flex justify-end mb-6">
-                <button 
-                    onClick={() => handleOpenCreateModal(activeTab)} 
-                    className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm text-white ${
-                        activeTab === 'live' 
-                        ? 'bg-[#213B34] hover:bg-gray-800'       // Color for LIVE tab
-                        : 'bg-[#55bca1] hover:bg-[#44a088]'  // Color for DEMO tab
-                    }`}
-                >
-                    <PlusIcon /> Open New Account
-                </button>
+                <div className="relative group">
+                    <button 
+                        onClick={() => handleOpenCreateModal(activeTab)} 
+                        disabled={accounts.some(acc => acc.type === activeTab)}
+                        className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm text-white disabled:opacity-50 disabled:cursor-not-allowed ${
+                            activeTab === 'live' 
+                            ? 'bg-[#213B34] hover:bg-gray-800 disabled:hover:bg-[#213B34]'       // Color for LIVE tab
+                            : 'bg-[#55bca1] hover:bg-[#44a088] disabled:hover:bg-[#55bca1]'  // Color for DEMO tab
+                        }`}
+                        title={accounts.some(acc => acc.type === activeTab) 
+                            ? `You can only have 1 ${activeTab} account at one time`
+                            : ''}
+                    >
+                        <PlusIcon /> Open New Account
+                    </button>
+                    {/* Tooltip for disabled button */}
+                    {accounts.some(acc => acc.type === activeTab) && (
+                        <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-xs rounded-lg shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                            You can only have 1 {activeTab} account at one time
+                            {/* Tooltip arrow */}
+                            <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-900 dark:border-t-slate-700"></div>
+                        </div>
+                    )}
+                </div>
                 </div>
                 {activeTab === 'live' && (<div>{liveAccounts.length === 0 ? (<div className="text-center py-10 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/30"><p className="text-slate-500 dark:text-slate-400">You haven&apos;t opened any live accounts yet.</p></div>) : (<div className="grid grid-cols-1 md:grid-cols-2 gap-5">{liveAccounts.map(renderAccountCard)}</div>)}</div>)}
                 {activeTab === 'demo' && (<div>{demoAccounts.length === 0 ? (<div className="text-center py-10 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/30"><p className="text-slate-500 dark:text-slate-400">You haven&apos;t opened any demo accounts yet.</p></div>) : (<div className="grid grid-cols-1 md:grid-cols-2 gap-5">{demoAccounts.map(renderAccountCard)}</div>)}</div>)}

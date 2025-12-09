@@ -479,3 +479,80 @@ type UpdateContractTPSLRequest struct {
 type CloseContractRequest struct {
 	ClosePrice float64 `json:"close_price"`
 }
+
+// ================================================================
+// DEPOSIT MODELS
+// ================================================================
+
+// PaymentMethod represents the payment method for deposits
+type PaymentMethod string
+
+const (
+	PaymentMethodTron PaymentMethod = "tron"
+)
+
+// DepositStatus represents the status of a deposit request
+type DepositStatus string
+
+const (
+	DepositStatusPending  DepositStatus = "pending"
+	DepositStatusApproved DepositStatus = "approved"
+	DepositStatusRejected DepositStatus = "rejected"
+	DepositStatusCancelled DepositStatus = "cancelled"
+)
+
+// Deposit represents a deposit request
+type Deposit struct {
+	ID             uuid.UUID              `json:"id"`
+	UserID         int64                  `json:"user_id"`
+	AccountID      uuid.UUID              `json:"account_id"`
+	ReferenceID    string                 `json:"reference_id"` // DEP-YYYYMMDD-XXXXXX
+	PaymentMethod  PaymentMethod          `json:"payment_method"`
+	Amount         float64                `json:"amount"`
+	Currency       string                 `json:"currency"`
+	ReceiptFilePath *string               `json:"receipt_file_path,omitempty"`
+	PaymentDetails map[string]interface{} `json:"payment_details,omitempty"`
+	Status         DepositStatus          `json:"status"`
+	TransactionID  *uuid.UUID             `json:"transaction_id,omitempty"`
+	AdminNotes     *string                `json:"admin_notes,omitempty"`
+	CreatedAt      time.Time              `json:"created_at"`
+	UpdatedAt      time.Time              `json:"updated_at"`
+}
+
+// CreateDepositRequest represents the request to create a deposit
+type CreateDepositRequest struct {
+	AccountID      uuid.UUID              `json:"account_id"`
+	PaymentMethod  PaymentMethod          `json:"payment_method"`
+	Amount         float64                `json:"amount"`
+	Currency       string                 `json:"currency"`
+	PaymentDetails map[string]interface{} `json:"payment_details,omitempty"`
+}
+
+// Validate validates the CreateDepositRequest
+func (r *CreateDepositRequest) Validate() error {
+	// Validate payment method (only Tron supported)
+	if r.PaymentMethod != PaymentMethodTron {
+		return &ValidationError{Field: "payment_method", Message: "only 'tron' payment method is supported"}
+	}
+
+	// Validate amount (minimum $5.00, maximum $100,000.00)
+	if r.Amount < 5.0 {
+		return &ValidationError{Field: "amount", Message: "minimum deposit amount is $5.00"}
+	}
+	if r.Amount > 100000.0 {
+		return &ValidationError{Field: "amount", Message: "maximum deposit amount is $100,000.00"}
+	}
+
+	// Validate currency
+	if r.Currency == "" {
+		return &ValidationError{Field: "currency", Message: "currency is required"}
+	}
+
+	return nil
+}
+
+// CreateDepositResponse represents the response after creating a deposit
+type CreateDepositResponse struct {
+	Deposit Deposit `json:"deposit"`
+	Message string  `json:"message"`
+}

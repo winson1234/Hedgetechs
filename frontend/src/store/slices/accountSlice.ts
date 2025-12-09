@@ -99,7 +99,12 @@ export const createAccount = createAsyncThunk(
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to create account');
+      if (!response.ok) {
+        // Try to extract error message from response
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.message || 'Failed to create account';
+        throw new Error(errorMessage);
+      }
       const data = await response.json();
       return data.account;
     } catch (error) {

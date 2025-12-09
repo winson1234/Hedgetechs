@@ -142,7 +142,7 @@ export default function Header() {
               onClick={() => setIsProfileOpen(prev => !prev)}
               className={`p-1.5 sm:p-2 border rounded transition ${
                 isProfileOpen
-                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                  ? 'border-[#00C0A2] dark:bg-indigo-900/20 text-[#00C0A2] dark:text-[#00C0A2]'
                   : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
               title="Profile"

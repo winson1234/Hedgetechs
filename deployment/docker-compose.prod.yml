@@ -13,9 +13,6 @@ services:
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      # Mount initialization scripts (runs only on first start when DB is empty)
-      - ../migration_sql:/docker-entrypoint-initdb.d/migrations:ro
-      - ./init-db:/docker-entrypoint-initdb.d:ro
     ports:
       - "127.0.0.1:5432:5432"
     networks:
@@ -77,6 +74,54 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ============================================
+  # Database Initialization (Runs once)
+  # ============================================
+  db-init:
+    image: postgres:16-alpine
+    container_name: brokerage-db-init
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../migration_sql:/migrations:ro
+    environment:
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+    command: >
+      sh -c "
+      echo '🚀 Initializing database...' &&
+      for sql_file in /migrations/0*.sql; do
+        if [ -f \"$$sql_file\" ]; then
+          filename=$$(basename \"$$sql_file\");
+          echo \"→ Running $$filename...\";
+          psql -h postgres -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-brokerage} -f \"$$sql_file\" 2>&1 | grep -v NOTICE || true;
+        fi;
+      done &&
+      echo '→ Creating notifications table...' &&
+      psql -h postgres -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-brokerage} <<'EOSQL'
+        CREATE TABLE IF NOT EXISTS public.notifications (
+          id uuid DEFAULT gen_random_uuid() NOT NULL,
+          user_id bigint NOT NULL,
+          type text NOT NULL,
+          title text NOT NULL,
+          message text NOT NULL,
+          is_read boolean DEFAULT false NOT NULL,
+          metadata jsonb,
+          created_at timestamp with time zone DEFAULT now() NOT NULL,
+          read_at timestamp with time zone,
+          CONSTRAINT notifications_pkey PRIMARY KEY (id),
+          CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications USING btree (user_id);
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON public.notifications USING btree (user_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON public.notifications USING btree (user_id, is_read, created_at DESC);
+      EOSQL
+      echo '✅ Database initialization complete!'
+      "
+    networks:
+      - brokerage-network
 
   # ============================================
   # Backend (Go API)
@@ -155,6 +200,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
     
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v1/ticker?symbols=BTCUSDT"]

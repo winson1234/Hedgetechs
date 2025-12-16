@@ -37,6 +37,17 @@ const uiPersistConfig = {
   key: 'ui',
   storage,
   whitelist: ['theme', 'isSidebarExpanded', 'selectedProductType'], // Only persist theme, sidebar state, and product type
+  version: 1,
+  migrate: (state: any) => {
+    // Migration: Force default product type to 'cfd' for all users
+    if (state && state.selectedProductType === 'spot') {
+      return {
+        ...state,
+        selectedProductType: 'cfd',
+      };
+    }
+    return state;
+  },
 };
 
 // Create persisted reducers

@@ -1,7 +1,7 @@
 import { apiFetch } from '../utils/api';
 import { useMemo, useState, useEffect, useRef, memo, useCallback } from 'react';
 import { useAppSelector } from '../store';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatAccountId } from '../utils/formatters';
 import type { Transaction, TransactionStatus, TransactionType, Position } from '../types';
 import type { Account } from '../store/slices/accountSlice';
 import { transformTransaction, type BackendTransaction } from '../store/slices/transactionSlice';
@@ -149,7 +149,17 @@ const TransactionRow = memo(({
   onClick: () => void;
 }) => {
   const account = accounts.find((a) => a.id === transaction.accountId);
-  const isPositive = transaction.type === 'deposit';
+  
+  // Determine if transaction is positive (credit) or negative (debit)
+  let isPositive = false;
+  if (transaction.type === 'deposit') {
+    isPositive = true;
+  } else if (transaction.type === 'transfer') {
+    // For transfers: "Transfer from Account X" = credit (positive), "Transfer to Account X" = debit (negative)
+    isPositive = transaction.description?.includes('Transfer from') || false;
+  }
+  // Withdrawals are always negative (debit)
+  
   const isDemoAdjustment = transaction.description?.includes('Demo Balance Adjustment');
 
   const icon = useMemo(() => {
@@ -163,7 +173,10 @@ const TransactionRow = memo(({
       );
     }
 
-    const iconMap: Record<TransactionType, JSX.Element> = {
+    // Normalize transaction type (backend uses 'withdrawal', frontend uses 'withdraw')
+    const normalizedType = transaction.type === 'withdrawal' ? 'withdraw' : transaction.type;
+    
+    const iconMap: Record<TransactionType | 'withdrawal', JSX.Element> = {
       deposit: (
         <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
           <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -172,6 +185,13 @@ const TransactionRow = memo(({
         </div>
       ),
       withdraw: (
+        <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+          <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+          </svg>
+        </div>
+      ),
+      withdrawal: (
         <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
           <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -194,11 +214,16 @@ const TransactionRow = memo(({
       ),
     };
 
-    return iconMap[transaction.type];
+    return iconMap[transaction.type] || iconMap[normalizedType as TransactionType];
   }, [transaction.type, isDemoAdjustment]);
 
   const description = useMemo(() => {
-    switch (transaction.type) {
+    const hasRejectionReason = transaction.status === 'failed' && transaction.errorMessage;
+    
+    // Normalize transaction type (backend uses 'withdrawal', frontend uses 'withdraw')
+    const txType = transaction.type === 'withdrawal' ? 'withdraw' : transaction.type;
+    
+    switch (txType) {
       case 'deposit':
         return (
           <div>
@@ -206,22 +231,102 @@ const TransactionRow = memo(({
               {isDemoAdjustment ? 'Demo Adjustment' : 'Deposit'}
             </p>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              {transaction.description || (transaction.metadata?.cardBrand && transaction.metadata?.last4
-                ? `${transaction.metadata.cardBrand.toUpperCase()} •••• ${transaction.metadata.last4}`
-                : 'Card payment')}
-              {!transaction.description && account && ` → Account ${account.account_id}`}
+              {(() => {
+                let desc = transaction.description || '';
+                // Remove outdated status text from description (status badge shows current status)
+                if (desc) {
+                  desc = desc
+                    .replace(/\s*\(Pending Approval\)/gi, '')
+                    .replace(/\s*\(Pending Review\)/gi, '')
+                    .replace(/\s*\(Approved\)/gi, '')
+                    .replace(/\s*\(Rejected\)/gi, '')
+                    .trim();
+                }
+                return desc || (transaction.metadata?.cardBrand && transaction.metadata?.last4
+                  ? `${transaction.metadata.cardBrand.toUpperCase()} •••• ${transaction.metadata.last4}`
+                  : 'Card payment');
+              })()}
+              {!transaction.description && account && ` → Account ${formatAccountId(account.account_id, account.type)}`}
             </p>
+            {hasRejectionReason && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Rejected: {transaction.errorMessage}
+              </p>
+            )}
           </div>
         );
       case 'withdraw':
+        // Build withdrawal description
+        let withdrawalDesc = transaction.description;
+        
+        // Remove outdated status text from description (status badge shows current status)
+        if (withdrawalDesc) {
+          withdrawalDesc = withdrawalDesc
+            .replace(/\s*\(Pending Approval\)/gi, '')
+            .replace(/\s*\(Pending Review\)/gi, '')
+            .replace(/\s*\(Approved\)/gi, '')
+            .replace(/\s*\(Rejected\)/gi, '')
+            .trim();
+        }
+        
+        if (!withdrawalDesc) {
+          // Try to build from metadata
+          if (transaction.metadata?.bankName) {
+            withdrawalDesc = `${transaction.metadata.bankName}`;
+            if (transaction.metadata.accountLast4) {
+              withdrawalDesc += ` •••• ${transaction.metadata.accountLast4}`;
+            }
+          } else if (transaction.metadata?.wallet_address) {
+            const addr = transaction.metadata.wallet_address as string;
+            withdrawalDesc = `Tron (USDT) ${addr.slice(0, 6)}...${addr.slice(-4)}`;
+          } else {
+            withdrawalDesc = 'Withdrawal request';
+          }
+        }
+        
+        // Extract withdrawal reference ID from description if present
+        // Format: "Withdrawal request WTH-20251216-000009 - USD 10.00"
+        const withdrawalMatch = withdrawalDesc.match(/Withdrawal request\s+([A-Z]+-\d{8}-\d+)/i);
+        const referenceId = withdrawalMatch ? withdrawalMatch[1] : null;
+        
+        // Build clean description
+        if (referenceId) {
+          // Extract currency and amount if present in original description
+          const amountMatch = withdrawalDesc.match(/(USD|EUR|GBP)\s+([\d,]+\.?\d*)/i);
+          if (amountMatch) {
+            withdrawalDesc = `Withdrawal ${referenceId} - ${amountMatch[1]} ${amountMatch[2]}`;
+          } else {
+            withdrawalDesc = `Withdrawal ${referenceId}`;
+          }
+        }
+        
+        // Add transaction number if available and not already included
+        if (transaction.transactionNumber && !withdrawalDesc.includes(transaction.transactionNumber)) {
+          withdrawalDesc = `${transaction.transactionNumber} - ${withdrawalDesc}`;
+        }
+        
+        // Add account info if available
+        if (account) {
+          withdrawalDesc += ` ← Account ${formatAccountId(account.account_id, account.type)}`;
+        }
+        
         return (
           <div>
             <p className="font-medium text-slate-900 dark:text-slate-100">Withdrawal</p>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              {transaction.description || (transaction.metadata?.bankName || 'Bank')}
-              {!transaction.description && transaction.metadata?.accountLast4 && ` •••• ${transaction.metadata.accountLast4}`}
-              {!transaction.description && account && ` ← Account ${account.account_id}`}
+              {withdrawalDesc}
             </p>
+            {hasRejectionReason && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Error: {transaction.errorMessage}
+              </p>
+            )}
           </div>
         );
       case 'transfer':
@@ -231,6 +336,14 @@ const TransactionRow = memo(({
             <p className="text-sm text-slate-600 dark:text-slate-400">
               {transaction.description || `${transaction.fromAccountId} → ${transaction.toAccountId}`}
             </p>
+            {hasRejectionReason && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Error: {transaction.errorMessage}
+              </p>
+            )}
           </div>
         );
       default:
@@ -890,8 +1003,8 @@ export default function HistoryPage() {
       .reduce((sum, t) => sum + t.amount, 0);
       
     const totalWithdrawn = transactions
-      .filter(t => t.type === 'withdraw' && t.status === 'completed')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter(t => (t.type === 'withdraw' || t.type === 'withdrawal') && (t.status === 'completed' || t.status === 'approved'))
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     // Pending items count (from pending orders + pending transactions)
     const pendingTxn = transactions.filter(t => t.status === 'pending').length;

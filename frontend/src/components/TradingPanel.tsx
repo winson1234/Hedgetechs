@@ -4,6 +4,7 @@ import { setActiveAccount, fetchAccounts, updateAccountBalanceOptimistic } from 
 import { createPendingOrder, executeMarketOrder, fetchOrders, fetchPendingOrders } from '../store/slices/orderSlice';
 import { addToast, /* setSelectedProductType, */ triggerPositionsRefresh } from '../store/slices/uiSlice';
 import { formatPrice } from '../utils/priceUtils';
+import { formatAccountId } from '../utils/formatters';
 // import { ProductType } from '../types'; // Commented out - not used when CFD is disabled
 
 type OrderType = 'limit' | 'market' | 'stop-limit';
@@ -620,11 +621,11 @@ export default function TradingPanel() {
             value={activeAccountId || ''}
             onChange={(e) => dispatch(setActiveAccount(e.target.value))}
             className="max-w-[140px] min-w-0 px-1.5 py-0.5 text-[10px] bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-700 dark:text-slate-300 font-medium focus:outline-none focus:ring-1 focus:ring-[#00C0A2]"
-            title={`Account ${accounts.find((acc) => acc.id === activeAccountId)?.account_id}`}
+            title={`Account ${formatAccountId(accounts.find((acc) => acc.id === activeAccountId)?.account_id, accounts.find((acc) => acc.id === activeAccountId)?.type)}`}
           >
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
-                {account.account_id} ({account.type === 'live' ? 'LIVE' : 'DEMO'})
+                {formatAccountId(account.account_id, account.type)} ({account.type === 'live' ? 'LIVE' : 'DEMO'})
               </option>
             ))}
           </select>

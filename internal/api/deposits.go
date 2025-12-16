@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -28,7 +27,6 @@ const (
 	// File upload settings
 	MaxFileSize      = 10 * 1024 * 1024 // 10MB
 	AllowedMimeTypes = "image/jpeg,image/png,image/jpg,application/pdf"
-	UploadDir        = "uploads/deposits"
 )
 
 // CreateDeposit handles POST /api/v1/deposits
@@ -136,6 +134,20 @@ func CreateDeposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Marshal payment_details to JSON string for JSONB column
+	var paymentDetailsValue interface{}
+	if req.PaymentDetails != nil && len(req.PaymentDetails) > 0 {
+		paymentDetailsJSON, err := json.Marshal(req.PaymentDetails)
+		if err != nil {
+			log.Printf("CreateDeposit: Failed to marshal payment details: %v", err)
+			respondWithJSONError(w, http.StatusBadRequest, "invalid_request", "invalid payment details format")
+			return
+		}
+		paymentDetailsValue = string(paymentDetailsJSON)
+	} else {
+		paymentDetailsValue = nil // Will be inserted as NULL
+	}
+
 	// Generate unique deposit reference ID
 	var referenceID string
 	err = tx.QueryRow(ctx, "SELECT generate_deposit_reference_id()").Scan(&referenceID)
@@ -145,30 +157,18 @@ func CreateDeposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get client IP address
+	clientIP := getClientIP(r)
+
 	// Create deposit record
 	depositID := uuid.New()
 	status := models.DepositStatusPending
 
-	// Marshal payment_details to JSON for JSONB column
-	// Use interface{} to allow NULL when payment_details is empty
-	var paymentDetailsValue interface{}
-	if req.PaymentDetails != nil && len(req.PaymentDetails) > 0 {
-		paymentDetailsJSON, err := json.Marshal(req.PaymentDetails)
-		if err != nil {
-			log.Printf("CreateDeposit: Failed to marshal payment details: %v", err)
-			respondWithJSONError(w, http.StatusBadRequest, "invalid_request", "invalid payment details format")
-			return
-		}
-		paymentDetailsValue = paymentDetailsJSON
-	} else {
-		paymentDetailsValue = nil // Will be inserted as NULL
-	}
-
 	_, err = tx.Exec(ctx,
-		`INSERT INTO deposits (id, user_id, account_id, reference_id, payment_method, amount, currency, payment_details, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5::payment_method, $6, $7, $8, $9::deposit_status, NOW(), NOW())`,
+		`INSERT INTO deposits (id, user_id, account_id, reference_id, payment_method, amount, currency, payment_details, status, client_ip, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5::payment_method, $6, $7, $8, $9::deposit_status, $10, NOW(), NOW())`,
 		depositID, userID, req.AccountID, referenceID, req.PaymentMethod, req.Amount, req.Currency,
-		paymentDetailsValue, status,
+		paymentDetailsValue, status, clientIP,
 	)
 	if err != nil {
 		log.Printf("CreateDeposit: Failed to insert deposit: %v", err)
@@ -189,15 +189,19 @@ func CreateDeposit(w http.ResponseWriter, r *http.Request) {
 	transactionID := uuid.New()
 	description := fmt.Sprintf("Deposit request %s - %s %.2f (Pending Review)", referenceID, req.Currency, req.Amount)
 
+	metadataMap := map[string]interface{}{
+		"deposit_id":   depositID.String(),
+		"reference_id": referenceID,
+	}
+	metadataBytes, _ := json.Marshal(metadataMap)
+	metadataValue := string(metadataBytes)
+
 	_, err = tx.Exec(ctx,
 		`INSERT INTO transactions (id, account_id, transaction_number, type, currency, amount, status, description, metadata, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())`,
 		transactionID, req.AccountID, transactionNumber, models.TransactionTypeDeposit, req.Currency,
 		req.Amount, models.TransactionStatusPending, description,
-		map[string]interface{}{
-			"deposit_id":   depositID.String(),
-			"reference_id": referenceID,
-		},
+		metadataValue,
 	)
 	if err != nil {
 		log.Printf("CreateDeposit: Failed to create transaction entry: %v", err)
@@ -242,7 +246,7 @@ func CreateDeposit(w http.ResponseWriter, r *http.Request) {
 }
 
 // UploadReceipt handles POST /api/v1/deposits/:id/receipt
-// Uploads a payment receipt file (image/PDF) for a deposit request
+// Uploads a payment receipt file (image/PDF) for a deposit request directly to the database
 func UploadReceipt(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -260,7 +264,6 @@ func UploadReceipt(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract deposit ID from URL path
-	// Path format: /api/v1/deposits/{id}/receipt
 	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(pathParts) < 4 || pathParts[0] != "api" || pathParts[1] != "v1" || pathParts[2] != "deposits" || pathParts[4] != "receipt" {
 		respondWithJSONError(w, http.StatusBadRequest, "invalid_request", "invalid URL path format")
@@ -315,6 +318,11 @@ func UploadReceipt(w http.ResponseWriter, r *http.Request) {
 		for _, validExt := range validExts {
 			if ext == validExt {
 				isValidType = true
+				if ext == ".pdf" {
+					contentType = "application/pdf"
+				} else {
+					contentType = "image/jpeg" // Generic fallback
+				}
 				break
 			}
 		}
@@ -322,6 +330,14 @@ func UploadReceipt(w http.ResponseWriter, r *http.Request) {
 
 	if !isValidType {
 		respondWithJSONError(w, http.StatusBadRequest, "validation_error", "invalid file type. Only JPG, PNG, and PDF files are allowed")
+		return
+	}
+
+	// Read file content into memory
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		log.Printf("UploadReceipt: Failed to read file: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "upload_error", "failed to read file content")
 		return
 	}
 
@@ -364,55 +380,15 @@ func UploadReceipt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create upload directory if it doesn't exist
-	err = os.MkdirAll(UploadDir, 0755)
-	if err != nil {
-		log.Printf("UploadReceipt: Failed to create upload directory: %v", err)
-		respondWithJSONError(w, http.StatusInternalServerError, "storage_error", "failed to create upload directory")
-		return
-	}
-
-	// Generate unique filename: deposit-{uuid}-{timestamp}.{ext}
-	ext := filepath.Ext(header.Filename)
-	if ext == "" {
-		// Default extension based on content type
-		if strings.Contains(contentType, "pdf") {
-			ext = ".pdf"
-		} else if strings.Contains(contentType, "png") {
-			ext = ".png"
-		} else {
-			ext = ".jpg"
-		}
-	}
-	filename := fmt.Sprintf("deposit-%s-%d%s", depositID.String(), time.Now().Unix(), ext)
-	filePath := filepath.Join(UploadDir, filename)
-
-	// Save file to disk
-	dst, err := os.Create(filePath)
-	if err != nil {
-		log.Printf("UploadReceipt: Failed to create file: %v", err)
-		respondWithJSONError(w, http.StatusInternalServerError, "storage_error", "failed to save file")
-		return
-	}
-	defer dst.Close()
-
-	_, err = io.Copy(dst, file)
-	if err != nil {
-		log.Printf("UploadReceipt: Failed to write file: %v", err)
-		os.Remove(filePath) // Clean up on error
-		respondWithJSONError(w, http.StatusInternalServerError, "storage_error", "failed to write file")
-		return
-	}
-
-	// Update deposit record with file path
+	// Update deposit record with file data (BLOB)
+	// We no longer save to disk
 	_, err = pool.Exec(ctx,
-		`UPDATE deposits SET receipt_file_path = $1, updated_at = NOW() WHERE id = $2`,
-		filePath, depositID,
+		`UPDATE deposits SET receipt_data = $1, receipt_mime_type = $2, updated_at = NOW() WHERE id = $3`,
+		fileBytes, contentType, depositID,
 	)
 	if err != nil {
-		log.Printf("UploadReceipt: Failed to update deposit: %v", err)
-		os.Remove(filePath) // Clean up on error
-		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to update deposit")
+		log.Printf("UploadReceipt: Failed to update deposit with receipt: %v", err)
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to save receipt")
 		return
 	}
 
@@ -474,9 +450,11 @@ func GetDeposits(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch deposits
+	// NOTE: We do NOT fetch receipt_data here (too heavy). We only fetch receipt_mime_type.
 	rows, err := pool.Query(ctx,
 		`SELECT id, user_id, account_id, reference_id, payment_method, amount, currency, 
-		        receipt_file_path, payment_details, status, transaction_id, admin_notes, 
+		        receipt_mime_type, payment_details, status, transaction_id, admin_notes,
+		        client_ip, admin_ip, approved_at, rejected_at, approved_by, rejected_by,
 		        created_at, updated_at
 		 FROM deposits
 		 WHERE account_id = $1
@@ -494,23 +472,38 @@ func GetDeposits(w http.ResponseWriter, r *http.Request) {
 	var deposits []models.Deposit
 	for rows.Next() {
 		var deposit models.Deposit
-		var receiptFilePath *string
+		var receiptMimeType *string
 		var paymentDetailsJSON []byte
 		var adminNotes *string
+		var clientIP *string
+		var adminIP *string
+		var approvedAt *time.Time
+		var rejectedAt *time.Time
+		var approvedBy *int64
+		var rejectedBy *int64
 
 		err := rows.Scan(
 			&deposit.ID, &deposit.UserID, &deposit.AccountID, &deposit.ReferenceID,
 			&deposit.PaymentMethod, &deposit.Amount, &deposit.Currency,
-			&receiptFilePath, &paymentDetailsJSON, &deposit.Status,
-			&deposit.TransactionID, &adminNotes, &deposit.CreatedAt, &deposit.UpdatedAt,
+			&receiptMimeType, &paymentDetailsJSON, &deposit.Status,
+			&deposit.TransactionID, &adminNotes,
+			&clientIP, &adminIP, &approvedAt, &rejectedAt, &approvedBy, &rejectedBy,
+			&deposit.CreatedAt, &deposit.UpdatedAt,
 		)
 		if err != nil {
 			log.Printf("Failed to scan deposit: %v", err)
 			continue
 		}
 
-		deposit.ReceiptFilePath = receiptFilePath
+		// Ensure your model has this field or use a wrapper struct
+		// deposit.ReceiptMimeType = receiptMimeType
 		deposit.AdminNotes = adminNotes
+		deposit.ClientIP = clientIP
+		deposit.AdminIP = adminIP
+		deposit.ApprovedAt = approvedAt
+		deposit.RejectedAt = rejectedAt
+		deposit.ApprovedBy = approvedBy
+		deposit.RejectedBy = rejectedBy
 
 		// Parse payment_details JSON
 		if len(paymentDetailsJSON) > 0 {
@@ -537,13 +530,21 @@ func GetDeposits(w http.ResponseWriter, r *http.Request) {
 // Helper function to get deposit by ID
 func getDepositByID(ctx context.Context, pool DBQuerier, depositID uuid.UUID, userID int64) (models.Deposit, error) {
 	var deposit models.Deposit
-	var receiptFilePath *string
+	var receiptMimeType *string
 	var paymentDetailsJSON []byte
 	var adminNotes *string
+	var clientIP *string
+	var adminIP *string
+	var approvedAt *time.Time
+	var rejectedAt *time.Time
+	var approvedBy *int64
+	var rejectedBy *int64
 
+	// NOTE: Changed receipt_file_path to receipt_mime_type
 	err := pool.QueryRow(ctx,
 		`SELECT id, user_id, account_id, reference_id, payment_method, amount, currency,
-		        receipt_file_path, payment_details, status, transaction_id, admin_notes,
+		        receipt_mime_type, payment_details, status, transaction_id, admin_notes,
+		        client_ip, admin_ip, approved_at, rejected_at, approved_by, rejected_by,
 		        created_at, updated_at
 		 FROM deposits
 		 WHERE id = $1 AND user_id = $2`,
@@ -551,15 +552,24 @@ func getDepositByID(ctx context.Context, pool DBQuerier, depositID uuid.UUID, us
 	).Scan(
 		&deposit.ID, &deposit.UserID, &deposit.AccountID, &deposit.ReferenceID,
 		&deposit.PaymentMethod, &deposit.Amount, &deposit.Currency,
-		&receiptFilePath, &paymentDetailsJSON, &deposit.Status,
-		&deposit.TransactionID, &adminNotes, &deposit.CreatedAt, &deposit.UpdatedAt,
+		&receiptMimeType, &paymentDetailsJSON, &deposit.Status,
+		&deposit.TransactionID, &adminNotes,
+		&clientIP, &adminIP, &approvedAt, &rejectedAt, &approvedBy, &rejectedBy,
+		&deposit.CreatedAt, &deposit.UpdatedAt,
 	)
 	if err != nil {
 		return deposit, fmt.Errorf("failed to fetch deposit: %w", err)
 	}
 
-	deposit.ReceiptFilePath = receiptFilePath
+	// Ensure your model has this field
+	// deposit.ReceiptMimeType = receiptMimeType
 	deposit.AdminNotes = adminNotes
+	deposit.ClientIP = clientIP
+	deposit.AdminIP = adminIP
+	deposit.ApprovedAt = approvedAt
+	deposit.RejectedAt = rejectedAt
+	deposit.ApprovedBy = approvedBy
+	deposit.RejectedBy = rejectedBy
 
 	// Parse payment_details JSON
 	if len(paymentDetailsJSON) > 0 {
@@ -569,4 +579,29 @@ func getDepositByID(ctx context.Context, pool DBQuerier, depositID uuid.UUID, us
 	}
 
 	return deposit, nil
+}
+
+// getClientIP extracts the client's IP address from the request
+// It checks X-Forwarded-For, X-Real-IP headers before falling back to RemoteAddr
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header (may contain multiple IPs if behind proxies)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Take the first IP (original client)
+		ips := strings.Split(xff, ",")
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+
+	// Fallback to RemoteAddr (format: "ip:port")
+	ip := r.RemoteAddr
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+	return ip
 }

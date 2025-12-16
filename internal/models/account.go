@@ -515,6 +515,12 @@ type Deposit struct {
 	Status         DepositStatus          `json:"status"`
 	TransactionID  *uuid.UUID             `json:"transaction_id,omitempty"`
 	AdminNotes     *string                `json:"admin_notes,omitempty"`
+	ClientIP       *string                `json:"client_ip,omitempty"`       // IP address when deposit was created
+	AdminIP        *string                `json:"admin_ip,omitempty"`        // IP address of admin when approved/rejected
+	ApprovedAt     *time.Time             `json:"approved_at,omitempty"`     // Timestamp when approved
+	RejectedAt     *time.Time             `json:"rejected_at,omitempty"`     // Timestamp when rejected
+	ApprovedBy     *int64                 `json:"approved_by,omitempty"`     // Admin user ID who approved
+	RejectedBy     *int64                 `json:"rejected_by,omitempty"`     // Admin user ID who rejected
 	CreatedAt      time.Time              `json:"created_at"`
 	UpdatedAt      time.Time              `json:"updated_at"`
 }

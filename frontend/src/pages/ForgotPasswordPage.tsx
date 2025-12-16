@@ -79,10 +79,8 @@ export default function ForgotPasswordPage() {
         // Handle different error statuses
         if (data.status === 'not_found') {
           setEmailError('No account found with this email address');
-        } else if (data.status === 'pending') {
-          setEmailError('Your registration is still pending admin approval. Password reset is not available.');
-        } else if (data.status === 'rejected') {
-          setEmailError('Your registration has been rejected. Password reset is not available. Please contact support.');
+        } else if (data.status === 'inactive') {
+          setEmailError('Your account is inactive. Password reset is not available. Please contact support.');
         } else {
           setEmailError(data.message || 'An error occurred. Please try again.');
         }

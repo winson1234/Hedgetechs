@@ -147,8 +147,8 @@ useEffect(() => {
       country: formData.country
     })).unwrap();
 
-    // Show pending approval message
-    alert(`Registration submitted successfully!\n\n${result.message || 'Your account is pending admin approval. You will be notified via email once approved.'}`);
+    // Show success message
+    alert(`Registration successful!\n\n${result.message || 'You can now log in with your credentials.'}`);
     
     // Redirect to login page
     navigate('/login');

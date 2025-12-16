@@ -1,121 +1,109 @@
-# Full Docker development environment with hot reloading
-# Usage: docker compose -f docker-compose.dev.yml --env-file .env.dev up --build
-
 services:
   # ============================================
-  # PostgreSQL (Local Development Database)
+  # PostgreSQL Database
   # ============================================
   postgres:
     image: postgres:16-alpine
     container_name: brokerage-postgres-dev
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-brokerage_dev}
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
-      - postgres-data-dev:/var/lib/postgresql/data
-      # Optional: Mount init scripts
-      - ./sql-scripts:/docker-entrypoint-initdb.d:ro
+      - postgres-dev-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     networks:
-      - brokerage-network
+      - brokerage-dev-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 3s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-brokerage_dev}"]
+      interval: 10s
+      timeout: 5s
       retries: 5
       start_period: 10s
-    # Development-optimized settings (faster, less safe)
-    command:
-      - "postgres"
-      - "-c"
-      - "fsync=off"
-      - "-c"
-      - "synchronous_commit=off"
-      - "-c"
-      - "full_page_writes=off"
-      - "-c"
-      - "max_connections=100"
-      - "-c"
-      - "shared_buffers=128MB"
 
   # ============================================
-  # Redis (Local Development Cache)
+  # Redis Cache
   # ============================================
   redis:
     image: redis:7-alpine
     container_name: brokerage-redis-dev
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass "${REDIS_PASSWORD:-123456}"
+      --appendonly yes
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-123456}
+    volumes:
+      - redis-dev-data:/data
     ports:
       - "6379:6379"
-    command: redis-server --requirepass "${REDIS_PASSWORD}"
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    volumes:
-      - redis-data-dev:/data
     networks:
-      - brokerage-network
+      - brokerage-dev-network
     healthcheck:
-      test: ["CMD", "sh", "-c", "redis-cli -a \"$$REDIS_PASSWORD\" ping"]
-      interval: 5s
-      timeout: 3s
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-123456}", "ping"]
+      interval: 10s
+      timeout: 5s
       retries: 5
-      start_period: 5s
 
   # ============================================
-  # Backend (Go with Air hot reload)
+  # Backend (Go API) - Development with Hot Reload
   # ============================================
   backend:
     build:
       context: .
       dockerfile: cmd/server/Dockerfile.dev
     container_name: brokerage-backend-dev
+    restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
       # ============================================
       # DATABASE (Local PostgreSQL)
       # ============================================
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
-      - DATABASE_MIGRATION_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-brokerage_dev}?sslmode=disable
+      - DATABASE_MIGRATION_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-brokerage_dev}?sslmode=disable
       
       # ============================================
-      # REDIS (Local)
+      # REDIS
       # ============================================
       - REDIS_ADDR=redis:6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-123456}
       
       # ============================================
       # JWT
       # ============================================
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRY_HOURS=24
+      - JWT_SECRET=${JWT_SECRET:-dev_secret_key_change_in_production}
+      - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
       
       # ============================================
       # PAYMENT PROCESSING
       # ============================================
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - NOWPAYMENTS_API_KEY=${NOWPAYMENTS_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - NOWPAYMENTS_API_KEY=${NOWPAYMENTS_API_KEY:-}
       
       # ============================================
       # MARKET DATA
       # ============================================
       - MARKET_DATA_PROVIDER=${MARKET_DATA_PROVIDER:-hybrid}
-      - TWELVE_DATA_API_KEY=${TWELVE_DATA_API_KEY}
+      - TWELVE_DATA_API_KEY=${TWELVE_DATA_API_KEY:-}
       - TWELVE_DATA_POLL_INTERVAL=${TWELVE_DATA_POLL_INTERVAL:-15m}
       - ENABLE_EXTERNAL_FETCH=${ENABLE_EXTERNAL_FETCH:-true}
-      - WINDOWS_API_URL=${WINDOWS_API_URL:-}
+      - WINDOWS_API_URL=${WINDOWS_API_URL:-http://host.docker.internal:5000}
       
       # ============================================
-      # EMAIL (Mailhog in dev)
+      # EMAIL
       # ============================================
       - RESEND_API_KEY=${RESEND_API_KEY:-}
-      - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-dev@localhost}
+      - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-onboarding@resend.dev}
       
       # ============================================
-      # AWS FACE LIVENESS (Optional in dev)
+      # AWS FACE LIVENESS
       # ============================================
       - AWS_AI_ACCESS_KEY=${AWS_AI_ACCESS_KEY:-}
       - AWS_AI_SECRET_KEY=${AWS_AI_SECRET_KEY:-}
@@ -124,26 +112,26 @@ services:
       # ============================================
       # ENVIRONMENT
       # ============================================
-      - ENVIRONMENT=development
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - DOCKER_ENV=development
       - PORT=8080
       
       # ============================================
       # CORS
       # ============================================
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
     
     volumes:
-      # Mount entire project for hot reload
-      - ./:/app
-      # Exclude tmp directory (Air build artifacts)
-      - /app/tmp
-      # Cache Go build
-      - go-build-cache:/root/.cache/go-build
-      - go-mod-cache:/go/pkg/mod
+      # Mount source code for hot reload
+      - ./internal:/app/internal
+      - ./cmd:/app/cmd
+      - ./sql-scripts:/app/sql-scripts
+      - ./go.mod:/app/go.mod
+      - ./go.sum:/app/go.sum
+      - ./.air.toml:/app/.air.toml
     
     networks:
-      - brokerage-network
+      - brokerage-dev-network
     
     depends_on:
       postgres:
@@ -151,107 +139,52 @@ services:
       redis:
         condition: service_healthy
     
-    # Don't restart in dev (Air handles rebuilds)
-    restart: "no"
-    
-    # Add stdin/tty for better logging
-    stdin_open: true
-    tty: true
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   # ============================================
-  # Frontend (React/Vite with hot reload)
+  # Frontend (React/Vite) - Development with Hot Reload
   # ============================================
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
     container_name: brokerage-frontend-dev
+    restart: unless-stopped
     ports:
       - "5173:5173"
     environment:
-      - VITE_STRIPE_PUBLISHABLE_KEY=${VITE_STRIPE_PUBLISHABLE_KEY}
-      - VITE_API_URL=http://localhost:8080
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8080}
+      - VITE_STRIPE_PUBLISHABLE_KEY=${VITE_STRIPE_PUBLISHABLE_KEY:-}
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:-}
       - VITE_DOCKER_BACKEND_URL=http://backend:8080
       - DOCKER_ENV=development
-    
     volumes:
       # Mount source code for hot reload
       - ./frontend:/app
-      # Exclude node_modules (use container's version)
       - /app/node_modules
-      - /app/dist
-    
     networks:
-      - brokerage-network
-    
-    restart: "no"
-    
-    stdin_open: true
-    tty: true
-
-  # ============================================
-  # pgAdmin (PostgreSQL Web UI)
-  # ============================================
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: brokerage-pgadmin
-    ports:
-      - "5050:80"
-    environment:
-      - PGADMIN_DEFAULT_EMAIL=dev@localhost.com
-      - PGADMIN_DEFAULT_PASSWORD=devpassword123
-      - PGADMIN_CONFIG_SERVER_MODE=False
-      - PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED=False
-    volumes:
-      - pgadmin-data:/var/lib/pgadmin
-    networks:
-      - brokerage-network
+      - brokerage-dev-network
     depends_on:
-      - postgres
-    restart: unless-stopped
-
-  # ============================================
-  # Redis Commander (Redis Web UI)
-  # ============================================
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: brokerage-redis-gui
-    ports:
-      - "8081:8081"
-    environment:
-      - REDIS_HOSTS=local:redis:6379:0:${REDIS_PASSWORD}
-    networks:
-      - brokerage-network
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  # ============================================
-  # Mailhog (Email Testing)
-  # ============================================
-  mailhog:
-    image: mailhog/mailhog:latest
-    container_name: brokerage-mailhog
-    ports:
-      - "1025:1025"  # SMTP server
-      - "8025:8025"  # Web UI
-    networks:
-      - brokerage-network
-    restart: unless-stopped
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5173"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
 networks:
-  brokerage-network:
+  brokerage-dev-network:
     driver: bridge
 
 volumes:
-  postgres-data-dev:
+  postgres-dev-data:
     driver: local
-  redis-data-dev:
-    driver: local
-  pgadmin-data:
-    driver: local
-  go-build-cache:
-    driver: local
-  go-mod-cache:
+  redis-dev-data:
     driver: local

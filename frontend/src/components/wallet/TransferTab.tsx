@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, memo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatAccountId } from '../../utils/formatters';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { addToast } from '../../store/slices/uiSlice';
 import { createTransfer } from '../../store/slices/transactionSlice';
@@ -261,7 +261,7 @@ function TransferTab() {
               const balance = acc.balances.find(b => b.currency === acc.currency);
               return (
                 <option key={acc.id} value={acc.id}>
-                  {acc.account_id} ({acc.type}) - {formatCurrency(balance?.amount || 0, acc.currency)}
+                  {formatAccountId(acc.account_id, acc.type)} ({acc.type}) - {formatCurrency(balance?.amount || 0, acc.currency)}
                 </option>
               );
             })}
@@ -293,7 +293,7 @@ function TransferTab() {
               const balance = acc.balances.find(b => b.currency === acc.currency);
               return (
                 <option key={acc.id} value={acc.id}>
-                  {acc.account_id} ({acc.type}) - {formatCurrency(balance?.amount || 0, acc.currency)}
+                  {formatAccountId(acc.account_id, acc.type)} ({acc.type}) - {formatCurrency(balance?.amount || 0, acc.currency)}
                 </option>
               );
             })}

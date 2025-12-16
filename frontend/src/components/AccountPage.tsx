@@ -8,7 +8,7 @@ import { setActiveWalletTab, addToast } from '../store/slices/uiSlice';
 import OpenAccountModal from './OpenAccountModal';
 import EditBalanceModal from './EditBalanceModal';
 import AccountHoldingsChart from './AccountHoldingsChart';
-import { formatBalance, getBalanceAmount, balancesToRecord } from '../utils/formatters';
+import { formatBalance, formatAccountId, getBalanceAmount, balancesToRecord } from '../utils/formatters';
 
 // --- Icons ---
 const PlusIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg> );
@@ -259,7 +259,7 @@ export default function AccountPage() {
             )}
           </div>
         </div>
-        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 truncate">{acc.account_id}</p>
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 truncate">{formatAccountId(acc.account_id, acc.type)}</p>
 
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1">
@@ -298,30 +298,16 @@ export default function AccountPage() {
              </div>
              <div className="p-5 md:p-6 lg:p-8">
                 <div className="flex justify-end mb-6">
-                <div className="relative group">
-                    <button 
-                        onClick={() => handleOpenCreateModal(activeTab)} 
-                        disabled={accounts.some(acc => acc.type === activeTab)}
-                        className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm text-white disabled:opacity-50 disabled:cursor-not-allowed ${
-                            activeTab === 'live' 
-                            ? 'bg-[#213B34] hover:bg-gray-800 disabled:hover:bg-[#213B34]'       // Color for LIVE tab
-                            : 'bg-[#55bca1] hover:bg-[#44a088] disabled:hover:bg-[#55bca1]'  // Color for DEMO tab
-                        }`}
-                        title={accounts.some(acc => acc.type === activeTab) 
-                            ? `You can only have 1 ${activeTab} account at one time`
-                            : ''}
-                    >
-                        <PlusIcon /> Open New Account
-                    </button>
-                    {/* Tooltip for disabled button */}
-                    {accounts.some(acc => acc.type === activeTab) && (
-                        <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-xs rounded-lg shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                            You can only have 1 {activeTab} account at one time
-                            {/* Tooltip arrow */}
-                            <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-900 dark:border-t-slate-700"></div>
-                        </div>
-                    )}
-                </div>
+                <button 
+                    onClick={() => handleOpenCreateModal(activeTab)} 
+                    className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm text-white ${
+                        activeTab === 'live' 
+                        ? 'bg-[#213B34] hover:bg-gray-800'       // Color for LIVE tab
+                        : 'bg-[#55bca1] hover:bg-[#44a088]'  // Color for DEMO tab
+                    }`}
+                >
+                    <PlusIcon /> Open New Account
+                </button>
                 </div>
                 {activeTab === 'live' && (<div>{liveAccounts.length === 0 ? (<div className="text-center py-10 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/30"><p className="text-slate-500 dark:text-slate-400">You haven&apos;t opened any live accounts yet.</p></div>) : (<div className="grid grid-cols-1 md:grid-cols-2 gap-5">{liveAccounts.map(renderAccountCard)}</div>)}</div>)}
                 {activeTab === 'demo' && (<div>{demoAccounts.length === 0 ? (<div className="text-center py-10 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/30"><p className="text-slate-500 dark:text-slate-400">You haven&apos;t opened any demo accounts yet.</p></div>) : (<div className="grid grid-cols-1 md:grid-cols-2 gap-5">{demoAccounts.map(renderAccountCard)}</div>)}</div>)}
@@ -336,7 +322,7 @@ export default function AccountPage() {
                         {/* Account Information */}
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                              <div className="text-slate-500 dark:text-slate-400">Account ID:</div>
-                             <div className="font-medium text-slate-700 dark:text-slate-300 truncate text-right">{selectedAccount.account_id}</div>
+                             <div className="font-medium text-slate-700 dark:text-slate-300 truncate text-right">{formatAccountId(selectedAccount.account_id, selectedAccount.type)}</div>
 
                              <div className="text-slate-500 dark:text-slate-400">Type:</div>
                              <div className="text-right">

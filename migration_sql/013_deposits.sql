@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS public.deposits (
   payment_method public.payment_method NOT NULL DEFAULT 'tron'::payment_method,
   amount numeric(20, 8) NOT NULL,
   currency text NOT NULL DEFAULT 'USD',
-  receipt_file_path text NULL, -- Path to uploaded receipt file
+  receipt_data bytea NULL, -- Receipt file stored as BLOB (binary data)
+  receipt_mime_type text NULL, -- MIME type of the receipt (image/jpeg, image/png, application/pdf)
   payment_details jsonb NULL, -- Optional payment details (e.g., transaction hash, wallet address)
   status public.deposit_status NOT NULL DEFAULT 'pending'::deposit_status,
   transaction_id uuid NULL, -- Link to transactions table (ledger entry)

@@ -23,7 +23,7 @@ function InstrumentsPanel() {
   const [searchQuery, setSearchQuery] = useState('')
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all')
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('forex')
 
   // Load favorites and category filter from localStorage on mount
   useEffect(() => {
@@ -111,7 +111,7 @@ function InstrumentsPanel() {
       let iconUrl = inst.iconUrl || ''
       let isForexPair = false
       let forexPair = { base: '', quote: '' }
-      
+
       if (!iconUrl && inst.base_currency) {
         // Check if this is a forex pair (has quote_currency and not USDT)
         if (inst.quote_currency && inst.quote_currency !== 'USDT') {
@@ -121,7 +121,7 @@ function InstrumentsPanel() {
             quote: inst.quote_currency
           }
         }
-        
+
         // Complete icon mapping for ALL 26 instruments in database
         const iconMap: Record<string, string> = {
           // Major Cryptocurrencies
@@ -157,7 +157,7 @@ function InstrumentsPanel() {
           // Forex & Commodities (CFD instruments)
           'EUR': 'https://hatscripts.github.io/circle-flags/flags/eu.svg',
           'PAXG': 'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/paxg.png',
-          
+
           // Forex pairs (dual-flag SVGs for pair representation)
           'CAD': 'https://hatscripts.github.io/circle-flags/flags/ca.svg',
           'AUD': 'https://hatscripts.github.io/circle-flags/flags/au.svg',
@@ -259,11 +259,10 @@ function InstrumentsPanel() {
         {/* Favorite filter toggle */}
         <button
           onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-          className={`p-1.5 rounded transition-colors ${
-            showFavoritesOnly
+          className={`p-1.5 rounded transition-colors ${showFavoritesOnly
               ? 'bg-amber-500 text-white'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
+            }`}
           title={showFavoritesOnly ? 'Show all instruments' : 'Show favorites only'}
         >
           <svg className="w-4 h-4" fill={showFavoritesOnly ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
@@ -272,73 +271,18 @@ function InstrumentsPanel() {
         </button>
       </div>
 
-      {/* Category Filter Tabs - Row 1: Crypto */}
-      <div className="flex gap-1 mb-2 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-        <button
-          onClick={() => setCategoryFilter('all')}
-          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition ${
-            categoryFilter === 'all'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-          }`}
-        >
-          All ({categoryCounts.all})
-        </button>
-        <button
-          onClick={() => setCategoryFilter('major')}
-          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition ${
-            categoryFilter === 'major'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-          }`}
-        >
-          Major ({categoryCounts.major})
-        </button>
-        <button
-          onClick={() => setCategoryFilter('defi')}
-          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition ${
-            categoryFilter === 'defi'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-          }`}
-        >
-          DeFi ({categoryCounts.defi})
-        </button>
-        <button
-          onClick={() => setCategoryFilter('altcoin')}
-          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition ${
-            categoryFilter === 'altcoin'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-          }`}
-        >
-          Altcoin ({categoryCounts.altcoin})
-        </button>
-      </div>
-
-      {/* Category Filter Tabs - Row 2: CFD - DISABLED */}
-      {/* <div className="flex gap-1 mb-3 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+      {/* Category Filter - Forex Only */}
+      <div className="flex gap-1 mb-3 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
         <button
           onClick={() => setCategoryFilter('forex')}
-          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition ${
-            categoryFilter === 'forex'
+          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition ${categoryFilter === 'forex'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-          }`}
+            }`}
         >
           Forex ({categoryCounts.forex})
         </button>
-        <button
-          onClick={() => setCategoryFilter('commodity')}
-          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition ${
-            categoryFilter === 'commodity'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-          }`}
-        >
-          Commodity ({categoryCounts.commodity})
-        </button>
-      </div> */}
+      </div>
 
       {/* Search Bar */}
       <div className="relative mb-3">
@@ -401,11 +345,10 @@ function InstrumentsPanel() {
             return (
               <li
                 key={item.symbol}
-                className={`relative py-3 px-3 rounded-lg cursor-pointer transition-all ${
-                  isActiveInstrument
-                  ? 'bg-[#00C0A2]/10 dark:bg-[#00C0A2]/20 border border-[#00C0A2] dark:border-[#00C0A2]'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
-                }`}
+                className={`relative py-3 px-3 rounded-lg cursor-pointer transition-all ${isActiveInstrument
+                    ? 'bg-[#00C0A2]/10 dark:bg-[#00C0A2]/20 border border-[#00C0A2] dark:border-[#00C0A2]'
+                    : 'hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
+                  }`}
               >
                 <div className="flex items-center gap-3" onClick={() => dispatch(setActiveInstrument(item.symbol))}>
                   {/* Icon */}
@@ -435,29 +378,25 @@ function InstrumentsPanel() {
 
                     {/* Status Indicator */}
                     {!item.isLoading && (
-                      <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900 ${
-                        item.isActive ? 'bg-green-500' : 'bg-slate-400'
-                      }`} title={item.isActive ? 'Active' : 'Inactive'}></div>
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900 ${item.isActive ? 'bg-green-500' : 'bg-slate-400'
+                        }`} title={item.isActive ? 'Active' : 'Inactive'}></div>
                     )}
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className={`text-sm font-semibold ${
-                        isActiveInstrument ? 'text-[#00C0A2] dark:text-[#00C0A2]' : 'text-slate-700 dark:text-slate-300'
-                      }`}>
+                      <span className={`text-sm font-semibold ${isActiveInstrument ? 'text-[#00C0A2] dark:text-[#00C0A2]' : 'text-slate-700 dark:text-slate-300'
+                        }`}>
                         {item.displayName}
                       </span>
-                      <span className={`text-xs font-bold ${
-                        isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'
-                      }`}>
+                      <span className={`text-xs font-bold ${isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'
+                        }`}>
                         {changeText}
                       </span>
                     </div>
-                    <div className={`text-xs mt-1 ${
-                      isActiveInstrument ? 'text-slate-600 dark:text-slate-300' : 'text-slate-500 dark:text-slate-400'
-                    }`}>
+                    <div className={`text-xs mt-1 ${isActiveInstrument ? 'text-slate-600 dark:text-slate-300' : 'text-slate-500 dark:text-slate-400'
+                      }`}>
                       ${formatPrice(item.price)}
                     </div>
                   </div>

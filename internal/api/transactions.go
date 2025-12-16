@@ -244,12 +244,16 @@ func GetTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch transactions
+	// Fetch transactions with rejection reasons from deposits table
 	rows, err := pool.Query(ctx,
-		`SELECT id, account_id, transaction_number, type, currency, amount, status, target_account_id, description, created_at, updated_at
-		 FROM transactions
-		 WHERE account_id = $1
-		 ORDER BY created_at DESC
+		`SELECT 
+			t.id, t.account_id, t.transaction_number, t.type, t.currency, t.amount, t.status, 
+			t.target_account_id, t.description, t.metadata, t.created_at, t.updated_at,
+			d.admin_notes, d.status as deposit_status
+		 FROM transactions t
+		 LEFT JOIN deposits d ON t.id = d.transaction_id
+		 WHERE t.account_id = $1
+		 ORDER BY t.created_at DESC
 		 LIMIT 100`,
 		accountID,
 	)
@@ -263,15 +267,36 @@ func GetTransactions(w http.ResponseWriter, r *http.Request) {
 	var transactions []models.Transaction
 	for rows.Next() {
 		var transaction models.Transaction
+		var metadataJSON []byte
+		var adminNotes *string
+		var depositStatus *string
+
 		err := rows.Scan(
 			&transaction.ID, &transaction.AccountID, &transaction.TransactionNumber, &transaction.Type, &transaction.Currency,
 			&transaction.Amount, &transaction.Status, &transaction.TargetAccountID, &transaction.Description,
-			&transaction.CreatedAt, &transaction.UpdatedAt,
+			&metadataJSON, &transaction.CreatedAt, &transaction.UpdatedAt,
+			&adminNotes, &depositStatus,
 		)
 		if err != nil {
 			log.Printf("Failed to scan transaction: %v", err)
 			continue
 		}
+
+		// Parse metadata JSON
+		if len(metadataJSON) > 0 {
+			if err := json.Unmarshal(metadataJSON, &transaction.Metadata); err != nil {
+				log.Printf("Failed to parse transaction metadata: %v", err)
+				transaction.Metadata = make(map[string]any)
+			}
+		} else {
+			transaction.Metadata = make(map[string]any)
+		}
+
+		// Add rejection reason to metadata if transaction is failed and linked to a rejected deposit
+		if transaction.Status == models.TransactionStatusFailed && depositStatus != nil && *depositStatus == "rejected" && adminNotes != nil && *adminNotes != "" {
+			transaction.Metadata["rejection_reason"] = *adminNotes
+		}
+
 		transactions = append(transactions, transaction)
 	}
 

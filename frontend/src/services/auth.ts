@@ -44,7 +44,7 @@ export interface CheckStatusResponse {
 
 /**
  * Register a new user
- * Note: Registration creates a pending_registrations record requiring admin approval
+ * Note: Registration creates a user account directly, no approval needed
  */
 export async function register(data: RegisterRequest): Promise<{ success: boolean; message: string }> {
   try {
@@ -59,12 +59,14 @@ export async function register(data: RegisterRequest): Promise<{ success: boolea
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || 'Registration failed');
+      // Extract error message from backend response
+      const errorMessage = result.message || result.error || 'Registration failed';
+      throw new Error(errorMessage);
     }
 
     return {
       success: true,
-      message: result.message || 'Registration submitted successfully. Your account is pending admin approval.',
+      message: result.message || 'Registration successful. You can now log in.',
     };
   } catch (error) {
     throw error instanceof Error ? error : new Error('Registration failed');

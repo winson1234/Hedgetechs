@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getApiUrl } from '../../config/api';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatAccountId } from '../../utils/formatters';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { addToast } from '../../store/slices/uiSlice';
 import { fetchAccounts } from '../../store/slices/accountSlice';
@@ -327,7 +327,7 @@ function DepositTab() {
                 const balance = acc.balances.find(b => b.currency === acc.currency);
                 return (
                   <option key={acc.id} value={acc.id}>
-                    {acc.account_id} - {formatCurrency(balance?.amount || 0, acc.currency)}
+                    {formatAccountId(acc.account_id, acc.type)} - {formatCurrency(balance?.amount || 0, acc.currency)}
                   </option>
                 );
               })}

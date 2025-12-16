@@ -12,6 +12,21 @@ Comprehensive CFD and forex trading platform with cryptocurrency support, featur
 
 ## Commands
 
+### 🚀 Quick Start (Docker - Recommended)
+
+```bash
+# Start development environment
+make dev                    # Start all services (frontend, backend, DB, redis)
+make dev-daemon             # Start in background
+make dev-logs               # View logs
+
+# Stop services
+make dev-down               # Stop all services
+make dev-clean              # Stop and remove volumes
+```
+
+### 🔧 Manual Commands
+
 **Backend (Go)**
 ```bash
 go mod tidy                     # Install dependencies
@@ -29,6 +44,15 @@ pnpm run typecheck    # TypeScript type checking
 pnpm run lint         # Lint codebase
 pnpm run build        # Production build
 ```
+
+### 🔥 Troubleshooting
+
+**Can't create demo or live accounts?**
+```bash
+./fix_database_and_accounts.sh
+```
+
+See [QUICK_START.md](./QUICK_START.md) or [DATABASE_FIX_GUIDE.md](./DATABASE_FIX_GUIDE.md) for details.
 
 ---
 

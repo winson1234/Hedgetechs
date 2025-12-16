@@ -42,19 +42,6 @@ function OpenAccountModal({
   const [error, setError] = useState<string | null>(null)
   const [balanceError, setBalanceError] = useState<string | null>(null)
 
-  // Check if user already has an account of the selected type
-  const hasAccountType = accounts.some(acc => acc.type === accountType)
-  
-  // Tooltip message for disabled button
-  const getDisabledMessage = () => {
-    if (hasAccountType) {
-      return accountType === 'demo' 
-        ? 'You can only have 1 demo account at one time'
-        : 'You can only have 1 live account at one time'
-    }
-    return ''
-  }
-
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -152,50 +139,28 @@ function OpenAccountModal({
               Account Type
             </label>
             <div className="flex gap-1 bg-slate-100 dark:bg-slate-900 rounded-lg p-1">
-              <div className="relative flex-1 group">
-                <button
-                  onClick={() => setAccountType('live')}
-                  disabled={isLoading || accounts.some(acc => acc.type === 'live')}
-                  className={`w-full px-3 py-1.5 text-sm font-medium rounded-md transition ${
-                    accountType === 'live'
-                      ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  Live
-                  {accounts.some(acc => acc.type === 'live') && (
-                    <span className="ml-1 text-xs opacity-75">(Owned)</span>
-                  )}
-                </button>
-                {accounts.some(acc => acc.type === 'live') && (
-                  <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-xs rounded-lg shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    You can only have 1 live account at one time
-                    <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-900 dark:border-t-slate-700"></div>
-                  </div>
-                )}
-              </div>
-              <div className="relative flex-1 group">
-                <button
-                  onClick={() => setAccountType('demo')}
-                  disabled={isLoading || accounts.some(acc => acc.type === 'demo')}
-                  className={`w-full px-3 py-1.5 text-sm font-medium rounded-md transition ${
-                    accountType === 'demo'
-                      ? 'bg-white dark:bg-slate-700 text-green-700 dark:text-green-300 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  Demo
-                  {accounts.some(acc => acc.type === 'demo') && (
-                    <span className="ml-1 text-xs opacity-75">(Owned)</span>
-                  )}
-                </button>
-                {accounts.some(acc => acc.type === 'demo') && (
-                  <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-xs rounded-lg shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    You can only have 1 demo account at one time
-                    <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-900 dark:border-t-slate-700"></div>
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => setAccountType('live')}
+                disabled={isLoading}
+                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition ${
+                  accountType === 'live'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                Live
+              </button>
+              <button
+                onClick={() => setAccountType('demo')}
+                disabled={isLoading}
+                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition ${
+                  accountType === 'demo'
+                    ? 'bg-white dark:bg-slate-700 text-green-700 dark:text-green-300 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                Demo
+              </button>
             </div>
           </div>
 
@@ -283,31 +248,20 @@ function OpenAccountModal({
           >
             Cancel
           </button>
-          <div className="relative group">
-            <button
-              onClick={handleSubmit}
-              disabled={isLoading || (accountType === 'demo' && !!balanceError) || hasAccountType} // Disable if loading, balance error, or already has account type
-              className="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[100px]" // Min width to prevent size change
-              title={hasAccountType ? getDisabledMessage() : ''}
-            >
-              {isLoading ? (
-                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-              ) : (
-                  'Create Account'
-              )}
-            </button>
-            {/* Tooltip for disabled button */}
-            {hasAccountType && (
-              <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-xs rounded-lg shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                {getDisabledMessage()}
-                {/* Tooltip arrow */}
-                <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-900 dark:border-t-slate-700"></div>
-              </div>
+          <button
+            onClick={handleSubmit}
+            disabled={isLoading || (accountType === 'demo' && !!balanceError)}
+            className="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[100px]"
+          >
+            {isLoading ? (
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            ) : (
+                'Create Account'
             )}
-          </div>
+          </button>
         </div>
       </div>
     </div>

@@ -695,6 +695,78 @@ func main() {
 		}
 	})
 
+	// Transfers endpoint (protected with JWT authentication)
+	// POST /api/v1/transfers - Transfer funds between internal accounts
+	http.HandleFunc("/api/v1/transfers", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(authMiddleware(api.Transfer))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Notifications endpoints (protected with JWT authentication)
+	// GET /api/v1/notifications - Get all notifications
+	// GET /api/v1/notifications/unread-count - Get unread count
+	// PATCH /api/v1/notifications/mark-all-read - Mark all as read
+	// PATCH /api/v1/notifications/read?id={uuid} - Mark specific notification as read
+	http.HandleFunc("/api/v1/notifications/unread-count", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			api.CORSMiddleware(authMiddleware(api.GetUnreadCount))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	http.HandleFunc("/api/v1/notifications/mark-all-read", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPatch:
+			api.CORSMiddleware(authMiddleware(api.MarkAllNotificationsRead))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	http.HandleFunc("/api/v1/notifications/read", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPatch:
+			api.CORSMiddleware(authMiddleware(api.MarkNotificationRead))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	http.HandleFunc("/api/v1/notifications", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			api.CORSMiddleware(authMiddleware(api.GetNotifications))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Deposits endpoints (protected with JWT authentication)
 	// POST /api/v1/deposits - Create deposit request
 	// GET /api/v1/deposits?account_id={uuid} - List deposits for account
@@ -713,13 +785,96 @@ func main() {
 		}
 	})
 
+	// Withdrawals endpoints (protected with JWT authentication)
+	// POST /api/v1/withdrawals - Create withdrawal request
+	// GET /api/v1/withdrawals?account_id={uuid} - List withdrawals for account
+	http.HandleFunc("/api/v1/withdrawals", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(authMiddleware(api.CreateWithdrawal))(w, r)
+		case http.MethodGet:
+			api.CORSMiddleware(authMiddleware(api.GetWithdrawals))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// GET /api/v1/withdrawals/saved-methods - Get saved withdrawal methods
+	http.HandleFunc("/api/v1/withdrawals/saved-methods", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			api.CORSMiddleware(authMiddleware(api.GetSavedWithdrawalMethods))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// PUT/PATCH /api/v1/withdrawals/:id/status - Update withdrawal status (approve/reject/complete)
+	// DELETE /api/v1/withdrawals/saved-methods/:id - Delete saved method
+	http.HandleFunc("/api/v1/withdrawals/", func(w http.ResponseWriter, r *http.Request) {
+		// Check if this is a status update request
+		if strings.HasSuffix(r.URL.Path, "/status") {
+			switch r.Method {
+			case http.MethodPut, http.MethodPatch:
+				api.CORSMiddleware(authMiddleware(api.UpdateWithdrawalStatus))(w, r)
+			case http.MethodOptions:
+				api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				})(w, r)
+			default:
+				w.WriteHeader(http.StatusMethodNotAllowed)
+			}
+			return
+		}
+
+		// Check if this is a saved method deletion request
+		if strings.Contains(r.URL.Path, "/saved-methods/") {
+			switch r.Method {
+			case http.MethodDelete:
+				api.CORSMiddleware(authMiddleware(api.DeleteSavedWithdrawalMethod))(w, r)
+			case http.MethodOptions:
+				api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				})(w, r)
+			default:
+				w.WriteHeader(http.StatusMethodNotAllowed)
+			}
+			return
+		}
+
+		// No other withdrawal sub-endpoints
+		w.WriteHeader(http.StatusNotFound)
+	})
+
 	// POST /api/v1/deposits/:id/receipt - Upload payment receipt for deposit
+	// PUT/PATCH /api/v1/deposits/:id/status - Update deposit status (approve/reject)
 	http.HandleFunc("/api/v1/deposits/", func(w http.ResponseWriter, r *http.Request) {
 		// Check if this is a receipt upload request
 		if strings.Contains(r.URL.Path, "/receipt") {
 			switch r.Method {
 			case http.MethodPost:
 				api.CORSMiddleware(authMiddleware(api.UploadReceipt))(w, r)
+			case http.MethodOptions:
+				api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				})(w, r)
+			default:
+				w.WriteHeader(http.StatusMethodNotAllowed)
+			}
+		} else if strings.Contains(r.URL.Path, "/status") {
+			// Deposit status update endpoint (approve/reject)
+			switch r.Method {
+			case http.MethodPut, http.MethodPatch:
+				// TODO: Replace with admin middleware once implemented
+				api.CORSMiddleware(authMiddleware(api.UpdateDepositStatus))(w, r)
 			case http.MethodOptions:
 				api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusOK)
@@ -957,12 +1112,24 @@ func runMigrations() error {
 		log.Println("Using DATABASE_MIGRATION_URL for migrations (session pooler mode)")
 	}
 
-	// Construct migrations path
-	migrationsPath := "file://sql-scripts/migrations"
+	// Construct migrations path - try multiple locations
+	var migrationsPath string
+	possiblePaths := []string{
+		"sql-scripts/migrations",        // Docker/project root
+		"../../sql-scripts/migrations",  // Running from cmd/server
+		"/app/sql-scripts/migrations",   // Absolute path in Docker
+	}
 
-	// Check if running from cmd/server directory
-	if _, err := os.Stat("../../sql-scripts/migrations"); err == nil {
-		migrationsPath = "file://../../sql-scripts/migrations"
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path); err == nil {
+			migrationsPath = "file://" + path
+			log.Printf("Found migrations directory at: %s", path)
+			break
+		}
+	}
+
+	if migrationsPath == "" {
+		return fmt.Errorf("migrations directory not found in any of: %v", possiblePaths)
 	}
 
 	// Create migration instance

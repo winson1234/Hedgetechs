@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProfileDropdown from './ProfileDropdown';
+import NotificationBell from './NotificationBell';
 import { useAppDispatch, useAppSelector } from '../store';
 import { setActiveWalletTab, toggleTheme } from '../store/slices/uiSlice';
 
@@ -107,6 +108,9 @@ export default function Header() {
               Funds
             </button>
 
+
+          {/* Notification Bell */}
+          <NotificationBell />
 
           {/* Theme Toggle Button */}
           <button

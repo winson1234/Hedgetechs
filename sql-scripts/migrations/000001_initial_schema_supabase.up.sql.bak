@@ -94,13 +94,18 @@ CREATE SEQUENCE IF NOT EXISTS public.transaction_number_seq
     CACHE 1;
 
 -- Grant usage to authenticated users
+GRANT USAGE ON SEQUENCE public.live_account_seq TO authenticated;
+GRANT USAGE ON SEQUENCE public.demo_account_seq TO authenticated;
+GRANT USAGE ON SEQUENCE public.order_number_seq TO authenticated;
+GRANT USAGE ON SEQUENCE public.contract_number_seq TO authenticated;
+GRANT USAGE ON SEQUENCE public.transaction_number_seq TO authenticated;
 
 -- ================================================================
 -- 4. USERS TABLE (extends Supabase auth.users)
 -- ================================================================
 
 CREATE TABLE IF NOT EXISTS public.users (
-    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT NOT NULL UNIQUE,
     full_name TEXT,
     country TEXT,
@@ -108,9 +113,16 @@ CREATE TABLE IF NOT EXISTS public.users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "Users can read own data" ON public.users
+    FOR SELECT USING (auth.uid() = id);
 
+CREATE POLICY "Users can update own data" ON public.users
+    FOR UPDATE USING (auth.uid() = id);
 
+CREATE POLICY "Users can insert own data" ON public.users
+    FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- ================================================================
 -- 5. ACCOUNTS TABLE
@@ -131,9 +143,16 @@ CREATE TABLE IF NOT EXISTS public.accounts (
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON public.accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_account_number ON public.accounts(account_number);
 
+ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "Users can read own accounts" ON public.accounts
+    FOR SELECT USING (auth.uid() = user_id);
 
+CREATE POLICY "Users can insert own accounts" ON public.accounts
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+CREATE POLICY "Users can update own accounts" ON public.accounts
+    FOR UPDATE USING (auth.uid() = user_id);
 
 -- ================================================================
 -- 6. BALANCES TABLE
@@ -151,9 +170,34 @@ CREATE TABLE IF NOT EXISTS public.balances (
 
 CREATE INDEX IF NOT EXISTS idx_balances_account_id ON public.balances(account_id);
 
+ALTER TABLE public.balances ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "Users can read own balances" ON public.balances
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.accounts
+            WHERE accounts.id = balances.account_id
+            AND accounts.user_id = auth.uid()
+        )
+    );
 
+CREATE POLICY "Users can insert own balances" ON public.balances
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.accounts
+            WHERE accounts.id = balances.account_id
+            AND accounts.user_id = auth.uid()
+        )
+    );
 
+CREATE POLICY "Users can update own balances" ON public.balances
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM public.accounts
+            WHERE accounts.id = balances.account_id
+            AND accounts.user_id = auth.uid()
+        )
+    );
 
 -- ================================================================
 -- 7. KYC_DOCUMENTS TABLE
@@ -173,9 +217,16 @@ CREATE TABLE IF NOT EXISTS public.kyc_documents (
 CREATE INDEX IF NOT EXISTS idx_kyc_documents_user_id ON public.kyc_documents(user_id);
 CREATE INDEX IF NOT EXISTS idx_kyc_documents_status ON public.kyc_documents(status);
 
+ALTER TABLE public.kyc_documents ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "Users can read own KYC documents" ON public.kyc_documents
+    FOR SELECT USING (auth.uid() = user_id);
 
+CREATE POLICY "Users can insert own KYC documents" ON public.kyc_documents
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+CREATE POLICY "Users can update own pending KYC documents" ON public.kyc_documents
+    FOR UPDATE USING (auth.uid() = user_id AND status = 'pending');
 
 -- ================================================================
 -- 8. INSTRUMENTS TABLE
@@ -200,7 +251,10 @@ CREATE TABLE IF NOT EXISTS public.instruments (
 CREATE INDEX IF NOT EXISTS idx_instruments_tradeable ON public.instruments(is_tradeable);
 CREATE INDEX IF NOT EXISTS idx_instruments_type ON public.instruments(instrument_type);
 
+ALTER TABLE public.instruments ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "Anyone can read instruments" ON public.instruments
+    FOR SELECT USING (true);
 
 -- ================================================================
 -- 9. ORDERS TABLE
@@ -231,9 +285,23 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON public.orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON public.orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_order_number ON public.orders(order_number);
 
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "Users can read own orders" ON public.orders
+    FOR SELECT USING (auth.uid() = user_id);
 
+CREATE POLICY "Users can insert own orders" ON public.orders
+    FOR INSERT WITH CHECK (
+        auth.uid() = user_id AND
+        EXISTS (
+            SELECT 1 FROM public.accounts
+            WHERE accounts.id = orders.account_id
+            AND accounts.user_id = auth.uid()
+        )
+    );
 
+CREATE POLICY "Users can update own orders" ON public.orders
+    FOR UPDATE USING (auth.uid() = user_id);
 
 -- ================================================================
 -- 10. CONTRACTS TABLE (Open Positions)
@@ -269,9 +337,23 @@ CREATE INDEX IF NOT EXISTS idx_contracts_status ON public.contracts(status);
 CREATE INDEX IF NOT EXISTS idx_contracts_created_at ON public.contracts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_contracts_contract_number ON public.contracts(contract_number);
 
+ALTER TABLE public.contracts ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "Users can read own contracts" ON public.contracts
+    FOR SELECT USING (auth.uid() = user_id);
 
+CREATE POLICY "Users can insert own contracts" ON public.contracts
+    FOR INSERT WITH CHECK (
+        auth.uid() = user_id AND
+        EXISTS (
+            SELECT 1 FROM public.accounts
+            WHERE accounts.id = contracts.account_id
+            AND accounts.user_id = auth.uid()
+        )
+    );
 
+CREATE POLICY "Users can update own contracts" ON public.contracts
+    FOR UPDATE USING (auth.uid() = user_id);
 
 -- ================================================================
 -- 11. TRANSACTIONS TABLE
@@ -299,9 +381,34 @@ CREATE INDEX IF NOT EXISTS idx_transactions_contract_id ON public.transactions(c
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON public.transactions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_transaction_number ON public.transactions(transaction_number);
 
+ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "Users can read own transactions" ON public.transactions
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.accounts
+            WHERE accounts.id = transactions.account_id
+            AND accounts.user_id = auth.uid()
+        )
+    );
 
+CREATE POLICY "Users can insert own transactions" ON public.transactions
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.accounts
+            WHERE accounts.id = transactions.account_id
+            AND accounts.user_id = auth.uid()
+        )
+    );
 
+CREATE POLICY "Users can update own transactions" ON public.transactions
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM public.accounts
+            WHERE accounts.id = transactions.account_id
+            AND accounts.user_id = auth.uid()
+        )
+    );
 
 -- ================================================================
 -- 12. HELPER FUNCTIONS
@@ -350,6 +457,7 @@ BEGIN
 END;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.generate_account_number(TEXT) TO authenticated;
 
 -- Function to generate order numbers (ORD-00001 format)
 CREATE OR REPLACE FUNCTION public.generate_order_number()
@@ -373,6 +481,7 @@ BEGIN
 END;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.generate_order_number() TO authenticated;
 
 -- Function to generate contract numbers (CNT-00001 format)
 CREATE OR REPLACE FUNCTION public.generate_contract_number()
@@ -396,6 +505,7 @@ BEGIN
 END;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.generate_contract_number() TO authenticated;
 
 -- Function to generate transaction numbers (TXN-00001 format)
 CREATE OR REPLACE FUNCTION public.generate_transaction_number()
@@ -419,6 +529,7 @@ BEGIN
 END;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.generate_transaction_number() TO authenticated;
 
 -- ================================================================
 -- 13. TRIGGERS
@@ -466,13 +577,56 @@ CREATE TRIGGER update_contracts_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- Auto-create user profile trigger
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.users (id, email, full_name, country)
+    VALUES (
+        NEW.id,
+        NEW.email,
+        COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name'),
+        NEW.raw_user_meta_data->>'country'
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_new_user();
 
 -- Auto-delete auth user when public user is deleted
+CREATE OR REPLACE FUNCTION public.handle_user_delete()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Delete the user from auth.users
+    -- This ensures auth records don't become orphaned
+    DELETE FROM auth.users WHERE id = OLD.id;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
+CREATE TRIGGER on_public_user_deleted
+    AFTER DELETE ON public.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_user_delete();
 
 -- Auto-delete public user when auth user is deleted (reverse direction)
+CREATE OR REPLACE FUNCTION public.handle_auth_user_delete()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Delete the user from public.users
+    -- This ensures public records don't become orphaned
+    DELETE FROM public.users WHERE id = OLD.id;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
+CREATE TRIGGER on_auth_user_deleted
+    AFTER DELETE ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_auth_user_delete();
 
 -- ================================================================
 -- 14. SEED DATA FOR INSTRUMENTS

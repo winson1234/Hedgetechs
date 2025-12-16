@@ -120,6 +120,32 @@ export const balancesToRecord = (
 // ============================================================================
 
 /**
+ * Format account ID for display
+ * Demo accounts: padded with leading zeros to 5 digits (e.g., 00001, 00002)
+ * Live accounts: displayed as-is (e.g., 10001, 10002)
+ * @param accountId - Account ID number
+ * @param accountType - Account type ('live' or 'demo')
+ * @returns Formatted account ID string
+ */
+export const formatAccountId = (accountId: number | string | undefined, accountType?: 'live' | 'demo'): string => {
+  if (accountId === undefined || accountId === null) return '';
+  
+  const id = typeof accountId === 'string' ? parseInt(accountId, 10) : accountId;
+  if (isNaN(id)) return accountId.toString();
+
+  // If accountType is provided, use it; otherwise infer from ID range
+  const isLive = accountType === 'live' || (accountType === undefined && id >= 10001 && id <= 19999);
+  
+  if (isLive) {
+    // Live accounts: display as-is (10001, 10002, etc.)
+    return id.toString();
+  } else {
+    // Demo accounts: pad with leading zeros to 5 digits (00001, 00002, etc.)
+    return id.toString().padStart(5, '0');
+  }
+};
+
+/**
  * Format account number for display
  * @param accountNumber - Full account number (e.g., 1000001)
  * @param obfuscate - Whether to show only last 3 digits (e.g., "****001")

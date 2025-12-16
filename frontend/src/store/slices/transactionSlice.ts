@@ -51,10 +51,31 @@ export type { BackendTransaction };
 
 // Transform backend transaction to frontend format (export for use in batch history)
 export const transformTransaction = (backend: BackendTransaction): Transaction => {
+  // Extract rejection reason from metadata if available
+  let errorMessage: string | undefined;
+  if (backend.metadata && typeof backend.metadata.rejection_reason === 'string') {
+    errorMessage = backend.metadata.rejection_reason;
+  }
+
+  // Extract payment metadata (excluding rejection_reason)
+  let paymentMetadata: PaymentMethodMetadata | undefined;
+  if (backend.metadata) {
+    const { rejection_reason, ...rest } = backend.metadata;
+    if (Object.keys(rest).length > 0) {
+      paymentMetadata = rest as PaymentMethodMetadata;
+    }
+  }
+
+  // Normalize transaction type: backend uses 'withdrawal', frontend uses 'withdraw'
+  let normalizedType = backend.type as TransactionType;
+  if (backend.type === 'withdrawal') {
+    normalizedType = 'withdraw';
+  }
+
   return {
     id: backend.id,
     transactionNumber: backend.transaction_number,  // Human-readable number
-    type: backend.type as TransactionType,
+    type: normalizedType,
     status: backend.status as TransactionStatus,
     accountId: backend.account_id,
     amount: backend.amount,
@@ -63,7 +84,8 @@ export const transformTransaction = (backend: BackendTransaction): Transaction =
     targetAccountId: backend.target_account_id,
     toAccountId: backend.target_account_id,
     description: backend.description,
-    metadata: backend.metadata as PaymentMethodMetadata | undefined,
+    metadata: paymentMetadata,
+    errorMessage: errorMessage,
   };
 };
 
@@ -215,24 +237,29 @@ export const createTransfer = createAsyncThunk(
       const token = getAuthToken(getState as () => RootState);
       if (!token) throw new Error('Not authenticated');
 
-      const response = await apiFetch('api/v1/transactions', {
+      const response = await apiFetch('api/v1/transfers', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          account_id: fromAccountId,
-          type: 'transfer',
+          from_account_id: fromAccountId,
+          to_account_id: toAccountId,
           amount,
           currency,
-          target_account_id: toAccountId,
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to create transfer');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.message || 'Failed to create transfer';
+        throw new Error(errorMessage);
+      }
       const data = await response.json();
-      return transformTransaction(data.transaction);
+      // The transfer API returns debit_transaction and credit_transaction
+      // We'll return the debit transaction for consistency
+      return transformTransaction(data.transfer.debit_transaction);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create transfer';
       return rejectWithValue(message);

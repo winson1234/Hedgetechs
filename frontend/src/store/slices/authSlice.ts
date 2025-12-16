@@ -127,7 +127,7 @@ const authSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // Sign up (creates pending registration, no auth state change)
+    // Sign up (creates user account directly, no auth state change - user needs to log in)
     builder
       .addCase(signUp.pending, (state) => {
         state.loading = true;
@@ -135,7 +135,7 @@ const authSlice = createSlice({
       })
       .addCase(signUp.fulfilled, (state) => {
         state.loading = false;
-        // Registration successful but pending approval - no auth state change
+        // Registration successful - user can now log in
       })
       .addCase(signUp.rejected, (state, action) => {
         state.loading = false;

@@ -1,4 +1,4 @@
-import { formatBalance } from '../utils/formatters';
+import { formatBalance, formatAccountId } from '../utils/formatters';
 import type { Transaction, Position } from '../types';
 import {
   type LegacyExecutedOrder as ExecutedOrder,
@@ -43,7 +43,8 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
   // Helper function to get account ID from account UUID
   const getAccountNumber = (accountId: string | number): string => {
     const account = accounts.find(acc => acc.id === accountId || acc.account_id === accountId);
-    return account ? account.account_id.toString() : 'Unknown Account';
+    if (!account) return 'Unknown Account';
+    return formatAccountId(account.account_id, account.type);
   };
 
   if (!item) return null;
@@ -169,10 +170,12 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
           </div>
         )}
 
-        {/* Error message */}
+        {/* Error message / Rejection reason */}
         {txn.status === 'failed' && txn.errorMessage && (
           <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-            <p className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">Error Details</p>
+            <p className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">
+              {txn.type === 'deposit' ? 'Rejection Reason' : 'Error Details'}
+            </p>
             <p className="text-sm text-red-600 dark:text-red-400">{txn.errorMessage}</p>
           </div>
         )}

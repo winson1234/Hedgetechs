@@ -32,7 +32,7 @@ interface UIState {
 
 // Initial state
 const initialState: UIState = {
-  theme: 'dark', // Default theme
+  theme: 'light', // Default theme
   currentPage: 'trading',
   activeInstrument: 'BTCUSDT', // Default to Bitcoin
   selectedProductType: 'cfd', // Default to CFD trading

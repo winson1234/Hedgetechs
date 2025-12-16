@@ -331,40 +331,19 @@ function WithdrawTab() {
               Withdrawal Information
             </h3>
 
-            {/* Withdrawal Method Tabs */}
+            {/* Withdrawal Method */}
             <div className="mb-6">
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
                 WITHDRAWAL METHOD
               </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setWithdrawalMethod('tron')}
-                  className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
-                    withdrawalMethod === 'tron'
-                      ? 'bg-indigo-500 text-white shadow-md'
-                      : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:border-indigo-400 dark:hover:border-indigo-500'
-                  }`}
-                >
-                  Tron (USDT)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWithdrawalMethod('bank_transfer')}
-                  className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
-                    withdrawalMethod === 'bank_transfer'
-                      ? 'bg-indigo-500 text-white shadow-md'
-                      : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:border-indigo-400 dark:hover:border-indigo-500'
-                  }`}
-                >
-                  Bank Transfer
-                </button>
+              <div className="px-4 py-2.5 rounded-lg font-semibold text-sm bg-[#00C0A2] text-white shadow-md text-center">
+                Tron (USDT)
               </div>
             </div>
 
             {/* Fee Breakdown */}
             {withdrawalAmount > 0 && (
-              <div className="mb-6 p-4 bg-white dark:bg-slate-900 border-2 border-indigo-300 dark:border-indigo-700 rounded-lg">
+              <div className="mb-6 p-4 bg-white dark:bg-slate-900 border-2 border-[#00C0A2]/30 dark:border-[#00C0A2]/70 rounded-lg">
                 <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
                   Fee Breakdown
                 </h4>
@@ -396,23 +375,23 @@ function WithdrawTab() {
             {/* Instructions */}
             <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-400 mb-6">
               <li className="flex items-start gap-2">
-                <span className="text-indigo-500 mt-0.5 font-bold">1.</span>
-                <span>Select your withdrawal method (Tron or Bank Transfer)</span>
+                <span className="text-[#00C0A2] mt-0.5 font-bold">1.</span>
+                <span>Enter your Tron (USDT) wallet address</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-indigo-500 mt-0.5 font-bold">2.</span>
+                <span className="text-[#00C0A2] mt-0.5 font-bold">2.</span>
                 <span>Enter the withdrawal amount and destination details</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-indigo-500 mt-0.5 font-bold">3.</span>
+                <span className="text-[#00C0A2] mt-0.5 font-bold">3.</span>
                 <span>Review the fee and final amount you'll receive</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-indigo-500 mt-0.5 font-bold">4.</span>
+                <span className="text-[#00C0A2] mt-0.5 font-bold">4.</span>
                 <span>Submit your withdrawal request for admin approval</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-indigo-500 mt-0.5 font-bold">5.</span>
+                <span className="text-[#00C0A2] mt-0.5 font-bold">5.</span>
                 <span>Receive your funds once approved (typically 24-48 hours)</span>
               </li>
             </ul>
@@ -430,7 +409,7 @@ function WithdrawTab() {
                   <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
                     <li>• Funds are reserved immediately upon request</li>
                     <li>• Minimum withdrawal: $10.00 | Maximum: $100,000.00</li>
-                    <li>• Double-check your {withdrawalMethod === 'tron' ? 'wallet address' : 'bank details'}</li>
+                    <li>• Double-check your wallet address</li>
                     <li>• Processing time: 24-48 hours after approval</li>
                     <li>• Withdrawals are subject to admin verification</li>
                   </ul>
@@ -463,7 +442,7 @@ function WithdrawTab() {
             <select
               id="withdrawAccount"
               {...register('accountId')}
-              className="w-full px-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-base font-medium"
+              className="w-full px-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#00C0A2] focus:border-[#00C0A2] transition-all text-base font-medium"
             >
               {liveAccounts.map(acc => {
                 const balance = acc.balances.find(b => b.currency === acc.currency);
@@ -499,7 +478,7 @@ function WithdrawTab() {
                 min="10"
                 max="100000"
                 step="0.01"
-                className="w-full pl-8 pr-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-lg font-semibold"
+                className="w-full pl-8 pr-4 py-3.5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#00C0A2] focus:border-[#00C0A2] transition-all text-lg font-semibold"
               />
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -520,7 +499,7 @@ function WithdrawTab() {
                 id="savedMethod"
                 value={selectedSavedMethod}
                 onChange={(e) => setSelectedSavedMethod(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm"
+                  className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#00C0A2] focus:border-[#00C0A2] transition-all text-sm"
               >
                 <option value="new">+ Enter New Details</option>
                 {savedMethods
@@ -556,7 +535,7 @@ function WithdrawTab() {
                   {...register('walletAddress' as any)}
                   placeholder="Enter your Tron wallet address (starts with T)"
                   disabled={selectedSavedMethod !== 'new'}
-                  className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm font-mono disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#00C0A2] focus:border-[#00C0A2] transition-all text-sm font-mono disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   USDT will be sent to this TRC20 address
@@ -568,72 +547,6 @@ function WithdrawTab() {
             </>
           )}
 
-          {/* Bank Transfer Withdrawal Fields */}
-          {withdrawalMethod === 'bank_transfer' && (
-            <div className="space-y-4 border-t border-slate-200 dark:border-slate-700 pt-5">
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Bank Account Details</p>
-
-              {/* Account Holder Name */}
-              <div>
-                <input
-                  type="text"
-                  {...register('accountHolderName' as any)}
-                  placeholder="Account Holder's Name *"
-                  disabled={selectedSavedMethod !== 'new'}
-                  className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                />
-                {errors.accountHolderName && (
-                  <p className="text-xs text-red-500 mt-1">{(errors as any).accountHolderName?.message}</p>
-                )}
-              </div>
-
-              {/* Bank Name (Optional) */}
-              <div>
-                <input
-                  type="text"
-                  {...register('bankName' as any)}
-                  placeholder="Bank Name (Optional)"
-                  disabled={selectedSavedMethod !== 'new'}
-                  className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                />
-              </div>
-
-              {/* Account Number */}
-              <div>
-                <input
-                  type="text"
-                  {...register('accountNumber' as any)}
-                  placeholder="Bank Account Number (min 8 digits) *"
-                  disabled={selectedSavedMethod !== 'new'}
-                  className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                />
-                {selectedSavedMethod !== 'new' && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                    Using saved account. Full account number will be used from saved data.
-                  </p>
-                )}
-                {errors.accountNumber && (
-                  <p className="text-xs text-red-500 mt-1">{(errors as any).accountNumber?.message}</p>
-                )}
-              </div>
-
-              {/* Routing Number */}
-              <div>
-                <input
-                  type="text"
-                  {...register('routingNumber' as any)}
-                  placeholder="Routing Number (9 digits) *"
-                  maxLength={9}
-                  disabled={selectedSavedMethod !== 'new'}
-                  className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                />
-                {errors.routingNumber && (
-                  <p className="text-xs text-red-500 mt-1">{(errors as any).routingNumber?.message}</p>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Save for Reuse - only show for new entries */}
           {selectedSavedMethod === 'new' && (
             <div className="flex items-center gap-2 pt-2">
@@ -641,10 +554,10 @@ function WithdrawTab() {
                 type="checkbox"
                 id="saveForReuse"
                 {...register('saveForReuse' as any)}
-                className="w-4 h-4 text-indigo-600 border-slate-300 dark:border-slate-600 rounded focus:ring-indigo-500"
+                className="w-4 h-4 text-[#00C0A2] border-slate-300 dark:border-slate-600 rounded focus:ring-[#00C0A2]"
               />
               <label htmlFor="saveForReuse" className="text-sm text-slate-700 dark:text-slate-300">
-                💾 Save this {withdrawalMethod === 'tron' ? 'wallet address' : 'bank account'} for future withdrawals
+                💾 Save this wallet address for future withdrawals
               </label>
             </div>
           )}

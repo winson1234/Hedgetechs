@@ -292,8 +292,8 @@ export default function AccountPage() {
            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm">
              <div className="border-b border-slate-200 dark:border-slate-700 px-5 md:px-6 lg:px-8 pt-3">
                <nav className="flex -mb-px space-x-8" aria-label="Tabs">
-                 <button onClick={() => setActiveTab('live')} className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'live'? 'border-indigo-500 text-indigo-600 dark:text-indigo-400': 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'}`}>Live Accounts ({liveAccounts.length})</button>
-                 <button onClick={() => setActiveTab('demo')} className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'demo'? 'border-indigo-500 text-indigo-600 dark:text-indigo-400': 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'}`}>Demo Accounts ({demoAccounts.length})</button>
+                 <button onClick={() => setActiveTab('live')} className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'live'? 'border-[#00C0A2] text-[#00C0A2]': 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'}`}>Live Accounts ({liveAccounts.length})</button>
+                 <button onClick={() => setActiveTab('demo')} className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'demo'? 'border-[#00C0A2] text-[#00C0A2]': 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'}`}>Demo Accounts ({demoAccounts.length})</button>
                </nav>
              </div>
              <div className="p-5 md:p-6 lg:p-8">

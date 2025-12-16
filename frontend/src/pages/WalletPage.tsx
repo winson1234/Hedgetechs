@@ -46,7 +46,7 @@ export default function WalletPage() {
                 onClick={() => dispatch(setActiveWalletTab(tab))}
                 className={`whitespace-nowrap pb-4 px-3 border-b-2 font-semibold text-base transition-colors capitalize ${
                   activeWalletTab === tab
-                    ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                    ? 'border-[#00C0A2] text-[#00C0A2]'
                     : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
                 }`}
               >

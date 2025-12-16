@@ -1,25 +1,41 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Initializing database schema..."
+echo "================================================"
+echo "🚀 Starting Database Initialization"
+echo "================================================"
+echo ""
+echo "Database: $POSTGRES_DB"
+echo "User: $POSTGRES_USER"
+echo ""
+
+# List available migration files for debugging
+echo "📁 Available migration files:"
+ls -la /docker-entrypoint-initdb.d/migrations/ 2>/dev/null || echo "❌ Migration directory not found!"
+echo ""
 
 # Run all migration files in order
-for i in $(seq -w 1 17); do
-    migration_file="/docker-entrypoint-initdb.d/migrations/${i#0}_*.sql"
-    
-    # Find the actual file
-    actual_file=$(ls $migration_file 2>/dev/null | head -1)
-    
-    if [ -f "$actual_file" ]; then
-        echo "→ Running $(basename "$actual_file")..."
-        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f "$actual_file"
-        echo "  ✅ Success"
+echo "📦 Running migrations..."
+for migration_file in /docker-entrypoint-initdb.d/migrations/0*.sql; do
+    if [ -f "$migration_file" ]; then
+        filename=$(basename "$migration_file")
+        echo "→ Running $filename..."
+        
+        if psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f "$migration_file"; then
+            echo "  ✅ $filename completed successfully"
+        else
+            echo "  ❌ $filename failed"
+            exit 1
+        fi
+    else
+        echo "⚠️  No migration files found in /docker-entrypoint-initdb.d/migrations/"
+        break
     fi
 done
 
-# Create notifications table
+echo ""
 echo "→ Creating notifications table..."
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+if psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
     CREATE TABLE IF NOT EXISTS public.notifications (
         id uuid DEFAULT gen_random_uuid() NOT NULL,
         user_id bigint NOT NULL,
@@ -38,12 +54,37 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON public.notifications USING btree (user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON public.notifications USING btree (user_id, is_read, created_at DESC);
 EOSQL
-echo "  ✅ Notifications table created"
+then
+    echo "  ✅ Notifications table created"
+else
+    echo "  ❌ Notifications table creation failed"
+    exit 1
+fi
 
 echo ""
-echo "✅ Database initialization complete!"
+echo "================================================"
+echo "✅ Database Initialization Complete!"
+echo "================================================"
 echo ""
 
 # Show created tables
 echo "📋 Created tables:"
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "\dt"
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "
+SELECT 
+    schemaname,
+    tablename 
+FROM pg_tables 
+WHERE schemaname = 'public' 
+ORDER BY tablename;
+"
+
+echo ""
+echo "📊 Table counts:"
+psql --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "
+SELECT 
+    schemaname || '.' || tablename AS table_name,
+    n_live_tup AS row_count
+FROM pg_stat_user_tables 
+WHERE schemaname = 'public' 
+ORDER BY tablename;
+"

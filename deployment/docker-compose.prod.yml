@@ -56,6 +56,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: brokerage-redis-prod
+    ports:
+      - "6379:6379"
     restart: always
     command: >
       redis-server

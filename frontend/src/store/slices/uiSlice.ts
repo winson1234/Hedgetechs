@@ -34,7 +34,7 @@ interface UIState {
 const initialState: UIState = {
   theme: 'light', // Default theme
   currentPage: 'trading',
-  activeInstrument: 'BTCUSDT', // Default to Bitcoin
+  activeInstrument: 'CADJPY', // Default to CAD/JPY forex pair
   selectedProductType: 'cfd', // Default to CFD trading
   activeWalletTab: 'overview',
   showAnalyticsPanel: false,

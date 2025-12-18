@@ -339,6 +339,31 @@ func CreateWithdrawal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create notification for the user (async, non-blocking)
+	go func() {
+		notificationCtx, notificationCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer notificationCancel()
+
+		notificationTitle := "Withdrawal Request Created"
+		notificationMessage := fmt.Sprintf("Your withdrawal request %s for %.2f %s has been created and is pending admin approval. Net amount: %.2f %s (Fee: %.2f %s)",
+			withdrawal.ReferenceID, withdrawal.Amount, withdrawal.Currency, withdrawal.NetAmount, withdrawal.Currency, withdrawal.FeeAmount, withdrawal.Currency)
+
+		metadata := map[string]interface{}{
+			"withdrawal_id":    withdrawalID.String(),
+			"reference_id":     withdrawal.ReferenceID,
+			"amount":           withdrawal.Amount,
+			"fee_amount":       withdrawal.FeeAmount,
+			"net_amount":       withdrawal.NetAmount,
+			"currency":         withdrawal.Currency,
+			"withdrawal_method": withdrawal.WithdrawalMethod,
+			"status":           "pending",
+		}
+
+		if err := CreateNotification(notificationCtx, pool, userID, models.NotificationTypeWithdrawal, notificationTitle, notificationMessage, metadata); err != nil {
+			log.Printf("CreateWithdrawal: Failed to create notification: %v", err)
+		}
+	}()
+
 	// Return success response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

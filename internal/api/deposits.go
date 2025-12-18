@@ -235,6 +235,29 @@ func CreateDeposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create notification for the user (async, non-blocking)
+	go func() {
+		notificationCtx, notificationCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer notificationCancel()
+
+		notificationTitle := "Deposit Request Created"
+		notificationMessage := fmt.Sprintf("Your deposit request %s for %.2f %s has been created and is pending admin approval. Please upload payment receipt for review.",
+			deposit.ReferenceID, deposit.Amount, deposit.Currency)
+
+		metadata := map[string]interface{}{
+			"deposit_id":   depositID.String(),
+			"reference_id": deposit.ReferenceID,
+			"amount":       deposit.Amount,
+			"currency":     deposit.Currency,
+			"account_id":   deposit.AccountID.String(),
+			"status":       "pending",
+		}
+
+		if err := CreateNotification(notificationCtx, pool, userID, models.NotificationTypeDeposit, notificationTitle, notificationMessage, metadata); err != nil {
+			log.Printf("CreateDeposit: Failed to create notification: %v", err)
+		}
+	}()
+
 	// Return success response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

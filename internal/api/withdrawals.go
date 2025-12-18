@@ -722,8 +722,16 @@ func UpdateWithdrawalStatus(w http.ResponseWriter, r *http.Request) {
 				withdrawal.ReferenceID, withdrawal.Amount, withdrawal.Currency, withdrawal.NetAmount, withdrawal.Currency)
 		}
 
+		// Log notification creation attempt for debugging
+		log.Printf("UpdateWithdrawalStatus: Creating notification for user_id=%d, type=%s, title=%s, status=%s", 
+			withdrawal.UserID, models.NotificationTypeWithdrawal, notificationTitle, req.Status)
+
 		if err := CreateNotification(notificationCtx, pool, withdrawal.UserID, models.NotificationTypeWithdrawal, notificationTitle, notificationMessage, metadata); err != nil {
-			log.Printf("UpdateWithdrawalStatus: Failed to create notification: %v", err)
+			log.Printf("UpdateWithdrawalStatus: Failed to create notification: %v (user_id=%d, withdrawal_id=%s, status=%s)", 
+				err, withdrawal.UserID, withdrawalID.String(), req.Status)
+		} else {
+			log.Printf("UpdateWithdrawalStatus: Successfully created notification for user_id=%d, withdrawal_id=%s, status=%s", 
+				withdrawal.UserID, withdrawalID.String(), req.Status)
 		}
 	}()
 

@@ -277,6 +277,12 @@ func MarkAllNotificationsRead(w http.ResponseWriter, r *http.Request) {
 // CreateNotification creates a notification in the database
 // This is a helper function used by other APIs
 func CreateNotification(ctx context.Context, pool *pgxpool.Pool, userID int64, notificationType, title, message string, metadata map[string]interface{}) error {
+	// Validate userID
+	if userID <= 0 {
+		log.Printf("CreateNotification: Invalid user_id=%d, skipping notification creation", userID)
+		return fmt.Errorf("invalid user_id: %d", userID)
+	}
+
 	var metadataJSON []byte
 	var err error
 	if len(metadata) > 0 {
@@ -298,16 +304,22 @@ func CreateNotification(ctx context.Context, pool *pgxpool.Pool, userID int64, n
 		metadataValue = nil
 	}
 
+	// Log notification creation attempt
+	log.Printf("CreateNotification: Creating notification for user_id=%d, type=%s, title=%s", userID, notificationType, title)
+
 	_, err = pool.Exec(ctx,
 		`INSERT INTO notifications (user_id, type, title, message, metadata, created_at)
 		 VALUES ($1, $2, $3, $4, $5, NOW())`,
 		userID, notificationType, title, message, metadataValue,
 	)
 	if err != nil {
-		log.Printf("CreateNotification: Failed to create notification: %v", err)
+		log.Printf("CreateNotification: Failed to create notification: %v (user_id=%d, type=%s, title=%s)", 
+			err, userID, notificationType, title)
 		return err
 	}
 
+	log.Printf("CreateNotification: Successfully created notification for user_id=%d, type=%s, title=%s", 
+		userID, notificationType, title)
 	return nil
 }
 

@@ -334,8 +334,16 @@ func UpdateDepositStatus(w http.ResponseWriter, r *http.Request) {
 			metadata["rejection_reason"] = rejectionReason
 		}
 
+		// Log notification creation attempt for debugging
+		log.Printf("UpdateDepositStatus: Creating notification for user_id=%d, type=%s, title=%s", 
+			deposit.UserID, models.NotificationTypeDeposit, notificationTitle)
+
 		if err := CreateNotification(notificationCtx, pool, deposit.UserID, models.NotificationTypeDeposit, notificationTitle, notificationMessage, metadata); err != nil {
-			log.Printf("UpdateDepositStatus: Failed to create notification: %v", err)
+			log.Printf("UpdateDepositStatus: Failed to create notification: %v (user_id=%d, deposit_id=%s)", 
+				err, deposit.UserID, depositID.String())
+		} else {
+			log.Printf("UpdateDepositStatus: Successfully created notification for user_id=%d, deposit_id=%s", 
+				deposit.UserID, depositID.String())
 		}
 	}()
 

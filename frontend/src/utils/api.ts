@@ -34,8 +34,8 @@ export function getApiUrl(path: string): string {
 export async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
   const url = getApiUrl(path);
   
-  // Get JWT token from localStorage
-  const token = localStorage.getItem('auth_token');
+  // Get JWT token from sessionStorage
+  const token = sessionStorage.getItem('auth_token');
   
   // Inject Authorization header if token exists
   const headers = new Headers(options?.headers || {});

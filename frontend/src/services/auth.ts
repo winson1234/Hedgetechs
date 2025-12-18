@@ -93,9 +93,9 @@ export async function login(data: LoginRequest): Promise<AuthResponse> {
       throw new Error(result.error || 'Login failed');
     }
 
-    // Store token in localStorage
+    // Store token in sessionStorage (cleared when tab closes)
     if (result.token) {
-      localStorage.setItem('auth_token', result.token);
+      sessionStorage.setItem('auth_token', result.token);
     }
 
     return result as AuthResponse;
@@ -106,11 +106,11 @@ export async function login(data: LoginRequest): Promise<AuthResponse> {
 
 /**
  * Logout current user
- * Clears JWT token from localStorage
+ * Clears JWT token from sessionStorage
  */
 export async function logout(): Promise<void> {
-  localStorage.removeItem('auth_token');
-  localStorage.removeItem('user_data');
+  sessionStorage.removeItem('auth_token');
+  sessionStorage.removeItem('user_data');
 }
 
 /**
@@ -141,14 +141,14 @@ export async function checkStatus(email: string): Promise<CheckStatusResponse> {
  * Get stored JWT token
  */
 export function getToken(): string | null {
-  return localStorage.getItem('auth_token');
+  return sessionStorage.getItem('auth_token');
 }
 
 /**
  * Get stored user data
  */
 export function getStoredUser(): User | null {
-  const userData = localStorage.getItem('user_data');
+  const userData = sessionStorage.getItem('user_data');
   if (!userData) return null;
 
   try {
@@ -159,10 +159,10 @@ export function getStoredUser(): User | null {
 }
 
 /**
- * Store user data in localStorage
+ * Store user data in sessionStorage
  */
 export function storeUser(user: User): void {
-  localStorage.setItem('user_data', JSON.stringify(user));
+  sessionStorage.setItem('user_data', JSON.stringify(user));
 }
 
 /**

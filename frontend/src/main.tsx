@@ -58,7 +58,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch()
 
   useEffect(() => {
-    // Validate session from localStorage (JWT token)
+    // Validate session from sessionStorage (JWT token - cleared when tab closes)
     dispatch(validateSession())
   }, [dispatch])
 

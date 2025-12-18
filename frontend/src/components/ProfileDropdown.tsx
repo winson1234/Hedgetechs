@@ -115,7 +115,7 @@ const confirmLogout = async () => {
 
     // Call backend API to change password
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = sessionStorage.getItem('auth_token');
       if (!token) {
         setPasswordMessage({ text: 'Please log in again to change your password.', type: 'error' });
         return;

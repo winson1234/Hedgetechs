@@ -173,6 +173,20 @@ func (s *PartitionManagerService) archiveAndPruneOldPartitions(ctx context.Conte
 
 	// Process each old partition
 	for _, partitionName := range oldPartitions {
+		// Check if archiver is configured
+		if s.archiver == nil {
+			// No archiver configured, just drop the partition directly
+			log.Printf("[PartitionManager] No archiver configured, dropping partition without archiving: %s", partitionName)
+			err := s.dropPartition(ctx, partitionName)
+			if err != nil {
+				log.Printf("[PartitionManager] ERROR: Failed to drop partition %s: %v", partitionName, err)
+				continue
+			}
+			log.Printf("[PartitionManager] Successfully dropped partition: %s", partitionName)
+			dropped++
+			continue
+		}
+
 		// Step 1: Archive partition to S3
 		log.Printf("[PartitionManager] Archiving partition: %s", partitionName)
 

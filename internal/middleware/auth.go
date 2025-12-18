@@ -69,10 +69,11 @@ func NewAuthMiddleware(authStorage *services.AuthStorageService) func(http.Handl
 				return
 			}
 
-			// CRITICAL: Check session revocation (Kill Switch)
-			// If password was changed after this token was issued, reject it
-			// NOTE: This feature requires Redis. If Redis is unavailable, skip the check (fail-open for availability)
+			// CRITICAL: Session validation checks
+			// NOTE: These features require Redis. If Redis is unavailable, skip checks (fail-open for availability)
 			if authStorage != nil {
+				// Check 1: Session revocation (Kill Switch)
+				// If password was changed after this token was issued, reject it
 				tokenIssuedAt := claims.IssuedAt.Unix()
 				isRevoked, err := authStorage.IsSessionRevoked(r.Context(), userUUID.String(), tokenIssuedAt)
 				if err != nil {
@@ -86,8 +87,24 @@ func NewAuthMiddleware(authStorage *services.AuthStorageService) func(http.Handl
 					})
 					return
 				}
+				
+				// Check 2: Active session validation
+				// Verify that the session token exists in Redis (tab closed, logout, or cache cleared invalidates)
+				if claims.SessionID != "" {
+					sessionValid, err := authStorage.ValidateSession(r.Context(), userUUID.String(), claims.SessionID)
+					if err != nil {
+						log.Printf("[AUTH ERROR] Failed to validate session for user %s: %v", userUUID, err)
+					}
+					if !sessionValid {
+						respondWithJSON(w, http.StatusUnauthorized, map[string]interface{}{
+							"error":   "session_expired",
+							"message": "Your session has expired or been invalidated. Please log in again.",
+						})
+						return
+					}
+				}
 			}
-			// If authStorage is nil, session revocation is disabled (logged at startup)
+			// If authStorage is nil, session checks are disabled (logged at startup)
 
 			// Look up bigint user_id from users table
 			pool, err := database.GetPool()

@@ -50,3 +50,4 @@ cmd/server/server
 # Temp files
 *.tmp
 tmp/
+mt5-publisher/

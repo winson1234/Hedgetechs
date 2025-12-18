@@ -12,16 +12,17 @@ import (
 
 // CustomClaims represents the JWT claims structure
 type CustomClaims struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
+	UserID    string `json:"user_id"`
+	Email     string `json:"email"`
+	SessionID string `json:"session_id"` // Session ID for tracking active sessions in Redis
 	jwt.RegisteredClaims
 }
 
-// GenerateJWT creates a new JWT token for the user
-func GenerateJWT(userID uuid.UUID, email string) (string, error) {
+// GenerateJWT creates a new JWT token for the user with a unique session ID
+func GenerateJWT(userID uuid.UUID, email string) (string, string, error) {
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		return "", errors.New("JWT_SECRET environment variable not set")
+		return "", "", errors.New("JWT_SECRET environment variable not set")
 	}
 
 	// Get expiry hours from env or default to 24 hours
@@ -32,10 +33,14 @@ func GenerateJWT(userID uuid.UUID, email string) (string, error) {
 		}
 	}
 
+	// Generate unique session ID for this login
+	sessionID := uuid.New().String()
+
 	// Create claims
 	claims := CustomClaims{
-		UserID: userID.String(),
-		Email:  email,
+		UserID:    userID.String(),
+		Email:     email,
+		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(expiryHours))),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -49,10 +54,10 @@ func GenerateJWT(userID uuid.UUID, email string) (string, error) {
 	// Sign token
 	tokenString, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return tokenString, nil
+	return tokenString, sessionID, nil
 }
 
 // ValidateJWT validates a JWT token and returns the claims

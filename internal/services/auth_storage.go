@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	"brokerageProject/internal/config"
+
 	"github.com/redis/go-redis/v9"
 )
 
@@ -25,11 +27,12 @@ func NewAuthStorageService(client *redis.Client) *AuthStorageService {
 // OTP Management
 // ============================================================================
 
-// StoreOTP stores an OTP code for the given email with 10-minute TTL
-// Key format: auth:otp:{email}
+// StoreOTP stores an OTP code for the given email with 120 second (2 minute) TTL
+// Key format: verify:{email}
+// This key will automatically expire after the TTL, cleaning up stale OTPs
 func (s *AuthStorageService) StoreOTP(ctx context.Context, email, otp string) error {
-	key := fmt.Sprintf("auth:otp:%s", email)
-	ttl := 10 * time.Minute
+	key := fmt.Sprintf("%s:%s", config.OTPKeyPrefix, email)
+	ttl := config.OTPExpiryDuration
 
 	err := s.client.Set(ctx, key, otp, ttl).Err()
 	if err != nil {
@@ -39,11 +42,18 @@ func (s *AuthStorageService) StoreOTP(ctx context.Context, email, otp string) er
 	return nil
 }
 
+// OTPValidationResult represents the result of OTP validation
+type OTPValidationResult struct {
+	Valid     bool
+	ErrorCode string // OTP_EXPIRED, OTP_INVALID, OTP_MISSING
+}
+
 // ValidateOTP validates the OTP for the given email and deletes it immediately on success.
 // Uses a Lua script to ensure atomicity and prevent race conditions (replay attacks).
 // This ensures one-time use even under concurrent requests.
+// Returns OTPValidationResult with appropriate error code
 func (s *AuthStorageService) ValidateOTP(ctx context.Context, email, otp string) bool {
-	key := fmt.Sprintf("auth:otp:%s", email)
+	key := fmt.Sprintf("%s:%s", config.OTPKeyPrefix, email)
 
 	// Execute Lua script: Check value and delete in one atomic step
 	// Result is 1 (success/deleted) or 0 (failure/not found/mismatch)
@@ -56,9 +66,61 @@ func (s *AuthStorageService) ValidateOTP(ctx context.Context, email, otp string)
 	return result == 1
 }
 
+// ValidateOTPWithDetails validates the OTP and returns detailed error information
+// This includes whether the OTP is expired, invalid, or missing
+func (s *AuthStorageService) ValidateOTPWithDetails(ctx context.Context, email, otp string) OTPValidationResult {
+	key := fmt.Sprintf("%s:%s", config.OTPKeyPrefix, email)
+
+	// First check if key exists
+	exists, err := s.client.Exists(ctx, key).Result()
+	if err != nil {
+		return OTPValidationResult{Valid: false, ErrorCode: config.ErrorCodeOTPInvalid}
+	}
+
+	// If key doesn't exist, it's either expired or was never created
+	if exists == 0 {
+		return OTPValidationResult{Valid: false, ErrorCode: config.ErrorCodeOTPExpired}
+	}
+
+	// Key exists, now validate the value atomically and delete if valid
+	result, err := validateOTPScript.Run(ctx, s.client, []string{key}, otp).Int()
+	if err != nil {
+		return OTPValidationResult{Valid: false, ErrorCode: config.ErrorCodeOTPInvalid}
+	}
+
+	if result == 1 {
+		return OTPValidationResult{Valid: true, ErrorCode: ""}
+	}
+
+	// OTP exists but doesn't match - invalid OTP
+	return OTPValidationResult{Valid: false, ErrorCode: config.ErrorCodeOTPInvalid}
+}
+
+// CheckOTPExists checks if an OTP exists for the given email (without validating or deleting it)
+// Useful for checking if an OTP has expired
+func (s *AuthStorageService) CheckOTPExists(ctx context.Context, email string) (bool, error) {
+	key := fmt.Sprintf("%s:%s", config.OTPKeyPrefix, email)
+	exists, err := s.client.Exists(ctx, key).Result()
+	if err != nil {
+		return false, fmt.Errorf("failed to check OTP existence: %w", err)
+	}
+	return exists > 0, nil
+}
+
+// GetOTPTTL returns the remaining TTL for an OTP
+// Returns -1 if key doesn't exist, -2 if key exists but has no TTL
+func (s *AuthStorageService) GetOTPTTL(ctx context.Context, email string) (time.Duration, error) {
+	key := fmt.Sprintf("%s:%s", config.OTPKeyPrefix, email)
+	ttl, err := s.client.TTL(ctx, key).Result()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get OTP TTL: %w", err)
+	}
+	return ttl, nil
+}
+
 // DeleteOTP manually deletes an OTP (for cleanup if needed)
 func (s *AuthStorageService) DeleteOTP(ctx context.Context, email string) error {
-	key := fmt.Sprintf("auth:otp:%s", email)
+	key := fmt.Sprintf("%s:%s", config.OTPKeyPrefix, email)
 	return s.client.Del(ctx, key).Err()
 }
 
@@ -66,11 +128,12 @@ func (s *AuthStorageService) DeleteOTP(ctx context.Context, email string) error 
 // Reset Token Management
 // ============================================================================
 
-// StoreResetToken stores a reset token with the associated email with 15-minute TTL
+// StoreResetToken stores a reset token with the associated email with configurable TTL
 // Key format: auth:reset:{token}
+// Default TTL: 15 minutes
 func (s *AuthStorageService) StoreResetToken(ctx context.Context, token, email string) error {
 	key := fmt.Sprintf("auth:reset:%s", token)
-	ttl := 15 * time.Minute
+	ttl := config.ResetTokenExpiryDuration
 
 	err := s.client.Set(ctx, key, email, ttl).Err()
 	if err != nil {
@@ -266,4 +329,107 @@ func (s *AuthStorageService) IsSessionRevoked(ctx context.Context, userUUID stri
 func (s *AuthStorageService) ClearRevocation(ctx context.Context, userUUID string) error {
 	key := fmt.Sprintf("auth:revocation:%s", userUUID)
 	return s.client.Del(ctx, key).Err()
+}
+
+// ============================================================================
+// Session Token Management (Active Session Tracking)
+// ============================================================================
+
+// StoreSession stores an active session token for the given user
+// Key format: session:{userUUID}:{sessionID}
+// TTL: 24 hours (matches JWT expiry)
+// Sessions are invalidated on logout, tab close, or cache clear
+func (s *AuthStorageService) StoreSession(ctx context.Context, userUUID, sessionID string) error {
+	key := fmt.Sprintf("session:%s:%s", userUUID, sessionID)
+	ttl := config.SessionExpiryDuration
+	
+	// Store session metadata (timestamp when session was created)
+	sessionData := time.Now().Unix()
+	
+	err := s.client.Set(ctx, key, sessionData, ttl).Err()
+	if err != nil {
+		return fmt.Errorf("failed to store session: %w", err)
+	}
+	
+	return nil
+}
+
+// ValidateSession checks if a session token is valid
+// Returns true if session exists in Redis, false otherwise
+func (s *AuthStorageService) ValidateSession(ctx context.Context, userUUID, sessionID string) (bool, error) {
+	key := fmt.Sprintf("session:%s:%s", userUUID, sessionID)
+	
+	exists, err := s.client.Exists(ctx, key).Result()
+	if err != nil {
+		return false, fmt.Errorf("failed to check session: %w", err)
+	}
+	
+	return exists > 0, nil
+}
+
+// DeleteSession removes a specific session (used on logout)
+func (s *AuthStorageService) DeleteSession(ctx context.Context, userUUID, sessionID string) error {
+	key := fmt.Sprintf("session:%s:%s", userUUID, sessionID)
+	return s.client.Del(ctx, key).Err()
+}
+
+// DeleteAllUserSessions removes all sessions for a specific user
+// Useful for "logout from all devices" functionality
+func (s *AuthStorageService) DeleteAllUserSessions(ctx context.Context, userUUID string) (int64, error) {
+	pattern := fmt.Sprintf("session:%s:*", userUUID)
+	
+	// Get all session keys for this user
+	keys, err := s.client.Keys(ctx, pattern).Result()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get session keys: %w", err)
+	}
+	
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	
+	// Delete all session keys
+	deleted, err := s.client.Del(ctx, keys...).Result()
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete sessions: %w", err)
+	}
+	
+	return deleted, nil
+}
+
+// GetUserSessionCount returns the number of active sessions for a user
+func (s *AuthStorageService) GetUserSessionCount(ctx context.Context, userUUID string) (int, error) {
+	pattern := fmt.Sprintf("session:%s:*", userUUID)
+	
+	keys, err := s.client.Keys(ctx, pattern).Result()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get session keys: %w", err)
+	}
+	
+	return len(keys), nil
+}
+
+// RefreshSession extends the TTL of an existing session
+// Useful for "remember me" or activity-based session extension
+func (s *AuthStorageService) RefreshSession(ctx context.Context, userUUID, sessionID string) error {
+	key := fmt.Sprintf("session:%s:%s", userUUID, sessionID)
+	ttl := config.SessionExpiryDuration
+	
+	// Check if session exists
+	exists, err := s.client.Exists(ctx, key).Result()
+	if err != nil {
+		return fmt.Errorf("failed to check session: %w", err)
+	}
+	
+	if exists == 0 {
+		return fmt.Errorf("session not found")
+	}
+	
+	// Extend TTL
+	err = s.client.Expire(ctx, key, ttl).Err()
+	if err != nil {
+		return fmt.Errorf("failed to refresh session: %w", err)
+	}
+	
+	return nil
 }

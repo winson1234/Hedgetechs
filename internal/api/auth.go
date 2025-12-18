@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"brokerageProject/internal/config"
 	"brokerageProject/internal/database"
 	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/models"
@@ -83,6 +84,20 @@ func HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Log successful registration
+	if utils.GlobalAuditLogger != nil {
+		auditEntry := models.NewAuditLogEntry(userID, "user_registered", models.ResourceTypeUser).
+			WithMetadata("email", req.Email).
+			WithMetadata("first_name", req.FirstName).
+			WithMetadata("last_name", req.LastName).
+			WithMetadata("country", req.Country)
+		
+		if err := utils.GlobalAuditLogger.LogFromRequest(ctx, r, auditEntry); err != nil {
+			// Log error but don't fail the registration
+			fmt.Printf("[AUDIT WARNING] Failed to log registration audit event: %v\n", err)
+		}
+	}
+
 	// Success response
 	response := models.RegisterResponse{
 		Message: "Registration successful. You can now log in.",
@@ -147,50 +162,102 @@ func HandleCheckStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// HandleLogin handles user login requests
-func HandleLogin(w http.ResponseWriter, r *http.Request) {
-	var req models.LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.RespondWithJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid request body")
-		return
-	}
+// HandleLogin returns a handler that processes login requests with rate limiting
+func HandleLogin(authStorage *services.AuthStorageService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req models.LoginRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid request body")
+			return
+		}
 
-	if req.Email == "" || req.Password == "" {
-		utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Email and password are required")
-		return
-	}
+		if req.Email == "" || req.Password == "" {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Email and password are required")
+			return
+		}
 
-	pool, err := database.GetPool()
+		ctx := r.Context()
+
+		// Check rate limit for login attempts (5 attempts per 15 minutes)
+		allowed, remaining, err := authStorage.CheckRateLimit(
+			ctx,
+			config.RateLimitActionLogin,
+			req.Email,
+			config.LoginMaxAttempts,
+			config.LoginWindow,
+		)
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to check rate limit")
+			return
+		}
+
+		if !allowed {
+			response := map[string]interface{}{
+				"error":               "rate_limit_exceeded",
+				"message":             "Too many login attempts. Please try again later.",
+				"retry_after_seconds": int(config.LoginWindow.Seconds()),
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		pool, err := database.GetPool()
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to connect to database")
+			return
+		}
+
+		// Check users table directly
+		var (
+			userID         uuid.UUID
+			hashedPassword string
+			isActive       bool
+		)
+
+		query := `
+			SELECT id, hash_password, is_active
+			FROM users
+			WHERE email = $1
+		`
+
+		err = pool.QueryRow(ctx, query, req.Email).Scan(
+			&userID, &hashedPassword, &isActive,
+		)
+
 	if err != nil {
-		utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to connect to database")
-		return
-	}
-	ctx := context.Background()
-
-	// Check users table directly
-	var (
-		userID         uuid.UUID
-		hashedPassword string
-		isActive       bool
-	)
-
-	query := `
-		SELECT id, hash_password, is_active
-		FROM users
-		WHERE email = $1
-	`
-
-	err = pool.QueryRow(ctx, query, req.Email).Scan(
-		&userID, &hashedPassword, &isActive,
-	)
-
-	if err != nil {
+		// Log failed login attempt (user not found)
+		if utils.GlobalAuditLogger != nil {
+			// Use zero UUID since user doesn't exist
+			auditEntry := models.NewAuditLogEntry(uuid.Nil, models.ActionLoginFailure, models.ResourceTypeUser).
+				WithMetadata("email", req.Email).
+				WithMetadata("reason", "user_not_found").
+				WithFailure("Invalid email or password")
+			
+			if logErr := utils.GlobalAuditLogger.LogFromRequest(ctx, r, auditEntry); logErr != nil {
+				fmt.Printf("[AUDIT WARNING] Failed to log failed login audit event: %v\n", logErr)
+			}
+		}
+		
 		utils.RespondWithJSONError(w, http.StatusUnauthorized, "authentication_error", "Invalid email or password")
 		return
 	}
 
 	// Check if account is active
 	if !isActive {
+		// Log failed login attempt (account inactive)
+		if utils.GlobalAuditLogger != nil {
+			auditEntry := models.NewAuditLogEntry(userID, models.ActionLoginFailure, models.ResourceTypeUser).
+				WithMetadata("email", req.Email).
+				WithMetadata("reason", "account_inactive").
+				WithFailure("Account is inactive")
+			
+			if logErr := utils.GlobalAuditLogger.LogFromRequest(ctx, r, auditEntry); logErr != nil {
+				fmt.Printf("[AUDIT WARNING] Failed to log failed login audit event: %v\n", logErr)
+			}
+		}
+		
 		response := models.LoginResponse{
 			Message: "Your account is inactive. Please contact support",
 			Status:  "inactive",
@@ -203,54 +270,89 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Verify password
 	if err := utils.VerifyPassword(hashedPassword, req.Password); err != nil {
+		// Log failed login attempt (invalid password)
+		if utils.GlobalAuditLogger != nil {
+			auditEntry := models.NewAuditLogEntry(userID, models.ActionLoginFailure, models.ResourceTypeUser).
+				WithMetadata("email", req.Email).
+				WithMetadata("reason", "invalid_password").
+				WithFailure("Invalid email or password")
+			
+			if logErr := utils.GlobalAuditLogger.LogFromRequest(ctx, r, auditEntry); logErr != nil {
+				fmt.Printf("[AUDIT WARNING] Failed to log failed login audit event: %v\n", logErr)
+			}
+		}
+		
 		utils.RespondWithJSONError(w, http.StatusUnauthorized, "authentication_error", "Invalid email or password")
 		return
 	}
 
-	// Update last_login
-	updateLoginQuery := `UPDATE users SET last_login = $1 WHERE id = $2`
-	pool.Exec(ctx, updateLoginQuery, time.Now(), userID)
+		// Update last_login
+		updateLoginQuery := `UPDATE users SET last_login = $1 WHERE id = $2`
+		pool.Exec(ctx, updateLoginQuery, time.Now(), userID)
 
-	// Generate JWT token
-	token, err := utils.GenerateJWT(userID, req.Email)
-	if err != nil {
-		utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to generate authentication token")
-		return
+		// Generate JWT token with session ID
+		token, sessionID, err := utils.GenerateJWT(userID, req.Email)
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to generate authentication token")
+			return
+		}
+
+		// Store session in Redis (active session tracking)
+		if authStorage != nil {
+			if err := authStorage.StoreSession(ctx, userID.String(), sessionID); err != nil {
+				// Log error but don't fail the login (graceful degradation)
+				fmt.Printf("[SESSION WARNING] Failed to store session in Redis: %v\n", err)
+			}
+		}
+
+		// Get user info
+		var user models.UserInfo
+		getUserQuery := `
+			SELECT id, user_id, email, first_name, last_name, phone_number, country, is_active
+			FROM users
+			WHERE id = $1
+		`
+		err = pool.QueryRow(ctx, getUserQuery, userID).Scan(
+			&user.ID,
+			&user.UserID,
+			&user.Email,
+			&user.FirstName,
+			&user.LastName,
+			&user.PhoneNumber,
+			&user.Country,
+			&user.IsActive,
+		)
+
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to retrieve user information")
+			return
+		}
+
+		// Log successful login
+		if utils.GlobalAuditLogger != nil {
+			auditEntry := models.NewAuditLogEntry(userID, models.ActionLoginSuccess, models.ResourceTypeUser).
+				WithMetadata("email", req.Email).
+				WithMetadata("user_id", user.UserID).
+				WithMetadata("session_id", sessionID)
+			
+			if logErr := utils.GlobalAuditLogger.LogFromRequest(ctx, r, auditEntry); logErr != nil {
+				// Log error but don't fail the login
+				fmt.Printf("[AUDIT WARNING] Failed to log successful login audit event: %v\n", logErr)
+			}
+		}
+
+		// Success response
+		response := models.LoginResponse{
+			Token:   token,
+			User:    &user,
+			Message: "Login successful",
+			Status:  "approved",
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining-1))
+		json.NewEncoder(w).Encode(response)
 	}
-
-	// Get user info
-	var user models.UserInfo
-	getUserQuery := `
-		SELECT id, user_id, email, first_name, last_name, phone_number, country, is_active
-		FROM users
-		WHERE id = $1
-	`
-	err = pool.QueryRow(ctx, getUserQuery, userID).Scan(
-		&user.ID,
-		&user.UserID,
-		&user.Email,
-		&user.FirstName,
-		&user.LastName,
-		&user.PhoneNumber,
-		&user.Country,
-		&user.IsActive,
-	)
-
-	if err != nil {
-		utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to retrieve user information")
-		return
-	}
-
-	// Success response
-	response := models.LoginResponse{
-		Token:   token,
-		User:    &user,
-		Message: "Login successful",
-		Status:  "approved",
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
 }
 
 // generateOTP generates a random 6-digit OTP
@@ -289,8 +391,14 @@ func HandleForgotPassword(authStorage *services.AuthStorageService, emailSender 
 
 		ctx := r.Context()
 
-		// CRITICAL: Check rate limit FIRST (3 attempts per hour per email)
-		allowed, remaining, err := authStorage.CheckRateLimit(ctx, "forgot_password", req.Email, 3, 1*time.Hour)
+		// CRITICAL: Check rate limit FIRST using configured limits
+		allowed, remaining, err := authStorage.CheckRateLimit(
+			ctx, 
+			config.RateLimitActionForgotPassword, 
+			req.Email, 
+			config.OTPRequestMaxAttempts, 
+			config.OTPRequestWindow,
+		)
 		if err != nil {
 			utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to check rate limit")
 			return
@@ -364,7 +472,7 @@ func HandleForgotPassword(authStorage *services.AuthStorageService, emailSender 
 	}
 }
 
-// HandleVerifyOTP returns a handler that processes OTP verification requests
+// HandleVerifyOTP returns a handler that processes OTP verification requests with rate limiting
 func HandleVerifyOTP(authStorage *services.AuthStorageService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req models.VerifyOTPRequest
@@ -380,14 +488,71 @@ func HandleVerifyOTP(authStorage *services.AuthStorageService) http.HandlerFunc 
 
 		ctx := r.Context()
 
-		// Validate OTP from Redis (auto-deletes on success - one-time use)
-		valid := authStorage.ValidateOTP(ctx, req.Email, req.OTP)
-		if !valid {
-			response := models.VerifyOTPResponse{
-				Message: "Invalid or expired OTP. Please request a new one.",
-				Success: false,
+		// Check rate limit for OTP verification attempts (5 attempts per 5 minutes)
+		allowed, remaining, err := authStorage.CheckRateLimit(
+			ctx,
+			config.RateLimitActionOTPVerify,
+			req.Email,
+			config.OTPVerifyMaxAttempts,
+			config.OTPVerifyWindow,
+		)
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to check rate limit")
+			return
+		}
+
+		if !allowed {
+			response := map[string]interface{}{
+				"error":               "rate_limit_exceeded",
+				"message":             "Too many OTP verification attempts. Please try again later.",
+				"retry_after_seconds": int(config.OTPVerifyWindow.Seconds()),
 			}
 			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Validate OTP from Redis with detailed error information
+		validationResult := authStorage.ValidateOTPWithDetails(ctx, req.Email, req.OTP)
+		
+		if !validationResult.Valid {
+			// Determine response based on error code
+			var message string
+			var errorCode string
+			
+			switch validationResult.ErrorCode {
+			case config.ErrorCodeOTPExpired:
+				message = "OTP has expired. Please request a new one."
+				errorCode = config.ErrorCodeOTPExpired
+			case config.ErrorCodeOTPInvalid:
+				message = "Invalid OTP code. Please check and try again."
+				errorCode = config.ErrorCodeOTPInvalid
+			default:
+				message = "Invalid or expired OTP. Please request a new one."
+				errorCode = config.ErrorCodeOTPInvalid
+			}
+
+			// Log failed OTP verification attempt
+			if utils.GlobalAuditLogger != nil {
+				auditEntry := models.NewAuditLogEntry(uuid.Nil, "otp_verification_failed", models.ResourceTypeUser).
+					WithMetadata("email", req.Email).
+					WithMetadata("error_code", validationResult.ErrorCode).
+					WithMetadata("reason", message).
+					WithFailure(message)
+				
+				if logErr := utils.GlobalAuditLogger.LogFromRequest(ctx, r, auditEntry); logErr != nil {
+					fmt.Printf("[AUDIT WARNING] Failed to log OTP verification failure: %v\n", logErr)
+				}
+			}
+
+			response := map[string]interface{}{
+				"error":   errorCode,
+				"message": message,
+				"success": false,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining-1))
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(response)
 			return
@@ -400,10 +565,20 @@ func HandleVerifyOTP(authStorage *services.AuthStorageService) http.HandlerFunc 
 			return
 		}
 
-		// Store reset token in Redis with 15-minute TTL
+		// Store reset token in Redis with configurable TTL
 		if err := authStorage.StoreResetToken(ctx, resetToken, req.Email); err != nil {
 			utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to store reset token")
 			return
+		}
+
+		// Log successful OTP verification
+		if utils.GlobalAuditLogger != nil {
+			auditEntry := models.NewAuditLogEntry(uuid.Nil, "otp_verification_success", models.ResourceTypeUser).
+				WithMetadata("email", req.Email)
+			
+			if logErr := utils.GlobalAuditLogger.LogFromRequest(ctx, r, auditEntry); logErr != nil {
+				fmt.Printf("[AUDIT WARNING] Failed to log OTP verification success: %v\n", logErr)
+			}
 		}
 
 		response := models.VerifyOTPResponse{
@@ -413,6 +588,7 @@ func HandleVerifyOTP(authStorage *services.AuthStorageService) http.HandlerFunc 
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining-1))
 		json.NewEncoder(w).Encode(response)
 	}
 }
@@ -491,6 +667,18 @@ func HandleResetPassword(authStorage *services.AuthStorageService) http.HandlerF
 		if err := authStorage.RevokeSessions(ctx, userUUID); err != nil {
 			// Log error but don't fail the request (password was already reset)
 			fmt.Printf("[AUTH WARNING] Failed to revoke sessions for user %s: %v\n", userUUID, err)
+		}
+
+		// Log successful password reset
+		if utils.GlobalAuditLogger != nil {
+			userUUIDParsed, _ := uuid.Parse(userUUID)
+			auditEntry := models.NewAuditLogEntry(userUUIDParsed, models.ActionPasswordChanged, models.ResourceTypeUser).
+				WithMetadata("email", email).
+				WithMetadata("method", "password_reset")
+			
+			if logErr := utils.GlobalAuditLogger.LogFromRequest(ctx, r, auditEntry); logErr != nil {
+				fmt.Printf("[AUDIT WARNING] Failed to log password reset audit event: %v\n", logErr)
+			}
 		}
 
 		response := models.ResetPasswordResponse{
@@ -581,11 +769,159 @@ func HandleChangePassword(authStorage *services.AuthStorageService) http.Handler
 			fmt.Printf("[AUTH WARNING] Failed to revoke sessions for user %s: %v\n", userUUID, err)
 		}
 
+		// Log successful password change
+		if utils.GlobalAuditLogger != nil {
+			userUUIDParsed, _ := uuid.Parse(userUUID)
+			auditEntry := models.NewAuditLogEntry(userUUIDParsed, models.ActionPasswordChanged, models.ResourceTypeUser).
+				WithMetadata("email", email).
+				WithMetadata("method", "authenticated_change")
+			
+			if logErr := utils.GlobalAuditLogger.LogFromRequest(ctx, r, auditEntry); logErr != nil {
+				fmt.Printf("[AUDIT WARNING] Failed to log password change audit event: %v\n", logErr)
+			}
+		}
+
 		response := map[string]interface{}{
 			"message": "Password changed successfully. Please log in again with your new password.",
 			"success": true,
 		}
 
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// HandleLogout returns a handler that processes logout requests and invalidates the session
+func HandleLogout(authStorage *services.AuthStorageService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get user email from context (injected by auth middleware)
+		email, err := middleware.GetUserEmailFromContext(r.Context())
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusUnauthorized, "authentication_error", "User not authenticated")
+			return
+		}
+		
+		// Get user UUID from token
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			utils.RespondWithJSONError(w, http.StatusUnauthorized, "missing_token", "Authorization header required")
+			return
+		}
+		
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			utils.RespondWithJSONError(w, http.StatusUnauthorized, "invalid_token_format", "Invalid authorization format")
+			return
+		}
+		
+		tokenString := parts[1]
+		claims, err := utils.ValidateJWT(tokenString)
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusUnauthorized, "invalid_token", "Invalid or expired token")
+			return
+		}
+		
+		userUUID := claims.UserID
+		sessionID := claims.SessionID
+		ctx := r.Context()
+		
+		// Delete the session from Redis
+		if authStorage != nil && sessionID != "" {
+			if err := authStorage.DeleteSession(ctx, userUUID, sessionID); err != nil {
+				// Log error but don't fail the logout
+				fmt.Printf("[SESSION WARNING] Failed to delete session from Redis: %v\n", err)
+			}
+		}
+		
+		// Parse UUID for audit log
+		userIDForAudit, _ := uuid.Parse(userUUID)
+		
+		// Log successful logout
+		if utils.GlobalAuditLogger != nil {
+			auditEntry := models.NewAuditLogEntry(userIDForAudit, "user_logout", models.ResourceTypeUser).
+				WithMetadata("email", email).
+				WithMetadata("session_id", sessionID)
+			
+			if logErr := utils.GlobalAuditLogger.LogFromRequest(ctx, r, auditEntry); logErr != nil {
+				fmt.Printf("[AUDIT WARNING] Failed to log logout audit event: %v\n", logErr)
+			}
+		}
+		
+		// Success response
+		response := map[string]interface{}{
+			"message": "Logout successful",
+			"success": true,
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// HandleLogoutAll returns a handler that logs out from all devices/sessions
+func HandleLogoutAll(authStorage *services.AuthStorageService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get user email from context (injected by auth middleware)
+		email, err := middleware.GetUserEmailFromContext(r.Context())
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusUnauthorized, "authentication_error", "User not authenticated")
+			return
+		}
+		
+		// Get user UUID from token
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			utils.RespondWithJSONError(w, http.StatusUnauthorized, "missing_token", "Authorization header required")
+			return
+		}
+		
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			utils.RespondWithJSONError(w, http.StatusUnauthorized, "invalid_token_format", "Invalid authorization format")
+			return
+		}
+		
+		tokenString := parts[1]
+		claims, err := utils.ValidateJWT(tokenString)
+		if err != nil {
+			utils.RespondWithJSONError(w, http.StatusUnauthorized, "invalid_token", "Invalid or expired token")
+			return
+		}
+		
+		userUUID := claims.UserID
+		ctx := r.Context()
+		
+		// Delete all sessions for this user from Redis
+		var deletedCount int64
+		if authStorage != nil {
+			deletedCount, err = authStorage.DeleteAllUserSessions(ctx, userUUID)
+			if err != nil {
+				// Log error but don't fail the logout
+				fmt.Printf("[SESSION WARNING] Failed to delete all sessions from Redis: %v\n", err)
+			}
+		}
+		
+		// Parse UUID for audit log
+		userIDForAudit, _ := uuid.Parse(userUUID)
+		
+		// Log successful logout from all devices
+		if utils.GlobalAuditLogger != nil {
+			auditEntry := models.NewAuditLogEntry(userIDForAudit, "user_logout_all", models.ResourceTypeUser).
+				WithMetadata("email", email).
+				WithMetadata("sessions_deleted", deletedCount)
+			
+			if logErr := utils.GlobalAuditLogger.LogFromRequest(ctx, r, auditEntry); logErr != nil {
+				fmt.Printf("[AUDIT WARNING] Failed to log logout-all audit event: %v\n", logErr)
+			}
+		}
+		
+		// Success response
+		response := map[string]interface{}{
+			"message":          "Logged out from all devices",
+			"success":          true,
+			"sessions_deleted": deletedCount,
+		}
+		
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 	}

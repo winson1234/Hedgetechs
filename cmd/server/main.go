@@ -447,7 +447,7 @@ func main() {
 	http.HandleFunc("/api/v1/auth/login", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleLogin))(w, r)
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleLogin(authStorage)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -521,6 +521,34 @@ func main() {
 		switch r.Method {
 		case http.MethodPost:
 			api.CORSMiddleware(authMiddleware(api.HandleChangePassword(authStorage)))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/auth/logout - Logout (authenticated, invalidates current session)
+	http.HandleFunc("/api/v1/auth/logout", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(authMiddleware(api.HandleLogout(authStorage)))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	// POST /api/v1/auth/logout-all - Logout from all devices (authenticated, invalidates all sessions)
+	http.HandleFunc("/api/v1/auth/logout-all", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(authMiddleware(api.HandleLogoutAll(authStorage)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)

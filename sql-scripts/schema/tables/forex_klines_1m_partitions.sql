@@ -24,48 +24,6 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: forex_klines_1m_2025_09; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.forex_klines_1m_2025_09 (
-    id uuid DEFAULT gen_random_uuid(),
-    symbol text NOT NULL,
-    "timestamp" timestamp without time zone NOT NULL,
-    open_bid numeric(18,5) NOT NULL,
-    high_bid numeric(18,5) NOT NULL,
-    low_bid numeric(18,5) NOT NULL,
-    close_bid numeric(18,5) NOT NULL,
-    open_ask numeric(18,5) NOT NULL,
-    high_ask numeric(18,5) NOT NULL,
-    low_ask numeric(18,5) NOT NULL,
-    close_ask numeric(18,5) NOT NULL,
-    volume integer DEFAULT 0,
-    created_at timestamp without time zone DEFAULT now()
-);
-
-
---
--- Name: forex_klines_1m_2025_10; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.forex_klines_1m_2025_10 (
-    id uuid DEFAULT gen_random_uuid(),
-    symbol text NOT NULL,
-    "timestamp" timestamp without time zone NOT NULL,
-    open_bid numeric(18,5) NOT NULL,
-    high_bid numeric(18,5) NOT NULL,
-    low_bid numeric(18,5) NOT NULL,
-    close_bid numeric(18,5) NOT NULL,
-    open_ask numeric(18,5) NOT NULL,
-    high_ask numeric(18,5) NOT NULL,
-    low_ask numeric(18,5) NOT NULL,
-    close_ask numeric(18,5) NOT NULL,
-    volume integer DEFAULT 0,
-    created_at timestamp without time zone DEFAULT now()
-);
-
-
---
 -- Name: forex_klines_1m_2025_11; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -202,21 +160,6 @@ ALTER TABLE ONLY public.forex_klines_1m_2025_12
 ALTER TABLE ONLY public.forex_klines_1m_2026_01
     ADD CONSTRAINT forex_klines_1m_2026_01_symbol_timestamp_key UNIQUE (symbol, "timestamp");
 
-
---
--- Name: forex_klines_1m_2025_09_symbol_timestamp_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX forex_klines_1m_2025_09_symbol_timestamp_idx ON public.forex_klines_1m_2025_09 USING btree (symbol, "timestamp");
-
-
---
--- Name: forex_klines_1m_2025_10_symbol_timestamp_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX forex_klines_1m_2025_10_symbol_timestamp_idx ON public.forex_klines_1m_2025_10 USING btree (symbol, "timestamp");
-
-
 --
 -- Name: forex_klines_1m_2025_11_symbol_timestamp_idx; Type: INDEX; Schema: public; Owner: -
 --
@@ -236,35 +179,6 @@ CREATE UNIQUE INDEX forex_klines_1m_2025_12_symbol_timestamp_idx ON public.forex
 --
 
 CREATE UNIQUE INDEX forex_klines_1m_2026_01_symbol_timestamp_idx ON public.forex_klines_1m_2026_01 USING btree (symbol, "timestamp");
-
-
---
--- Name: forex_klines_1m_2025_09_symbol_timestamp_idx; Type: INDEX ATTACH; Schema: public; Owner: -
---
-
-ALTER INDEX public.idx_forex_klines_unique ATTACH PARTITION public.forex_klines_1m_2025_09_symbol_timestamp_idx;
-
-
---
--- Name: forex_klines_1m_2025_09_symbol_timestamp_key; Type: INDEX ATTACH; Schema: public; Owner: -
---
-
-ALTER INDEX public.forex_klines_1m_symbol_timestamp_key ATTACH PARTITION public.forex_klines_1m_2025_09_symbol_timestamp_key;
-
-
---
--- Name: forex_klines_1m_2025_10_symbol_timestamp_idx; Type: INDEX ATTACH; Schema: public; Owner: -
---
-
-ALTER INDEX public.idx_forex_klines_unique ATTACH PARTITION public.forex_klines_1m_2025_10_symbol_timestamp_idx;
-
-
---
--- Name: forex_klines_1m_2025_10_symbol_timestamp_key; Type: INDEX ATTACH; Schema: public; Owner: -
---
-
-ALTER INDEX public.forex_klines_1m_symbol_timestamp_key ATTACH PARTITION public.forex_klines_1m_2025_10_symbol_timestamp_key;
-
 
 --
 -- Name: forex_klines_1m_2025_11_symbol_timestamp_idx; Type: INDEX ATTACH; Schema: public; Owner: -

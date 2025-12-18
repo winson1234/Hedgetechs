@@ -39,14 +39,9 @@ import notificationReducer from './slices/notificationSlice';
 // WebSocket middleware
 import { websocketMiddleware } from './middleware/websocket';
 
-// Persist configuration - Use sessionStorage so auth is cleared when tab closes
-// Note: We persist user data, but token is managed separately in sessionStorage
-// The REHYDRATE handler validates against sessionStorage as source of truth
-const authPersistConfig = {
-  key: 'auth',
-  storage: sessionStorageEngine,
-  whitelist: ['user'], // Only persist user data (token is in sessionStorage directly)
-};
+// DO NOT persist auth state - we manage it directly from sessionStorage
+// This ensures auth is completely cleared when tab closes
+// Auth state will be restored from sessionStorage on app load via validateSession()
 
 // Persist UI configuration - persist theme, sidebar state, and product type
 const uiPersistConfig = {
@@ -67,13 +62,13 @@ const uiPersistConfig = {
 };
 
 // Create persisted reducers
-const persistedAuthReducer = persistReducer(authPersistConfig, authReducer);
+// Auth reducer is NOT persisted - managed directly from sessionStorage
 const persistedUiReducer = persistReducer(uiPersistConfig, uiReducer);
 
 // Configure store
 export const store = configureStore({
   reducer: {
-    auth: persistedAuthReducer,
+    auth: authReducer, // NOT persisted - managed from sessionStorage directly
     account: accountReducer,
     order: orderReducer,
     price: priceReducer,

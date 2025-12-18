@@ -41,20 +41,23 @@ console.warn = (...args) => {
   originalWarn.apply(console, args)
 }
 
-// Clear any old localStorage auth data (migration from localStorage to sessionStorage)
-// This ensures users are logged out when they close the tab
+// Clear any old localStorage and sessionStorage auth data on app load
+// This ensures clean state and migration from old storage
 if (typeof window !== 'undefined') {
   // Remove old localStorage auth data if it exists
   if (localStorage.getItem('auth_token')) {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');
   }
-  // Also clear any old redux-persist auth data from localStorage
+  // Clear any old redux-persist auth data from localStorage
   try {
-    const oldAuthData = localStorage.getItem('persist:auth');
-    if (oldAuthData) {
-      localStorage.removeItem('persist:auth');
-    }
+    localStorage.removeItem('persist:auth');
+  } catch (e) {
+    // Ignore errors
+  }
+  // Clear any old redux-persist auth data from sessionStorage
+  try {
+    sessionStorage.removeItem('persist:auth');
   } catch (e) {
     // Ignore errors
   }

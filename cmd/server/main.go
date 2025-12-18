@@ -291,7 +291,8 @@ func main() {
 
 	// Create message broadcaster that fans out to both hub and order processor
 	// This allows both WebSocket clients and the order processor to receive real-time price updates
-	messageBroadcaster := make(chan []byte, 256) // Small buffer with rate limiting in place
+	// Increased buffer to handle high-frequency updates from multiple sources
+	messageBroadcaster := make(chan []byte, 1024) // Increased buffer for multiple high-frequency data sources
 	go func() {
 		for msg := range messageBroadcaster {
 			// Forward to hub for WebSocket clients (non-blocking)

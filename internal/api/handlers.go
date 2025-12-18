@@ -42,10 +42,11 @@ func HandleWebSocket(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Create a hub client with a per-client send channel
-	// Small buffer (256) provides early warning if client is slow or message rate is too high
+	// Increased buffer (1024) to handle high-frequency updates from multiple sources
+	// Old messages are automatically dropped when buffer is full to keep latest data
 	client := &hub.Client{
 		Conn: conn,
-		Send: make(chan []byte, 256), // With rate limiting, this should be sufficient
+		Send: make(chan []byte, 1024), // Increased to handle multiple high-frequency data sources
 	}
 
 	// Register the new client with the hub
@@ -63,6 +64,10 @@ func HandleWebSocket(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 
+		// Track consecutive write failures to detect slow/unresponsive clients
+		consecutiveFailures := 0
+		maxFailures := 5
+
 		for {
 			select {
 			case msg, ok := <-c.Send:
@@ -72,19 +77,28 @@ func HandleWebSocket(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				// Set write deadline to avoid blocking forever
-				c.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				// Set write deadline to avoid blocking forever (reduced from 10s to 5s for faster failure detection)
+				c.Conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 				if err := c.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
 					// Don't log normal connection closures
 					if !websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
-						log.Printf("Error writing to client: %v", err)
+						consecutiveFailures++
+						if consecutiveFailures >= maxFailures {
+							log.Printf("Client write failed %d times consecutively, disconnecting: %v", consecutiveFailures, err)
+							return
+						}
+						log.Printf("Error writing to client (failure %d/%d): %v", consecutiveFailures, maxFailures, err)
+					} else {
+						return
 					}
-					return
+				} else {
+					// Reset failure counter on successful write
+					consecutiveFailures = 0
 				}
 
 			case <-ticker.C:
 				// Send ping to keep connection alive
-				c.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				c.Conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 				if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 					return
 				}

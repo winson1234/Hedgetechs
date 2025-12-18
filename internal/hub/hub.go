@@ -30,9 +30,10 @@ type Client struct {
 // NewHub creates a new Hub instance.
 func NewHub() *Hub {
 	return &Hub{
-		// Small buffer (256) provides early warning if message rate is too high
-		// With rate limiting in place, this should be sufficient for ~26 symbols
-		Broadcast:  make(chan []byte, 256),
+		// Increased buffer (1024) to handle high-frequency updates from multiple sources
+		// (Binance trades, depth, forex updates, etc.)
+		// Still provides backpressure if clients are too slow
+		Broadcast:  make(chan []byte, 1024),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
@@ -77,15 +78,33 @@ func (h *Hub) Run() {
 			// Safely iterate over clients and send message
 			h.mu.Lock()
 			for client := range h.clients {
-				// Non-blocking send to the client's buffer. If the client's buffer is full, skip and log.
+				// Try to send message to client buffer
 				select {
 				case client.Send <- message:
-					// enqueued
+					// Successfully enqueued
 				default:
+					// Buffer is full - try to drop oldest message and add new one
+					// This prevents buffer from growing indefinitely while keeping latest data
 					bufferCap := cap(client.Send)
 					bufferLen := len(client.Send)
-					log.Printf("WARNING: Client send buffer full (%d/%d messages), dropping message for client %s", bufferLen, bufferCap, client.Conn.RemoteAddr())
-					// do not unregister here; client writePump will detect issues and unregister if needed
+					
+					// Try to drop oldest message and add new one
+					select {
+					case <-client.Send: // Drop oldest message
+						select {
+						case client.Send <- message: // Add new message
+							// Successfully replaced oldest with newest
+						default:
+							// Still full after dropping one, log warning
+							log.Printf("WARNING: Client send buffer still full (%d/%d messages) after dropping oldest, skipping message for client %s", 
+								len(client.Send), bufferCap, client.Conn.RemoteAddr())
+						}
+					default:
+						// Couldn't drop (shouldn't happen), log error
+						log.Printf("WARNING: Client send buffer full (%d/%d messages), dropping message for client %s", 
+							bufferLen, bufferCap, client.Conn.RemoteAddr())
+					}
+					// Note: We don't unregister here; client writePump will detect issues and unregister if needed
 				}
 			}
 			h.mu.Unlock() // Unlock before potentially lengthy unregister operations

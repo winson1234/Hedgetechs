@@ -39,12 +39,13 @@ import notificationReducer from './slices/notificationSlice';
 // WebSocket middleware
 import { websocketMiddleware } from './middleware/websocket';
 
-// Persist configuration - ONLY persist auth tokens for security
-// Use sessionStorage so auth is cleared when tab closes
+// Persist configuration - Use sessionStorage so auth is cleared when tab closes
+// Note: We persist user data, but token is managed separately in sessionStorage
+// The REHYDRATE handler validates against sessionStorage as source of truth
 const authPersistConfig = {
   key: 'auth',
   storage: sessionStorageEngine,
-  whitelist: ['user', 'session'], // Only persist user and session data
+  whitelist: ['user'], // Only persist user data (token is in sessionStorage directly)
 };
 
 // Persist UI configuration - persist theme, sidebar state, and product type

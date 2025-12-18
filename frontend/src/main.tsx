@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { PersistGate } from 'redux-persist/integration/react'
 import { store, persistor, useAppDispatch, useAppSelector } from './store'
-import { validateSession } from './store/slices/authSlice'
+import { validateSession, clearAuth } from './store/slices/authSlice'
 import App from './App'
 import './index.css'
 import { Elements } from '@stripe/react-stripe-js'
@@ -41,6 +41,25 @@ console.warn = (...args) => {
   originalWarn.apply(console, args)
 }
 
+// Clear any old localStorage auth data (migration from localStorage to sessionStorage)
+// This ensures users are logged out when they close the tab
+if (typeof window !== 'undefined') {
+  // Remove old localStorage auth data if it exists
+  if (localStorage.getItem('auth_token')) {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
+  }
+  // Also clear any old redux-persist auth data from localStorage
+  try {
+    const oldAuthData = localStorage.getItem('persist:auth');
+    if (oldAuthData) {
+      localStorage.removeItem('persist:auth');
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+}
+
 // Load Stripe publishable key from environment
 // Only load Stripe if key is provided, otherwise pass null
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
@@ -58,7 +77,17 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch()
 
   useEffect(() => {
-    // Validate session from sessionStorage (JWT token - cleared when tab closes)
+    // First, check if sessionStorage is empty - if so, clear auth state immediately
+    const token = sessionStorage.getItem('auth_token')
+    const userData = sessionStorage.getItem('user_data')
+    
+    if (!token || !userData) {
+      // SessionStorage is empty (tab was closed), clear auth state
+      dispatch(clearAuth())
+      return
+    }
+    
+    // Then validate session from sessionStorage
     dispatch(validateSession())
   }, [dispatch])
 

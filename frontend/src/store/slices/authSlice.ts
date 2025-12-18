@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { REHYDRATE } from 'redux-persist';
 import * as authService from '../../services/auth';
 import type { User } from '../../services/auth';
 
@@ -119,6 +120,14 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    // Clear auth state completely
+    clearAuth: (state) => {
+      state.user = null;
+      state.token = null;
+      state.isAuthenticated = false;
+      state.loading = false;
+      state.error = null;
+    },
     // Set auth state manually if needed
     setAuth: (state, action: PayloadAction<{ user: User | null; token: string | null }>) => {
       state.user = action.payload.user;
@@ -127,6 +136,34 @@ const authSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    // Handle REHYDRATE from redux-persist
+    // Always validate against sessionStorage - if sessionStorage is empty, clear auth state
+    builder
+      .addCase(REHYDRATE, (state, action) => {
+        // Always check sessionStorage first - it's the source of truth
+        const token = authService.getToken();
+        const user = authService.getStoredUser();
+        
+        // If sessionStorage is empty (tab was closed), clear everything
+        if (!token || !user) {
+          // Clear all auth state
+          state.user = null;
+          state.token = null;
+          state.isAuthenticated = false;
+          state.loading = false;
+          state.error = null;
+          return; // Don't restore anything
+        }
+        
+        // If sessionStorage has data, restore from it (not from redux-persist)
+        // This ensures sessionStorage is always the source of truth
+        state.user = user;
+        state.token = token;
+        state.isAuthenticated = true;
+        state.loading = false;
+        state.error = null;
+      });
+
     // Sign up (creates user account directly, no auth state change - user needs to log in)
     builder
       .addCase(signUp.pending, (state) => {
@@ -197,5 +234,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, setAuth } = authSlice.actions;
+export const { clearError, clearAuth, setAuth } = authSlice.actions;
 export default authSlice.reducer;

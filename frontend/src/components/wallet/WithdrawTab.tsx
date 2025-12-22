@@ -99,7 +99,6 @@ function WithdrawTab() {
   const [withdrawalMethod] = useState<WithdrawalMethod>('tron');
   const [savedMethods, setSavedMethods] = useState<SavedWithdrawalMethod[]>([]);
   const [selectedSavedMethod, setSelectedSavedMethod] = useState<string>('new');
-  const [isLoadingSavedMethods, setIsLoadingSavedMethods] = useState(false);
 
   // React Hook Form (dynamic schema based on withdrawal method)
   const currentSchema = withdrawalMethod === 'tron' ? tronWithdrawalSchema : bankWithdrawalSchema;
@@ -143,7 +142,6 @@ function WithdrawTab() {
 
   // Fetch saved withdrawal methods
   const fetchSavedMethods = useCallback(async () => {
-    setIsLoadingSavedMethods(true);
     try {
       const authToken = token || getToken();
       if (!authToken) return;
@@ -160,8 +158,6 @@ function WithdrawTab() {
       }
     } catch (error) {
       console.error('Failed to fetch saved methods:', error);
-    } finally {
-      setIsLoadingSavedMethods(false);
     }
   }, [token]);
 

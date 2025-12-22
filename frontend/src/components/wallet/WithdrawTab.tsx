@@ -15,7 +15,7 @@ interface SavedWithdrawalMethod {
   id: string;
   withdrawal_method: WithdrawalMethod;
   nickname?: string;
-  withdrawal_details: Record<string, any>;
+  withdrawal_details: Record<string, unknown>;
   is_default: boolean;
   last_used_at?: string;
   created_at: string;
@@ -96,10 +96,9 @@ function WithdrawTab() {
 
   // State
   const [isProcessing, setIsProcessing] = useState(false);
-  const [withdrawalMethod, setWithdrawalMethod] = useState<WithdrawalMethod>('tron');
+  const [withdrawalMethod] = useState<WithdrawalMethod>('tron');
   const [savedMethods, setSavedMethods] = useState<SavedWithdrawalMethod[]>([]);
   const [selectedSavedMethod, setSelectedSavedMethod] = useState<string>('new');
-  const [isLoadingSavedMethods, setIsLoadingSavedMethods] = useState(false);
 
   // React Hook Form (dynamic schema based on withdrawal method)
   const currentSchema = withdrawalMethod === 'tron' ? tronWithdrawalSchema : bankWithdrawalSchema;
@@ -198,15 +197,15 @@ function WithdrawTab() {
     if (!savedMethod) return;
 
     if (savedMethod.withdrawal_method === 'tron') {
-      setValue('walletAddress' as any, savedMethod.withdrawal_details.wallet_address || '');
+      setValue('walletAddress' as keyof WithdrawalFormData, savedMethod.withdrawal_details.wallet_address as string || '');
     } else {
-      setValue('accountHolderName' as any, savedMethod.withdrawal_details.account_holder_name || '');
-      setValue('bankName' as any, savedMethod.withdrawal_details.bank_name || '');
-      setValue('routingNumber' as any, savedMethod.withdrawal_details.routing_number || '');
+      setValue('accountHolderName' as keyof WithdrawalFormData, savedMethod.withdrawal_details.account_holder_name as string || '');
+      setValue('bankName' as keyof WithdrawalFormData, savedMethod.withdrawal_details.bank_name as string || '');
+      setValue('routingNumber' as keyof WithdrawalFormData, savedMethod.withdrawal_details.routing_number as string || '');
       // For account number, we only have last 4 digits, show placeholder
-      const last4 = savedMethod.withdrawal_details.account_last4;
+      const last4 = savedMethod.withdrawal_details.account_last4 as string | undefined;
       if (last4) {
-        setValue('accountNumber' as any, '****' + last4);
+        setValue('accountNumber' as keyof WithdrawalFormData, '****' + last4);
       }
     }
   }, [selectedSavedMethod, savedMethods, setValue]);
@@ -245,7 +244,7 @@ function WithdrawTab() {
       }
 
       // Prepare withdrawal details based on method
-      let withdrawalDetails: Record<string, any>;
+      let withdrawalDetails: Record<string, unknown>;
       if (withdrawalMethod === 'tron') {
         const tronData = data as TronWithdrawalFormData;
         withdrawalDetails = {
@@ -384,7 +383,7 @@ function WithdrawTab() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-[#00C0A2] mt-0.5 font-bold">3.</span>
-                <span>Review the fee and final amount you'll receive</span>
+                <span>Review the fee and final amount you&apos;ll receive</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-[#00C0A2] mt-0.5 font-bold">4.</span>
@@ -532,7 +531,7 @@ function WithdrawTab() {
                 <input
                   type="text"
                   id="walletAddress"
-                  {...register('walletAddress' as any)}
+                  {...register('walletAddress' as keyof WithdrawalFormData)}
                   placeholder="Enter your Tron wallet address (starts with T)"
                   disabled={selectedSavedMethod !== 'new'}
                   className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#00C0A2] focus:border-[#00C0A2] transition-all text-sm font-mono disabled:opacity-60 disabled:cursor-not-allowed"
@@ -541,7 +540,7 @@ function WithdrawTab() {
                   USDT will be sent to this TRC20 address
                 </p>
                 {errors.walletAddress && (
-                  <p className="text-xs text-red-500 mt-1">{(errors as any).walletAddress?.message}</p>
+                  <p className="text-xs text-red-500 mt-1">{(errors as { walletAddress?: { message?: string } }).walletAddress?.message}</p>
                 )}
               </div>
             </>
@@ -553,7 +552,7 @@ function WithdrawTab() {
               <input
                 type="checkbox"
                 id="saveForReuse"
-                {...register('saveForReuse' as any)}
+                {...register('saveForReuse' as keyof WithdrawalFormData)}
                 className="w-4 h-4 text-[#00C0A2] border-slate-300 dark:border-slate-600 rounded focus:ring-[#00C0A2]"
               />
               <label htmlFor="saveForReuse" className="text-sm text-slate-700 dark:text-slate-300">

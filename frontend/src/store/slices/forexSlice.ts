@@ -46,7 +46,7 @@ const initialState: ForexState = {
 // Async thunk to fetch all forex quotes
 export const fetchForexQuotes = createAsyncThunk(
   'forex/fetchQuotes',
-  async (_, { rejectWithValue }) => {
+  async () => {
     try {
       const response = await apiFetch('api/v1/forex/quotes');
       if (!response.ok) {

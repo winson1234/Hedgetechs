@@ -1,5 +1,5 @@
 class RequestQueue {
-    private queue: Array<() => Promise<any>> = [];
+    private queue: Array<() => Promise<unknown>> = [];
     private processing = false;
     private maxConcurrent = 3; // Maximum concurrent requests
     private activeRequests = 0;

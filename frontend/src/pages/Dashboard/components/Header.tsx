@@ -21,7 +21,6 @@ const Header: React.FC<HeaderProps> = ({
   scrollToSection 
 }) => {
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
   const isLoggedIn = useAppSelector(state => !!state.auth.token);
   const user = useAppSelector(state => state.auth.user);
 

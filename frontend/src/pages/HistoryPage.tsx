@@ -258,7 +258,7 @@ const TransactionRow = memo(({
             )}
           </div>
         );
-      case 'withdraw':
+      case 'withdraw': {
         // Build withdrawal description
         let withdrawalDesc = transaction.description;
         
@@ -329,6 +329,7 @@ const TransactionRow = memo(({
             )}
           </div>
         );
+      }
       case 'transfer':
         return (
           <div>
@@ -536,7 +537,7 @@ export default function HistoryPage() {
   const [minAmount, setMinAmount] = useState('');
   const [maxAmount, setMaxAmount] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage] = useState(20);
   const [showFilters, setShowFilters] = useState(false);
 
   // Batch history data state (from new batch endpoint)
@@ -703,14 +704,34 @@ export default function HistoryPage() {
 
   // Combined and sorted history
   const allHistory = useMemo<HistoryItem[]>(() => {
-    // Get live account IDs for filtering
+    // Get live account IDs for filtering (use both id and account_id for matching)
     const liveAccountIds = new Set(liveAccounts.map(acc => acc.id));
+    const liveAccountIdsByAccountId = new Set(liveAccounts.map(acc => acc.account_id?.toString()));
     
     // Filter out position_close transactions as they're already shown as closed positions
     // Also filter to only show live account transactions
-    const filteredTransactions = transactions.filter(t => 
-      t.type !== 'position_close' && liveAccountIds.has(t.accountId)
-    );
+    // Include transfers even if account ID doesn't match (they might be for accounts not yet loaded)
+    const filteredTransactions = transactions.filter(t => {
+      if (t.type === 'position_close') return false;
+      
+      // For transfers, be very lenient - transfers are always between user's own accounts
+      // So if we have any live accounts, show all transfers (they belong to this user)
+      // This fixes the issue where transfers don't show up if account IDs don't match exactly
+      if (t.type === 'transfer') {
+        // If we have live accounts, show all transfers (they're always user's own accounts)
+        // Only filter out if we have no live accounts at all (edge case)
+        if (liveAccounts.length > 0) {
+          return true; // Show all transfers for users with live accounts
+        }
+        // Fallback: try to match account IDs if no live accounts (shouldn't happen normally)
+        return liveAccountIds.has(t.accountId) || 
+               liveAccountIdsByAccountId.has(t.accountId) ||
+               (t.targetAccountId && (liveAccountIds.has(t.targetAccountId) || liveAccountIdsByAccountId.has(t.targetAccountId)));
+      }
+      
+      // For other transaction types, require exact account ID match
+      return liveAccountIds.has(t.accountId) || liveAccountIdsByAccountId.has(t.accountId);
+    });
 
     // Filter out CFD/Futures executed orders since they're shown as contracts
     // Only show Spot product orders in the history
@@ -977,9 +998,6 @@ export default function HistoryPage() {
     setSortOption('date-desc');
   }, []);
 
-  // Check if any filters are active
-  const hasActiveFilters = searchQuery || dateRange !== 'all' || statusFilter !== 'all' ||
-                           typeFilter !== 'all' || minAmount || maxAmount;
 
   // Memoized click handlers
   const handleItemClick = useCallback((item: HistoryItem) => {

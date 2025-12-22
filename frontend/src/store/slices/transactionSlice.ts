@@ -60,6 +60,7 @@ export const transformTransaction = (backend: BackendTransaction): Transaction =
   // Extract payment metadata (excluding rejection_reason)
   let paymentMetadata: PaymentMethodMetadata | undefined;
   if (backend.metadata) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { rejection_reason, ...rest } = backend.metadata;
     if (Object.keys(rest).length > 0) {
       paymentMetadata = rest as PaymentMethodMetadata;

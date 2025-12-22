@@ -139,8 +139,9 @@ export function useGSAPScrollAnimations() {
     return () => {
       observerRef.current?.disconnect();
       contentObserver.disconnect();
-      elementsRef.current.forEach((animation) => animation.kill());
-      elementsRef.current.clear();
+      const currentElements = elementsRef.current;
+      currentElements.forEach((animation) => animation.kill());
+      currentElements.clear();
     };
   }, []);
 

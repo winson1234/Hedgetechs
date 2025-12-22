@@ -22,11 +22,6 @@ export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Only show notification bell if user is authenticated
-  if (!token) {
-    return null;
-  }
-
   // Only fetch if user is authenticated
   const isAuthenticated = !!token;
 
@@ -65,6 +60,11 @@ export default function NotificationBell() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen]);
+
+  // Only show notification bell if user is authenticated
+  if (!token) {
+    return null;
+  }
 
   const handleNotificationClick = async (notificationId: string, isRead: boolean) => {
     if (!isRead) {

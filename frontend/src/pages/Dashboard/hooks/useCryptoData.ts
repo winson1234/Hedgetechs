@@ -106,6 +106,7 @@ export const useCryptoData = () => {
     };
 
     fetchInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { cryptoData };

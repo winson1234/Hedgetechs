@@ -37,7 +37,7 @@ const getAuthToken = (getState: () => RootState) => {
 // Fetch notifications
 export const fetchNotifications = createAsyncThunk(
   'notification/fetchNotifications',
-  async (unreadOnly: boolean = false, { getState, rejectWithValue }) => {
+  async (unreadOnly: boolean = false, { getState }) => {
     try {
       const token = getAuthToken(getState as () => RootState);
       if (!token) {
@@ -68,7 +68,7 @@ export const fetchNotifications = createAsyncThunk(
 // Fetch unread count
 export const fetchUnreadCount = createAsyncThunk(
   'notification/fetchUnreadCount',
-  async (_, { getState, rejectWithValue }) => {
+  async (_, { getState }) => {
     try {
       const token = getAuthToken(getState as () => RootState);
       if (!token) {

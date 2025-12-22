@@ -32,9 +32,6 @@ function OpenAccountModal({
   openAccount,
   onAccountCreated,
 }: OpenAccountModalProps) {
-  // Get existing accounts from Redux store
-  const accounts = useAppSelector((state) => state.account.accounts)
-  
   const [accountType, setAccountType] = useState<'live' | 'demo'>('live')
   const [selectedCurrency, setSelectedCurrency] = useState<string>('USD')
   const [initialBalance, setInitialBalance] = useState<string>('10000')

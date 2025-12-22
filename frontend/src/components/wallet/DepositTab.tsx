@@ -62,8 +62,6 @@ function DepositTab() {
     },
   });
 
-  const selectedAccountId = watch('accountId');
-
   // Update selected account when active account changes
   useEffect(() => {
     if (activeAccount) {

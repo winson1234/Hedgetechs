@@ -11,19 +11,6 @@ import {
 } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
 
-// Create sessionStorage engine for redux-persist
-// This ensures auth tokens are cleared when the tab closes
-const sessionStorageEngine = {
-  getItem: (key: string): Promise<string | null> => {
-    return Promise.resolve(window.sessionStorage.getItem(key));
-  },
-  setItem: (key: string, value: string): Promise<void> => {
-    return Promise.resolve(window.sessionStorage.setItem(key, value));
-  },
-  removeItem: (key: string): Promise<void> => {
-    return Promise.resolve(window.sessionStorage.removeItem(key));
-  },
-};
 
 // Import slices
 import authReducer from './slices/authSlice';

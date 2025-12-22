@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../../../store';
 import { signOut } from '../../../store/slices/authSlice';
 import { clearAccounts } from '../../../store/slices/accountSlice';

@@ -1,6 +1,5 @@
 import { useState, useEffect, memo } from 'react';
 import { CURRENCIES } from '../config/constants';
-import { useAppSelector } from '../store';
 
 import type { Account } from '../store/slices/accountSlice'
 

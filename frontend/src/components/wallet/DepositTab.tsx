@@ -52,7 +52,7 @@ function DepositTab() {
   const [addressCopied, setAddressCopied] = useState(false);
 
   // React Hook Form
-  const { register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<DepositFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, reset } = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
     defaultValues: {
       accountId: activeAccount?.id || accounts.find(a => a.type === 'live')?.id || '',

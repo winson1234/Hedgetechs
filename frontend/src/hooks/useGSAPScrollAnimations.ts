@@ -135,13 +135,16 @@ export function useGSAPScrollAnimations() {
       });
     });
 
+    // Capture ref value at effect start for cleanup
+    const elementsRefValue = elementsRef.current;
+    const observerRefValue = observerRef.current;
+
     // Cleanup
     return () => {
-      observerRef.current?.disconnect();
+      observerRefValue?.disconnect();
       contentObserver.disconnect();
-      const currentElements = elementsRef.current;
-      currentElements.forEach((animation) => animation.kill());
-      currentElements.clear();
+      elementsRefValue.forEach((animation) => animation.kill());
+      elementsRefValue.clear();
     };
   }, []);
 

@@ -26,6 +26,8 @@ function PortfolioLegend({ payload, formatBalance }: PortfolioLegendProps) {
     <div className="space-y-3">
       {payload.map((entry) => {
         const asset = entry.payload;
+        // Extract actual currency (remove "Live: " or "Demo: " prefix)
+        const actualCurrency = asset.currency.replace(/^(Live|Demo):\s*/, '');
 
         return (
           <div
@@ -49,14 +51,26 @@ function PortfolioLegend({ payload, formatBalance }: PortfolioLegendProps) {
                       : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                   }`}
                 >
-                  {asset.currency.substring(0, 3)}
+                  {actualCurrency.substring(0, 3)}
                 </div>
 
                 {/* Currency Name & Type */}
                 <div className="min-w-0">
-                  <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">
-                    {asset.currency}
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                      {actualCurrency}
+                    </p>
+                    {asset.currency.startsWith('Live:') && (
+                      <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-1.5 py-0.5 rounded uppercase">
+                        Live
+                      </span>
+                    )}
+                    {asset.currency.startsWith('Demo:') && (
+                      <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-1.5 py-0.5 rounded uppercase">
+                        Demo
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     {asset.isFiat ? 'Fiat Currency' : 'Cryptocurrency'}
                   </p>
@@ -67,7 +81,7 @@ function PortfolioLegend({ payload, formatBalance }: PortfolioLegendProps) {
               <div className="text-right shrink-0">
                 <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
                   {asset.isFiat
-                    ? formatBalance(asset.amount, asset.currency)
+                    ? formatBalance(asset.amount, actualCurrency)
                     : asset.amount.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 6,

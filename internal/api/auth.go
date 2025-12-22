@@ -179,28 +179,34 @@ func HandleLogin(authStorage *services.AuthStorageService) http.HandlerFunc {
 		ctx := r.Context()
 
 		// Check rate limit for login attempts (5 attempts per 15 minutes)
-		allowed, remaining, err := authStorage.CheckRateLimit(
-			ctx,
-			config.RateLimitActionLogin,
-			req.Email,
-			config.LoginMaxAttempts,
-			config.LoginWindow,
-		)
-		if err != nil {
-			utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to check rate limit")
-			return
-		}
-
-		if !allowed {
-			response := map[string]interface{}{
-				"error":               "rate_limit_exceeded",
-				"message":             "Too many login attempts. Please try again later.",
-				"retry_after_seconds": int(config.LoginWindow.Seconds()),
+		// Skip rate limiting if Redis/authStorage is unavailable (graceful degradation)
+		var allowed bool = true
+		var remaining int = config.LoginMaxAttempts
+		var err error
+		if authStorage != nil {
+			allowed, remaining, err = authStorage.CheckRateLimit(
+				ctx,
+				config.RateLimitActionLogin,
+				req.Email,
+				config.LoginMaxAttempts,
+				config.LoginWindow,
+			)
+			if err != nil {
+				utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to check rate limit")
+				return
 			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusTooManyRequests)
-			json.NewEncoder(w).Encode(response)
-			return
+
+			if !allowed {
+				response := map[string]interface{}{
+					"error":               "rate_limit_exceeded",
+					"message":             "Too many login attempts. Please try again later.",
+					"retry_after_seconds": int(config.LoginWindow.Seconds()),
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusTooManyRequests)
+				json.NewEncoder(w).Encode(response)
+				return
+			}
 		}
 
 		pool, err := database.GetPool()
@@ -392,28 +398,34 @@ func HandleForgotPassword(authStorage *services.AuthStorageService, emailSender 
 		ctx := r.Context()
 
 		// CRITICAL: Check rate limit FIRST using configured limits
-		allowed, remaining, err := authStorage.CheckRateLimit(
-			ctx, 
-			config.RateLimitActionForgotPassword, 
-			req.Email, 
-			config.OTPRequestMaxAttempts, 
-			config.OTPRequestWindow,
-		)
-		if err != nil {
-			utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to check rate limit")
-			return
-		}
-
-		if !allowed {
-			response := map[string]interface{}{
-				"error":               "rate_limit_exceeded",
-				"message":             "Too many password reset attempts. Please try again later.",
-				"retry_after_seconds": 3600,
+		// Skip rate limiting if Redis/authStorage is unavailable (graceful degradation)
+		var allowed bool = true
+		var remaining int = config.OTPRequestMaxAttempts
+		var err error
+		if authStorage != nil {
+			allowed, remaining, err = authStorage.CheckRateLimit(
+				ctx, 
+				config.RateLimitActionForgotPassword, 
+				req.Email, 
+				config.OTPRequestMaxAttempts, 
+				config.OTPRequestWindow,
+			)
+			if err != nil {
+				utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to check rate limit")
+				return
 			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusTooManyRequests)
-			json.NewEncoder(w).Encode(response)
-			return
+
+			if !allowed {
+				response := map[string]interface{}{
+					"error":               "rate_limit_exceeded",
+					"message":             "Too many password reset attempts. Please try again later.",
+					"retry_after_seconds": 3600,
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusTooManyRequests)
+				json.NewEncoder(w).Encode(response)
+				return
+			}
 		}
 
 		pool, err := database.GetPool()
@@ -446,6 +458,12 @@ func HandleForgotPassword(authStorage *services.AuthStorageService, emailSender 
 
 		// Only actually send OTP if user was found and approved
 		if userFound {
+			// Check if Redis/authStorage is available (required for OTP functionality)
+			if authStorage == nil {
+				utils.RespondWithJSONError(w, http.StatusServiceUnavailable, "service_unavailable", "OTP service is currently unavailable. Please try again later.")
+				return
+			}
+
 			// Generate OTP
 			otp, err := generateOTP()
 			if err != nil {
@@ -487,6 +505,12 @@ func HandleVerifyOTP(authStorage *services.AuthStorageService) http.HandlerFunc 
 		}
 
 		ctx := r.Context()
+
+		// Check if Redis/authStorage is available (required for OTP functionality)
+		if authStorage == nil {
+			utils.RespondWithJSONError(w, http.StatusServiceUnavailable, "service_unavailable", "OTP service is currently unavailable. Please try again later.")
+			return
+		}
 
 		// Check rate limit for OTP verification attempts (5 attempts per 5 minutes)
 		allowed, remaining, err := authStorage.CheckRateLimit(
@@ -615,6 +639,12 @@ func HandleResetPassword(authStorage *services.AuthStorageService) http.HandlerF
 
 		ctx := r.Context()
 
+		// Check if Redis/authStorage is available (required for reset token validation)
+		if authStorage == nil {
+			utils.RespondWithJSONError(w, http.StatusServiceUnavailable, "service_unavailable", "Password reset service is currently unavailable. Please try again later.")
+			return
+		}
+
 		// Validate reset token from Redis (auto-deletes on success - one-time use)
 		email, err := authStorage.ValidateResetToken(ctx, req.ResetToken)
 		if err != nil {
@@ -664,9 +694,11 @@ func HandleResetPassword(authStorage *services.AuthStorageService) http.HandlerF
 		}
 
 		// CRITICAL: Revoke all sessions for this user (invalidate existing JWTs)
-		if err := authStorage.RevokeSessions(ctx, userUUID); err != nil {
-			// Log error but don't fail the request (password was already reset)
-			fmt.Printf("[AUTH WARNING] Failed to revoke sessions for user %s: %v\n", userUUID, err)
+		if authStorage != nil {
+			if err := authStorage.RevokeSessions(ctx, userUUID); err != nil {
+				// Log error but don't fail the request (password was already reset)
+				fmt.Printf("[AUTH WARNING] Failed to revoke sessions for user %s: %v\n", userUUID, err)
+			}
 		}
 
 		// Log successful password reset
@@ -764,9 +796,11 @@ func HandleChangePassword(authStorage *services.AuthStorageService) http.Handler
 		}
 
 		// CRITICAL: Revoke all sessions for this user (invalidate all existing JWTs including current one)
-		if err := authStorage.RevokeSessions(ctx, userUUID); err != nil {
-			// Log error but don't fail the request (password was already changed)
-			fmt.Printf("[AUTH WARNING] Failed to revoke sessions for user %s: %v\n", userUUID, err)
+		if authStorage != nil {
+			if err := authStorage.RevokeSessions(ctx, userUUID); err != nil {
+				// Log error but don't fail the request (password was already changed)
+				fmt.Printf("[AUTH WARNING] Failed to revoke sessions for user %s: %v\n", userUUID, err)
+			}
 		}
 
 		// Log successful password change

@@ -33,13 +33,27 @@ function PortfolioTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
 
   const data = payload[0].payload;
-  const fullName = CURRENCY_NAMES[data.currency] || data.currency;
+  // Extract actual currency (remove "Live: " or "Demo: " prefix)
+  const actualCurrency = data.currency.replace(/^(Live|Demo):\s*/, '');
+  const isLive = data.currency.startsWith('Live:');
+  const isDemo = data.currency.startsWith('Demo:');
+  const fullName = CURRENCY_NAMES[actualCurrency] || actualCurrency;
 
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 shadow-lg">
       {/* Currency Name */}
-      <div className="font-semibold text-slate-900 dark:text-slate-100 mb-2">
-        {fullName} ({data.currency})
+      <div className="font-semibold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2 flex-wrap">
+        <span>{fullName} ({actualCurrency})</span>
+        {isLive && (
+          <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-1.5 py-0.5 rounded uppercase">
+            Live
+          </span>
+        )}
+        {isDemo && (
+          <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 px-1.5 py-0.5 rounded uppercase">
+            Demo
+          </span>
+        )}
       </div>
 
       {/* Details Grid */}
@@ -57,7 +71,7 @@ function PortfolioTooltip({ active, payload }: CustomTooltipProps) {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 6,
                 })
-            } {data.currency}
+            } {actualCurrency}
           </span>
         </div>
 

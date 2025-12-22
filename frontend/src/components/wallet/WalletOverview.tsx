@@ -4,6 +4,7 @@ import { useAppSelector } from '../../store';
 import { useAssetPrices } from '../../hooks/useAssetPrices';
 import { getApiUrl } from '../../config/api';
 import PortfolioAllocation from './PortfolioAllocation';
+import AccountSwitcher from '../AccountSwitcher';
 
 export default function WalletOverview() {
   // Access Redux state
@@ -96,12 +97,16 @@ export default function WalletOverview() {
     }, 0);
   }, [accounts, assetPrices, fxRates]);
 
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">
-          Portfolio Overview
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            Portfolio Overview
+          </h2>
+          <AccountSwitcher variant="wallet" />
+        </div>
 
         {/* Total Portfolio Value - Primary Card */}
         <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
@@ -137,6 +142,7 @@ export default function WalletOverview() {
             </p>
           </div>
         </div>
+
       </div>
 
       <PortfolioAllocation

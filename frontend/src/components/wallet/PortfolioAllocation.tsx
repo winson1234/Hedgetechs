@@ -86,42 +86,73 @@ function PortfolioAllocation({
   }, []);
 
   const assetAllocations = useMemo((): AssetAllocation[] => {
-    const assetTotals: Record<string, number> = {};
+    // Safety check: return empty array if no accounts
+    if (!accounts || accounts.length === 0) {
+      return [];
+    }
 
-    // Aggregate all assets across accounts
+    // Separate assets by account type (Live vs Demo)
+    const liveAssetTotals: Record<string, number> = {};
+    const demoAssetTotals: Record<string, number> = {};
+
+    // Aggregate assets separately for live and demo accounts
     accounts.forEach(acc => {
+      if (!acc || !acc.balances) return; // Skip invalid accounts
+      const targetTotals = acc.type === 'live' ? liveAssetTotals : demoAssetTotals;
       acc.balances.forEach((balance) => {
-        if (assetTotals[balance.currency]) {
-          assetTotals[balance.currency] += balance.amount;
+        if (!balance || !balance.currency) return; // Skip invalid balances
+        if (targetTotals[balance.currency]) {
+          targetTotals[balance.currency] += balance.amount || 0;
         } else {
-          assetTotals[balance.currency] = balance.amount;
+          targetTotals[balance.currency] = balance.amount || 0;
         }
       });
     });
 
+    // Combine both types but mark them with account type prefix
+    const combinedAssets: Record<string, { amount: number; accountType: 'live' | 'demo' }> = {};
+
+    // Add live assets with "Live: " prefix
+    Object.entries(liveAssetTotals).forEach(([currency, amount]) => {
+      if (amount > 0) {
+        const key = `Live: ${currency}`;
+        combinedAssets[key] = { amount, accountType: 'live' };
+      }
+    });
+
+    // Add demo assets with "Demo: " prefix (always separate, even if same currency exists in live)
+    Object.entries(demoAssetTotals).forEach(([currency, amount]) => {
+      if (amount > 0) {
+        const key = `Demo: ${currency}`;
+        combinedAssets[key] = { amount, accountType: 'demo' };
+      }
+    });
+
     // Calculate USD values and percentages
-    const allocations: AssetAllocation[] = Object.entries(assetTotals)
-      .filter(([, amount]) => amount > 0)
-      .map(([currency, amount]) => {
-        const isFiat = ['USD', 'EUR', 'MYR', 'JPY'].includes(currency);
+    const allocations: AssetAllocation[] = Object.entries(combinedAssets)
+      .filter(([, data]) => data.amount > 0)
+      .map(([displayCurrency, data]) => {
+        // Extract actual currency from display name
+        const actualCurrency = displayCurrency.replace(/^(Live|Demo):\s*/, '');
+        const isFiat = ['USD', 'EUR', 'MYR', 'JPY'].includes(actualCurrency);
         let usdValue = 0;
 
         if (isFiat) {
           // Convert fiat to USD using real forex rates from Massive API
-          const rate = fxRates[currency] || 1.0;
-          usdValue = amount * rate;
+          const rate = fxRates[actualCurrency] || 1.0;
+          usdValue = data.amount * rate;
         } else {
           // Convert crypto to USD using asset prices from Binance
-          const symbol = `${currency}USDT`;
+          const symbol = `${actualCurrency}USDT`;
           const price = assetPrices[symbol] || 0;
-          usdValue = amount * price;
+          usdValue = data.amount * price;
         }
 
         const percentage = totalPortfolioValue > 0 ? (usdValue / totalPortfolioValue) * 100 : 0;
 
         return {
-          currency,
-          amount,
+          currency: displayCurrency, // Use display name (e.g., "Live: USD" or "Demo: USD")
+          amount: data.amount,
           usdValue,
           percentage,
           isFiat,
@@ -214,11 +245,23 @@ function PortfolioAllocation({
               {/* Right Column: Detailed Legend */}
               <div>
                 <PortfolioLegend
-                  payload={chartSnapshot.map((asset) => ({
-                    value: asset.currency,
-                    color: getAssetColor(asset.currency),
-                    payload: asset,
-                  }))}
+                  payload={chartSnapshot.map((asset) => {
+                    // Extract actual currency for color (remove "Live: " or "Demo: " prefix)
+                    const actualCurrency = asset.currency.replace(/^(Live|Demo):\s*/, '');
+                    // Use indigo for live accounts, green for demo accounts
+                    const baseColor = getAssetColor(actualCurrency);
+                    const accountTypeColor = asset.currency.startsWith('Live:')
+                      ? '#6366f1' // indigo-500
+                      : asset.currency.startsWith('Demo:')
+                      ? '#22c55e' // green-500
+                      : baseColor;
+                    
+                    return {
+                      value: asset.currency,
+                      color: accountTypeColor,
+                      payload: asset,
+                    };
+                  })}
                   formatBalance={formatBalance}
                 />
               </div>

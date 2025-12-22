@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProfileDropdown from './ProfileDropdown';
 import NotificationBell from './NotificationBell';
+import AccountSwitcher from './AccountSwitcher';
 import { useAppDispatch, useAppSelector } from '../store';
 import { setActiveWalletTab, toggleTheme } from '../store/slices/uiSlice';
 
@@ -31,6 +32,12 @@ export default function Header() {
   }, [activeAccount]);
 
   const accountCurrency = activeAccount?.currency || 'USD';
+
+  // Get active live account for header display
+  const activeLiveAccount = useMemo(() => {
+    if (!activeAccount || activeAccount.type !== 'live') return null;
+    return activeAccount;
+  }, [activeAccount]);
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -70,12 +77,29 @@ export default function Header() {
 
         {/* Right Side: Icons and Actions */}
         <div className="flex items-center gap-1 sm:gap-2 lg:gap-4">
+          {/* Account Switcher - Full on md+, compact badge on mobile */}
+          <div className="hidden sm:block md:hidden">
+            {/* Mobile: Show compact badge */}
+            {activeAccount && (
+              <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                activeAccount.type === 'live'
+                  ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
+                  : 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
+              }`}>
+                {activeAccount.type === 'live' ? 'LIVE' : 'DEMO'}
+              </span>
+            )}
+          </div>
+          <div className="hidden md:block">
+            <AccountSwitcher variant="header" />
+          </div>
+
           {/* Active Account Balance */}
           <div className="hidden sm:block text-xs sm:text-sm text-slate-700 dark:text-slate-300">
             <span className="hidden md:inline">Balance:{' '}</span>
             <span className="font-semibold">
               {usdBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
-              <span className="hidden sm:inline">{accountCurrency}</span>
+              <span className="hidden sm:inline">{activeLiveAccount ? 'USD' : accountCurrency}</span>
             </span>
           </div>
           

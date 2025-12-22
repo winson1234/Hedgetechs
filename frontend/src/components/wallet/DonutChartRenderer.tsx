@@ -4,6 +4,22 @@ import { getAssetColor } from '../../utils/colors';
 import PortfolioTooltip from './PortfolioTooltip';
 import type { AssetAllocation } from './PortfolioAllocation';
 
+// Helper to get color for asset allocation (handles Live/Demo prefixes)
+const getAllocationColor = (currency: string): string => {
+  // Extract actual currency (remove "Live: " or "Demo: " prefix)
+  const actualCurrency = currency.replace(/^(Live|Demo):\s*/, '');
+  
+  // Use indigo for live accounts, green for demo accounts
+  if (currency.startsWith('Live:')) {
+    return '#6366f1'; // indigo-500
+  } else if (currency.startsWith('Demo:')) {
+    return '#22c55e'; // green-500
+  }
+  
+  // Fallback to asset color
+  return getAssetColor(actualCurrency);
+};
+
 interface DonutChartRendererProps {
   assetAllocations: AssetAllocation[]; // Frozen snapshot data for chart segments
   liveValue: number; // Live updating value for center label
@@ -45,7 +61,7 @@ function DonutChartRenderer({
             {assetAllocations.map((asset) => (
               <Cell
                 key={asset.currency}
-                fill={getAssetColor(asset.currency)}
+                fill={getAllocationColor(asset.currency)}
               />
             ))}
           </Pie>

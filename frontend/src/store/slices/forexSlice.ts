@@ -49,12 +49,19 @@ export const fetchForexQuotes = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await apiFetch('api/v1/forex/quotes');
-      if (!response.ok) throw new Error('Failed to fetch forex quotes');
+      if (!response.ok) {
+        // If 404 or service unavailable, return empty array instead of error
+        if (response.status === 404 || response.status === 503) {
+          return [] as ForexQuote[];
+        }
+        throw new Error('Failed to fetch forex quotes');
+      }
       const data = await response.json();
       return data.quotes as ForexQuote[];
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch forex quotes';
-      return rejectWithValue(message);
+      // Silently fail if endpoint is unavailable - don't break the app
+      console.warn('Forex quotes endpoint unavailable:', error);
+      return [] as ForexQuote[];
     }
   }
 );
@@ -147,6 +154,8 @@ const forexSlice = createSlice({
     builder.addCase(fetchForexQuotes.rejected, (state, action) => {
       state.loading = false;
       state.error = action.payload as string;
+      // Don't clear existing quotes on error - keep last known state
+      // This prevents UI flicker when Redis is temporarily unavailable
     });
 
     // Fetch forex klines

@@ -14,6 +14,7 @@ import (
 	"brokerageProject/internal/utils"
 	"brokerageProject/internal/worker"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -698,12 +699,37 @@ func main() {
 	http.HandleFunc("/api/v1/instruments/symbol", api.CORSMiddleware(allowHEAD(api.GetInstrumentBySymbol)))
 
 	// Forex endpoints (public - no auth required, cache-first design)
+	// Always register endpoints, but handlers will gracefully handle Redis unavailability
 	if redisClient != nil && forexKlines != nil {
 		// GET /api/v1/forex/quotes - All forex pair quotes with 24h stats
 		http.HandleFunc("/api/v1/forex/quotes", api.CORSMiddleware(allowHEAD(api.HandleForexQuotes(redisClient))))
 		// GET /api/v1/forex/klines?symbol=EURUSD&interval=1h&limit=100 - Historical klines
 		http.HandleFunc("/api/v1/forex/klines", api.CORSMiddleware(allowHEAD(api.HandleForexKlines(forexKlines, redisClient))))
 		log.Println("Forex API endpoints registered: /api/v1/forex/quotes, /api/v1/forex/klines")
+	} else {
+		// Register endpoints with fallback handlers when Redis is unavailable
+		http.HandleFunc("/api/v1/forex/quotes", api.CORSMiddleware(allowHEAD(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet && r.Method != http.MethodHead {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			// Return empty quotes when Redis is unavailable
+			response := map[string]interface{}{
+				"quotes": []interface{}{},
+				"count":  0,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(response)
+		})))
+		http.HandleFunc("/api/v1/forex/klines", api.CORSMiddleware(allowHEAD(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet && r.Method != http.MethodHead {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			http.Error(w, "Forex klines service unavailable (Redis required)", http.StatusServiceUnavailable)
+		})))
+		log.Println("Forex API endpoints registered with fallback handlers (Redis unavailable)")
 	}
 
 	// Transactions endpoints (protected with JWT authentication)

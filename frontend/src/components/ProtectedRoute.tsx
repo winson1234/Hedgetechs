@@ -1,13 +1,39 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAppSelector } from '../store';
+import { useEffect, useState } from 'react';
 
 export default function ProtectedRoute() {
   const { user, loading } = useAppSelector((state) => state.auth);
+  const location = useLocation();
+  const [isInitialMount, setIsInitialMount] = useState(true);
   const isLoggedIn = !!user;
   const isLoading = loading;
 
-  // Show loading state while checking authentication
-  if (isLoading) {
+  // Check if we have a token in sessionStorage (indicates user might be logged in)
+  const hasToken = typeof window !== 'undefined' && !!sessionStorage.getItem('auth_token');
+
+  // Track initial mount - wait for first auth validation to complete
+  useEffect(() => {
+    // On initial mount, if we have a token, wait for validation
+    if (isInitialMount && hasToken) {
+      // Wait until loading completes
+      if (!loading) {
+        // Small delay to ensure Redux state is fully updated
+        const timer = setTimeout(() => {
+          setIsInitialMount(false);
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    } else if (isInitialMount && !hasToken) {
+      // No token, can proceed immediately
+      setIsInitialMount(false);
+    }
+  }, [isInitialMount, hasToken, loading]);
+
+  // Show loading state while:
+  // 1. Currently loading, OR
+  // 2. Initial mount with token but validation not complete yet
+  if (isLoading || (isInitialMount && hasToken)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="flex flex-col items-center gap-4">
@@ -18,9 +44,9 @@ export default function ProtectedRoute() {
     );
   }
 
-  // Redirect to login if not authenticated
-  if (!isLoggedIn) {
-    return <Navigate to="/login" replace />;
+  // Only redirect to login if validation is complete and user is not logged in
+  if (!isInitialMount && !isLoggedIn) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   // Render child routes if authenticated

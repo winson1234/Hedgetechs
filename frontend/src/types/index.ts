@@ -67,6 +67,8 @@ export type PaymentMethodMetadata = {
   routingNumber?: string
   // For FPX payments (Malaysia online banking)
   fpxBank?: string // e.g., 'maybank2u', 'cimbclicks', etc.
+  // For crypto withdrawals (Tron/USDT)
+  wallet_address?: string
 }
 
 export type Transaction = {

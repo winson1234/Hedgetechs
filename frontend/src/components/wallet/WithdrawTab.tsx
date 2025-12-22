@@ -99,6 +99,7 @@ function WithdrawTab() {
   const [withdrawalMethod] = useState<WithdrawalMethod>('tron');
   const [savedMethods, setSavedMethods] = useState<SavedWithdrawalMethod[]>([]);
   const [selectedSavedMethod, setSelectedSavedMethod] = useState<string>('new');
+  const [isLoadingSavedMethods, setIsLoadingSavedMethods] = useState(false);
 
   // React Hook Form (dynamic schema based on withdrawal method)
   const currentSchema = withdrawalMethod === 'tron' ? tronWithdrawalSchema : bankWithdrawalSchema;
@@ -505,10 +506,10 @@ function WithdrawTab() {
                   .filter(m => m.withdrawal_method === withdrawalMethod)
                   .map(method => {
                     let displayName = method.nickname || 'Saved Method';
-                    if (withdrawalMethod === 'tron' && method.withdrawal_details.wallet_address) {
+                    if (withdrawalMethod === 'tron' && method.withdrawal_details.wallet_address && typeof method.withdrawal_details.wallet_address === 'string') {
                       const addr = method.withdrawal_details.wallet_address;
                       displayName = method.nickname || `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-                    } else if (method.withdrawal_details.account_last4) {
+                    } else if (method.withdrawal_details.account_last4 && typeof method.withdrawal_details.account_last4 === 'string') {
                       displayName = method.nickname || `****${method.withdrawal_details.account_last4}`;
                     }
                     return (
@@ -540,7 +541,9 @@ function WithdrawTab() {
                   USDT will be sent to this TRC20 address
                 </p>
                 {errors.walletAddress && (
-                  <p className="text-xs text-red-500 mt-1">{(errors as { walletAddress?: { message?: string } }).walletAddress?.message}</p>
+                  <p className="text-xs text-red-500 mt-1">
+                    {(errors as unknown as { walletAddress?: { message?: string } }).walletAddress?.message}
+                  </p>
                 )}
               </div>
             </>

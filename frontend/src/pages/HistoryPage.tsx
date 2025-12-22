@@ -174,9 +174,10 @@ const TransactionRow = memo(({
     }
 
     // Normalize transaction type (backend uses 'withdrawal', frontend uses 'withdraw')
-    const normalizedType = transaction.type === 'withdrawal' ? 'withdraw' : transaction.type;
+    // Handle both 'withdraw' and 'withdrawal' types from backend
+    const normalizedType: TransactionType = (transaction.type === 'withdrawal' || transaction.type === 'withdraw') ? 'withdraw' : transaction.type;
     
-    const iconMap: Record<TransactionType | 'withdrawal', JSX.Element> = {
+    const iconMap: Record<TransactionType, JSX.Element> = {
       deposit: (
         <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
           <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -185,13 +186,6 @@ const TransactionRow = memo(({
         </div>
       ),
       withdraw: (
-        <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-          <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-          </svg>
-        </div>
-      ),
-      withdrawal: (
         <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
           <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -214,14 +208,15 @@ const TransactionRow = memo(({
       ),
     };
 
-    return iconMap[transaction.type] || iconMap[normalizedType as TransactionType];
+    return iconMap[normalizedType] || iconMap.deposit;
   }, [transaction.type, isDemoAdjustment]);
 
   const description = useMemo(() => {
     const hasRejectionReason = transaction.status === 'failed' && transaction.errorMessage;
     
     // Normalize transaction type (backend uses 'withdrawal', frontend uses 'withdraw')
-    const txType = transaction.type === 'withdrawal' ? 'withdraw' : transaction.type;
+    // Handle both 'withdraw' and potential 'withdrawal' from backend
+    const txType: TransactionType = (transaction.type === 'withdraw' || (transaction.type as string) === 'withdrawal') ? 'withdraw' : transaction.type;
     
     switch (txType) {
       case 'deposit':
@@ -279,8 +274,8 @@ const TransactionRow = memo(({
             if (transaction.metadata.accountLast4) {
               withdrawalDesc += ` •••• ${transaction.metadata.accountLast4}`;
             }
-          } else if (transaction.metadata?.wallet_address) {
-            const addr = transaction.metadata.wallet_address as string;
+          } else if (transaction.metadata?.wallet_address && typeof transaction.metadata.wallet_address === 'string') {
+            const addr = transaction.metadata.wallet_address;
             withdrawalDesc = `Tron (USDT) ${addr.slice(0, 6)}...${addr.slice(-4)}`;
           } else {
             withdrawalDesc = 'Withdrawal request';
@@ -1021,7 +1016,7 @@ export default function HistoryPage() {
       .reduce((sum, t) => sum + t.amount, 0);
       
     const totalWithdrawn = transactions
-      .filter(t => (t.type === 'withdraw' || t.type === 'withdrawal') && (t.status === 'completed' || t.status === 'approved'))
+      .filter(t => t.type === 'withdraw' && (t.status === 'completed' || t.status === 'approved'))
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     // Pending items count (from pending orders + pending transactions)

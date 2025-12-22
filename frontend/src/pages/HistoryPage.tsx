@@ -175,7 +175,7 @@ const TransactionRow = memo(({
 
     // Normalize transaction type (backend uses 'withdrawal', frontend uses 'withdraw')
     // Handle both 'withdraw' and 'withdrawal' types from backend
-    const normalizedType: TransactionType = (transaction.type === 'withdrawal' || transaction.type === 'withdraw') ? 'withdraw' : transaction.type;
+    const normalizedType: TransactionType = (transaction.type === 'withdraw' || (transaction.type as string) === 'withdrawal') ? 'withdraw' : transaction.type;
     
     const iconMap: Record<TransactionType, JSX.Element> = {
       deposit: (
@@ -1016,7 +1016,12 @@ export default function HistoryPage() {
       .reduce((sum, t) => sum + t.amount, 0);
       
     const totalWithdrawn = transactions
-      .filter(t => t.type === 'withdraw' && (t.status === 'completed' || t.status === 'approved'))
+      .filter(t => {
+        const isWithdraw = t.type === 'withdraw' || (t.type as string) === 'withdrawal';
+        const statusStr = t.status as string;
+        const isCompleted = t.status === 'completed' || statusStr === 'approved';
+        return isWithdraw && isCompleted;
+      })
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     // Pending items count (from pending orders + pending transactions)

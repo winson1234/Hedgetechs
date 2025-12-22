@@ -536,9 +536,9 @@ function WithdrawTab() {
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   USDT will be sent to this TRC20 address
                 </p>
-                {errors.walletAddress && (
+                {'walletAddress' in errors && errors.walletAddress && (
                   <p className="text-xs text-red-500 mt-1">
-                    {(errors as unknown as { walletAddress?: { message?: string } }).walletAddress?.message}
+                    {errors.walletAddress.message}
                   </p>
                 )}
               </div>

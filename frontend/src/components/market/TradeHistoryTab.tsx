@@ -102,11 +102,11 @@ export default function TradeHistoryTab({ filterByProductType, selectedProductTy
                       )}
                       {order.side.toUpperCase()}
                     </span>
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-300 bg-slate-700 border border-slate-600 uppercase">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 uppercase">
                       {order.type}
                     </span>
                   </div>
-                  <span className="text-xs text-slate-400 flex items-center gap-1">
+                  <span className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -117,13 +117,13 @@ export default function TradeHistoryTab({ filterByProductType, selectedProductTy
                 {/* Trade Details */}
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-2">
                   <div className="flex justify-between items-center py-1">
-                    <span className="text-slate-400 flex items-center gap-1">
+                    <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                       </svg>
                       Amount:
                     </span>
-                    <span className="font-semibold text-slate-200">
+                    <span className="font-semibold text-slate-900 dark:text-slate-200">
                       {order.amount_base.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 6,
@@ -132,25 +132,25 @@ export default function TradeHistoryTab({ filterByProductType, selectedProductTy
                   </div>
 
                   <div className="flex justify-between items-center py-1">
-                    <span className="text-slate-400 flex items-center gap-1">
+                    <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                       </svg>
                       Avg Price:
                     </span>
-                    <span className="font-semibold text-slate-200">
+                    <span className="font-semibold text-slate-900 dark:text-slate-200">
                       {formatCurrency(order.average_fill_price || 0, 'USD')}
                     </span>
                   </div>
 
                   <div className="flex justify-between items-center py-1">
-                    <span className="text-slate-400 flex items-center gap-1">
+                    <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       Filled:
                     </span>
-                    <span className="font-semibold text-slate-200">
+                    <span className="font-semibold text-slate-900 dark:text-slate-200">
                       {order.filled_amount.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 6,
@@ -159,13 +159,13 @@ export default function TradeHistoryTab({ filterByProductType, selectedProductTy
                   </div>
 
                   <div className="flex justify-between items-center py-1">
-                    <span className="text-slate-400 flex items-center gap-1">
+                    <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-5m-5 5h.01M9 17h.01M9 12h.01M12 12h.01M15 12h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       Total:
                     </span>
-                    <span className="font-bold text-slate-100">
+                    <span className="font-bold text-slate-900 dark:text-slate-100">
                       {formatCurrency((order.average_fill_price || 0) * order.filled_amount, 'USD')}
                     </span>
                   </div>

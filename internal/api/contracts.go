@@ -139,9 +139,11 @@ func CreateContract(w http.ResponseWriter, r *http.Request) {
 	// Fetch created contract
 	var contract models.Contract
 	err = pool.QueryRow(ctx,
-		`SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size, entry_price, margin_used, leverage,
-		        tp_price, sl_price, close_price, pnl, swap, commission, pair_id, created_at, closed_at, updated_at
-		 FROM contracts WHERE id = $1`,
+		`SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
+		        c.tp_price, c.sl_price, c.close_price, c.pnl, c.swap, c.commission, c.pair_id, c.created_at, c.closed_at, c.updated_at
+		 FROM contracts c
+		 JOIN users u ON c.user_id = u.user_id
+		 WHERE c.id = $1`,
 		contractID,
 	).Scan(
 		&contract.ID, &contract.UserID, &contract.AccountID, &contract.Symbol, &contract.ContractNumber, &contract.Side, &contract.Status,
@@ -205,19 +207,20 @@ func GetContracts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build query based on status filter
-	query := `SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size, entry_price, margin_used, leverage,
-	                 tp_price, sl_price, close_price, pnl, swap, commission, pair_id, created_at, closed_at, updated_at
-	          FROM contracts
-	          WHERE account_id = $1`
+	query := `SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
+	                 c.tp_price, c.sl_price, c.close_price, c.pnl, c.swap, c.commission, c.pair_id, c.created_at, c.closed_at, c.updated_at
+	          FROM contracts c
+	          JOIN users u ON c.user_id = u.user_id
+	          WHERE c.account_id = $1`
 
 	args := []interface{}{accountID}
 
 	if statusFilter != "" {
-		query += " AND status = $2"
+		query += " AND c.status = $2"
 		args = append(args, statusFilter)
 	}
 
-	query += " ORDER BY created_at DESC LIMIT 100"
+	query += " ORDER BY c.created_at DESC LIMIT 100"
 
 	// Fetch contracts
 	rows, err := pool.Query(ctx, query, args...)
@@ -317,11 +320,12 @@ func GetContractHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Query closed and liquidated contracts
-	query := `SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size, entry_price, margin_used, leverage,
-	                 tp_price, sl_price, close_price, pnl, swap, commission, pair_id, created_at, closed_at, updated_at
-	          FROM contracts
-	          WHERE account_id = $1 AND status IN ('closed', 'liquidated')
-	          ORDER BY closed_at DESC NULLS LAST, created_at DESC
+	query := `SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
+	                 c.tp_price, c.sl_price, c.close_price, c.pnl, c.swap, c.commission, c.pair_id, c.created_at, c.closed_at, c.updated_at
+	          FROM contracts c
+	          JOIN users u ON c.user_id = u.user_id
+	          WHERE c.account_id = $1 AND c.status IN ('closed', 'liquidated')
+	          ORDER BY c.closed_at DESC NULLS LAST, c.created_at DESC
 	          LIMIT 200`
 
 	rows, err := pool.Query(ctx, query, accountID)
@@ -450,9 +454,11 @@ func CloseContract(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	// Fetch closed contract to return details
 	var contract models.Contract
 	err = pool.QueryRow(ctx,
-		`SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size, entry_price, margin_used, leverage,
-		        tp_price, sl_price, close_price, pnl, swap, commission, pair_id, created_at, closed_at, updated_at
-		 FROM contracts WHERE id = $1`,
+		`SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
+		        c.tp_price, c.sl_price, c.close_price, c.pnl, c.swap, c.commission, c.pair_id, c.created_at, c.closed_at, c.updated_at
+		 FROM contracts c
+		 JOIN users u ON c.user_id = u.user_id
+		 WHERE c.id = $1`,
 		contractID,
 	).Scan(
 		&contract.ID, &contract.UserID, &contract.AccountID, &contract.Symbol, &contract.ContractNumber, &contract.Side, &contract.Status,
@@ -585,9 +591,11 @@ func ClosePair(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch both closed contracts to return details
-	query := `SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size, entry_price, margin_used, leverage,
-	                 tp_price, sl_price, close_price, pnl, swap, commission, pair_id, created_at, closed_at, updated_at
-	          FROM contracts WHERE pair_id = $1`
+	query := `SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
+	                 c.tp_price, c.sl_price, c.close_price, c.pnl, c.swap, c.commission, c.pair_id, c.created_at, c.closed_at, c.updated_at
+	          FROM contracts c
+	          JOIN users u ON c.user_id = u.user_id
+	          WHERE c.pair_id = $1`
 
 	rows, err := pool.Query(ctx, query, pairID)
 	if err != nil {

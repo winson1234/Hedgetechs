@@ -98,11 +98,12 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create order with leverage and product_type
+	// NOTE: orders.user_id is bigint (not UUID), so use accountUserID instead of userUUID
 	orderID := uuid.New()
 	_, err = pool.Exec(ctx,
-		`INSERT INTO orders (id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, product_type, filled_amount, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 0, NOW(), NOW())`,
-		orderID, userUUID, req.AccountID, normalizedSymbol, orderNumber, req.Side, req.Type, models.OrderStatusPending, req.AmountBase, req.LimitPrice, req.StopPrice, leverage, req.ProductType,
+		`INSERT INTO orders (id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, product_type, execution_strategy, filled_amount, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'b_book', 0, NOW(), NOW())`,
+		orderID, accountUserID, req.AccountID, normalizedSymbol, orderNumber, req.Side, req.Type, models.OrderStatusPending, req.AmountBase, req.LimitPrice, req.StopPrice, leverage, req.ProductType,
 	)
 	if err != nil {
 		log.Printf("Failed to insert order: %v", err)
@@ -172,8 +173,10 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	// These will be executed by the order matching engine later
 	var order models.Order
 	err = pool.QueryRow(ctx,
-		`SELECT id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, product_type, filled_amount, average_fill_price, created_at, updated_at
-		 FROM orders WHERE id = $1`,
+		`SELECT o.id, u.id, o.account_id, o.symbol, o.order_number, o.side, o.type, o.status, o.amount_base, o.limit_price, o.stop_price, o.leverage, o.product_type, o.filled_amount, o.average_fill_price, o.created_at, o.updated_at
+		 FROM orders o
+		 JOIN users u ON o.user_id = u.user_id
+		 WHERE o.id = $1`,
 		orderID,
 	).Scan(
 		&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.OrderNumber, &order.Side, &order.Type, &order.Status,
@@ -238,18 +241,19 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build query with optional product_type filter
-	query := `SELECT id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, product_type, filled_amount, average_fill_price, created_at, updated_at
-	          FROM orders
-	          WHERE account_id = $1`
+	query := `SELECT o.id, u.id, o.account_id, o.symbol, o.order_number, o.side, o.type, o.status, o.amount_base, o.limit_price, o.stop_price, o.leverage, o.product_type, o.filled_amount, o.average_fill_price, o.created_at, o.updated_at
+	          FROM orders o
+	          JOIN users u ON o.user_id = u.user_id
+	          WHERE o.account_id = $1`
 
 	args := []interface{}{accountID}
 
 	if productTypeFilter != "" {
-		query += " AND product_type = $2"
+		query += " AND o.product_type = $2"
 		args = append(args, productTypeFilter)
 	}
 
-	query += " ORDER BY created_at DESC LIMIT 100"
+	query += " ORDER BY o.created_at DESC LIMIT 100"
 
 	// Fetch orders
 	rows, err := pool.Query(ctx, query, args...)

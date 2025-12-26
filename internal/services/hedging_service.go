@@ -36,11 +36,13 @@ type PairedPosition struct {
 // GetPairedPosition fetches both contracts in a hedged pair
 func (s *HedgingService) GetPairedPosition(ctx context.Context, pairID uuid.UUID) (*PairedPosition, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size,
-		        entry_price, margin_used, leverage, liquidation_price, tp_price, sl_price, close_price, pnl,
-		        swap, commission, created_at, closed_at, updated_at
-		 FROM contracts WHERE pair_id = $1
-		 ORDER BY side ASC`, // Long first, then Short
+		`SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size,
+		        c.entry_price, c.margin_used, c.leverage, c.liquidation_price, c.tp_price, c.sl_price, c.close_price, c.pnl,
+		        c.swap, c.commission, c.created_at, c.closed_at, c.updated_at
+		 FROM contracts c
+		 JOIN users u ON c.user_id = u.user_id
+		 WHERE c.pair_id = $1
+		 ORDER BY c.side ASC`, // Long first, then Short
 		pairID,
 	)
 	if err != nil {
@@ -103,13 +105,14 @@ func (s *HedgingService) ClosePositionWithMarginRelease(
 	var accountCurrency string
 	var pairID sql.NullString
 	err = tx.QueryRow(ctx,
-		`SELECT c.id, c.user_id, c.account_id, c.symbol, c.contract_number, c.side, c.status,
+		`SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status,
 		        c.lot_size, c.entry_price, c.margin_used, c.leverage, c.liquidation_price,
 		        c.tp_price, c.sl_price, c.close_price, c.pnl, c.swap, c.commission,
 		        c.created_at, c.closed_at, c.updated_at, c.pair_id,
 		        a.currency
 		 FROM contracts c
 		 JOIN accounts a ON c.account_id = a.id
+		 JOIN users u ON c.user_id = u.user_id
 		 WHERE c.id = $1`,
 		contractID,
 	).Scan(

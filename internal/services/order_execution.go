@@ -46,15 +46,18 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 	// PERFORMANCE: Use SELECT FOR UPDATE to lock row and prevent race conditions
 	var order models.Order
 	var accountCurrency, quoteCurrency string
+	var instrumentType string
 	err = tx.QueryRow(ctx,
-		`SELECT o.id, o.user_id, o.account_id, o.symbol, o.order_number, o.side, o.type,
+		`SELECT o.id, u.id, o.account_id, o.symbol, o.order_number, o.side, o.type,
 		        o.status, o.amount_base, o.limit_price, o.stop_price, o.leverage, o.product_type, o.filled_amount,
 		        o.average_fill_price, o.created_at, o.updated_at,
 		        a.currency,
-		        i.quote_currency
+		        i.quote_currency,
+		        i.instrument_type
 		 FROM orders o
 		 JOIN accounts a ON o.account_id = a.id
 		 JOIN instruments i ON o.symbol = i.symbol
+		 JOIN users u ON o.user_id = u.user_id
 		 WHERE o.id = $1
 		 FOR UPDATE OF o NOWAIT`,
 		orderID,
@@ -63,7 +66,7 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 		&order.Side, &order.Type, &order.Status, &order.AmountBase, &order.LimitPrice,
 		&order.StopPrice, &order.Leverage, &order.ProductType, &order.FilledAmount, &order.AverageFillPrice,
 		&order.CreatedAt, &order.UpdatedAt,
-		&accountCurrency, &quoteCurrency,
+		&accountCurrency, &quoteCurrency, &instrumentType,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch order: %w", err)
@@ -85,12 +88,20 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 
 	// Check if this is spot or leveraged trading (read from order.ProductType)
 	isSpot := order.ProductType == models.ProductTypeSpot
+	isForex := instrumentType == "forex"
 
 	var result *ExecutionResult
 	if isSpot {
 		result, err = s.executeSpotOrder(ctx, tx, &order, executionPrice, notionalValue, fee, accountCurrency, quoteCurrency)
+	} else if isForex {
+		// For forex orders, create only 1 position (buy = long, sell = short)
+		log.Printf("Executing forex order %s as single position", order.OrderNumber)
+		result, err = s.ExecuteSinglePositionOrder(ctx, tx, &order, executionPrice, notionalValue, fee, accountCurrency)
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		// For leveraged products, check if LP routing is enabled before creating service
+		// For other leveraged products (CFD/Futures), check if LP routing is enabled
 		// PERFORMANCE FIX: Skip routing service creation if disabled (saves 1-2 seconds)
 		var routingEnabled bool
 		err := s.pool.QueryRow(ctx, `
@@ -507,6 +518,13 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 	longLiquidationPrice := executionPrice * (1.0 - marginRatio)
 	shortLiquidationPrice := executionPrice * (1.0 + marginRatio)
 
+	// Get bigint user_id from accounts table (contracts.user_id is bigint, not UUID)
+	var accountUserID int64
+	err = tx.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", order.AccountID).Scan(&accountUserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account user_id: %w", err)
+	}
+
 	// PERFORMANCE: Batch insert both positions in a single query (reduces DB round-trips)
 	longContractID := uuid.New()
 	shortContractID := uuid.New()
@@ -517,7 +535,7 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 		   ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW()),
 		   ($15, $2, $3, $4, $16, $17, $7, $8, $9, $10, $11, $12, $18, $14, NOW(), NOW())`,
 		// Long position (values $1-$14)
-		longContractID, order.UserID, order.AccountID, order.Symbol, longContractNumber,
+		longContractID, accountUserID, order.AccountID, order.Symbol, longContractNumber,
 		models.ContractSideLong, models.ContractStatusOpen, order.AmountBase, executionPrice,
 		marginPerPosition-(fee/2.0), leverage, fee/2.0, longLiquidationPrice, pairID,
 		// Short position (values $15-$18, reuses $2-$14 where applicable)
@@ -540,10 +558,12 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 	// Fetch both contracts (return long contract as primary)
 	var longContract models.Contract
 	err = tx.QueryRow(ctx,
-		`SELECT id, user_id, account_id, symbol, contract_number, side, status, lot_size,
-		        entry_price, margin_used, leverage, liquidation_price, tp_price, sl_price, close_price, pnl,
-		        swap, commission, created_at, closed_at, updated_at
-		 FROM contracts WHERE id = $1`,
+		`SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size,
+		        c.entry_price, c.margin_used, c.leverage, c.liquidation_price, c.tp_price, c.sl_price, c.close_price, c.pnl,
+		        c.swap, c.commission, c.created_at, c.closed_at, c.updated_at
+		 FROM contracts c
+		 JOIN users u ON c.user_id = u.user_id
+		 WHERE c.id = $1`,
 		longContractID,
 	).Scan(
 		&longContract.ID, &longContract.UserID, &longContract.AccountID, &longContract.Symbol, &longContract.ContractNumber,
@@ -567,6 +587,185 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 		Contract: &longContract, // Return long contract as primary reference
 		Success:  true,
 		Message:  fmt.Sprintf("hedged position opened: LONG %s and SHORT %s at price %.8f (pair_id: %s)", longContractNumber, shortContractNumber, executionPrice, pairID.String()),
+	}, nil
+}
+
+// ExecuteSinglePositionOrder executes a forex order (opens only 1 position based on buy/sell side)
+// For forex: Buy = Long position, Sell = Short position
+func (s *OrderExecutionService) ExecuteSinglePositionOrder(
+	ctx context.Context,
+	tx pgx.Tx,
+	order *models.Order,
+	executionPrice float64,
+	notionalValue float64,
+	fee float64,
+	accountCurrency string,
+) (*ExecutionResult, error) {
+	// Get instrument type and max leverage from appropriate configuration table
+	var instrumentType string
+	err := tx.QueryRow(ctx,
+		`SELECT instrument_type FROM instruments WHERE symbol = $1`,
+		order.Symbol,
+	).Scan(&instrumentType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get instrument type: %w", err)
+	}
+
+	// Get max leverage from the appropriate configuration table
+	var maxLeverage int
+	if instrumentType == "forex" {
+		// Forex instruments: read from forex_configurations.max_leverage
+		err = tx.QueryRow(ctx,
+			`SELECT max_leverage FROM forex_configurations WHERE symbol = $1`,
+			order.Symbol,
+		).Scan(&maxLeverage)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get forex max leverage: %w", err)
+		}
+	} else {
+		// Crypto/Commodity instruments: read from spot_configurations or use high default
+		if instrumentType == "commodity" {
+			maxLeverage = 100
+		} else {
+			maxLeverage = 50 // Crypto default
+		}
+	}
+
+	// Use user-selected leverage from order (default to 1 if not set)
+	leverage := order.Leverage
+	if leverage < 1 {
+		leverage = 1
+	}
+
+	// Validate leverage doesn't exceed instrument's cap
+	if leverage > maxLeverage {
+		return &ExecutionResult{
+			Order:   *order,
+			Success: false,
+			Message: fmt.Sprintf("leverage %dx exceeds instrument maximum of %dx", leverage, maxLeverage),
+		}, nil
+	}
+
+	// Calculate required margin for single position
+	marginRequired := (notionalValue / float64(leverage)) + fee
+
+	// Check if account has enough balance for margin
+	actualAccountCurrency, currentBalance, err := s.getBalanceWithFallback(ctx, tx, order.AccountID, accountCurrency)
+	if err != nil {
+		return nil, err
+	}
+
+	if currentBalance < marginRequired {
+		return &ExecutionResult{
+			Order:   *order,
+			Success: false,
+			Message: fmt.Sprintf("insufficient %s balance (required: %.8f, available: %.8f)", actualAccountCurrency, marginRequired, currentBalance),
+		}, nil
+	}
+
+	// Deduct margin from balance
+	_, err = tx.Exec(ctx,
+		`UPDATE balances SET amount = amount - $1, updated_at = NOW()
+		 WHERE account_id = $2 AND currency = $3`,
+		marginRequired, order.AccountID, actualAccountCurrency,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deduct margin: %w", err)
+	}
+
+	// Determine contract side based on order side
+	// Buy order = Long position, Sell order = Short position
+	var contractSide models.ContractSide
+	if order.Side == models.OrderSideBuy {
+		contractSide = models.ContractSideLong
+	} else {
+		contractSide = models.ContractSideShort
+	}
+
+	// Generate contract number
+	var contractNumber string
+	err = tx.QueryRow(ctx, "SELECT generate_contract_number()").Scan(&contractNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate contract number: %w", err)
+	}
+
+	// Calculate liquidation price
+	marginRatio := 1.0 / float64(leverage) * 0.9
+	var liquidationPrice float64
+	if contractSide == models.ContractSideLong {
+		liquidationPrice = executionPrice * (1.0 - marginRatio)
+	} else {
+		liquidationPrice = executionPrice * (1.0 + marginRatio)
+	}
+
+	// Get bigint user_id from accounts table (contracts.user_id is bigint, not UUID)
+	var accountUserID int64
+	err = tx.QueryRow(ctx, "SELECT user_id FROM accounts WHERE id = $1", order.AccountID).Scan(&accountUserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account user_id: %w", err)
+	}
+
+	// Create single position contract
+	contractID := uuid.New()
+	_, err = tx.Exec(ctx,
+		`INSERT INTO contracts (id, user_id, account_id, symbol, contract_number, side, status,
+		                        lot_size, entry_price, margin_used, leverage, commission, liquidation_price, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
+		contractID, accountUserID, order.AccountID, order.Symbol, contractNumber,
+		contractSide, models.ContractStatusOpen, order.AmountBase, executionPrice,
+		marginRequired-fee, leverage, fee, liquidationPrice,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create position: %w", err)
+	}
+
+	// Update order status
+	_, err = tx.Exec(ctx,
+		`UPDATE orders SET status = $1, filled_amount = $2, average_fill_price = $3, updated_at = NOW()
+		 WHERE id = $4`,
+		models.OrderStatusFilled, order.AmountBase, executionPrice, order.ID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update order status: %w", err)
+	}
+
+	// Fetch created contract
+	var contract models.Contract
+	err = tx.QueryRow(ctx,
+		`SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size,
+		        c.entry_price, c.margin_used, c.leverage, c.liquidation_price, c.tp_price, c.sl_price, c.close_price, c.pnl,
+		        c.swap, c.commission, c.pair_id, c.created_at, c.closed_at, c.updated_at
+		 FROM contracts c
+		 JOIN users u ON c.user_id = u.user_id
+		 WHERE c.id = $1`,
+		contractID,
+	).Scan(
+		&contract.ID, &contract.UserID, &contract.AccountID, &contract.Symbol, &contract.ContractNumber,
+		&contract.Side, &contract.Status, &contract.LotSize, &contract.EntryPrice, &contract.MarginUsed,
+		&contract.Leverage, &contract.LiquidationPrice, &contract.TPPrice, &contract.SLPrice, &contract.ClosePrice, &contract.PnL,
+		&contract.Swap, &contract.Commission, &contract.PairID, &contract.CreatedAt, &contract.ClosedAt, &contract.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch contract: %w", err)
+	}
+
+	// Update order object
+	order.Status = models.OrderStatusFilled
+	order.FilledAmount = order.AmountBase
+	avgPrice := executionPrice
+	order.AverageFillPrice = &avgPrice
+	order.UpdatedAt = time.Now()
+
+	sideStr := "LONG"
+	if contractSide == models.ContractSideShort {
+		sideStr = "SHORT"
+	}
+
+	return &ExecutionResult{
+		Order:    *order,
+		Contract: &contract,
+		Success:  true,
+		Message:  fmt.Sprintf("forex %s position opened: %s %s at price %.8f", sideStr, contractNumber, order.Symbol, executionPrice),
 	}, nil
 }
 

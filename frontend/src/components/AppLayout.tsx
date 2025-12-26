@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Header from './Header';
-import MainSidebar from './MainSidebar';
 import MobileBottomNav from './MobileBottomNav';
 import AnalyticsPanel from './AnalyticsPanel';
 import ToastNotification from './ToastNotification';
@@ -12,7 +11,6 @@ export default function AppLayout() {
   const location = useLocation();
   const dispatch = useAppDispatch();
   const isDarkMode = useAppSelector(selectIsDarkMode);
-  const isSidebarExpanded = useAppSelector(state => state.ui.isSidebarExpanded);
   const toasts = useAppSelector(state => state.ui.toasts);
 
   // Determine if we're on the trading page
@@ -36,9 +34,6 @@ export default function AppLayout() {
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         <Header />
 
-        {/* Main Sidebar for desktop */}
-        <MainSidebar />
-
         {/* Mobile Bottom Navigation */}
         <MobileBottomNav />
 
@@ -46,9 +41,7 @@ export default function AppLayout() {
         {isTradingPage && <AnalyticsPanel />}
 
         {/* Main Content Area */}
-        <div className={`${isTradingPage ? 'pt-0' : 'pt-8'} pb-16 md:pb-8 transition-all duration-150 ${
-          isSidebarExpanded ? 'md:ml-44' : 'md:ml-14'
-        }`}>
+        <div className={`${isTradingPage ? 'pt-0' : 'pt-8'} pb-16 md:pb-8`}>
           <Outlet />
         </div>
 

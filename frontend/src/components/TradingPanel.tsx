@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { setActiveAccount, fetchAccounts, updateAccountBalanceOptimistic } from '../store/slices/accountSlice';
 import { createPendingOrder, executeMarketOrder, fetchOrders, fetchPendingOrders } from '../store/slices/orderSlice';
-import { addToast, /* setSelectedProductType, */ triggerPositionsRefresh } from '../store/slices/uiSlice';
+import { addToast, /* setSelectedProductType, */ triggerPositionsRefresh, setActiveMarketTab } from '../store/slices/uiSlice';
 import { formatPrice } from '../utils/priceUtils';
 import { formatAccountId } from '../utils/formatters';
 // import { ProductType } from '../types'; // Commented out - not used when CFD is disabled
@@ -356,6 +356,11 @@ export default function TradingPanel() {
             duration: 7000,
           }));
 
+          // Navigate to positions tab after successful order (for CFD)
+          if (isCFD) {
+            dispatch(setActiveMarketTab('positions'));
+          }
+
           // Reset input fields after successful order
           setAmount('');
           setLimitPrice('');
@@ -445,11 +450,22 @@ export default function TradingPanel() {
           // Trigger positions refresh (for CFD orders)
           dispatch(triggerPositionsRefresh());
 
+          // Navigate to positions tab after successful order
+          if (isCFD) {
+            dispatch(setActiveMarketTab('positions'));
+          }
+
           // Reset input fields after successful order
           setAmount('');
           setPercentage(0);
         })
         .catch((error) => {
+          // Revert optimistic balance update on error
+          dispatch(updateAccountBalanceOptimistic({
+            accountId: activeAccountId,
+            balanceDelta: -balanceDelta, // Revert by negating the delta
+          }));
+
           // Show error toast with details
           console.error('Failed to execute market order:', error);
           dispatch(addToast({
@@ -1021,47 +1037,73 @@ export default function TradingPanel() {
                   )}
                 </div>
 
-{/* Buy/Sell Buttons */}
-<div className="grid grid-cols-2 gap-2.5 pt-2 pb-4">
-  <button
-    onClick={() => handleOrder('buy')}
-    disabled={
-      isPlacingOrder ||
-      parseFloat(amount || '0') <= 0 ||
-      (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) ||
-      (orderType !== 'market' && (parseFloat(getTotal() || 'Infinity') > usdBalance))
-    }
-    className="
-      px-4 py-3 text-base font-bold rounded-lg transition shadow-sm
-      flex items-center justify-center gap-2
-      bg-green-500 hover:bg-green-600 text-white
-      disabled:opacity-50 disabled:cursor-not-allowed
-      dark:bg-green-600 dark:hover:bg-green-500
-    "
-  >
-    {isCFD ? 'Hedge Buy' : `Buy ${baseCurrency}`}
-  </button>
+{/* Single Hedge Button */}
+<div className="pt-2 pb-4">
+  {isCFD ? (
+    /* Single Hedge Button for CFD/Forex - executes buy order */
+    <button
+      onClick={() => handleOrder('buy')}
+      disabled={
+        isPlacingOrder ||
+        parseFloat(amount || '0') <= 0 ||
+        (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) ||
+        (orderType !== 'market' && (parseFloat(getTotal() || 'Infinity') > usdBalance)) ||
+        ((orderType === 'limit' || orderType === 'stop-limit') &&
+          (isNaN(parseFloat(limitPrice)) || parseFloat(limitPrice) <= 0))
+      }
+      className="
+        w-full px-4 py-3 text-base font-bold rounded-lg transition shadow-sm
+        flex items-center justify-center gap-2
+        bg-[#00C0A2] hover:bg-[#00a085] text-white
+        disabled:opacity-50 disabled:cursor-not-allowed
+      "
+    >
+      Hedge
+    </button>
+  ) : (
+    /* Regular Buy/Sell Buttons for Spot */
+    <div className="grid grid-cols-2 gap-2.5">
+      <button
+        onClick={() => handleOrder('buy')}
+        disabled={
+          isPlacingOrder ||
+          parseFloat(amount || '0') <= 0 ||
+          (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) ||
+          (orderType !== 'market' && (parseFloat(getTotal() || 'Infinity') > usdBalance))
+        }
+        className="
+          px-4 py-3 text-base font-bold rounded-lg transition shadow-sm
+          flex items-center justify-center gap-2
+          bg-green-500 hover:bg-green-600 text-white
+          disabled:opacity-50 disabled:cursor-not-allowed
+          dark:bg-green-600 dark:hover:bg-green-500
+        "
+      >
+        {`Buy ${baseCurrency}`}
+      </button>
 
-  <button
-    onClick={() => handleOrder('sell')}
-    disabled={
-      isPlacingOrder ||
-      parseFloat(amount || '0') <= 0 ||
-      (isSpot && parseFloat(amount || '0') > currentHolding) ||
-      (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) ||
-      ((orderType === 'limit' || orderType === 'stop-limit') &&
-        (isNaN(parseFloat(limitPrice)) || parseFloat(limitPrice) <= 0))
-    }
-    className="
-      px-4 py-3 text-base font-bold rounded-lg transition shadow-sm
-      flex items-center justify-center gap-2
-      bg-red-500 hover:bg-red-600 text-white
-      disabled:opacity-50 disabled:cursor-not-allowed
-      dark:bg-red-600 dark:hover:bg-red-500
-    "
-  >
-    {isCFD ? 'Hedge Sell' : `Sell ${baseCurrency}`}
-  </button>
+      <button
+        onClick={() => handleOrder('sell')}
+        disabled={
+          isPlacingOrder ||
+          parseFloat(amount || '0') <= 0 ||
+          (isSpot && parseFloat(amount || '0') > currentHolding) ||
+          (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) ||
+          ((orderType === 'limit' || orderType === 'stop-limit') &&
+            (isNaN(parseFloat(limitPrice)) || parseFloat(limitPrice) <= 0))
+        }
+        className="
+          px-4 py-3 text-base font-bold rounded-lg transition shadow-sm
+          flex items-center justify-center gap-2
+          bg-red-500 hover:bg-red-600 text-white
+          disabled:opacity-50 disabled:cursor-not-allowed
+          dark:bg-red-600 dark:hover:bg-red-500
+        "
+      >
+        {`Sell ${baseCurrency}`}
+      </button>
+    </div>
+  )}
 </div>
 
 

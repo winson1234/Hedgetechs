@@ -67,75 +67,81 @@ export default function LoginPage() {
         <div className="background"></div>
 
         <div className="login-card">
-          <div className="logo">
-            <img src="/new-02.png" alt="Hedgetech.co" className="logo-image-login" />
-          </div>
-          <p className="subtitle">Sign in to Secure Client Area</p>
+          <div className="login-card-left">
+            <h1 className="signin-title">Sign In</h1>
+            <p className="subtitle">Enter your account details</p>
 
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label">Your email address</label>
-              <input
-                type="email"
-                className="form-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <div className="input-wrapper">
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label className="form-label">Your email address</label>
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type="email"
                   className="form-input"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
-
-                {/* Eye Icon */}
-                <svg
-                  className="eye-icon"
-                  onClick={() => setShowPassword(!showPassword)}
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  {showPassword ? (
-                    <>
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                      <circle cx="12" cy="12" r="3"></circle>
-                    </>
-                  ) : (
-                    <>
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
-                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
-                      <line x1="1" y1="1" x2="23" y2="23"></line>
-                    </>
-                  )}
-                </svg>
               </div>
 
-              <div className="forgot-password">
-                <Link to="/forgot-password">Forgot Password?</Link>
+              <div className="form-group">
+                <label className="form-label">Password</label>
+                <div className="input-wrapper">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    className="form-input"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+
+                  {/* Eye Icon */}
+                  <svg
+                    className="eye-icon"
+                    onClick={() => setShowPassword(!showPassword)}
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {showPassword ? (
+                      <>
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </>
+                    ) : (
+                      <>
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </>
+                    )}
+                  </svg>
+                </div>
+
+                <div className="forgot-password">
+                  <Link to="/forgot-password">Forgot Password?</Link>
+                </div>
               </div>
+
+              <button type="submit" className="login-button">Login</button>
+
+            </form>
+
+            <div className="signup-section">
+              <p className="signup-text">Don&apos;t have an account? <Link to="/register" className="create-account-link">Create an account</Link></p>
             </div>
+          </div>
 
-            <button type="submit" className="login-button">Login</button>
-
-          </form>
-
-          <div className="signup-section">
-            <p className="signup-text">Don&apos;t have an account?</p>
-            <div className="signup-links">
-              <Link to="/register" className='demo-signup-btn'>Open a Demo Account</Link>
-              <Link to="/register" className='real-signup-btn'>Open a Real Account</Link>
+          <div className="login-card-right">
+            <div className="logo-right">
+              <img src="/new-02.png" alt="Hedgetech.co" className="logo-image-login-right" />
+            </div>
+            <div className="welcome-content">
+              <h2 className="welcome-title">Welcome to HedgeTech</h2>
+              <p className="welcome-subtitle">Your premier trading portal for forex markets.</p>
             </div>
           </div>
         </div>

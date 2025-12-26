@@ -55,7 +55,6 @@ function TransferTab() {
 
   // State
   const [isProcessing, setIsProcessing] = useState(false);
-  const [transferType, setTransferType] = useState<'live' | 'demo'>('live');
 
   // React Hook Form
   const { register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<TransferFormData>({
@@ -89,10 +88,10 @@ function TransferTab() {
 
   const transferCurrency = fromAccount?.currency || 'USD';
 
-  // Filter "From" accounts by selected transfer type
+  // Filter "From" accounts - only Live accounts for transfers
   const fromAccounts = useMemo(() =>
-    accounts.filter(acc => acc.type === transferType),
-    [accounts, transferType]
+    accounts.filter(acc => acc.type === 'live'),
+    [accounts]
   );
 
   // Filter "To" accounts: same currency, same type, not the same account
@@ -139,13 +138,13 @@ function TransferTab() {
     }
   }, [fromAccountId, toAccounts, toAccountId, setValue]);
 
-  // Reset "From" account when transfer type changes if current selection is invalid
+  // Reset "From" account if current selection is invalid
   useEffect(() => {
     if (fromAccountId && !fromAccounts.some(a => a.id === fromAccountId)) {
       const firstAccount = fromAccounts[0];
       setValue('fromAccountId', firstAccount?.id || '');
     }
-  }, [transferType, fromAccounts, fromAccountId, setValue]);
+  }, [fromAccounts, fromAccountId, setValue]);
 
   const onSubmit = async (data: TransferFormData) => {
     const fromAcc = accounts.find(a => a.id === data.fromAccountId);
@@ -212,39 +211,8 @@ function TransferTab() {
         Internal Transfer
       </h2>
       <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-        Move funds between your trading accounts (same currency only).
+        Move funds between your Live trading accounts (same currency only).
       </p>
-
-      {/* Transfer Type Toggle */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Account Type
-        </label>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setTransferType('live')}
-            className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              transferType === 'live'
-                ? 'bg-[#00C0A2] text-white'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-            }`}
-          >
-            Live
-          </button>
-          <button
-            type="button"
-            onClick={() => setTransferType('demo')}
-            className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              transferType === 'demo'
-                ? 'bg-[#00C0A2] text-white'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-            }`}
-          >
-            Demo
-          </button>
-        </div>
-      </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* From Account */}
@@ -261,7 +229,7 @@ function TransferTab() {
               const balance = acc.balances.find(b => b.currency === acc.currency);
               return (
                 <option key={acc.id} value={acc.id}>
-                  {formatAccountId(acc.account_id, acc.type)} ({acc.type}) - {formatCurrency(balance?.amount || 0, acc.currency)}
+                  {formatAccountId(acc.account_id, acc.type)} - {formatCurrency(balance?.amount || 0, acc.currency)}
                 </option>
               );
             })}
@@ -293,7 +261,7 @@ function TransferTab() {
               const balance = acc.balances.find(b => b.currency === acc.currency);
               return (
                 <option key={acc.id} value={acc.id}>
-                  {formatAccountId(acc.account_id, acc.type)} ({acc.type}) - {formatCurrency(balance?.amount || 0, acc.currency)}
+                  {formatAccountId(acc.account_id, acc.type)} - {formatCurrency(balance?.amount || 0, acc.currency)}
                 </option>
               );
             })}
@@ -342,13 +310,17 @@ function TransferTab() {
           <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md p-3">
             <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Transfer Summary</p>
             <div className="space-y-1 text-xs text-slate-600 dark:text-slate-400">
-              <div className="flex justify-between">
-                <span>From:</span>
-                <span className="font-medium text-slate-900 dark:text-slate-100">{fromAccount.id}</span>
+              <div className="flex justify-between items-start gap-2">
+                <span className="flex-shrink-0">From:</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100 text-right break-words">
+                  {formatAccountId(fromAccount.account_id, fromAccount.type)}
+                </span>
               </div>
-              <div className="flex justify-between">
-                <span>To:</span>
-                <span className="font-medium text-slate-900 dark:text-slate-100">{toAccount.id}</span>
+              <div className="flex justify-between items-start gap-2">
+                <span className="flex-shrink-0">To:</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100 text-right break-words">
+                  {formatAccountId(toAccount.account_id, toAccount.type)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Fee:</span>

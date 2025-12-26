@@ -282,19 +282,20 @@ func GetPendingOrders(w http.ResponseWriter, r *http.Request) {
 
 	// Build query with optional product_type filter
 	// CRITICAL FIX: Only return orders with status = 'pending' (exclude executed, cancelled, failed)
-	query := `SELECT id, user_id, account_id, symbol, type, side, quantity, trigger_price, limit_price,
-	                 leverage, product_type, status, executed_at, executed_price, failure_reason, created_at, updated_at, order_number
-	          FROM pending_orders
-	          WHERE account_id = $1 AND status = 'pending'`
+	query := `SELECT p.id, u.id, p.account_id, p.symbol, p.type, p.side, p.quantity, p.trigger_price, p.limit_price,
+	                 p.leverage, p.product_type, p.status, p.executed_at, p.executed_price, p.failure_reason, p.created_at, p.updated_at, p.order_number
+	          FROM pending_orders p
+	          JOIN users u ON p.user_id = u.user_id
+	          WHERE p.account_id = $1 AND p.status = 'pending'`
 
 	args := []interface{}{accountID}
 
 	if productTypeFilter != "" {
-		query += " AND product_type = $2"
+		query += " AND p.product_type = $2"
 		args = append(args, productTypeFilter)
 	}
 
-	query += " ORDER BY created_at DESC"
+	query += " ORDER BY p.created_at DESC"
 
 	// Fetch pending orders
 	rows, err := pool.Query(ctx, query, args...)

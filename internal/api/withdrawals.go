@@ -700,12 +700,13 @@ func UpdateWithdrawalStatus(w http.ResponseWriter, r *http.Request) {
 			"net_amount":       withdrawal.NetAmount,
 			"currency":         withdrawal.Currency,
 			"withdrawal_method": withdrawalMethod,
+			"status":           string(req.Status),
 		}
 
 		switch req.Status {
 		case models.WithdrawalStatusApproved:
-			notificationTitle = "Withdrawal Approved"
-			notificationMessage = fmt.Sprintf("Your withdrawal request %s for %.2f %s has been approved. Net amount: %.2f %s (Fee: %.2f %s)",
+			notificationTitle = "Withdrawal Success"
+			notificationMessage = fmt.Sprintf("Your withdrawal request %s for %.2f %s has been successfully processed. Net amount: %.2f %s (Fee: %.2f %s)",
 				withdrawal.ReferenceID, withdrawal.Amount, withdrawal.Currency, withdrawal.NetAmount, withdrawal.Currency, withdrawal.FeeAmount, withdrawal.Currency)
 		case models.WithdrawalStatusRejected:
 			notificationTitle = "Withdrawal Rejected"
@@ -717,9 +718,16 @@ func UpdateWithdrawalStatus(w http.ResponseWriter, r *http.Request) {
 				withdrawal.ReferenceID, withdrawal.Amount, withdrawal.Currency, rejectionReason)
 			metadata["rejection_reason"] = rejectionReason
 		case models.WithdrawalStatusCompleted:
-			notificationTitle = "Withdrawal Completed"
-			notificationMessage = fmt.Sprintf("Your withdrawal %s for %.2f %s (net: %.2f %s) has been completed and funds have been sent.",
+			notificationTitle = "Withdrawal Success"
+			notificationMessage = fmt.Sprintf("Your withdrawal %s for %.2f %s (net: %.2f %s) has been successfully completed and funds have been sent.",
 				withdrawal.ReferenceID, withdrawal.Amount, withdrawal.Currency, withdrawal.NetAmount, withdrawal.Currency)
+		}
+
+		// Validate user_id before creating notification
+		if withdrawal.UserID <= 0 {
+			log.Printf("UpdateWithdrawalStatus: Invalid user_id=%d, cannot create notification for withdrawal_id=%s", 
+				withdrawal.UserID, withdrawalID.String())
+			return
 		}
 
 		// Log notification creation attempt for debugging

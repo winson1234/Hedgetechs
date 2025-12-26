@@ -288,17 +288,17 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                       )}
                       {position.side.toUpperCase()}
                     </span>
-                    <span className="text-sm font-bold text-slate-200">
+                    <span className="text-sm font-bold text-slate-900 dark:text-slate-200">
                       {position.symbol}
                     </span>
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-400 bg-slate-800 border border-slate-700">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
                       {position.leverage}x
                     </span>
                   </div>
                   <button
                     onClick={() => handleClosePosition(position.id, position.symbol)}
                     disabled={loading}
-                    className="px-3 py-1.5 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-900 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -310,13 +310,13 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                 {/* Position Details Grid */}
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-3">
                   <div className="flex justify-between items-center py-1">
-                    <span className="text-slate-400 flex items-center gap-1">
+                    <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                       </svg>
                       Size:
                     </span>
-                    <span className="font-semibold text-slate-200">
+                    <span className="font-semibold text-slate-900 dark:text-slate-200">
                       {position.lot_size.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 6,
@@ -325,44 +325,44 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                   </div>
 
                   <div className="flex justify-between items-center py-1">
-                    <span className="text-slate-400 flex items-center gap-1">
+                    <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                       </svg>
                       Entry:
                     </span>
-                    <span className="font-semibold text-slate-200">
+                    <span className="font-semibold text-slate-900 dark:text-slate-200">
                       {formatCurrency(position.entry_price, 'USD')}
                     </span>
                   </div>
 
                   <div className="flex justify-between items-center py-1">
-                    <span className="text-slate-400 flex items-center gap-1">
+                    <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
                       Current:
                     </span>
-                    <span className="font-semibold text-slate-200">
+                    <span className="font-semibold text-slate-900 dark:text-slate-200">
                       {formatCurrency(position.current_price || position.entry_price, 'USD')}
                     </span>
                   </div>
 
                   <div className="flex justify-between items-center py-1">
-                    <span className="text-slate-400 flex items-center gap-1">
+                    <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       Margin:
                     </span>
-                    <span className="font-semibold text-slate-200">
+                    <span className="font-semibold text-slate-900 dark:text-slate-200">
                       {formatCurrency(position.margin_used, 'USD')}
                     </span>
                   </div>
 
                   {position.liquidation_price && (
                     <div className="flex justify-between items-center py-1 col-span-2">
-                      <span className="text-slate-400 flex items-center gap-1">
+                      <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
@@ -376,15 +376,15 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                 </div>
 
                 {/* P&L and ROE Row */}
-                <div className="pt-2.5 border-t border-slate-700/50">
+                <div className="pt-2.5 border-t border-slate-300 dark:border-slate-700/50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400">P&L:</span>
+                      <span className="text-xs text-slate-600 dark:text-slate-400">P&L:</span>
                       <span
                         className={`text-sm font-bold ${
                           (position.unrealized_pnl || 0) >= 0
-                            ? 'text-green-400'
-                            : 'text-red-400'
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'
                         }`}
                       >
                         {(position.unrealized_pnl || 0) >= 0 ? '+' : ''}
@@ -392,7 +392,7 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400">ROE:</span>
+                      <span className="text-xs text-slate-600 dark:text-slate-400">ROE:</span>
                       <span
                         className={`text-sm font-bold ${
                           (position.roe || 0) >= 0

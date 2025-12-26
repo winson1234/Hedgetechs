@@ -382,7 +382,7 @@ body {
     width: 100px;
     height: 100px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #C76D00, #FDDB92);
+    background: linear-gradient(135deg, #00C0A2, #00a085);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -390,7 +390,7 @@ body {
     font-size: 42px;
     font-weight: 700;
     border: 4px solid var(--border-color);
-    box-shadow: 0 4px 15px rgba(199, 109, 0, 0.3);
+    box-shadow: 0 4px 15px rgba(0, 192, 162, 0.3);
     overflow: hidden;
     position: relative;
 }
@@ -402,7 +402,7 @@ body {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: var(--primary-gold-dark);
+    background: #00C0A2;
     border: 3px solid var(--bg-card);
     display: flex;
     align-items: center;
@@ -413,7 +413,7 @@ body {
 }
 
 .change-photo-btn:hover {
-    background: var(--primary-gold);
+    background: #00a085;
     transform: scale(1.1);
 }
 
@@ -459,7 +459,7 @@ body {
 .stat-value {
     font-size: 24px;
     font-weight: 700;
-    color: var(--primary-gold-dark);
+    color: #00C0A2;
     margin-bottom: 5px;
 }
 
@@ -502,7 +502,7 @@ body {
 
 .edit-link {
     font-size: 14px;
-    color: var(--primary-gold-dark);
+    color: #00C0A2;
     background: none;
     border: none;
     font-weight: 600;
@@ -550,7 +550,7 @@ body {
 }
 
 .warning {
-    color: #e67e22;
+    color: #00C0A2;
     font-weight: 600;
     cursor: pointer;
 }
@@ -663,8 +663,8 @@ body {
 .form-group input:focus,
 .form-group select:focus {
     outline: none;
-    border-color: var(--primary-gold-dark);
-    box-shadow: 0 0 0 3px rgba(199, 109, 0, 0.1);
+    border-color: #00C0A2;
+    box-shadow: 0 0 0 3px rgba(0, 192, 162, 0.1);
 }
 
 .form-group input.error,
@@ -688,7 +688,7 @@ body {
 
 .save-btn,
 .confirm-btn {
-    background: linear-gradient(135deg, var(--primary-gold-dark), var(--primary-gold));
+    background: linear-gradient(135deg, #00C0A2, #00a085);
     color: white;
     border: none;
     padding: 12px 28px;

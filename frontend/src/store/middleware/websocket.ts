@@ -170,12 +170,24 @@ export const websocketMiddleware: Middleware = (store) => {
           const ask = typeof data.ask === 'string' ? parseFloat(data.ask) : data.ask;
           const timestamp = data.timestamp;
 
+          // Update forex quote in forex slice
           store.dispatch(
             updateForexQuote({
               symbol,
               bid,
               ask,
               timestamp,
+            })
+          );
+
+          // Also update current price in price slice (use mid price for forex)
+          // This ensures LivePriceDisplay and ChartComponent can display forex prices
+          const midPrice = (bid + ask) / 2;
+          store.dispatch(
+            updateCurrentPrice({
+              symbol,
+              price: midPrice,
+              timestamp: timestamp,
             })
           );
         } else if (data.symbol && data.bids && data.asks) {

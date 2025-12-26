@@ -19,6 +19,7 @@ interface UIState {
   activeInstrument: string; // Currently selected trading instrument (e.g., 'BTCUSDT')
   selectedProductType: ProductType; // Currently selected product type for trading
   activeWalletTab: WalletTab; // Currently active wallet tab
+  activeMarketTab: 'orderbook' | 'trades' | 'pending' | 'history' | 'positions' | 'forex' | null; // Currently active market activity tab
   showAnalyticsPanel: boolean; // Analytics panel visibility
   isSidebarExpanded: boolean; // Sidebar expansion state
   positionsRefreshTrigger: number; // Trigger to refresh positions
@@ -37,6 +38,7 @@ const initialState: UIState = {
   activeInstrument: 'CADJPY', // Default to CAD/JPY forex pair
   selectedProductType: 'cfd', // Default to CFD trading
   activeWalletTab: 'overview',
+  activeMarketTab: null, // Default to null (component will set based on product type)
   showAnalyticsPanel: false,
   isSidebarExpanded: false, // Default to collapsed
   positionsRefreshTrigger: 0,
@@ -80,6 +82,11 @@ const uiSlice = createSlice({
     // Active wallet tab
     setActiveWalletTab: (state, action: PayloadAction<WalletTab>) => {
       state.activeWalletTab = action.payload;
+    },
+
+    // Active market activity tab
+    setActiveMarketTab: (state, action: PayloadAction<'orderbook' | 'trades' | 'pending' | 'history' | 'positions' | 'forex' | null>) => {
+      state.activeMarketTab = action.payload;
     },
 
     // Analytics panel
@@ -148,6 +155,7 @@ export const {
   setActiveInstrument,
   setSelectedProductType,
   setActiveWalletTab,
+  setActiveMarketTab,
   setShowAnalyticsPanel,
   toggleAnalyticsPanel,
   setSidebarExpanded,

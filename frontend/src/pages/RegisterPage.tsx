@@ -5,6 +5,30 @@ import { signUp } from '../store/slices/authSlice';
 import './register.css';
 //import { motion, AnimatePresence } from 'framer-motion';
 
+const COUNTRY_PREFIXES: Record<string, string> = {
+  MY: '+60',
+  SG: '+65',
+  TH: '+66',
+  ID: '+62',
+  PH: '+63',
+  VN: '+84',
+  US: '+1',
+  GB: '+44',
+  AU: '+61',
+};
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  MY: '🇲🇾',
+  SG: '🇸🇬',
+  TH: '🇹🇭',
+  ID: '🇮🇩',
+  PH: '🇵🇭',
+  VN: '🇻🇳',
+  US: '🇺🇸',
+  GB: '🇬🇧',
+  AU: '🇦🇺',
+};
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -39,59 +63,110 @@ export default function RegisterPage() {
 
   // Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }));
+    const { id, value } = e.target;
+
+    if (id === 'phoneNumber') {
+      let newPhone = value;
+      let newCountry = formData.country;
+
+      // Auto-detect Malaysia from local "01..." format
+      if (newPhone.startsWith('01')) {
+        newPhone = '+60' + newPhone.substring(1);
+        newCountry = 'MY';
+      }
+      // Auto-detect based on country codes
+      else {
+        if (newPhone.startsWith('+')) {
+          for (const [code, prefix] of Object.entries(COUNTRY_PREFIXES)) {
+            if (newPhone.startsWith(prefix)) {
+              newCountry = code;
+              break;
+            }
+          }
+        } else {
+          // Check for raw number start (e.g. 60...)
+          for (const [code, prefix] of Object.entries(COUNTRY_PREFIXES)) {
+            const rawPrefix = prefix.replace('+', '');
+            if (newPhone.startsWith(rawPrefix)) {
+              newPhone = '+' + newPhone;
+              newCountry = code;
+              break;
+            }
+          }
+        }
+      }
+
+      setFormData(prev => ({ ...prev, [id]: newPhone, country: newCountry }));
+    } else if (id === 'country') {
+      const newCountry = value;
+      let newPhone = formData.phoneNumber;
+
+      const oldCountry = formData.country;
+      const oldPrefix = COUNTRY_PREFIXES[oldCountry] || '';
+      const newPrefix = COUNTRY_PREFIXES[newCountry] || '';
+
+      if (oldPrefix && newPhone.startsWith(oldPrefix)) {
+        newPhone = newPrefix + newPhone.substring(oldPrefix.length);
+      } else if (!newPhone) {
+        newPhone = newPrefix;
+      }
+
+      setFormData(prev => ({ ...prev, [id]: value, phoneNumber: newPhone }));
+    } else {
+      setFormData(prev => ({ ...prev, [id]: value }));
+    }
   };
 
-useEffect(() => {
-  if (!formData.password) {
-    setPasswordStrength({ level: 0, text: '', color: '' });
-    return;
-  }
+  useEffect(() => {
+    if (!formData.password) {
+      setPasswordStrength({ level: 0, text: '', color: '' });
+      return;
+    }
 
-  let strength = 0;
-  const password = formData.password;
+    let strength = 0;
+    const password = formData.password;
 
-  if (password.length >= 8) strength++;
-  if (password.length >= 12) strength++;
-  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
-  if (/\d/.test(password)) strength++;
-  if (/[@$!%*?&#^+=._-]/.test(password)) strength++;
+    if (password.length >= 8) strength++;
+    if (password.length >= 12) strength++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+    if (/\d/.test(password)) strength++;
+    if (/[@$!%*?&#^+=._-]/.test(password)) strength++;
 
-  const levels = [
-    { text: '', color: '' },
-    { text: 'Weak', color: '#e74c3c' },
-    { text: 'Fair', color: '#f39c12' },
-    { text: 'Good', color: '#27ae60' },
-    { text: 'Strong', color: '#27ae60' },
-    { text: 'Very Strong', color: '#27ae60' }
-  ];
+    const levels = [
+      { text: '', color: '' },
+      { text: 'Weak', color: '#e74c3c' },
+      { text: 'Fair', color: '#f39c12' },
+      { text: 'Good', color: '#27ae60' },
+      { text: 'Strong', color: '#27ae60' },
+      { text: 'Very Strong', color: '#27ae60' }
+    ];
 
-  setPasswordStrength({ level: strength, ...levels[strength] });
-}, [formData.password]);
-// Retype password validation + password complexity check
-useEffect(() => {
-  // Check if passwords match
-  if (formData.retypePassword && formData.password !== formData.retypePassword) {
-    setRetypeError(true);
-  } else {
-    setRetypeError(false);
-  }
+    setPasswordStrength({ level: strength, ...levels[strength] });
+  }, [formData.password]);
+  // Retype password validation + password complexity check
+  useEffect(() => {
+    // Check if passwords match
+    if (formData.retypePassword && formData.password !== formData.retypePassword) {
+      setRetypeError(true);
+    } else {
+      setRetypeError(false);
+    }
 
-  // Check for password complexity
-  const password = formData.password;
-  const hasUpper = /[A-Z]/.test(password);
-  const hasLower = /[a-z]/.test(password);
-  const hasNumber = /\d/.test(password);
-  const hasSpecial = /[@$!%*?&#^+=._-]/.test(password);
+    // Check for password complexity
+    const password = formData.password;
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSpecial = /[@$!%*?&#^+=._-]/.test(password);
 
-  if (password && (!hasUpper || !hasLower || !hasNumber || !hasSpecial)) {
-    setPasswordStrength({
-      level: 1,
-      text: 'Too Simple — include upper, lower, number & symbol (@!#)',
-      color: '#e74c3c'
-    });
-  }
-}, [formData.password, formData.retypePassword]);
+    if (password && (!hasUpper || !hasLower || !hasNumber || !hasSpecial)) {
+      setPasswordStrength({
+        level: 1,
+        text: 'Too Simple — include upper, lower, number & symbol (@!#)',
+        color: '#e74c3c'
+      });
+    }
+  }, [formData.password, formData.retypePassword]);
 
   // Focus restoration toggle
   const togglePassword = () => {
@@ -105,69 +180,69 @@ useEffect(() => {
   };
 
   // Submit handler
- const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  if (!formData.email.includes('@')) {
-    setEmailError(true);
-    return;
-  }
-  setEmailError(false);
+    if (!formData.email.includes('@')) {
+      setEmailError(true);
+      return;
+    }
+    setEmailError(false);
 
-  // Check password strength
-  const password = formData.password;
+    // Check password strength
+    const password = formData.password;
 
-  // Must be at least 8 characters
-  if (password.length < 8) {
-    alert('Password must be at least 8 characters');
-    return;
-  }
+    // Must be at least 8 characters
+    if (password.length < 8) {
+      alert('Password must be at least 8 characters');
+      return;
+    }
 
-  // Must contain at least one uppercase, one lowercase, one number, and one special character
-  const strongPasswordRegex =
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^+=._-])[A-Za-z\d@$!%*?&#^+=._-]{8,}$/;
+    // Must contain at least one uppercase, one lowercase, one number, and one special character
+    const strongPasswordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^+=._-])[A-Za-z\d@$!%*?&#^+=._-]{8,}$/;
 
-  if (!strongPasswordRegex.test(password)) {
-    alert('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g. @, #, $, !)');
-    return;
-  }
+    if (!strongPasswordRegex.test(password)) {
+      alert('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g. @, #, $, !)');
+      return;
+    }
 
-  if (formData.password !== formData.retypePassword) {
-    setRetypeError(true);
-    return;
-  }
+    if (formData.password !== formData.retypePassword) {
+      setRetypeError(true);
+      return;
+    }
 
-  try {
-    const result = await dispatch(signUp({
-      email: formData.email,
-      password: formData.password,
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      phoneNumber: formData.phoneNumber,
-      country: formData.country
-    })).unwrap();
+    try {
+      const result = await dispatch(signUp({
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phoneNumber: formData.phoneNumber,
+        country: formData.country
+      })).unwrap();
 
-    // Show success message
-    alert(`Registration successful!\n\n${result.message || 'You can now log in with your credentials.'}`);
-    
-    // Redirect to login page
-    navigate('/login');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Registration failed';
-    alert(`Registration failed: ${message}`);
-  }
+      // Show success message
+      alert(`Registration successful!\n\n${result.message || 'You can now log in with your credentials.'}`);
+
+      // Redirect to login page
+      navigate('/login');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Registration failed';
+      alert(`Registration failed: ${message}`);
+    }
   };
 
   return (
-<div className="register-page">
-  <div className="header">
-    <Link to="/trading" className="logo">
-      <img src="/new-02.png" alt="Hedgetechs.co" className="logo-image-header" />
-    </Link>
-    <Link to="/login">
-      <button className="client-login-btn">Client Login</button>
-    </Link>
-  </div>
+    <div className="register-page">
+      <div className="header">
+        <Link to="/trading" className="logo">
+          <img src="/new-02.png" alt="Hedgetechs.co" className="logo-image-header" />
+        </Link>
+        <Link to="/login">
+          <button className="client-login-btn">Client Login</button>
+        </Link>
+      </div>
 
       <div className="background"></div>
 
@@ -215,14 +290,22 @@ useEffect(() => {
 
             {/* Phone Number */}
             <div className="form-group">
-              <label className="form-label">Phone Number</label>
-              <input
-                type="tel"
-                id="phoneNumber"
-                placeholder="+60123456789"
-                value={formData.phoneNumber}
-                onChange={handleChange}
-              />
+              <label className="form-label">Phone Number <span className="required">*</span></label>
+              <div className="phone-wrapper">
+                {formData.country && (
+                  <span className="flag-display">
+                    {COUNTRY_FLAGS[formData.country]}
+                  </span>
+                )}
+                <input
+                  type="tel"
+                  id="phoneNumber"
+                  value={formData.phoneNumber}
+                  onChange={handleChange}
+                  maxLength={15}
+                  required
+                />
+              </div>
             </div>
 
             {/* Password */}
@@ -252,14 +335,14 @@ useEffect(() => {
                 >
                   {showPassword ? (
                     <>
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
                     </>
                   ) : (
                     <>
                       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
-      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
-      <line x1="1" y1="1" x2="23" y2="23"></line>
+                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
                     </>
                   )}
                 </svg>
@@ -310,14 +393,14 @@ useEffect(() => {
                 >
                   {showRetypePassword ? (
                     <>
-                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
                     </>
                   ) : (
                     <>
-                       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
-      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
-      <line x1="1" y1="1" x2="23" y2="23"></line>
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
                     </>
                   )}
                 </svg>
@@ -332,7 +415,7 @@ useEffect(() => {
             </p>
 
             <Link to="/login" className="signin-link">Already have an account? Sign in</Link>
-    {/*<AnimatePresence>
+            {/*<AnimatePresence>
   {success && (
     <motion.div
       key="success-popup"

@@ -15,7 +15,7 @@ export default function TradingPage() {
       <div className="flex flex-col lg:flex-row min-h-[400px] lg:min-h-[600px] gap-px">
 
         {/* LEFT COLUMN: Instruments Panel - Desktop left, Mobile after chart */}
-        <div className="w-full lg:w-[350px] flex flex-col order-3 lg:order-1 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 lg:flex-shrink-0">
+        <div className="w-full lg:w-[240px] flex flex-col order-3 lg:order-1 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 lg:flex-shrink-0">
           {/* Instruments Panel - Full height, scrollable */}
           <div className="h-[600px] sm:h-[700px] lg:h-[calc(100vh-64px)] overflow-y-auto">
             <div className="p-2 sm:p-3">
@@ -37,7 +37,7 @@ export default function TradingPage() {
         </div>
 
         {/* RIGHT COLUMN: Trading Panel - Shows SECOND on mobile */}
-        <div className="w-full lg:w-[320px] order-2 lg:order-3 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 lg:flex-shrink-0">
+        <div className="w-full lg:w-[280px] order-2 lg:order-3 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 lg:flex-shrink-0">
           <div className="p-2 sm:p-4">
             <TradingPanel />
           </div>

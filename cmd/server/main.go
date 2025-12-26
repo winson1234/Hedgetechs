@@ -7,6 +7,7 @@ import (
 	"brokerageProject/internal/database"
 	"brokerageProject/internal/hub"
 	redisInfra "brokerageProject/internal/infrastructure/redis"
+	market_data "brokerageProject/internal/market_data"
 	redisProvider "brokerageProject/internal/market_data/redis"
 	"brokerageProject/internal/middleware"
 	"brokerageProject/internal/mt5client"
@@ -190,19 +191,24 @@ func main() {
 	}
 
 	// Initialize Data Integrity Service (gap detection and automatic backfill)
+	// NOTE: We check WINDOWS_API_URL from env directly (don't set default here)
+	// This allows mock publisher to detect if MT5 is configured
 	windowsAPIURL := os.Getenv("WINDOWS_API_URL")
-
-	// Only use default in local non-Docker development
+	
+	// Only use default for Data Integrity Service (not for mock publisher detection)
+	var dataIntegrityURL string
 	if windowsAPIURL == "" && os.Getenv("DOCKER_ENV") == "" && os.Getenv("ENVIRONMENT") != "production" {
-		log.Println("WARNING: WINDOWS_API_URL not set, using default http://localhost:5000 for local development")
-		windowsAPIURL = "http://localhost:5000"
+		log.Println("WARNING: WINDOWS_API_URL not set, using default http://localhost:5000 for Data Integrity Service")
+		dataIntegrityURL = "http://localhost:5000"
+	} else {
+		dataIntegrityURL = windowsAPIURL
 	}
 
-	if windowsAPIURL != "" && redisClient != nil {
-		log.Printf("Initializing Data Integrity Service with MT5 API at %s", windowsAPIURL)
+	if dataIntegrityURL != "" && redisClient != nil {
+		log.Printf("Initializing Data Integrity Service with MT5 API at %s", dataIntegrityURL)
 
 		mt5Client := mt5client.NewClient(mt5client.Config{
-			BaseURL:    windowsAPIURL,
+			BaseURL:    dataIntegrityURL,
 			Timeout:    30 * time.Second,
 			MaxRetries: 3,
 		})
@@ -222,7 +228,7 @@ func main() {
 			log.Println("Data Integrity Service started (gap detection every hour)")
 		}
 	} else {
-		if windowsAPIURL == "" {
+		if dataIntegrityURL == "" {
 			log.Println("INFO: Data Integrity Service disabled (WINDOWS_API_URL not configured)")
 		} else {
 			log.Println("WARNING: Data Integrity Service disabled (Redis unavailable)")
@@ -278,6 +284,43 @@ func main() {
 	// Subscribe hub to Redis forex price updates (if Redis available)
 	if redisClient != nil {
 		go h.SubscribeToRedisForex(context.Background(), redisClient)
+
+		// Start mock forex publisher ONLY for localhost development (when MT5 publisher isn't available)
+		// Detection logic:
+		// 1. Must be development environment (not production)
+		// 2. WINDOWS_API_URL must NOT be set (production server has this set)
+		// 3. This ensures mock only runs on localhost, never on production server
+		environment := os.Getenv("ENVIRONMENT")
+		windowsAPIURL := os.Getenv("WINDOWS_API_URL")
+		
+		// Check if we should start mock publisher
+		// Only start if:
+		// - Environment is empty or "development" (not "production")
+		// - WINDOWS_API_URL is NOT set OR is set to localhost/docker.internal (dev default)
+		// - Production server will have a real MT5 URL (not localhost)
+		// - This ensures mock publisher ONLY runs on localhost, never on production
+		isLocalhostURL := windowsAPIURL == "" || 
+			windowsAPIURL == "http://localhost:5000" || 
+			windowsAPIURL == "http://host.docker.internal:5000"
+		shouldStartMock := (environment == "" || environment == "development") && isLocalhostURL
+		
+		if shouldStartMock {
+			log.Println("========================================")
+			log.Println("[Mock Forex Publisher] LOCALHOST MODE DETECTED")
+			log.Println("[Mock Forex Publisher] Starting mock forex price publisher...")
+			log.Println("[Mock Forex Publisher] MT5 publisher not configured - using simulated prices")
+			log.Println("[Mock Forex Publisher] This will ONLY run on localhost, never on production server")
+			log.Println("========================================")
+			mockPublisher := market_data.NewMockForexPublisher(redisClient, forexSymbols)
+			go mockPublisher.Start(context.Background())
+			log.Println("[Mock Forex Publisher] Mock publisher started - forex prices will be simulated every 500ms")
+		} else {
+			if environment == "production" {
+				log.Println("[Mock Forex Publisher] Production environment detected - using real MT5 forex data from Redis")
+			} else if windowsAPIURL != "" {
+				log.Printf("[Mock Forex Publisher] WINDOWS_API_URL is set (%s) - using real MT5 forex data from Redis", windowsAPIURL)
+			}
+		}
 	}
 
 	// Initialize event-driven order processor (requires database and hub)

@@ -118,11 +118,12 @@ func fetchUserTransactions(ctx context.Context, pool *pgxpool.Pool, userID int64
 // fetchUserOrders retrieves all orders for user's accounts in a single query
 func fetchUserOrders(ctx context.Context, pool *pgxpool.Pool, userID int64) ([]models.Order, error) {
 	query := `
-		SELECT o.id, o.user_id, o.account_id, o.symbol, o.order_number, o.side, o.type, o.status,
+		SELECT o.id, u.id, o.account_id, o.symbol, o.order_number, o.side, o.type, o.status,
 		       o.amount_base, o.limit_price, o.stop_price, o.filled_amount, o.average_fill_price,
 		       o.created_at, o.updated_at
 		FROM orders o
 		INNER JOIN accounts a ON o.account_id = a.id
+		INNER JOIN users u ON o.user_id = u.user_id
 		WHERE a.user_id = $1
 		ORDER BY o.created_at DESC
 		LIMIT 100
@@ -154,11 +155,12 @@ func fetchUserOrders(ctx context.Context, pool *pgxpool.Pool, userID int64) ([]m
 // fetchUserPendingOrders retrieves all pending orders for user's accounts in a single query
 func fetchUserPendingOrders(ctx context.Context, pool *pgxpool.Pool, userID int64) ([]models.PendingOrder, error) {
 	query := `
-		SELECT p.id, p.user_id, p.account_id, p.symbol, p.type, p.side, p.quantity,
+		SELECT p.id, u.id, p.account_id, p.symbol, p.type, p.side, p.quantity,
 		       p.trigger_price, p.limit_price, p.status, p.executed_at, p.executed_price,
 		       p.failure_reason, p.created_at, p.updated_at
 		FROM pending_orders p
 		INNER JOIN accounts a ON p.account_id = a.id
+		INNER JOIN users u ON p.user_id = u.user_id
 		WHERE a.user_id = $1
 		ORDER BY p.created_at DESC
 		LIMIT 100

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, memo, useMemo } from 'react';
-import { useAppSelector } from '../store';
+import { useAppSelector, useAppDispatch } from '../store';
+import { setActiveMarketTab } from '../store/slices/uiSlice';
 import PendingOrdersTab from './market/PendingOrdersTab';
 import TradeHistoryTab from './market/TradeHistoryTab';
 import PositionsTable from './market/PositionsTable';
@@ -9,8 +10,10 @@ import { formatPrice, formatQuantity } from '../utils/priceUtils';
 type TabType = 'orderbook' | 'trades' | 'pending' | 'history' | 'positions' | 'forex';
 
 function MarketActivityPanel() {
+  const dispatch = useAppDispatch();
   const activeInstrument = useAppSelector(state => state.ui.activeInstrument);
   const selectedProductType = useAppSelector(state => state.ui.selectedProductType);
+  const activeMarketTabFromState = useAppSelector(state => state.ui.activeMarketTab);
   // Get order book and trades from Redux store (updated by WebSocket middleware)
   const orderBook = useAppSelector(state => state.price.orderBooks[activeInstrument]);
   const tradesRaw = useAppSelector(state => state.price.trades[activeInstrument]);
@@ -36,6 +39,15 @@ function MarketActivityPanel() {
 
   const [activeTab, setActiveTab] = useState<TabType>(getDefaultTab());
   const [filterByProductType, setFilterByProductType] = useState<boolean>(false);
+
+  // Sync with Redux state (for external navigation, e.g., from TradingPanel)
+  useEffect(() => {
+    if (activeMarketTabFromState !== null) {
+      setActiveTab(activeMarketTabFromState);
+      // Reset Redux state after applying
+      dispatch(setActiveMarketTab(null));
+    }
+  }, [activeMarketTabFromState, dispatch]);
 
   // Switch to appropriate tab when product type or forex status changes
   useEffect(() => {

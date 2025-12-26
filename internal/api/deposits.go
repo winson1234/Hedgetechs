@@ -136,7 +136,7 @@ func CreateDeposit(w http.ResponseWriter, r *http.Request) {
 
 	// Marshal payment_details to JSON string for JSONB column
 	var paymentDetailsValue interface{}
-	if req.PaymentDetails != nil && len(req.PaymentDetails) > 0 {
+	if len(req.PaymentDetails) > 0 {
 		paymentDetailsJSON, err := json.Marshal(req.PaymentDetails)
 		if err != nil {
 			log.Printf("CreateDeposit: Failed to marshal payment details: %v", err)

@@ -107,7 +107,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		log.Printf("Failed to insert order: %v", err)
-		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to create order")
+		// Return specific error for debugging
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", fmt.Sprintf("failed to create order: %v", err))
 		return
 	}
 

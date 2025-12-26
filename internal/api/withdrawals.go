@@ -176,19 +176,20 @@ func CreateWithdrawal(w http.ResponseWriter, r *http.Request) {
 
 	// Marshal withdrawal_details to JSON string for JSONB column
 	var withdrawalDetailsValue interface{}
-	if req.WithdrawalDetails != nil && len(req.WithdrawalDetails) > 0 {
+	if len(req.WithdrawalDetails) > 0 {
 		// Mask sensitive data before storing
 		maskedDetails := make(map[string]interface{})
 		for k, v := range req.WithdrawalDetails {
-			if k == "account_number" {
+			switch k {
+			case "account_number":
 				// Store only last 4 digits
 				if accountNum, ok := v.(string); ok && len(accountNum) >= 4 {
 					maskedDetails["account_last4"] = accountNum[len(accountNum)-4:]
 				}
-			} else if k == "routing_number" {
+			case "routing_number":
 				// Store routing number (it's not as sensitive)
 				maskedDetails[k] = v
-			} else {
+			default:
 				// Store other details as-is (wallet_address, account_holder_name, etc.)
 				maskedDetails[k] = v
 			}
@@ -349,14 +350,14 @@ func CreateWithdrawal(w http.ResponseWriter, r *http.Request) {
 			withdrawal.ReferenceID, withdrawal.Amount, withdrawal.Currency, withdrawal.NetAmount, withdrawal.Currency, withdrawal.FeeAmount, withdrawal.Currency)
 
 		metadata := map[string]interface{}{
-			"withdrawal_id":    withdrawalID.String(),
-			"reference_id":     withdrawal.ReferenceID,
-			"amount":           withdrawal.Amount,
-			"fee_amount":       withdrawal.FeeAmount,
-			"net_amount":       withdrawal.NetAmount,
-			"currency":         withdrawal.Currency,
+			"withdrawal_id":     withdrawalID.String(),
+			"reference_id":      withdrawal.ReferenceID,
+			"amount":            withdrawal.Amount,
+			"fee_amount":        withdrawal.FeeAmount,
+			"net_amount":        withdrawal.NetAmount,
+			"currency":          withdrawal.Currency,
 			"withdrawal_method": withdrawal.WithdrawalMethod,
-			"status":           "pending",
+			"status":            "pending",
 		}
 
 		if err := CreateNotification(notificationCtx, pool, userID, models.NotificationTypeWithdrawal, notificationTitle, notificationMessage, metadata); err != nil {
@@ -563,7 +564,7 @@ func UpdateWithdrawalStatus(w http.ResponseWriter, r *http.Request) {
 		&withdrawalMethod, &withdrawal.Amount, &withdrawal.FeeAmount, &withdrawal.NetAmount, &withdrawal.Currency,
 		&currentStatus, &transactionID, &withdrawalDetailsJSON,
 	)
-	
+
 	withdrawal.WithdrawalMethod = models.WithdrawalMethod(withdrawalMethod)
 
 	if err != nil {
@@ -693,14 +694,14 @@ func UpdateWithdrawalStatus(w http.ResponseWriter, r *http.Request) {
 
 		var notificationTitle, notificationMessage string
 		metadata := map[string]interface{}{
-			"withdrawal_id":    withdrawalID.String(),
-			"reference_id":     withdrawal.ReferenceID,
-			"amount":           withdrawal.Amount,
-			"fee_amount":       withdrawal.FeeAmount,
-			"net_amount":       withdrawal.NetAmount,
-			"currency":         withdrawal.Currency,
+			"withdrawal_id":     withdrawalID.String(),
+			"reference_id":      withdrawal.ReferenceID,
+			"amount":            withdrawal.Amount,
+			"fee_amount":        withdrawal.FeeAmount,
+			"net_amount":        withdrawal.NetAmount,
+			"currency":          withdrawal.Currency,
 			"withdrawal_method": withdrawalMethod,
-			"status":           string(req.Status),
+			"status":            string(req.Status),
 		}
 
 		switch req.Status {
@@ -725,20 +726,20 @@ func UpdateWithdrawalStatus(w http.ResponseWriter, r *http.Request) {
 
 		// Validate user_id before creating notification
 		if withdrawal.UserID <= 0 {
-			log.Printf("UpdateWithdrawalStatus: Invalid user_id=%d, cannot create notification for withdrawal_id=%s", 
+			log.Printf("UpdateWithdrawalStatus: Invalid user_id=%d, cannot create notification for withdrawal_id=%s",
 				withdrawal.UserID, withdrawalID.String())
 			return
 		}
 
 		// Log notification creation attempt for debugging
-		log.Printf("UpdateWithdrawalStatus: Creating notification for user_id=%d, type=%s, title=%s, status=%s", 
+		log.Printf("UpdateWithdrawalStatus: Creating notification for user_id=%d, type=%s, title=%s, status=%s",
 			withdrawal.UserID, models.NotificationTypeWithdrawal, notificationTitle, req.Status)
 
 		if err := CreateNotification(notificationCtx, pool, withdrawal.UserID, models.NotificationTypeWithdrawal, notificationTitle, notificationMessage, metadata); err != nil {
-			log.Printf("UpdateWithdrawalStatus: Failed to create notification: %v (user_id=%d, withdrawal_id=%s, status=%s)", 
+			log.Printf("UpdateWithdrawalStatus: Failed to create notification: %v (user_id=%d, withdrawal_id=%s, status=%s)",
 				err, withdrawal.UserID, withdrawalID.String(), req.Status)
 		} else {
-			log.Printf("UpdateWithdrawalStatus: Successfully created notification for user_id=%d, withdrawal_id=%s, status=%s", 
+			log.Printf("UpdateWithdrawalStatus: Successfully created notification for user_id=%d, withdrawal_id=%s, status=%s",
 				withdrawal.UserID, withdrawalID.String(), req.Status)
 		}
 	}()
@@ -997,4 +998,3 @@ func getWithdrawalByIDAdmin(ctx context.Context, pool DBQuerier, withdrawalID uu
 
 	return withdrawal, nil
 }
-

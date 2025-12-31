@@ -93,9 +93,8 @@ services:
       - KC_DB_USERNAME=${POSTGRES_USER:-postgres}
       - KC_DB_PASSWORD=${POSTGRES_PASSWORD}
       - KC_DB_SCHEMA=public
-      - KC_HOSTNAME=trade.hedgetechs.com
+      - KC_HOSTNAME=auth.hedgetechs.com
       - KC_PROXY=edge
-      - KC_HTTP_RELATIVE_PATH=/auth
     ports:
       - "127.0.0.1:8082:8080"
     volumes:

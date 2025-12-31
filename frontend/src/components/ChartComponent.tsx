@@ -201,7 +201,12 @@ function ChartComponent() {
 
         if (!Array.isArray(klines) || klines.length === 0) {
           console.warn('No klines data received');
+          seriesRef.current?.setData([]); // Explicitly set empty data
+          lastBarRef.current = null; // Reset last bar
           setIsLoading(false);
+          // Do NOT return, let logic proceed so references are set? 
+          // Actually if we look below, the code processes 'klines'. 
+          // So we should return, but after setting data.
           return;
         }
 

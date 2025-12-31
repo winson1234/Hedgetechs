@@ -10,7 +10,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-brokerage_dev}
-      - POSTGRES_MULTIPLE_DATABASES=${POSTGRES_DB:-brokerage_dev},keycloak_dev
+
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
       - postgres-dev-data:/var/lib/postgresql/data
@@ -64,7 +64,7 @@ services:
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
       - KC_HOSTNAME_URL=http://localhost:8082
       - KC_DB=postgres
-      - KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak_dev
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak
       - KC_DB_USERNAME=${POSTGRES_USER:-postgres}
       - KC_DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - KC_DB_SCHEMA=public

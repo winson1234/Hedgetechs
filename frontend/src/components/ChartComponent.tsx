@@ -339,8 +339,12 @@ function ChartComponent() {
     }
 
     // compute candle time (UTCTimestamp in seconds)
+    if (!currentPrice.timestamp || Number.isNaN(currentPrice.timestamp)) return
+
     const tickSec = Math.floor(currentPrice.timestamp / 1000)
     const candleTime = (Math.floor(tickSec / timeframeSeconds) * timeframeSeconds) as UTCTimestamp
+
+    if (Number.isNaN(candleTime) || candleTime === 0) return
 
     const current = lastBarRef.current
 

@@ -153,8 +153,15 @@ function ChartComponent() {
         timeVisible: true,
         secondsVisible: false,
       },
-      rightPriceScale: {
-        borderColor: isDark ? '#334155' : '#cbd5e1',
+      localization: {
+        locale: 'en-US',
+        dateFormat: 'dd MMM',
+        timeFormatter: (time: number) => {
+          if (!time || isNaN(time)) return '';
+          const date = new Date(time * 1000);
+          if (isNaN(date.getTime())) return '';
+          return date.toLocaleString();
+        }
       },
     })
 

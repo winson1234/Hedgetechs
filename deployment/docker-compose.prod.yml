@@ -177,8 +177,10 @@ services:
       # ============================================
       # REDIS
       # ============================================
-      - REDIS_ADDR=redis:6379
+      - REDIS_ADDR=${REDIS_ADDR:-redis:6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_CHANNEL=${REDIS_CHANNEL}
+      - REDIS_HASH_KEY=${REDIS_HASH_KEY}
       
       # ============================================
       # JWT

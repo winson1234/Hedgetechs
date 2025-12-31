@@ -36,6 +36,8 @@ type PriceUpdate struct {
 type Provider struct {
 	redisAddr     string
 	redisPassword string
+	channel       string
+	hashKey       string
 	client        *redis.Client
 	pubsub        *redis.PubSub
 
@@ -51,12 +53,22 @@ type Provider struct {
 
 // NewProvider creates a new Redis provider
 // password can be empty string if Redis doesn't require authentication
-func NewProvider(redisAddr string, redisPassword string) *Provider {
+func NewProvider(redisAddr, redisPassword, channel, hashKey string) *Provider {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// Set defaults if empty
+	if channel == "" {
+		channel = "fx_price_updates"
+	}
+	if hashKey == "" {
+		hashKey = "fx_latest_prices"
+	}
 
 	return &Provider{
 		redisAddr:     redisAddr,
 		redisPassword: redisPassword,
+		channel:       channel,
+		hashKey:       hashKey,
 		stopChan:      make(chan struct{}),
 		ctx:           ctx,
 		cancel:        cancel,
@@ -100,14 +112,14 @@ func (p *Provider) Subscribe(symbols []string, onTick func(string, float64)) err
 	p.wg.Add(1)
 	go p.subscribeToPubSub()
 
-	log.Printf("[Redis Provider] Subscribed to forex stream (Pub/Sub channel: %s)", PubSubChannel)
+	log.Printf("[Redis Provider] Subscribed to forex stream (Pub/Sub channel: %s)", p.channel)
 	return nil
 }
 
 // seedPriceCache fetches latest prices from Redis Hash and calls onTick for each
 // This ensures the backend has prices immediately on startup, even before new ticks arrive
 func (p *Provider) seedPriceCache() error {
-	result, err := p.client.HGetAll(p.ctx, HashKey).Result()
+	result, err := p.client.HGetAll(p.ctx, p.hashKey).Result()
 	if err != nil {
 		return fmt.Errorf("HGETALL failed: %w", err)
 	}
@@ -162,7 +174,7 @@ func (p *Provider) subscribeToPubSub() {
 		}
 
 		// Create Pub/Sub subscription
-		p.pubsub = p.client.Subscribe(p.ctx, PubSubChannel)
+		p.pubsub = p.client.Subscribe(p.ctx, p.channel)
 
 		// Wait for confirmation
 		_, err := p.pubsub.Receive(p.ctx)
@@ -173,7 +185,7 @@ func (p *Provider) subscribeToPubSub() {
 			continue
 		}
 
-		log.Printf("[Redis Provider] Subscribed to Pub/Sub channel: %s", PubSubChannel)
+		log.Printf("[Redis Provider] Subscribed to Pub/Sub channel: %s", p.channel)
 		backoff = initialBackoff
 
 		// Start reading messages

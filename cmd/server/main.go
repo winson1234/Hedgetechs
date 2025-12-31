@@ -391,9 +391,12 @@ func main() {
 		redisAddr = "localhost:6379"
 	}
 	redisPassword := os.Getenv("REDIS_PASSWORD")
-	redisForexProvider := redisProvider.NewProvider(redisAddr, redisPassword)
+	redisChannel := os.Getenv("REDIS_CHANNEL")
+	redisHashKey := os.Getenv("REDIS_HASH_KEY")
+
+	redisForexProvider := redisProvider.NewProvider(redisAddr, redisPassword, redisChannel, redisHashKey)
 	marketDataService.AddProvider(redisForexProvider)
-	log.Printf("Registered Redis Provider (real-time forex from MT5, addr=%s)", redisAddr)
+	log.Printf("Registered Redis Provider (real-time forex from MT5, addr=%s, channel=%s)", redisAddr, redisChannel)
 
 	// Start all providers
 	// Crypto symbols are handled by Binance provider (ignored by Redis)

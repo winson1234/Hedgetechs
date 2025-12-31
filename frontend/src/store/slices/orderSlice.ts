@@ -234,6 +234,52 @@ export const executeMarketOrder = createAsyncThunk(
   }
 );
 
+// Execute hedge order (Atomic)
+export const executeHedgeOrder = createAsyncThunk(
+  'order/executeHedgeOrder',
+  async (
+    orderData: {
+      account_id: string;
+      symbol: string;
+      amount_base: number;
+      leverage?: number;
+      product_type: 'spot' | 'cfd' | 'futures';
+    },
+    { getState, rejectWithValue }
+  ) => {
+    try {
+      const token = getAuthToken(getState as () => RootState);
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await apiFetch('api/v1/orders/hedge', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          account_id: orderData.account_id,
+          symbol: orderData.symbol,
+          amount_base: orderData.amount_base,
+          leverage: orderData.leverage || 1,
+          product_type: orderData.product_type,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to execute hedge order');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to execute hedge order';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // Order slice
 const orderSlice = createSlice({
   name: 'order',
@@ -328,6 +374,27 @@ const orderSlice = createSlice({
         }
       })
       .addCase(executeMarketOrder.rejected, (state, action) => {
+        state.isPlacingOrder = false;
+        state.error = action.payload as string;
+      });
+
+    // Execute hedge order
+    builder
+      .addCase(executeHedgeOrder.pending, (state) => {
+        state.isPlacingOrder = true;
+        state.error = null;
+      })
+      .addCase(executeHedgeOrder.fulfilled, (state, action) => {
+        state.isPlacingOrder = false;
+        // Hedge order is a container, but it returns a contract?
+        // Actually it returns order + contract.
+        // We can add the parent order to history if we want, or rely on fetchOrders refresh.
+        // For now, let's just create success state.
+        if (action.payload.order) {
+          state.orders.unshift(action.payload.order);
+        }
+      })
+      .addCase(executeHedgeOrder.rejected, (state, action) => {
         state.isPlacingOrder = false;
         state.error = action.payload as string;
       });

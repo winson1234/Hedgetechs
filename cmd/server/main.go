@@ -791,6 +791,20 @@ func main() {
 		log.Println("Forex API endpoints registered with fallback handlers (Redis unavailable)")
 	}
 
+	// POST /api/v1/orders/hedge - Create a hedged order (Dual Position)
+	http.HandleFunc("/api/v1/orders/hedge", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(authMiddleware(middleware.RateLimitMiddleware(api.CreateHedgeOrder)))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Transactions endpoints (protected with JWT authentication)
 	// POST /api/v1/transactions - Create transaction (deposit/withdrawal/transfer)
 	// GET /api/v1/transactions?account_id={uuid} - List transactions for account

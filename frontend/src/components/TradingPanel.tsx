@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { setActiveAccount, fetchAccounts, updateAccountBalanceOptimistic } from '../store/slices/accountSlice';
-import { createPendingOrder, executeMarketOrder, fetchOrders, fetchPendingOrders } from '../store/slices/orderSlice';
+import { createPendingOrder, executeMarketOrder, executeHedgeOrder, fetchOrders, fetchPendingOrders } from '../store/slices/orderSlice';
 import { addToast, /* setSelectedProductType, */ triggerPositionsRefresh, setActiveMarketTab } from '../store/slices/uiSlice';
 import { formatPrice } from '../utils/priceUtils';
 import { formatAccountId } from '../utils/formatters';
@@ -586,33 +586,14 @@ export default function TradingPanel() {
     }));
 
     try {
-      // Generate pair ID for linking hedged positions
-      const pairId = self.crypto.randomUUID();
-
-      // Execute both Buy and Sell orders in parallel
-      const buyPromise = dispatch(executeMarketOrder({
+      // Execute Atomic Hedge Order (Single Transaction)
+      await dispatch(executeHedgeOrder({
         account_id: activeAccountId,
         symbol: activeInstrument,
-        side: 'buy',
         amount_base: qty,
-        current_price: currentPrice,
         leverage: leverage,
         product_type: selectedProductType,
-        pair_id: pairId,
       })).unwrap();
-
-      const sellPromise = dispatch(executeMarketOrder({
-        account_id: activeAccountId,
-        symbol: activeInstrument,
-        side: 'sell',
-        amount_base: qty,
-        current_price: currentPrice,
-        leverage: leverage,
-        product_type: selectedProductType,
-        pair_id: pairId,
-      })).unwrap();
-
-      await Promise.all([buyPromise, sellPromise]);
 
       // Success
       const orderDetails = `${selectedProductType.toUpperCase()} HEDGE: ${qty.toFixed(8)} ${baseCurrency} at ~$${currentPrice.toFixed(2)} (${leverage}x)`;

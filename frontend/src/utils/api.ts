@@ -33,23 +33,34 @@ export function getApiUrl(path: string): string {
  */
 export async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
   const url = getApiUrl(path);
-  
+
   // Get JWT token from sessionStorage
   const token = sessionStorage.getItem('auth_token');
-  
+
   // Inject Authorization header if token exists
   const headers = new Headers(options?.headers || {});
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  
+
   // Merge headers back into options
   const enhancedOptions: RequestInit = {
     ...options,
     headers,
   };
-  
-  return fetch(url, enhancedOptions);
+
+  const response = await fetch(url, enhancedOptions);
+
+  // Interceptor: Handle 401 Unauthorized (Token Expired)
+  if (response.status === 401) {
+    sessionStorage.removeItem('auth_token');
+    // Save current path for redirect after login (optional)
+    sessionStorage.setItem('redirect_after_login', window.location.pathname);
+    // Force redirect to login
+    window.location.href = '/login';
+  }
+
+  return response;
 }
 
 // Export API_BASE_URL for debugging

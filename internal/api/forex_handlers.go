@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -16,8 +17,8 @@ type ForexQuote struct {
 	Symbol      string   `json:"symbol"`
 	Bid         float64  `json:"bid"`
 	Ask         float64  `json:"ask"`
-	Spread      float64  `json:"spread"`      // In pips
-	Change24h   float64  `json:"change24h"`   // Percentage
+	Spread      float64  `json:"spread"`    // In pips
+	Change24h   float64  `json:"change24h"` // Percentage
 	High24h     float64  `json:"high24h"`
 	Low24h      float64  `json:"low24h"`
 	RangePips   float64  `json:"rangePips"`   // 24h high-low range in pips
@@ -224,8 +225,8 @@ func HandleForexKlines(klinesService *services.ForexKlinesService, redisClient *
 	}
 }
 
-// fetchKlinesFromCache retrieves K-lines from Redis cache (sorted set)
-func fetchKlinesFromCache(ctx context.Context, redisClient *redis.Client, symbol string, limit int) ([]map[string]interface{}, error) {
+// fetchKlinesFromCache retrieves K-lines from Redis cache (sorted set) and converts to standard Kline struct
+func fetchKlinesFromCache(ctx context.Context, redisClient *redis.Client, symbol string, limit int) ([]services.Kline, error) {
 	key := "forex:klines:1m:" + symbol
 
 	// Get the last N bars using ZREVRANGE (reverse order by score/timestamp)
@@ -239,13 +240,54 @@ func fetchKlinesFromCache(ctx context.Context, redisClient *redis.Client, symbol
 	}
 
 	// Parse JSON strings into kline objects
-	klines := make([]map[string]interface{}, 0, len(klineStrings))
-	for i := len(klineStrings) - 1; i >= 0; i-- { // Reverse to get chronological order
-		var kline map[string]interface{}
-		if err := json.Unmarshal([]byte(klineStrings[i]), &kline); err != nil {
+	klines := make([]services.Kline, 0, len(klineStrings))
+	// We iterate backwards to return chronological order (oldest first)
+	for i := len(klineStrings) - 1; i >= 0; i-- {
+		var rawMap map[string]interface{}
+		if err := json.Unmarshal([]byte(klineStrings[i]), &rawMap); err != nil {
 			log.Printf("[Forex API] WARN: Failed to unmarshal cached kline: %v", err)
 			continue
 		}
+
+		// Convert raw map to services.Kline
+		kline := services.Kline{}
+
+		// Handle Timestamp
+		if tsVal, ok := rawMap["timestamp"].(float64); ok {
+			// Assume millisecond timestamp if > 1e11, else second
+			// User data 1767... is usually ms.
+			secs := int64(tsVal) / 1000
+			nsecs := (int64(tsVal) % 1000) * 1e6
+			kline.Timestamp = time.Unix(secs, nsecs).UTC()
+		} else if tsStr, ok := rawMap["timestamp"].(string); ok {
+			// Try parsing ISO string
+			if t, err := time.Parse(time.RFC3339, tsStr); err == nil {
+				kline.Timestamp = t
+			}
+		}
+
+		// Helper to get float
+		getFloat := func(keys ...string) float64 {
+			for _, k := range keys {
+				if v, ok := rawMap[k].(float64); ok {
+					return v
+				}
+			}
+			return 0
+		}
+
+		// Handle key variations (open_bid vs open)
+		kline.Open = getFloat("open_bid", "open")
+		kline.High = getFloat("high_bid", "high")
+		kline.Low = getFloat("low_bid", "low")
+		kline.Close = getFloat("close_bid", "close")
+
+		if v, ok := rawMap["volume"].(float64); ok {
+			kline.Volume = int(v)
+		} else if v, ok := rawMap["volume"].(int); ok {
+			kline.Volume = v
+		}
+
 		klines = append(klines, kline)
 	}
 
@@ -253,35 +295,28 @@ func fetchKlinesFromCache(ctx context.Context, redisClient *redis.Client, symbol
 }
 
 // hydrateCache writes fetched klines to Redis cache asynchronously
-func hydrateCache(ctx context.Context, redisClient *redis.Client, symbol string, klines interface{}) {
-	// Type assert to slice of maps
-	klinesSlice, ok := klines.([]map[string]interface{})
-	if !ok {
-		log.Printf("[Forex API] WARN: Cannot hydrate cache - unexpected klines type")
-		return
-	}
-
-	if len(klinesSlice) == 0 {
+func hydrateCache(ctx context.Context, redisClient *redis.Client, symbol string, klines []services.Kline) {
+	if len(klines) == 0 {
 		return
 	}
 
 	key := "forex:klines:1m:" + symbol
 
 	// Add each kline to Redis ZSET
-	for _, kline := range klinesSlice {
-		timestamp, ok := kline["timestamp"].(float64)
-		if !ok {
-			continue
-		}
-
+	for _, kline := range klines {
+		// Marshal standard Kline struct
 		klineJSON, err := json.Marshal(kline)
 		if err != nil {
 			continue
 		}
 
+		// Use millisecond timestamp as score to match publisher.py format (approx)
+		// publisher.py uses: int(time.time() * 1000)
+		score := float64(kline.Timestamp.UnixMilli())
+
 		// ZADD with score = timestamp
 		err = redisClient.ZAdd(ctx, key, redis.Z{
-			Score:  timestamp,
+			Score:  score,
 			Member: string(klineJSON),
 		}).Err()
 
@@ -291,7 +326,7 @@ func hydrateCache(ctx context.Context, redisClient *redis.Client, symbol string,
 		}
 	}
 
-	log.Printf("[Forex API] Cache hydrated for %s (%d bars)", symbol, len(klinesSlice))
+	log.Printf("[Forex API] Cache hydrated for %s (%d bars)", symbol, len(klines))
 }
 
 // calculateSpreadPips calculates spread in pips

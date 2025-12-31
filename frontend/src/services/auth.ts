@@ -90,7 +90,7 @@ export async function login(data: LoginRequest): Promise<AuthResponse> {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || 'Login failed');
+      throw new Error(result.message || result.error || 'Login failed');
     }
 
     // Store token in sessionStorage (cleared when tab closes)

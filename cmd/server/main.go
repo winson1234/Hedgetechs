@@ -145,24 +145,36 @@ func main() {
 		log.Println("WARNING: Auth storage service disabled (Redis unavailable)")
 	}
 
-	// Initialize email sender based on environment
-	var emailSender services.EmailSender
-	environment := os.Getenv("ENVIRONMENT")
-	if environment == "production" {
-		resendAPIKey := os.Getenv("RESEND_API_KEY")
-		emailFromAddress := os.Getenv("EMAIL_FROM_ADDRESS")
-		if resendAPIKey == "" || emailFromAddress == "" {
-			log.Fatal("FATAL: RESEND_API_KEY and EMAIL_FROM_ADDRESS must be set in production environment")
+	// Initialize email sender - DISABLED/UNUSED as Keycloak handles email
+	// var emailSender services.EmailSender
+	// ... (rest of the block commented out)
+	// Actually, let's keep it instantiated but mark as unused or comment it out properly to fix lint.
+	// Or just remove HandleForgotPassword's dependency on it, which I did.
+	// The lint error is "emailSender declared and not used".
+	// I will just remove the variable declaration or assignment.
+
+	// Initialize email sender based on environment (For future use or non-auth emails)
+	/*
+		var emailSender services.EmailSender
+		environment := os.Getenv("ENVIRONMENT")
+		if environment == "production" {
+			resendAPIKey := os.Getenv("RESEND_API_KEY")
+			emailFromAddress := os.Getenv("EMAIL_FROM_ADDRESS")
+			if resendAPIKey == "" || emailFromAddress == "" {
+				log.Fatal("FATAL: RESEND_API_KEY and EMAIL_FROM_ADDRESS must be set in production environment")
+			}
+			var err error
+			emailSender, err = services.NewResendSender(resendAPIKey, emailFromAddress)
+			if err != nil {
+				log.Fatalf("FATAL: Failed to initialize Resend email sender: %v", err)
+			}
+		} else {
+			emailSender = services.NewConsoleSender()
 		}
-		var err error
-		emailSender, err = services.NewResendSender(resendAPIKey, emailFromAddress)
-		if err != nil {
-			log.Fatalf("FATAL: Failed to initialize Resend email sender: %v", err)
-		}
-	} else {
-		emailSender = services.NewConsoleSender()
-	}
-	log.Printf("Email sender initialized (Environment: %s)", environment)
+		log.Printf("Email sender initialized (Environment: %s)", environment)
+	*/
+	// Replacing with a log message saying it's skipped for now.
+	log.Println("Email sender initialization skipped (Auth emails handled by Keycloak)")
 
 	// Define forex symbols (used by multiple services)
 	forexSymbols := []string{"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCHF", "CADJPY", "AUDNZD", "EURGBP", "USDCAD", "EURJPY", "GBPJPY"}
@@ -194,7 +206,7 @@ func main() {
 	// NOTE: We check WINDOWS_API_URL from env directly (don't set default here)
 	// This allows mock publisher to detect if MT5 is configured
 	windowsAPIURL := os.Getenv("WINDOWS_API_URL")
-	
+
 	// Only use default for Data Integrity Service (not for mock publisher detection)
 	var dataIntegrityURL string
 	if windowsAPIURL == "" && os.Getenv("DOCKER_ENV") == "" && os.Getenv("ENVIRONMENT") != "production" {
@@ -292,18 +304,18 @@ func main() {
 		// 3. This ensures mock only runs on localhost, never on production server
 		environment := os.Getenv("ENVIRONMENT")
 		windowsAPIURL := os.Getenv("WINDOWS_API_URL")
-		
+
 		// Check if we should start mock publisher
 		// Only start if:
 		// - Environment is empty or "development" (not "production")
 		// - WINDOWS_API_URL is NOT set OR is set to localhost/docker.internal (dev default)
 		// - Production server will have a real MT5 URL (not localhost)
 		// - This ensures mock publisher ONLY runs on localhost, never on production
-		isLocalhostURL := windowsAPIURL == "" || 
-			windowsAPIURL == "http://localhost:5000" || 
+		isLocalhostURL := windowsAPIURL == "" ||
+			windowsAPIURL == "http://localhost:5000" ||
 			windowsAPIURL == "http://host.docker.internal:5000"
 		shouldStartMock := (environment == "" || environment == "development") && isLocalhostURL
-		
+
 		if shouldStartMock {
 			log.Println("========================================")
 			log.Println("[Mock Forex Publisher] LOCALHOST MODE DETECTED")
@@ -472,13 +484,17 @@ func main() {
 	// Exchange rates proxy (backup for ExchangeRateService)
 	http.HandleFunc("/api/v1/proxy/exchange-rates", api.CORSMiddleware(allowHEAD(api.ProxyExchangeRates)))
 
+	// Initialize Keycloak Service
+	keycloakService := services.NewKeycloakService()
+	log.Println("Keycloak service initialized")
+
 	// ========== AUTHENTICATION ENDPOINTS (Public - No Auth Required) ==========
 
 	// POST /api/v1/auth/register - User registration (creates pending_registrations record)
 	http.HandleFunc("/api/v1/auth/register", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleRegister))(w, r)
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleRegister(keycloakService)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -492,7 +508,7 @@ func main() {
 	http.HandleFunc("/api/v1/auth/login", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleLogin(authStorage)))(w, r)
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleLogin(authStorage, keycloakService)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -520,7 +536,7 @@ func main() {
 	http.HandleFunc("/api/v1/auth/forgot-password", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleForgotPassword(authStorage, emailSender)))(w, r)
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(100, 20)(api.HandleForgotPassword(authStorage, keycloakService)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -559,13 +575,13 @@ func main() {
 	})
 
 	// Create auth middleware factory with session revocation
-	authMiddleware := middleware.NewAuthMiddleware(authStorage)
+	authMiddleware := middleware.NewAuthMiddleware(authStorage, keycloakService)
 
 	// POST /api/v1/auth/change-password - Change password (authenticated, with session revocation)
 	http.HandleFunc("/api/v1/auth/change-password", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			api.CORSMiddleware(authMiddleware(api.HandleChangePassword(authStorage)))(w, r)
+			api.CORSMiddleware(authMiddleware(api.HandleChangePassword(authStorage, keycloakService)))(w, r)
 		case http.MethodOptions:
 			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -1213,9 +1229,9 @@ func runMigrations() error {
 	// Construct migrations path - try multiple locations
 	var migrationsPath string
 	possiblePaths := []string{
-		"sql-scripts/migrations",        // Docker/project root
-		"../../sql-scripts/migrations",  // Running from cmd/server
-		"/app/sql-scripts/migrations",   // Absolute path in Docker
+		"sql-scripts/migrations",       // Docker/project root
+		"../../sql-scripts/migrations", // Running from cmd/server
+		"/app/sql-scripts/migrations",  // Absolute path in Docker
 	}
 
 	for _, path := range possiblePaths {

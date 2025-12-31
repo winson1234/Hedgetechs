@@ -64,9 +64,9 @@ type User struct {
 // Account represents a trading account
 type Account struct {
 	ID            uuid.UUID     `json:"id"`
-	UserID        int64         `json:"user_id"`               // bigint user_id for backward compatibility with admin panel
-	AccountID     int64         `json:"account_id"`            // Auto-incrementing account number
-	AccountNumber int64         `json:"account_number"`        // DEPRECATED: Alias for account_id (backward compatibility)
+	UserID        int64         `json:"user_id"`        // bigint user_id for backward compatibility with admin panel
+	AccountID     int64         `json:"account_id"`     // Auto-incrementing account number
+	AccountNumber int64         `json:"account_number"` // DEPRECATED: Alias for account_id (backward compatibility)
 	Type          AccountType   `json:"type"`
 	ProductType   *ProductType  `json:"product_type,omitempty"` // NULLABLE: Universal accounts have NULL product_type
 	Currency      string        `json:"currency"`
@@ -121,10 +121,10 @@ type Transaction struct {
 
 // CreateAccountRequest represents the request body for creating a new account
 type CreateAccountRequest struct {
-	Type           AccountType  `json:"type"`                       // "live" or "demo"
-	ProductType    *ProductType `json:"product_type,omitempty"`     // DEPRECATED: Optional for backward compatibility. New accounts are universal.
-	Currency       string       `json:"currency"`                   // e.g., "USD", "EUR"
-	InitialBalance float64      `json:"initial_balance"`            // Initial balance amount
+	Type           AccountType  `json:"type"`                   // "live" or "demo"
+	ProductType    *ProductType `json:"product_type,omitempty"` // DEPRECATED: Optional for backward compatibility. New accounts are universal.
+	Currency       string       `json:"currency"`               // e.g., "USD", "EUR"
+	InitialBalance float64      `json:"initial_balance"`        // Initial balance amount
 }
 
 // CreateAccountResponse represents the response after creating a new account
@@ -258,17 +258,17 @@ type Instrument struct {
 
 // SpotConfiguration represents crypto spot trading configuration
 type SpotConfiguration struct {
-	Symbol          string  `json:"symbol"`
-	BasePrecision   int     `json:"base_precision"`
-	QuotePrecision  int     `json:"quote_precision"`
-	TickSize        float64 `json:"tick_size"`
-	StepSize        float64 `json:"step_size"`
-	MinQuantity     float64 `json:"min_quantity"`
-	MaxQuantity     float64 `json:"max_quantity"`
-	MinNotional     float64 `json:"min_notional"`
-	MaxNotional     float64 `json:"max_notional"`
-	MakerFeeRate    float64 `json:"maker_fee_rate"`
-	TakerFeeRate    float64 `json:"taker_fee_rate"`
+	Symbol         string  `json:"symbol"`
+	BasePrecision  int     `json:"base_precision"`
+	QuotePrecision int     `json:"quote_precision"`
+	TickSize       float64 `json:"tick_size"`
+	StepSize       float64 `json:"step_size"`
+	MinQuantity    float64 `json:"min_quantity"`
+	MaxQuantity    float64 `json:"max_quantity"`
+	MinNotional    float64 `json:"min_notional"`
+	MaxNotional    float64 `json:"max_notional"`
+	MakerFeeRate   float64 `json:"maker_fee_rate"`
+	TakerFeeRate   float64 `json:"taker_fee_rate"`
 }
 
 // ForexConfiguration represents forex trading configuration
@@ -336,10 +336,11 @@ type Order struct {
 	AmountBase       float64     `json:"amount_base"`
 	LimitPrice       *float64    `json:"limit_price,omitempty"`
 	StopPrice        *float64    `json:"stop_price,omitempty"`
-	Leverage         int         `json:"leverage"`      // Leverage multiplier (1 for spot, >1 for CFD/Futures)
-	ProductType      ProductType `json:"product_type"`  // NEW: Product type at order level (spot, cfd, futures)
+	Leverage         int         `json:"leverage"`     // Leverage multiplier (1 for spot, >1 for CFD/Futures)
+	ProductType      ProductType `json:"product_type"` // NEW: Product type at order level (spot, cfd, futures)
 	FilledAmount     float64     `json:"filled_amount"`
 	AverageFillPrice *float64    `json:"average_fill_price,omitempty"`
+	PairID           *uuid.UUID  `json:"pair_id,omitempty"` // NEW: Link ID for hedged orders
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
 }
@@ -353,8 +354,9 @@ type CreateOrderRequest struct {
 	AmountBase  float64     `json:"amount_base"`
 	LimitPrice  *float64    `json:"limit_price,omitempty"`
 	StopPrice   *float64    `json:"stop_price,omitempty"`
-	Leverage    int         `json:"leverage"`     // Leverage multiplier (default: 1)
-	ProductType ProductType `json:"product_type"` // NEW: "spot", "cfd", or "futures" - Required for universal accounts
+	Leverage    int         `json:"leverage"`          // Leverage multiplier (default: 1)
+	ProductType ProductType `json:"product_type"`      // NEW: "spot", "cfd", or "futures" - Required for universal accounts
+	PairID      *uuid.UUID  `json:"pair_id,omitempty"` // NEW: Link ID for hedged orders
 }
 
 // Validate validates the CreateOrderRequest
@@ -495,34 +497,34 @@ const (
 type DepositStatus string
 
 const (
-	DepositStatusPending  DepositStatus = "pending"
-	DepositStatusApproved DepositStatus = "approved"
-	DepositStatusRejected DepositStatus = "rejected"
+	DepositStatusPending   DepositStatus = "pending"
+	DepositStatusApproved  DepositStatus = "approved"
+	DepositStatusRejected  DepositStatus = "rejected"
 	DepositStatusCancelled DepositStatus = "cancelled"
 )
 
 // Deposit represents a deposit request
 type Deposit struct {
-	ID             uuid.UUID              `json:"id"`
-	UserID         int64                  `json:"user_id"`
-	AccountID      uuid.UUID              `json:"account_id"`
-	ReferenceID    string                 `json:"reference_id"` // DEP-YYYYMMDD-XXXXXX
-	PaymentMethod  PaymentMethod          `json:"payment_method"`
-	Amount         float64                `json:"amount"`
-	Currency       string                 `json:"currency"`
-	ReceiptFilePath *string               `json:"receipt_file_path,omitempty"`
-	PaymentDetails map[string]interface{} `json:"payment_details,omitempty"`
-	Status         DepositStatus          `json:"status"`
-	TransactionID  *uuid.UUID             `json:"transaction_id,omitempty"`
-	AdminNotes     *string                `json:"admin_notes,omitempty"`
-	ClientIP       *string                `json:"client_ip,omitempty"`       // IP address when deposit was created
-	AdminIP        *string                `json:"admin_ip,omitempty"`        // IP address of admin when approved/rejected
-	ApprovedAt     *time.Time             `json:"approved_at,omitempty"`     // Timestamp when approved
-	RejectedAt     *time.Time             `json:"rejected_at,omitempty"`     // Timestamp when rejected
-	ApprovedBy     *int64                 `json:"approved_by,omitempty"`     // Admin user ID who approved
-	RejectedBy     *int64                 `json:"rejected_by,omitempty"`     // Admin user ID who rejected
-	CreatedAt      time.Time              `json:"created_at"`
-	UpdatedAt      time.Time              `json:"updated_at"`
+	ID              uuid.UUID              `json:"id"`
+	UserID          int64                  `json:"user_id"`
+	AccountID       uuid.UUID              `json:"account_id"`
+	ReferenceID     string                 `json:"reference_id"` // DEP-YYYYMMDD-XXXXXX
+	PaymentMethod   PaymentMethod          `json:"payment_method"`
+	Amount          float64                `json:"amount"`
+	Currency        string                 `json:"currency"`
+	ReceiptFilePath *string                `json:"receipt_file_path,omitempty"`
+	PaymentDetails  map[string]interface{} `json:"payment_details,omitempty"`
+	Status          DepositStatus          `json:"status"`
+	TransactionID   *uuid.UUID             `json:"transaction_id,omitempty"`
+	AdminNotes      *string                `json:"admin_notes,omitempty"`
+	ClientIP        *string                `json:"client_ip,omitempty"`   // IP address when deposit was created
+	AdminIP         *string                `json:"admin_ip,omitempty"`    // IP address of admin when approved/rejected
+	ApprovedAt      *time.Time             `json:"approved_at,omitempty"` // Timestamp when approved
+	RejectedAt      *time.Time             `json:"rejected_at,omitempty"` // Timestamp when rejected
+	ApprovedBy      *int64                 `json:"approved_by,omitempty"` // Admin user ID who approved
+	RejectedBy      *int64                 `json:"rejected_by,omitempty"` // Admin user ID who rejected
+	CreatedAt       time.Time              `json:"created_at"`
+	UpdatedAt       time.Time              `json:"updated_at"`
 }
 
 // CreateDepositRequest represents the request to create a deposit

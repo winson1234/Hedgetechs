@@ -45,7 +45,6 @@ func Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	// Get IP address and user agent from context
 	clientIP := utils.GetClientIP(r)
 	userAgent := r.UserAgent()
@@ -188,7 +187,7 @@ func Transfer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if currentBalance < req.Amount {
-		respondWithJSONError(w, http.StatusBadRequest, "insufficient_funds", 
+		respondWithJSONError(w, http.StatusBadRequest, "insufficient_funds",
 			fmt.Sprintf("insufficient balance. Available: %.2f %s, Required: %.2f %s", currentBalance, req.Currency, req.Amount, req.Currency))
 		return
 	}
@@ -271,7 +270,7 @@ func Transfer(w http.ResponseWriter, r *http.Request) {
 
 	// Get user UUID for audit logging
 	var userUUID uuid.UUID
-	err = tx.QueryRow(ctx, "SELECT id FROM users WHERE user_id = $1", userID).Scan(&userUUID)
+	err = tx.QueryRow(ctx, "SELECT keycloak_id FROM users WHERE user_id = $1", userID).Scan(&userUUID)
 	if err != nil {
 		log.Printf("Transfer: Failed to get user UUID: %v", err)
 		// Continue without audit log if we can't get UUID
@@ -318,15 +317,15 @@ func Transfer(w http.ResponseWriter, r *http.Request) {
 			req.Amount, req.Currency, fromAccountID, fromAccountType, toAccountID, toAccountType)
 
 		metadata := map[string]interface{}{
-			"from_account_id":    req.FromAccountID.String(),
+			"from_account_id":     req.FromAccountID.String(),
 			"from_account_number": fmt.Sprintf("%d", fromAccountID),
 			"from_account_type":   fromAccountType,
-			"to_account_id":      req.ToAccountID.String(),
+			"to_account_id":       req.ToAccountID.String(),
 			"to_account_number":   fmt.Sprintf("%d", toAccountID),
-			"to_account_type":    toAccountType,
-			"amount":             req.Amount,
-			"currency":           req.Currency,
-			"transaction_number": debitTransactionNumber,
+			"to_account_type":     toAccountType,
+			"amount":              req.Amount,
+			"currency":            req.Currency,
+			"transaction_number":  debitTransactionNumber,
 		}
 
 		if err := CreateNotification(notificationCtx, pool, userID, models.NotificationTypeTransfer, notificationTitle, notificationMessage, metadata); err != nil {
@@ -376,8 +375,7 @@ func Transfer(w http.ResponseWriter, r *http.Request) {
 			"amount":             req.Amount,
 			"currency":           req.Currency,
 			"from_account_id":    req.FromAccountID,
-			"to_account_id":     req.ToAccountID,
+			"to_account_id":      req.ToAccountID,
 		},
 	})
 }
-

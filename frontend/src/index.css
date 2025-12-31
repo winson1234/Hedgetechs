@@ -2,7 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
   margin: 0;
@@ -20,9 +22,11 @@ body {
     transform: translateX(-100%);
     opacity: 0;
   }
+
   50% {
     opacity: 1;
   }
+
   100% {
     transform: translateX(100%);
     opacity: 0;
@@ -34,9 +38,20 @@ body {
 }
 
 @keyframes fadeInOut {
-  0%, 100% { opacity: 0; transform: translateY(10px); }
-  10%, 90% { opacity: 1; transform: translateY(0); }
+
+  0%,
+  100% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  10%,
+  90% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 .animate-fade-in-out {
   animation: fadeInOut 3s ease-in-out forwards;
 }
@@ -75,4 +90,9 @@ body:not(.light-mode) img[src*="KrypitalX"] {
 /* Login and Register pages: Always use darkened text (like light mode) */
 .login-page img[src*="KrypitalX"] {
   filter: brightness(0.65) saturate(2.2) contrast(1.2) !important;
+}
+
+/* Safe area padding for mobile devices (iOS home bar support) */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
 }

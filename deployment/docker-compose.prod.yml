@@ -78,6 +78,35 @@ services:
       retries: 5
 
   # ============================================
+  # Keycloak Identity Provider
+  # ============================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: brokerage-keycloak-prod
+    restart: always
+    command: start --optimized --proxy edge --import-realm
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-brokerage}
+      - KC_DB_USERNAME=${POSTGRES_USER:-postgres}
+      - KC_DB_PASSWORD=${POSTGRES_PASSWORD}
+      - KC_DB_SCHEMA=public
+      - KC_HOSTNAME=trade.hedgetechs.com
+      - KC_PROXY=edge
+      - KC_HTTP_RELATIVE_PATH=/auth
+    ports:
+      - "127.0.0.1:8082:8080"
+    volumes:
+      - ./keycloak-config/realm-export.json:/opt/keycloak/data/import/realm.json
+    networks:
+      - brokerage-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ============================================
   # Database Initialization (Runs once)
   # ============================================
   db-init:
@@ -181,6 +210,11 @@ services:
       - AWS_AI_ACCESS_KEY=${AWS_AI_ACCESS_KEY}
       - AWS_AI_SECRET_KEY=${AWS_AI_SECRET_KEY}
       - AWS_AI_REGION=${AWS_AI_REGION:-us-east-1}
+
+      # ============================================
+      # IDENTITY PROVIDER (Internal Docker Network)
+      # ============================================
+      - KEYCLOAK_URL=http://keycloak:8080/auth
       
       # ============================================
       # ENVIRONMENT

@@ -309,18 +309,17 @@ func CreateNotification(ctx context.Context, pool *pgxpool.Pool, userID int64, n
 	log.Printf("CreateNotification: Creating notification for user_id=%d, type=%s, title=%s", userID, notificationType, title)
 
 	_, err = pool.Exec(ctx,
-		`INSERT INTO notifications (user_id, type, title, message, metadata, created_at)
-		 VALUES ($1, $2, $3, $4, $5, NOW())`,
-		userID, notificationType, title, message, metadataValue,
+		`INSERT INTO notifications (id, user_id, type, title, message, metadata, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+		uuid.New(), userID, notificationType, title, message, metadataValue,
 	)
 	if err != nil {
-		log.Printf("CreateNotification: Failed to create notification: %v (user_id=%d, type=%s, title=%s)", 
+		log.Printf("CreateNotification: Failed to create notification: %v (user_id=%d, type=%s, title=%s)",
 			err, userID, notificationType, title)
 		return err
 	}
 
-	log.Printf("CreateNotification: Successfully created notification for user_id=%d, type=%s, title=%s", 
+	log.Printf("CreateNotification: Successfully created notification for user_id=%d, type=%s, title=%s",
 		userID, notificationType, title)
 	return nil
 }
-

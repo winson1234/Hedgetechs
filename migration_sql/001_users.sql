@@ -16,8 +16,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TABLE public.users (
-    user_id bigserial NOT NULL,
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    user_id bigint NOT NULL,
+    keycloak_id uuid NOT NULL,
     first_name character varying(100) NOT NULL,
     last_name character varying(100) NOT NULL,
     email character varying(255) NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE public.users (
     avatar_url text NULL,
     CONSTRAINT users_pkey PRIMARY KEY (user_id),
     CONSTRAINT users_email_key UNIQUE (email),
-    CONSTRAINT users_id_key UNIQUE (id)
+    CONSTRAINT users_keycloak_id_key UNIQUE (keycloak_id)
 ) TABLESPACE pg_default;
 
 CREATE INDEX IF NOT EXISTS idx_users_active_created ON public.users USING btree (is_active, created_at DESC) TABLESPACE pg_default
@@ -48,7 +48,7 @@ CREATE INDEX IF NOT EXISTS idx_users_created_at ON public.users USING btree (cre
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON public.users USING btree (email) TABLESPACE pg_default;
 
-CREATE INDEX IF NOT EXISTS idx_users_id ON public.users USING btree (id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_users_keycloak_id ON public.users USING btree (keycloak_id) TABLESPACE pg_default;
 
 CREATE INDEX IF NOT EXISTS idx_users_is_active ON public.users USING btree (is_active) TABLESPACE pg_default;
 

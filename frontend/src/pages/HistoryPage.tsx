@@ -149,7 +149,7 @@ const TransactionRow = memo(({
   onClick: () => void;
 }) => {
   const account = accounts.find((a) => a.id === transaction.accountId);
-  
+
   // Determine if transaction is positive (credit) or negative (debit)
   let isPositive = false;
   if (transaction.type === 'deposit') {
@@ -159,7 +159,7 @@ const TransactionRow = memo(({
     isPositive = transaction.description?.includes('Transfer from') || false;
   }
   // Withdrawals are always negative (debit)
-  
+
   const isDemoAdjustment = transaction.description?.includes('Demo Balance Adjustment');
 
   const icon = useMemo(() => {
@@ -176,7 +176,7 @@ const TransactionRow = memo(({
     // Normalize transaction type (backend uses 'withdrawal', frontend uses 'withdraw')
     // Handle both 'withdraw' and 'withdrawal' types from backend
     const normalizedType: TransactionType = (transaction.type === 'withdraw' || (transaction.type as string) === 'withdrawal') ? 'withdraw' : transaction.type;
-    
+
     const iconMap: Record<TransactionType, JSX.Element> = {
       deposit: (
         <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
@@ -213,11 +213,11 @@ const TransactionRow = memo(({
 
   const description = useMemo(() => {
     const hasRejectionReason = transaction.status === 'failed' && transaction.errorMessage;
-    
+
     // Normalize transaction type (backend uses 'withdrawal', frontend uses 'withdraw')
     // Handle both 'withdraw' and potential 'withdrawal' from backend
     const txType: TransactionType = (transaction.type === 'withdraw' || (transaction.type as string) === 'withdrawal') ? 'withdraw' : transaction.type;
-    
+
     switch (txType) {
       case 'deposit':
         return (
@@ -256,7 +256,7 @@ const TransactionRow = memo(({
       case 'withdraw': {
         // Build withdrawal description
         let withdrawalDesc = transaction.description;
-        
+
         // Remove outdated status text from description (status badge shows current status)
         if (withdrawalDesc) {
           withdrawalDesc = withdrawalDesc
@@ -266,7 +266,7 @@ const TransactionRow = memo(({
             .replace(/\s*\(Rejected\)/gi, '')
             .trim();
         }
-        
+
         if (!withdrawalDesc) {
           // Try to build from metadata
           if (transaction.metadata?.bankName) {
@@ -281,12 +281,12 @@ const TransactionRow = memo(({
             withdrawalDesc = 'Withdrawal request';
           }
         }
-        
+
         // Extract withdrawal reference ID from description if present
         // Format: "Withdrawal request WTH-20251216-000009 - USD 10.00"
         const withdrawalMatch = withdrawalDesc.match(/Withdrawal request\s+([A-Z]+-\d{8}-\d+)/i);
         const referenceId = withdrawalMatch ? withdrawalMatch[1] : null;
-        
+
         // Build clean description
         if (referenceId) {
           // Extract currency and amount if present in original description
@@ -297,17 +297,17 @@ const TransactionRow = memo(({
             withdrawalDesc = `Withdrawal ${referenceId}`;
           }
         }
-        
+
         // Add transaction number if available and not already included
         if (transaction.transactionNumber && !withdrawalDesc.includes(transaction.transactionNumber)) {
           withdrawalDesc = `${transaction.transactionNumber} - ${withdrawalDesc}`;
         }
-        
+
         // Add account info if available
         if (account) {
           withdrawalDesc += ` ← Account ${formatAccountId(account.account_id, account.type)}`;
         }
-        
+
         return (
           <div>
             <p className="font-medium text-slate-900 dark:text-slate-100">Withdrawal</p>
@@ -702,13 +702,13 @@ export default function HistoryPage() {
     // Get live account IDs for filtering (use both id and account_id for matching)
     const liveAccountIds = new Set(liveAccounts.map(acc => acc.id));
     const liveAccountIdsByAccountId = new Set(liveAccounts.map(acc => acc.account_id?.toString()));
-    
+
     // Filter out position_close transactions as they're already shown as closed positions
     // Also filter to only show live account transactions
     // Include transfers even if account ID doesn't match (they might be for accounts not yet loaded)
     const filteredTransactions = transactions.filter(t => {
       if (t.type === 'position_close') return false;
-      
+
       // For transfers, be very lenient - transfers are always between user's own accounts
       // So if we have any live accounts, show all transfers (they belong to this user)
       // This fixes the issue where transfers don't show up if account IDs don't match exactly
@@ -719,11 +719,11 @@ export default function HistoryPage() {
           return true; // Show all transfers for users with live accounts
         }
         // Fallback: try to match account IDs if no live accounts (shouldn't happen normally)
-        return liveAccountIds.has(t.accountId) || 
-               liveAccountIdsByAccountId.has(t.accountId) ||
-               (t.targetAccountId && (liveAccountIds.has(t.targetAccountId) || liveAccountIdsByAccountId.has(t.targetAccountId)));
+        return liveAccountIds.has(t.accountId) ||
+          liveAccountIdsByAccountId.has(t.accountId) ||
+          (t.targetAccountId && (liveAccountIds.has(t.targetAccountId) || liveAccountIdsByAccountId.has(t.targetAccountId)));
       }
-      
+
       // For other transaction types, require exact account ID match
       return liveAccountIds.has(t.accountId) || liveAccountIdsByAccountId.has(t.accountId);
     });
@@ -762,7 +762,7 @@ export default function HistoryPage() {
   const demoHistory = useMemo<HistoryItem[]>(() => {
     // Get demo account IDs for filtering
     const demoAccountIds = new Set(demoAccounts.map(acc => acc.id));
-    
+
     // Filter executed orders for demo accounts (only spot orders)
     const demoExecutedOrders = executedOrders.filter((o) => {
       const orderWithProductType = o as ExecutedOrder & { product_type?: string };
@@ -792,13 +792,13 @@ export default function HistoryPage() {
   const tabCounts = useMemo(() => {
     // For 'all' tab, exclude pending orders since they have their own tab
     const allWithoutPending = allHistory.filter(item => item.itemType !== 'pendingOrder');
-    
+
     // Count from allHistory to ensure we only count live account items
     const openOrdersCount = allHistory.filter(item => item.itemType === 'pendingOrder').length;
     const tradesCount = allHistory.filter(item => item.itemType === 'executedOrder').length;
     const transactionsCount = allHistory.filter(item => item.itemType === 'transaction').length;
     const positionsCount = allHistory.filter(item => item.itemType === 'closedPosition').length;
-    
+
     return {
       all: allWithoutPending.length,
       openOrders: openOrdersCount,
@@ -842,25 +842,25 @@ export default function HistoryPage() {
         if (item.itemType === 'transaction') {
           const txn = item as Transaction;
           return txn.transactionNumber.toLowerCase().includes(query) ||
-                 txn.type.includes(query) ||
-                 txn.amount.toString().includes(query) ||
-                 txn.accountId.toString().includes(query);
+            txn.type.includes(query) ||
+            txn.amount.toString().includes(query) ||
+            txn.accountId.toString().includes(query);
         } else if (item.itemType === 'executedOrder') {
           const order = item as ExecutedOrder;
           return (order.orderNumber && order.orderNumber.toLowerCase().includes(query)) ||
-                 order.symbol.toLowerCase().includes(query) ||
-                 order.amount.toString().includes(query);
+            order.symbol.toLowerCase().includes(query) ||
+            order.amount.toString().includes(query);
         } else if (item.itemType === 'pendingOrder') {
           const order = item as PendingOrder;
           return (order.orderNumber && order.orderNumber.toLowerCase().includes(query)) ||
-                 order.symbol.toLowerCase().includes(query) ||
-                 order.amount.toString().includes(query);
+            order.symbol.toLowerCase().includes(query) ||
+            order.amount.toString().includes(query);
         } else {
           const position = item as ClosedPosition;
           return position.contract_number.toLowerCase().includes(query) ||
-                 position.symbol.toLowerCase().includes(query) ||
-                 position.side.toLowerCase().includes(query) ||
-                 (position.pnl && position.pnl.toString().includes(query));
+            position.symbol.toLowerCase().includes(query) ||
+            position.side.toLowerCase().includes(query) ||
+            (position.pnl && position.pnl.toString().includes(query));
         }
       });
     }
@@ -941,25 +941,25 @@ export default function HistoryPage() {
       case 'amount-desc':
         return sorted.sort((a, b) => {
           const amountA = a.itemType === 'transaction' ? (a as Transaction).amount :
-                          a.itemType === 'executedOrder' ? (a as ExecutedOrder).total :
-                          a.itemType === 'pendingOrder' ? (a as PendingOrder).amount * (a as PendingOrder).price :
-                          Math.abs((a as ClosedPosition).pnl || 0);
+            a.itemType === 'executedOrder' ? (a as ExecutedOrder).total :
+              a.itemType === 'pendingOrder' ? (a as PendingOrder).amount * (a as PendingOrder).price :
+                Math.abs((a as ClosedPosition).pnl || 0);
           const amountB = b.itemType === 'transaction' ? (b as Transaction).amount :
-                          b.itemType === 'executedOrder' ? (b as ExecutedOrder).total :
-                          b.itemType === 'pendingOrder' ? (b as PendingOrder).amount * (b as PendingOrder).price :
-                          Math.abs((b as ClosedPosition).pnl || 0);
+            b.itemType === 'executedOrder' ? (b as ExecutedOrder).total :
+              b.itemType === 'pendingOrder' ? (b as PendingOrder).amount * (b as PendingOrder).price :
+                Math.abs((b as ClosedPosition).pnl || 0);
           return amountB - amountA;
         });
       case 'amount-asc':
         return sorted.sort((a, b) => {
           const amountA = a.itemType === 'transaction' ? (a as Transaction).amount :
-                          a.itemType === 'executedOrder' ? (a as ExecutedOrder).total :
-                          a.itemType === 'pendingOrder' ? (a as PendingOrder).amount * (a as PendingOrder).price :
-                          Math.abs((a as ClosedPosition).pnl || 0);
+            a.itemType === 'executedOrder' ? (a as ExecutedOrder).total :
+              a.itemType === 'pendingOrder' ? (a as PendingOrder).amount * (a as PendingOrder).price :
+                Math.abs((a as ClosedPosition).pnl || 0);
           const amountB = b.itemType === 'transaction' ? (b as Transaction).amount :
-                          b.itemType === 'executedOrder' ? (b as ExecutedOrder).total :
-                          b.itemType === 'pendingOrder' ? (b as PendingOrder).amount * (b as PendingOrder).price :
-                          Math.abs((b as ClosedPosition).pnl || 0);
+            b.itemType === 'executedOrder' ? (b as ExecutedOrder).total :
+              b.itemType === 'pendingOrder' ? (b as PendingOrder).amount * (b as PendingOrder).price :
+                Math.abs((b as ClosedPosition).pnl || 0);
           return amountA - amountB;
         });
       default:
@@ -1010,11 +1010,11 @@ export default function HistoryPage() {
   // Stats for Summary Cards (matching PNG)
   const cardStats = useMemo(() => {
     const totalTxn = tabCounts.all; // or use transactions.length if specifically for wallet
-    
+
     const totalDeposited = transactions
       .filter(t => t.type === 'deposit' && t.status === 'completed')
       .reduce((sum, t) => sum + t.amount, 0);
-      
+
     const totalWithdrawn = transactions
       .filter(t => {
         const isWithdraw = t.type === 'withdraw' || (t.type as string) === 'withdrawal';
@@ -1059,7 +1059,7 @@ export default function HistoryPage() {
               <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{cardStats.totalTxn}</p>
             </div>
             <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             </div>
           </div>
 
@@ -1070,7 +1070,7 @@ export default function HistoryPage() {
               <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{formatCurrency(cardStats.totalDeposited, 'USD')}</p>
             </div>
             <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             </div>
           </div>
 
@@ -1081,7 +1081,7 @@ export default function HistoryPage() {
               <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{formatCurrency(cardStats.totalWithdrawn, 'USD')}</p>
             </div>
             <div className="h-10 w-10 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-rose-600 dark:text-rose-400">
-               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
             </div>
           </div>
 
@@ -1092,130 +1092,129 @@ export default function HistoryPage() {
               <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{cardStats.totalPending}</p>
             </div>
             <div className="h-10 w-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center text-yellow-600 dark:text-yellow-400">
-               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
           </div>
         </div>
 
         {/* Right Column: Main Panel with Tabs & List */}
         <div className="lg:col-span-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 h-fit">
-          
+
           {/* Top Toolbar: Search & Actions */}
           <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 items-center justify-between">
-             {/* Search Input */}
-             <div className="relative w-full sm:max-w-md">
-               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                 <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-               </div>
-               <input
-                  type="text"
-                  placeholder="Search instruments..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg leading-5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-               />
-             </div>
+            {/* Search Input */}
+            <div className="relative w-full sm:max-w-md">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Search instruments..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg leading-5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
 
-             {/* Buttons */}
-             <div className="flex items-center gap-3 w-full sm:w-auto">
-               <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center justify-center px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-1/2 sm:w-auto"
-               >
-                  <svg className="w-4 h-4 mr-2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                  Filters
-               </button>
-               <button
-                  onClick={handleExportCSV}
-                  className="flex items-center justify-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#00C0A2] hover:bg-[#00a085] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-1/2 sm:w-auto"
-               >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                  Export CSV
-               </button>
-             </div>
+            {/* Buttons */}
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center justify-center px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-1/2 sm:w-auto"
+              >
+                <svg className="w-4 h-4 mr-2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                Filters
+              </button>
+              <button
+                onClick={handleExportCSV}
+                className="flex items-center justify-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#00C0A2] hover:bg-[#00a085] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-1/2 sm:w-auto"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                Export CSV
+              </button>
+            </div>
           </div>
 
           {/* Filter Expansion (conditionally rendered) */}
           {showFilters && (
             <div className="p-5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-               {/* Reused filter logic from previous code */}
-               <div>
-                  <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Date Range</label>
-                  <select value={dateRange} onChange={(e) => setDateRange(e.target.value as DateRangeOption)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-sm"><option value="all">All Time</option><option value="today">Today</option><option value="week">Last 7 Days</option><option value="month">Last 30 Days</option></select>
-               </div>
-               <div>
-                  <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Status</label>
-                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as TransactionStatus | 'all')} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-sm"><option value="all">All Statuses</option><option value="completed">Completed</option><option value="pending">Pending</option></select>
-               </div>
-               <div>
-                  <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Type</label>
-                  <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as TransactionType | 'all')} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-sm"><option value="all">All Types</option><option value="deposit">Deposits</option><option value="withdraw">Withdrawals</option></select>
-               </div>
-               <div className="flex items-end">
-                   <button onClick={clearFilters} className="text-sm text-indigo-600 hover:text-indigo-800">Clear Filters</button>
-               </div>
+              {/* Reused filter logic from previous code */}
+              <div>
+                <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Date Range</label>
+                <select value={dateRange} onChange={(e) => setDateRange(e.target.value as DateRangeOption)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-sm"><option value="all">All Time</option><option value="today">Today</option><option value="week">Last 7 Days</option><option value="month">Last 30 Days</option></select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Status</label>
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as TransactionStatus | 'all')} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-sm"><option value="all">All Statuses</option><option value="completed">Completed</option><option value="pending">Pending</option></select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Type</label>
+                <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as TransactionType | 'all')} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-sm"><option value="all">All Types</option><option value="deposit">Deposits</option><option value="withdraw">Withdrawals</option></select>
+              </div>
+              <div className="flex items-end">
+                <button onClick={clearFilters} className="text-sm text-indigo-600 hover:text-indigo-800">Clear Filters</button>
+              </div>
             </div>
           )}
 
           {/* Tabs Navigation (Border Bottom Style) */}
-          <div className="border-b border-slate-200 dark:border-slate-800">
-            <nav className="flex -mb-px" aria-label="Tabs">
-               {[
-                 { id: 'all', label: 'All', count: tabCounts.all },
-                 { id: 'trades', label: 'Trades', count: tabCounts.trades },
-                 { id: 'transactions', label: 'Transactions', count: tabCounts.transactions },
-                 { id: 'positions', label: 'Positions', count: tabCounts.positions },
-                 { id: 'open-orders', label: 'Open Orders', count: tabCounts.openOrders },
-                 { id: 'demo', label: 'Demo', count: tabCounts.demo },
-               ].map((tab) => (
-                 <button
-                   key={tab.id}
-                   onClick={() => setActiveTab(tab.id as HistoryTab)}
-                   className={`whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
-                     activeTab === tab.id
-                       ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                       : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200'
-                   }`}
-                 >
-                   {tab.label} ({tab.count})
-                 </button>
-               ))}
+          <div className="border-b border-slate-200 dark:border-slate-800 overflow-x-auto hide-scrollbar">
+            <nav className="flex -mb-px min-w-max" aria-label="Tabs">
+              {[
+                { id: 'all', label: 'All', count: tabCounts.all },
+                { id: 'trades', label: 'Trades', count: tabCounts.trades },
+                { id: 'transactions', label: 'Transactions', count: tabCounts.transactions },
+                { id: 'positions', label: 'Positions', count: tabCounts.positions },
+                { id: 'open-orders', label: 'Open Orders', count: tabCounts.openOrders },
+                { id: 'demo', label: 'Demo', count: tabCounts.demo },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as HistoryTab)}
+                  className={`whitespace-nowrap py-4 px-3 md:px-6 border-b-2 font-medium text-xs sm:text-sm transition-colors ${activeTab === tab.id
+                      ? 'border-[#00C0A2] text-[#00C0A2] dark:text-[#00C0A2]'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200'
+                    }`}
+                >
+                  {tab.label} ({tab.count})
+                </button>
+              ))}
             </nav>
           </div>
 
           {/* Main Content / List */}
           <div className="min-h-[400px]">
-             {paginatedHistory.length === 0 ? (
-                /* Empty State Matching PNG */
-                <div className="flex flex-col items-center justify-center h-[400px] text-center">
-                   <div className="w-16 h-16 text-slate-300 dark:text-slate-600 mb-4">
-                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                   </div>
-                   <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">No history yet</h3>
-                   <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Your transaction history will appear here.</p>
+            {paginatedHistory.length === 0 ? (
+              /* Empty State Matching PNG */
+              <div className="flex flex-col items-center justify-center h-[400px] text-center">
+                <div className="w-16 h-16 text-slate-300 dark:text-slate-600 mb-4">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                 </div>
-             ) : (
-                <div className="p-4 space-y-2">
-                  {paginatedHistory.map((item, index) => {
-                     const key = `${item.itemType}-${item.id}-${index}`;
-                     if (item.itemType === 'transaction') return <TransactionRow key={key} transaction={item as Transaction} accounts={accounts} onClick={() => handleItemClick(item)} />;
-                     if (item.itemType === 'executedOrder') return <ExecutedOrderRow key={key} order={item as ExecutedOrder} onClick={() => handleItemClick(item)} />;
-                     if (item.itemType === 'pendingOrder') return <PendingOrderRow key={key} order={item as PendingOrder} onClick={() => handleItemClick(item)} />;
-                     return <ClosedPositionRow key={key} position={item as ClosedPosition} onClick={() => handleItemClick(item)} />;
-                  })}
+                <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">No history yet</h3>
+                <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Your transaction history will appear here.</p>
+              </div>
+            ) : (
+              <div className="p-4 space-y-2">
+                {paginatedHistory.map((item, index) => {
+                  const key = `${item.itemType}-${item.id}-${index}`;
+                  if (item.itemType === 'transaction') return <TransactionRow key={key} transaction={item as Transaction} accounts={accounts} onClick={() => handleItemClick(item)} />;
+                  if (item.itemType === 'executedOrder') return <ExecutedOrderRow key={key} order={item as ExecutedOrder} onClick={() => handleItemClick(item)} />;
+                  if (item.itemType === 'pendingOrder') return <PendingOrderRow key={key} order={item as PendingOrder} onClick={() => handleItemClick(item)} />;
+                  return <ClosedPositionRow key={key} position={item as ClosedPosition} onClick={() => handleItemClick(item)} />;
+                })}
 
-                  {/* Pagination Logic preserved inside the panel */}
-                  {totalPages > 1 && (
-                    <div className="flex justify-between items-center pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
-                       <span className="text-sm text-slate-500">Page {currentPage} of {totalPages}</span>
-                       <div className="flex gap-2">
-                          <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1} className="px-3 py-1 border rounded text-sm hover:bg-slate-50 disabled:opacity-50">Prev</button>
-                          <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage === totalPages} className="px-3 py-1 border rounded text-sm hover:bg-slate-50 disabled:opacity-50">Next</button>
-                       </div>
+                {/* Pagination Logic preserved inside the panel */}
+                {totalPages > 1 && (
+                  <div className="flex justify-between items-center pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+                    <span className="text-sm text-slate-500">Page {currentPage} of {totalPages}</span>
+                    <div className="flex gap-2">
+                      <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 border rounded text-sm hover:bg-slate-50 disabled:opacity-50">Prev</button>
+                      <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 border rounded text-sm hover:bg-slate-50 disabled:opacity-50">Next</button>
                     </div>
-                  )}
-                </div>
-             )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

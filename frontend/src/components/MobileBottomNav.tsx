@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 // Icon component for mobile navigation
 const MobileNavIcon = ({ iconName }: { iconName: string }) => {
   const icons: Record<string, JSX.Element> = {
-  
+
     account: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -41,13 +41,12 @@ const MobileNavLink = ({ icon, label, to, isActive }: MobileNavLinkProps) => {
   return (
     <Link
       to={to}
-      className={`flex-1 flex flex-col items-center justify-center h-16 transition-colors relative ${
-        isActive
-          ? 'text-indigo-600 dark:text-indigo-400'
-          : 'text-slate-500 dark:text-slate-400'
-      }`}
+      className={`flex-1 flex flex-col items-center justify-center h-16 transition-colors relative ${isActive
+        ? 'text-[#00C0A2] dark:text-[#00C0A2]'
+        : 'text-slate-500 dark:text-slate-400'
+        }`}
     >
-      {isActive && <div className="absolute top-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400"></div>}
+      {isActive && <div className="absolute top-0 left-0 right-0 h-0.5 bg-[#00C0A2] dark:bg-[#00C0A2]"></div>}
       <MobileNavIcon iconName={icon} />
       <span className="text-xs mt-1 font-medium">{label}</span>
     </Link>
@@ -58,8 +57,8 @@ export default function MobileBottomNav() {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 h-16">
-     
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe">
+
       <MobileNavLink
         icon="account"
         label="Account"

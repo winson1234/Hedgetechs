@@ -115,10 +115,10 @@ export default function TradingPanel() {
     if (currentPrice > 0 && limitPrice === '') {
       setLimitPrice(formatPrice(currentPrice));
     }
-     // If current price becomes 0 (e.g., instrument change reset), clear limit price
-     else if (currentPrice <= 0 && limitPrice !== '') {
-        setLimitPrice('');
-     }
+    // If current price becomes 0 (e.g., instrument change reset), clear limit price
+    else if (currentPrice <= 0 && limitPrice !== '') {
+      setLimitPrice('');
+    }
     // Don't reset limitPrice automatically if currentPrice changes later, let user control it
   }, [currentPrice, limitPrice]);
 
@@ -128,7 +128,7 @@ export default function TradingPanel() {
   useEffect(() => {
     // Reset ALL state including currentPrice
     setCurrentPrice(0);
-    setLimitPrice(''); 
+    setLimitPrice('');
     setStopPrice('');
     setAmount('');
     setPercentage(0);
@@ -153,8 +153,8 @@ export default function TradingPanel() {
       if (!isNaN(parsedLimitPrice) && parsedLimitPrice > 0) {
         priceForCalc = parsedLimitPrice; // Use limit price if valid
       } else {
-          // If limit price is invalid for limit/stop-limit, use current price as fallback for calculation
-          priceForCalc = currentPrice > 0 ? currentPrice : 0;
+        // If limit price is invalid for limit/stop-limit, use current price as fallback for calculation
+        priceForCalc = currentPrice > 0 ? currentPrice : 0;
       }
     }
 
@@ -194,14 +194,14 @@ export default function TradingPanel() {
   // Calculate fee amount
   const getFeeAmount = useCallback((): number => {
     let priceForFee = currentPrice;
-    if ((orderType === 'limit' || orderType === 'stop-limit') ) {
-        const parsedLimitPrice = parseFloat(limitPrice);
-        if(!isNaN(parsedLimitPrice) && parsedLimitPrice > 0) {
-            priceForFee = parsedLimitPrice;
-        } else {
-            // Use current price if limit price is invalid for limit/stop-limit
-             priceForFee = currentPrice > 0 ? currentPrice : 0;
-        }
+    if ((orderType === 'limit' || orderType === 'stop-limit')) {
+      const parsedLimitPrice = parseFloat(limitPrice);
+      if (!isNaN(parsedLimitPrice) && parsedLimitPrice > 0) {
+        priceForFee = parsedLimitPrice;
+      } else {
+        // Use current price if limit price is invalid for limit/stop-limit
+        priceForFee = currentPrice > 0 ? currentPrice : 0;
+      }
     }
     const qty = parseFloat(amount);
     if (isNaN(priceForFee) || isNaN(qty) || priceForFee <= 0 || qty <= 0) {
@@ -214,14 +214,14 @@ export default function TradingPanel() {
   // Calculate total including fee
   const getTotal = useCallback((): string => {
     let priceForTotal = currentPrice;
-     if ((orderType === 'limit' || orderType === 'stop-limit') ) {
-        const parsedLimitPrice = parseFloat(limitPrice);
-        if(!isNaN(parsedLimitPrice) && parsedLimitPrice > 0) {
-            priceForTotal = parsedLimitPrice;
-        } else {
-             // Use current price if limit price is invalid for limit/stop-limit
-             priceForTotal = currentPrice > 0 ? currentPrice : 0;
-        }
+    if ((orderType === 'limit' || orderType === 'stop-limit')) {
+      const parsedLimitPrice = parseFloat(limitPrice);
+      if (!isNaN(parsedLimitPrice) && parsedLimitPrice > 0) {
+        priceForTotal = parsedLimitPrice;
+      } else {
+        // Use current price if limit price is invalid for limit/stop-limit
+        priceForTotal = currentPrice > 0 ? currentPrice : 0;
+      }
     }
     const qty = parseFloat(amount);
     if (isNaN(priceForTotal) || isNaN(qty) || priceForTotal <= 0 || qty <= 0) {
@@ -237,22 +237,22 @@ export default function TradingPanel() {
     // Determine the price to use for calculation
     let price = currentPrice;
     if ((orderType === 'limit' || orderType === 'stop-limit')) {
-        const parsedLimitPrice = parseFloat(limitPrice);
-        if (!isNaN(parsedLimitPrice) && parsedLimitPrice > 0) {
-            price = parsedLimitPrice;
-        } else if (currentPrice <= 0) {
-            // If limit price is invalid AND current price is invalid, cannot calculate
-            console.warn('Cannot calculate percentage amount: Invalid price.');
-            setAmount('0');
-            setPercentage(pct);
-            return;
-        }
-        // Fallback to current price if limit price is invalid but current price is valid
-        else {
-             price = currentPrice;
-        }
+      const parsedLimitPrice = parseFloat(limitPrice);
+      if (!isNaN(parsedLimitPrice) && parsedLimitPrice > 0) {
+        price = parsedLimitPrice;
+      } else if (currentPrice <= 0) {
+        // If limit price is invalid AND current price is invalid, cannot calculate
+        console.warn('Cannot calculate percentage amount: Invalid price.');
+        setAmount('0');
+        setPercentage(pct);
+        return;
+      }
+      // Fallback to current price if limit price is invalid but current price is valid
+      else {
+        price = currentPrice;
+      }
     }
-     // If price is still invalid (e.g., market order with no current price yet)
+    // If price is still invalid (e.g., market order with no current price yet)
     if (isNaN(price) || price <= 0) {
       console.warn('Invalid price for percentage calculation:', price);
       setAmount('0'); // Set amount to 0 if price is invalid
@@ -264,7 +264,7 @@ export default function TradingPanel() {
     const usdToSpend = usdBalance * (pct / 100);
     // Estimate fee and subtract it before calculating amount
     const effectivePrice = price * (1 + feeLevel / 100);
-     // Avoid division by zero if effectivePrice is somehow zero
+    // Avoid division by zero if effectivePrice is somehow zero
     const calculatedAmount = effectivePrice > 0 ? usdToSpend / effectivePrice : 0;
 
     // Ensure amount is not negative and format
@@ -299,25 +299,25 @@ export default function TradingPanel() {
     // Stop price validation for stop-limit orders
     const stopPriceNum = parseFloat(stopPrice);
     if (orderType === 'stop-limit' && (isNaN(stopPriceNum) || stopPriceNum <= 0)) {
-        console.error('Invalid stop price entered.'); // Log error instead of alert
-        return;
+      console.error('Invalid stop price entered.'); // Log error instead of alert
+      return;
     }
     // Additional validation for stop-limit: stop price vs current price
     if (orderType === 'stop-limit') {
-        // Ensure currentPrice is valid before comparing
-         if (isNaN(currentPrice) || currentPrice <= 0) {
-            console.error("Cannot validate stop price: Current market price is unknown.");
-            return;
-         }
-        // Allow stop price to be equal for triggering immediately if needed
-        if (side === 'buy' && stopPriceNum < currentPrice) {
-            console.error('Buy Stop price must be at or above the current market price.'); // Log error
-            return;
-        }
-        if (side === 'sell' && stopPriceNum > currentPrice) {
-            console.error('Sell Stop price must be at or below the current market price.'); // Log error
-            return;
-        }
+      // Ensure currentPrice is valid before comparing
+      if (isNaN(currentPrice) || currentPrice <= 0) {
+        console.error("Cannot validate stop price: Current market price is unknown.");
+        return;
+      }
+      // Allow stop price to be equal for triggering immediately if needed
+      if (side === 'buy' && stopPriceNum < currentPrice) {
+        console.error('Buy Stop price must be at or above the current market price.'); // Log error
+        return;
+      }
+      if (side === 'sell' && stopPriceNum > currentPrice) {
+        console.error('Sell Stop price must be at or below the current market price.'); // Log error
+        return;
+      }
     }
 
 
@@ -478,66 +478,66 @@ export default function TradingPanel() {
 
     // Create TP/SL orders if enabled (applies to all order types)
     if (enableTPSL && activeAccountId) {
-        const tpTriggerNum = parseFloat(tpTrigger);
-        const tpLimitNum = parseFloat(tpLimit);
-        const slTriggerNum = parseFloat(slTrigger);
-        const slLimitNum = parseFloat(slLimit);
+      const tpTriggerNum = parseFloat(tpTrigger);
+      const tpLimitNum = parseFloat(tpLimit);
+      const slTriggerNum = parseFloat(slTrigger);
+      const slLimitNum = parseFloat(slLimit);
 
-        // Validate TP/SL prices with directional checks
-        let hasValidTP = !isNaN(tpTriggerNum) && tpTriggerNum > 0 && !isNaN(tpLimitNum) && tpLimitNum > 0;
-        let hasValidSL = !isNaN(slTriggerNum) && slTriggerNum > 0 && !isNaN(slLimitNum) && slLimitNum > 0;
+      // Validate TP/SL prices with directional checks
+      let hasValidTP = !isNaN(tpTriggerNum) && tpTriggerNum > 0 && !isNaN(tpLimitNum) && tpLimitNum > 0;
+      let hasValidSL = !isNaN(slTriggerNum) && slTriggerNum > 0 && !isNaN(slLimitNum) && slLimitNum > 0;
 
-        // Additional validation: ensure TP is favorable and SL is unfavorable
-        if (hasValidTP) {
-          if (side === 'buy' && tpTriggerNum <= currentPrice) {
-            console.error('TP trigger must be above entry price for buy orders');
-            hasValidTP = false;
-          } else if (side === 'sell' && tpTriggerNum >= currentPrice) {
-            console.error('TP trigger must be below entry price for sell orders');
-            hasValidTP = false;
-          }
-        }
-
-        if (hasValidSL) {
-          if (side === 'buy' && slTriggerNum >= currentPrice) {
-            console.error('SL trigger must be below entry price for buy orders');
-            hasValidSL = false;
-          } else if (side === 'sell' && slTriggerNum <= currentPrice) {
-            console.error('SL trigger must be above entry price for sell orders');
-            hasValidSL = false;
-          }
-        }
-
-        // Create TP order (stop-limit order in opposite direction)
-        if (hasValidTP) {
-          dispatch(createPendingOrder({
-            account_id: activeAccountId,
-            type: 'stop_limit',
-            side: side === 'buy' ? 'sell' : 'buy', // Opposite side to close position
-            symbol: activeInstrument,
-            quantity: qty,
-            trigger_price: tpTriggerNum,
-            limit_price: tpLimitNum,
-            leverage: isCFD ? leverage : 1,
-            product_type: selectedProductType,
-          }));
-        }
-
-        // Create SL order (stop-limit order in opposite direction)
-        if (hasValidSL) {
-          dispatch(createPendingOrder({
-            account_id: activeAccountId,
-            type: 'stop_limit',
-            side: side === 'buy' ? 'sell' : 'buy', // Opposite side to close position
-            symbol: activeInstrument,
-            quantity: qty,
-            trigger_price: slTriggerNum,
-            limit_price: slLimitNum,
-            leverage: isCFD ? leverage : 1,
-            product_type: selectedProductType,
-          }));
+      // Additional validation: ensure TP is favorable and SL is unfavorable
+      if (hasValidTP) {
+        if (side === 'buy' && tpTriggerNum <= currentPrice) {
+          console.error('TP trigger must be above entry price for buy orders');
+          hasValidTP = false;
+        } else if (side === 'sell' && tpTriggerNum >= currentPrice) {
+          console.error('TP trigger must be below entry price for sell orders');
+          hasValidTP = false;
         }
       }
+
+      if (hasValidSL) {
+        if (side === 'buy' && slTriggerNum >= currentPrice) {
+          console.error('SL trigger must be below entry price for buy orders');
+          hasValidSL = false;
+        } else if (side === 'sell' && slTriggerNum <= currentPrice) {
+          console.error('SL trigger must be above entry price for sell orders');
+          hasValidSL = false;
+        }
+      }
+
+      // Create TP order (stop-limit order in opposite direction)
+      if (hasValidTP) {
+        dispatch(createPendingOrder({
+          account_id: activeAccountId,
+          type: 'stop_limit',
+          side: side === 'buy' ? 'sell' : 'buy', // Opposite side to close position
+          symbol: activeInstrument,
+          quantity: qty,
+          trigger_price: tpTriggerNum,
+          limit_price: tpLimitNum,
+          leverage: isCFD ? leverage : 1,
+          product_type: selectedProductType,
+        }));
+      }
+
+      // Create SL order (stop-limit order in opposite direction)
+      if (hasValidSL) {
+        dispatch(createPendingOrder({
+          account_id: activeAccountId,
+          type: 'stop_limit',
+          side: side === 'buy' ? 'sell' : 'buy', // Opposite side to close position
+          symbol: activeInstrument,
+          quantity: qty,
+          trigger_price: slTriggerNum,
+          limit_price: slLimitNum,
+          leverage: isCFD ? leverage : 1,
+          product_type: selectedProductType,
+        }));
+      }
+    }
 
     // Reset form after placing order
     setAmount('');
@@ -545,6 +545,109 @@ export default function TradingPanel() {
     // Reset limit price to current price for convenience, keep stop price as is
     setLimitPrice(currentPrice > 0 ? formatPrice(currentPrice) : '');
     // setStopPrice(''); // User might want to reuse stop price
+  };
+
+  // Handle Hedge Order (Both Buy and Sell)
+  const handleHedgeOrder = async () => {
+    const price = currentPrice;
+    const qty = parseFloat(amount);
+
+    // Basic Validations
+    if (isNaN(qty) || qty <= 0) {
+      console.error('Invalid amount entered.');
+      return;
+    }
+    if (isNaN(price) || price <= 0) {
+      console.error('Invalid current price.');
+      dispatch(addToast({
+        type: 'error',
+        message: 'Cannot execute hedge order: Invalid current price',
+        duration: 5000,
+      }));
+      return;
+    }
+    if (!activeAccountId) {
+      console.error('No active account selected');
+      dispatch(addToast({
+        type: 'error',
+        message: 'No active account selected',
+        duration: 5000,
+      }));
+      return;
+    }
+
+    // Optimistic update: Deduct margin for both legs
+    const marginPerLeg = (qty * price) / leverage;
+    const totalMargin = marginPerLeg * 2;
+
+    dispatch(updateAccountBalanceOptimistic({
+      accountId: activeAccountId,
+      balanceDelta: -totalMargin,
+    }));
+
+    try {
+      // Generate pair ID for linking hedged positions
+      const pairId = self.crypto.randomUUID();
+
+      // Execute both Buy and Sell orders in parallel
+      const buyPromise = dispatch(executeMarketOrder({
+        account_id: activeAccountId,
+        symbol: activeInstrument,
+        side: 'buy',
+        amount_base: qty,
+        current_price: currentPrice,
+        leverage: leverage,
+        product_type: selectedProductType,
+        pair_id: pairId,
+      })).unwrap();
+
+      const sellPromise = dispatch(executeMarketOrder({
+        account_id: activeAccountId,
+        symbol: activeInstrument,
+        side: 'sell',
+        amount_base: qty,
+        current_price: currentPrice,
+        leverage: leverage,
+        product_type: selectedProductType,
+        pair_id: pairId,
+      })).unwrap();
+
+      await Promise.all([buyPromise, sellPromise]);
+
+      // Success
+      const orderDetails = `${selectedProductType.toUpperCase()} HEDGE: ${qty.toFixed(8)} ${baseCurrency} at ~$${currentPrice.toFixed(2)} (${leverage}x)`;
+
+      dispatch(addToast({
+        type: 'success',
+        message: `✓ Hedge Executed - ${orderDetails}`,
+        duration: 7000,
+      }));
+
+      // Refresh data
+      dispatch(fetchAccounts());
+      dispatch(fetchOrders(activeAccountId));
+      dispatch(triggerPositionsRefresh());
+      dispatch(setActiveMarketTab('positions'));
+
+      // Reset form
+      setAmount('');
+      setPercentage(0);
+      setLimitPrice(currentPrice > 0 ? formatPrice(currentPrice) : '');
+
+    } catch (error) {
+      // Revert optimistic update
+      dispatch(updateAccountBalanceOptimistic({
+        accountId: activeAccountId,
+        balanceDelta: totalMargin,
+      }));
+
+      console.error('Failed to execute hedge order:', error);
+      dispatch(addToast({
+        type: 'error',
+        message: `✗ Hedge Failed - ${error}`,
+        duration: 7000,
+      }));
+    }
   };
 
   return (
@@ -596,40 +699,37 @@ export default function TradingPanel() {
       {/* Order Type Tabs */}
       <div className="flex gap-1 px-4 pt-3 pb-2 bg-white dark:bg-slate-900">
         {/* ... Limit, Market, Stop-Limit buttons ... */}
-         <button
+        <button
           onClick={() => setOrderType('limit')}
-          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded transition ${
-            orderType === 'limit'
-              ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
-              : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700'
-          }`}
+          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded transition ${orderType === 'limit'
+            ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
+            : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700'
+            }`}
         >
           Limit
         </button>
         <button
           onClick={() => setOrderType('market')}
-          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded transition ${
-            orderType === 'market'
-              ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
-              : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700'
-          }`}
+          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded transition ${orderType === 'market'
+            ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
+            : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700'
+            }`}
         >
           Market
         </button>
         <button
           onClick={() => setOrderType('stop-limit')}
-          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded transition ${
-            orderType === 'stop-limit'
-              ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
-              : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700'
-          }`}
+          className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded transition ${orderType === 'stop-limit'
+            ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
+            : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700'
+            }`}
         >
           Stop-Limit
         </button>
       </div>
 
       {/* Available Balance Breakdown */}
-       <div className="mb-4 px-4 py-3 bg-slate-100 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+      <div className="mb-4 px-4 py-3 bg-slate-100 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center justify-between gap-2 mb-2.5">
           <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0">Available Balance</div>
           {/* Account Switcher */}
@@ -698,7 +798,7 @@ export default function TradingPanel() {
       {/* Order Form */}
       <div className="flex-1 flex flex-col gap-3 px-4 overflow-y-auto"> {/* Added pr-1 for scrollbar */}
         {/* Stop Price (only for stop-limit) */}
-         {orderType === 'stop-limit' && (
+        {orderType === 'stop-limit' && (
           <div>
             <label className="block text-xs font-semibold text-slate-400 mb-1.5">
               Stop Price
@@ -725,13 +825,13 @@ export default function TradingPanel() {
               {orderType === 'stop-limit' ? 'Limit Price' : 'Price'}
             </label>
             <div className="relative">
-                        <input
-              type="number"
-              value={limitPrice}
-              onChange={(e) => setLimitPrice(e.target.value)}
-              placeholder={currentPrice > 0 ? formatPrice(currentPrice) : '0.00'}
-              min="0" step="any"
-              className="
+              <input
+                type="number"
+                value={limitPrice}
+                onChange={(e) => setLimitPrice(e.target.value)}
+                placeholder={currentPrice > 0 ? formatPrice(currentPrice) : '0.00'}
+                min="0" step="any"
+                className="
                 w-full px-3 py-2 text-sm
                 bg-white dark:bg-slate-800
                 border border-slate-300 dark:border-slate-700
@@ -739,7 +839,7 @@ export default function TradingPanel() {
                 focus:outline-none focus:ring-1 focus:ring-[#00C0A2] focus:border-[#00C0A2]
                 text-slate-900 dark:text-slate-100
               "
-            />
+              />
 
               <span className="absolute right-3 top-2 text-xs text-slate-500 font-medium">{quoteCurrency}</span>
             </div>
@@ -760,29 +860,29 @@ export default function TradingPanel() {
               min="0" // Ensure non-negative input
               step="any" // Allow decimals
               className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-[#00C0A2] text-slate-900 dark:text-slate-100"
-              />
+            />
             <span className="absolute right-3 top-2 text-xs text-slate-500 font-medium">{baseCurrency}</span>
           </div>
         </div>
 
         <div>
-             <div className="flex gap-1.5">
-                {[25, 50, 75, 100].map((pct) => (
-                <button
-                    key={`buy-pct-${pct}`} // Renamed key
-                    onClick={() => calculateAmountFromPercentage(pct)} // Simplified onClick
-                    className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded transition ${
-                     // Simpler styling check based only on percentage
-                     percentage === pct
-                     ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
-                      : 'bg-slate-200 text-slate-700 hover:bg-slate-300 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200'
-                    }`}
-                    disabled={usdBalance <= 0} // Disable if no USD balance
-                >
-                    {pct}%
-                </button>
-                ))}
-            </div>
+          <div className="flex gap-1.5">
+            {[25, 50, 75, 100].map((pct) => (
+              <button
+                key={`buy-pct-${pct}`} // Renamed key
+                onClick={() => calculateAmountFromPercentage(pct)} // Simplified onClick
+                className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded transition ${
+                  // Simpler styling check based only on percentage
+                  percentage === pct
+                    ? 'bg-[#00C0A2] hover:bg-[#00a085] text-white'
+                    : 'bg-slate-200 text-slate-700 hover:bg-slate-300 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200'
+                  }`}
+                disabled={usdBalance <= 0} // Disable if no USD balance
+              >
+                {pct}%
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Leverage Selector (only for CFD accounts) */}
@@ -799,7 +899,7 @@ export default function TradingPanel() {
               focus:outline-none focus:ring-1 focus:ring-[#00C0A2] focus:border-[#00C0A2]
               
               dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700"
-                          >
+            >
               <option value="1">1x (No Leverage)</option>
               <option value="5">5x</option>
               <option value="10">10x</option>
@@ -817,295 +917,294 @@ export default function TradingPanel() {
         {/* TP/SL Toggle */}
         {/* Make this clickable but indicate placeholder */}
         <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
-  <label
-    className="flex items-center justify-between cursor-pointer"
-    title="TP/SL (Coming soon)"
-  >
-    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-      TP/SL
-    </span>
+          <label
+            className="flex items-center justify-between cursor-pointer"
+            title="TP/SL (Coming soon)"
+          >
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              TP/SL
+            </span>
 
-    <div className="relative">
-      <input
-        type="checkbox"
-        checked={enableTPSL}
-        onChange={(e) => setEnableTPSL(e.target.checked)}
-        className="sr-only peer"
-      />
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={enableTPSL}
+                onChange={(e) => setEnableTPSL(e.target.checked)}
+                className="sr-only peer"
+              />
 
-      {/* Track */}
-      <div className="
+              {/* Track */}
+              <div className="
         w-11 h-6 rounded-full transition
         bg-slate-300 peer-checked:bg-[#00C0A2]
         dark:bg-slate-700 dark:peer-checked:bg-[#00C0A2]
       "></div>
 
-      {/* Thumb */}
-      <div className="
+              {/* Thumb */}
+              <div className="
         absolute left-0.5 top-0.5 w-5 h-5 rounded-full transition
         bg-white peer-checked:translate-x-5
         shadow
       "></div>
-    </div>
-  </label>
-</div>
+            </div>
+          </label>
+        </div>
 
 
 
-       {/* TP/SL Advanced Options (Conditional Rendering) */}
-{enableTPSL && (
-  <div className="space-y-3 p-2.5 rounded border
+        {/* TP/SL Advanced Options (Conditional Rendering) */}
+        {enableTPSL && (
+          <div className="space-y-3 p-2.5 rounded border
     bg-slate-100 border-slate-300
     dark:bg-slate-800/50 dark:border-slate-700
   ">
-    {/* Take Profit */}
-    <div>
-      <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-2">
-        Take Profit
-      </div>
-
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="block text-xs mb-1 text-slate-600 dark:text-slate-400">
-            TP Trigger
-          </label>
-          <input
-            type="number"
-            value={tpTrigger}
-            onChange={(e) => setTpTrigger(e.target.value)}
-            placeholder="0.00"
-            min="0"
-            step="any"
-            className="w-full px-2 py-1.5 text-xs rounded
-              bg-white text-slate-900 border border-slate-300
-              focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500
-              dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700
-            "
-          />
-        </div>
-
-        <div className="flex-1">
-          <label className="block text-xs mb-1 text-slate-600 dark:text-slate-400">
-            TP Limit
-          </label>
-          <input
-            type="number"
-            value={tpLimit}
-            onChange={(e) => setTpLimit(e.target.value)}
-            placeholder="0.00"
-            min="0"
-            step="any"
-            className="w-full px-2 py-1.5 text-xs rounded
-              bg-white text-slate-900 border border-slate-300
-              focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500
-              dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700
-            "
-          />
-        </div>
-      </div>
-    </div>
-
-    {/* Stop Loss */}
-    <div>
-      <div className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2">
-        Stop Loss
-      </div>
-
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="block text-xs mb-1 text-slate-600 dark:text-slate-400">
-            SL Trigger
-          </label>
-          <input
-            type="number"
-            value={slTrigger}
-            onChange={(e) => setSlTrigger(e.target.value)}
-            placeholder="0.00"
-            min="0"
-            step="any"
-            className="w-full px-2 py-1.5 text-xs rounded
-              bg-white text-slate-900 border border-slate-300
-              focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500
-              dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700
-            "
-          />
-        </div>
-
-        <div className="flex-1">
-          <label className="block text-xs mb-1 text-slate-600 dark:text-slate-400">
-            SL Limit
-          </label>
-          <input
-            type="number"
-            value={slLimit}
-            onChange={(e) => setSlLimit(e.target.value)}
-            placeholder="0.00"
-            min="0"
-            step="any"
-            className="w-full px-2 py-1.5 text-xs rounded
-              bg-white text-slate-900 border border-slate-300
-              focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500
-              dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700
-            "
-          />
-        </div>
-      </div>
-    </div>
-  </div>
-)}
-
-
-
-                  {/* Total & Fee */}
-            <div className="pt-2.5 border-t border-slate-300 dark:border-slate-800">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                  Fee ({feeLevel}%)
-                </span>
-                <span className="text-sm font-semibold text-slate-900 dark:text-slate-200">
-                  {getFeeAmount().toFixed(2)}
-                  <span className="text-xs text-slate-500 ml-1">{quoteCurrency}</span>
-                </span>
+            {/* Take Profit */}
+            <div>
+              <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-2">
+                Take Profit
               </div>
 
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                  Total (incl. fee)
-                </span>
-                <span className="text-base font-bold text-slate-900 dark:text-slate-100">
-                  {getTotal()}
-                  <span className="text-xs text-slate-500 ml-1">{quoteCurrency}</span>
-                </span>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs mb-1 text-slate-600 dark:text-slate-400">
+                    TP Trigger
+                  </label>
+                  <input
+                    type="number"
+                    value={tpTrigger}
+                    onChange={(e) => setTpTrigger(e.target.value)}
+                    placeholder="0.00"
+                    min="0"
+                    step="any"
+                    className="w-full px-2 py-1.5 text-xs rounded
+              bg-white text-slate-900 border border-slate-300
+              focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500
+              dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700
+            "
+                  />
+                </div>
+
+                <div className="flex-1">
+                  <label className="block text-xs mb-1 text-slate-600 dark:text-slate-400">
+                    TP Limit
+                  </label>
+                  <input
+                    type="number"
+                    value={tpLimit}
+                    onChange={(e) => setTpLimit(e.target.value)}
+                    placeholder="0.00"
+                    min="0"
+                    step="any"
+                    className="w-full px-2 py-1.5 text-xs rounded
+              bg-white text-slate-900 border border-slate-300
+              focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500
+              dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700
+            "
+                  />
+                </div>
               </div>
             </div>
 
+            {/* Stop Loss */}
+            <div>
+              <div className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2">
+                Stop Loss
+              </div>
 
-                      {/* Trading Info Block */}
-                <div className="p-3 rounded border
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs mb-1 text-slate-600 dark:text-slate-400">
+                    SL Trigger
+                  </label>
+                  <input
+                    type="number"
+                    value={slTrigger}
+                    onChange={(e) => setSlTrigger(e.target.value)}
+                    placeholder="0.00"
+                    min="0"
+                    step="any"
+                    className="w-full px-2 py-1.5 text-xs rounded
+              bg-white text-slate-900 border border-slate-300
+              focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500
+              dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700
+            "
+                  />
+                </div>
+
+                <div className="flex-1">
+                  <label className="block text-xs mb-1 text-slate-600 dark:text-slate-400">
+                    SL Limit
+                  </label>
+                  <input
+                    type="number"
+                    value={slLimit}
+                    onChange={(e) => setSlLimit(e.target.value)}
+                    placeholder="0.00"
+                    min="0"
+                    step="any"
+                    className="w-full px-2 py-1.5 text-xs rounded
+              bg-white text-slate-900 border border-slate-300
+              focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500
+              dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700
+            "
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+
+        {/* Total & Fee */}
+        <div className="pt-2.5 border-t border-slate-300 dark:border-slate-800">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+              Fee ({feeLevel}%)
+            </span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-200">
+              {getFeeAmount().toFixed(2)}
+              <span className="text-xs text-slate-500 ml-1">{quoteCurrency}</span>
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+              Total (incl. fee)
+            </span>
+            <span className="text-base font-bold text-slate-900 dark:text-slate-100">
+              {getTotal()}
+              <span className="text-xs text-slate-500 ml-1">{quoteCurrency}</span>
+            </span>
+          </div>
+        </div>
+
+
+        {/* Trading Info Block */}
+        <div className="p-3 rounded border
                   bg-slate-100 border-slate-300
                   dark:bg-slate-800/50 dark:border-slate-700
                 ">
-                  {isSpot ? (
-                    <div className="grid grid-cols-2 gap-4 text-xs">
-                      <div className="text-center">
-                        <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">
-                          Lots
-                        </div>
-                        <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                          {lots.toFixed(6)}
-                        </div>
-                      </div>
-
-                      <div className="text-center border-l border-slate-300 dark:border-slate-700">
-                        <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">
-                          Total Value
-                        </div>
-                        <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                          ${getTotal()}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-4 text-xs">
-                      <div className="text-center">
-                        <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">
-                          Lots
-                        </div>
-                        <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                          {lots.toFixed(2)}
-                        </div>
-                      </div>
-
-                      <div className="text-center border-x border-slate-300 dark:border-slate-700">
-                        <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">
-                          Margin
-                        </div>
-                        <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                          ${margin.toFixed(2)}
-                        </div>
-                      </div>
-
-                      <div className="text-center">
-                        <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">
-                          Pip Value
-                        </div>
-                        <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                          ${pipValue.toFixed(4)}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+          {isSpot ? (
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              <div className="text-center">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">
+                  Lots
                 </div>
+                <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  {lots.toFixed(6)}
+                </div>
+              </div>
 
-{/* Single Hedge Button */}
-<div className="pt-2 pb-4">
-  {isCFD ? (
-    /* Single Hedge Button for CFD/Forex - executes buy order */
-    <button
-      onClick={() => handleOrder('buy')}
-      disabled={
-        isPlacingOrder ||
-        parseFloat(amount || '0') <= 0 ||
-        (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) ||
-        (orderType !== 'market' && (parseFloat(getTotal() || 'Infinity') > usdBalance)) ||
-        ((orderType === 'limit' || orderType === 'stop-limit') &&
-          (isNaN(parseFloat(limitPrice)) || parseFloat(limitPrice) <= 0))
-      }
-      className="
+              <div className="text-center border-l border-slate-300 dark:border-slate-700">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">
+                  Total Value
+                </div>
+                <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  ${getTotal()}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 text-xs">
+              <div className="text-center">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">
+                  Lots
+                </div>
+                <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  {lots.toFixed(2)}
+                </div>
+              </div>
+
+              <div className="text-center border-x border-slate-300 dark:border-slate-700">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">
+                  Margin
+                </div>
+                <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  ${margin.toFixed(2)}
+                </div>
+              </div>
+
+              <div className="text-center">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">
+                  Pip Value
+                </div>
+                <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  ${pipValue.toFixed(4)}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Single Hedge Button */}
+        <div className="pt-2 pb-4">
+          {isCFD ? (
+            /* Single Hedge Button for CFD/Forex - executes BOTH buy and sell */
+            <button
+              onClick={handleHedgeOrder}
+              disabled={
+                isPlacingOrder ||
+                parseFloat(amount || '0') <= 0 ||
+                (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) ||
+                (orderType !== 'market' && (parseFloat(getTotal() || 'Infinity') * 2 > usdBalance)) || // *2 for hedge margin
+                ((orderType === 'limit' || orderType === 'stop-limit') &&
+                  (isNaN(parseFloat(limitPrice)) || parseFloat(limitPrice) <= 0))
+              }
+              className="
         w-full px-4 py-3 text-base font-bold rounded-lg transition shadow-sm
         flex items-center justify-center gap-2
         bg-[#00C0A2] hover:bg-[#00a085] text-white
         disabled:opacity-50 disabled:cursor-not-allowed
       "
-    >
-      Hedge
-    </button>
-  ) : (
-    /* Regular Buy/Sell Buttons for Spot */
-    <div className="grid grid-cols-2 gap-2.5">
-      <button
-        onClick={() => handleOrder('buy')}
-        disabled={
-          isPlacingOrder ||
-          parseFloat(amount || '0') <= 0 ||
-          (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) ||
-          (orderType !== 'market' && (parseFloat(getTotal() || 'Infinity') > usdBalance))
-        }
-        className="
-          px-4 py-3 text-base font-bold rounded-lg transition shadow-sm
-          flex items-center justify-center gap-2
-          bg-green-500 hover:bg-green-600 text-white
-          disabled:opacity-50 disabled:cursor-not-allowed
-          dark:bg-green-600 dark:hover:bg-green-500
-        "
-      >
-        {`Buy ${baseCurrency}`}
-      </button>
+            >
+              Hedge
+            </button>
+          ) : (
+            /* Regular Buy/Sell Buttons for Spot */
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                onClick={() => handleOrder('buy')}
+                disabled={
+                  isPlacingOrder ||
+                  parseFloat(amount || '0') <= 0 ||
+                  (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) ||
+                  (orderType !== 'market' && (parseFloat(getTotal() || 'Infinity') > usdBalance))
+                }
+                className="
+                  px-4 py-3 text-base font-bold rounded-lg transition shadow-sm
+                  flex items-center justify-center gap-2
+                  bg-green-500 hover:bg-green-600 text-white
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  dark:bg-green-600 dark:hover:bg-green-500
+                "
+              >
+                {`Buy ${baseCurrency}`}
+              </button>
 
-      <button
-        onClick={() => handleOrder('sell')}
-        disabled={
-          isPlacingOrder ||
-          parseFloat(amount || '0') <= 0 ||
-          (isSpot && parseFloat(amount || '0') > currentHolding) ||
-          (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) ||
-          ((orderType === 'limit' || orderType === 'stop-limit') &&
-            (isNaN(parseFloat(limitPrice)) || parseFloat(limitPrice) <= 0))
-        }
-        className="
-          px-4 py-3 text-base font-bold rounded-lg transition shadow-sm
-          flex items-center justify-center gap-2
-          bg-red-500 hover:bg-red-600 text-white
-          disabled:opacity-50 disabled:cursor-not-allowed
-          dark:bg-red-600 dark:hover:bg-red-500
-        "
-      >
-        {`Sell ${baseCurrency}`}
-      </button>
-    </div>
-  )}
-</div>
-
+              <button
+                onClick={() => handleOrder('sell')}
+                disabled={
+                  isPlacingOrder ||
+                  parseFloat(amount || '0') <= 0 ||
+                  (isSpot && parseFloat(amount || '0') > currentHolding) ||
+                  (orderType === 'market' && (isNaN(currentPrice) || currentPrice <= 0)) ||
+                  ((orderType === 'limit' || orderType === 'stop-limit') &&
+                    (isNaN(parseFloat(limitPrice)) || parseFloat(limitPrice) <= 0))
+                }
+                className="
+                  px-4 py-3 text-base font-bold rounded-lg transition shadow-sm
+                  flex items-center justify-center gap-2
+                  bg-red-500 hover:bg-red-600 text-white
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  dark:bg-red-600 dark:hover:bg-red-500
+                "
+              >
+                {`Sell ${baseCurrency}`}
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Order Processing Overlay - Centered */}
         {isPlacingOrder && (
@@ -1147,3 +1246,4 @@ export default function TradingPanel() {
     </div>
   );
 }
+

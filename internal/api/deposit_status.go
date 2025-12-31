@@ -372,11 +372,17 @@ func UpdateDepositStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create in-app notification for the user (async, non-blocking)
-	log.Printf("UpdateDepositStatus: Starting notification creation goroutine for deposit_id=%s, status=%s, user_id=%d",
+	log.Printf("DEBUG: UpdateDepositStatus: Starting notification creation goroutine for deposit_id=%s, status=%s, user_id=%d",
 		depositID.String(), req.Status, deposit.UserID)
 
 	go func() {
-		log.Printf("UpdateDepositStatus: Inside notification goroutine for deposit_id=%s", depositID.String())
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("DEBUG: UpdateDepositStatus: Notification goroutine PANIC: %v", r)
+			}
+		}()
+
+		log.Printf("DEBUG: UpdateDepositStatus: Inside notification goroutine for deposit_id=%s", depositID.String())
 
 		notificationCtx, notificationCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer notificationCancel()

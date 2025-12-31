@@ -227,9 +227,9 @@ function ChartComponent() {
               low: k.low,
               close: k.close
             };
-          });
+          }).filter(k => !Number.isNaN(k.time)); // Filter out invalid timestamps
 
-          // CRITICAL: Sort forex klines in ascending order (oldest first)
+          // Sort forex klines in ascending order
           formatted.sort((a, b) => (a.time as number) - (b.time as number));
         } else {
           // Handle crypto klines (Unix milliseconds -> Unix seconds)
@@ -245,8 +245,19 @@ function ChartComponent() {
               low: parseFloat(k.low),
               close: parseFloat(k.close)
             };
-          });
+          }).filter(k => !Number.isNaN(k.time)); // Filter out invalid timestamps
+
+          // Also sort crypto klines just in case
+          formatted.sort((a, b) => (a.time as number) - (b.time as number));
         }
+
+        // Deduplicate data points (keep last one for each timestamp)
+        // frequent cause of crashes in lightweight-charts
+        const uniqueData = new Map<number, CandlestickData<UTCTimestamp>>();
+        formatted.forEach(item => {
+          uniqueData.set(item.time as number, item);
+        });
+        formatted = Array.from(uniqueData.values()).sort((a, b) => (a.time as number) - (b.time as number));
 
         seriesRef.current?.setData(formatted);
         // remember last bar and set initial OHLCV

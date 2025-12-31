@@ -28,9 +28,8 @@ const (
 	UserAgentKey ContextKey = "user_agent"
 )
 
-// NewAuthMiddleware creates a middleware factory with dependency injection for session revocation
-// This factory pattern allows us to inject AuthStorageService without using global variables
-func NewAuthMiddleware(authStorage *services.AuthStorageService) func(http.HandlerFunc) http.HandlerFunc {
+// NewAuthMiddleware creates a middleware factory with dependency injection
+func NewAuthMiddleware(authStorage *services.AuthStorageService, keycloakService *services.KeycloakService) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			// Get the Authorization header
@@ -53,16 +52,36 @@ func NewAuthMiddleware(authStorage *services.AuthStorageService) func(http.Handl
 				return
 			}
 
-			// Validate and parse the JWT token using custom JWT validator
-			claims, err := utils.ValidateJWT(tokenString)
-			if err != nil {
-				log.Printf("JWT validation error: %v", err)
-				respondWithError(w, http.StatusUnauthorized, "invalid or expired token")
-				return
+			var userIDStr string
+			var userEmail string
+			var claims *utils.CustomClaims
+
+			// KEYCLOAK VALIDATION
+			if keycloakService != nil {
+				// Validate against Keycloak (via UserInfo endpoint)
+				uid, email, err := keycloakService.ValidateUserToken(r.Context(), tokenString)
+				if err != nil {
+					log.Printf("Keycloak token validation failed: %v", err)
+					respondWithError(w, http.StatusUnauthorized, "invalid or expired token")
+					return
+				}
+				userIDStr = uid
+				userEmail = email
+			} else {
+				// LEGACY LOCAL VALIDATION
+				var err error
+				claims, err = utils.ValidateJWT(tokenString)
+				if err != nil {
+					log.Printf("JWT validation error: %v", err)
+					respondWithError(w, http.StatusUnauthorized, "invalid or expired token")
+					return
+				}
+				userIDStr = claims.UserID
+				userEmail = claims.Email
 			}
 
-			// Parse user UUID from claims
-			userUUID, err := uuid.Parse(claims.UserID)
+			// Parse user UUID
+			userUUID, err := uuid.Parse(userIDStr)
 			if err != nil {
 				log.Printf("Invalid user ID in token: %v", err)
 				respondWithError(w, http.StatusUnauthorized, "invalid user ID in token")
@@ -71,7 +90,7 @@ func NewAuthMiddleware(authStorage *services.AuthStorageService) func(http.Handl
 
 			// CRITICAL: Session validation checks
 			// NOTE: These features require Redis. If Redis is unavailable, skip checks (fail-open for availability)
-			if authStorage != nil {
+			if authStorage != nil && claims != nil {
 				// Check 1: Session revocation (Kill Switch)
 				// If password was changed after this token was issued, reject it
 				tokenIssuedAt := claims.IssuedAt.Unix()
@@ -87,7 +106,7 @@ func NewAuthMiddleware(authStorage *services.AuthStorageService) func(http.Handl
 					})
 					return
 				}
-				
+
 				// Check 2: Active session validation
 				// Verify that the session token exists in Redis (tab closed, logout, or cache cleared invalidates)
 				if claims.SessionID != "" {
@@ -98,7 +117,7 @@ func NewAuthMiddleware(authStorage *services.AuthStorageService) func(http.Handl
 					if !sessionValid {
 						respondWithJSON(w, http.StatusUnauthorized, map[string]interface{}{
 							"error":   "session_expired",
-							"message": "Your session has expired or been invalidated. Please log in again.",
+							"message": "Please login to start again",
 						})
 						return
 					}
@@ -115,7 +134,7 @@ func NewAuthMiddleware(authStorage *services.AuthStorageService) func(http.Handl
 			}
 
 			var userBigIntID int64
-			err = pool.QueryRow(r.Context(), "SELECT user_id FROM users WHERE id = $1", userUUID).Scan(&userBigIntID)
+			err = pool.QueryRow(r.Context(), "SELECT user_id FROM users WHERE keycloak_id = $1", userUUID).Scan(&userBigIntID)
 			if err != nil {
 				log.Printf("Failed to lookup user_id for UUID %s: %v", userUUID, err)
 				respondWithError(w, http.StatusUnauthorized, "user not found")
@@ -128,7 +147,7 @@ func NewAuthMiddleware(authStorage *services.AuthStorageService) func(http.Handl
 
 			// Inject bigint user_id into the request context
 			ctx := context.WithValue(r.Context(), UserIDKey, userBigIntID)
-			ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+			ctx = context.WithValue(ctx, UserEmailKey, userEmail)
 			ctx = context.WithValue(ctx, IPAddressKey, ipAddress)
 			ctx = context.WithValue(ctx, UserAgentKey, userAgent)
 
@@ -188,7 +207,7 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		var userBigIntID int64
-		err = pool.QueryRow(r.Context(), "SELECT user_id FROM users WHERE id = $1", userUUID).Scan(&userBigIntID)
+		err = pool.QueryRow(r.Context(), "SELECT user_id FROM users WHERE keycloak_id = $1", userUUID).Scan(&userBigIntID)
 		if err != nil {
 			log.Printf("Failed to lookup user_id for UUID %s: %v", userUUID, err)
 			respondWithError(w, http.StatusUnauthorized, "user not found")

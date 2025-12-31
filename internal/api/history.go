@@ -15,10 +15,10 @@ import (
 
 // BatchHistoryResponse combines all history data in a single response
 type BatchHistoryResponse struct {
-	Transactions  []models.Transaction       `json:"transactions"`
-	Orders        []models.Order             `json:"orders"`
-	PendingOrders []models.PendingOrder      `json:"pending_orders"`
-	Success       bool                       `json:"success"`
+	Transactions  []models.Transaction  `json:"transactions"`
+	Orders        []models.Order        `json:"orders"`
+	PendingOrders []models.PendingOrder `json:"pending_orders"`
+	Success       bool                  `json:"success"`
 }
 
 // GetBatchHistory retrieves all history data (transactions, orders, pending orders) for the authenticated user
@@ -118,7 +118,7 @@ func fetchUserTransactions(ctx context.Context, pool *pgxpool.Pool, userID int64
 // fetchUserOrders retrieves all orders for user's accounts in a single query
 func fetchUserOrders(ctx context.Context, pool *pgxpool.Pool, userID int64) ([]models.Order, error) {
 	query := `
-		SELECT o.id, u.id, o.account_id, o.symbol, o.order_number, o.side, o.type, o.status,
+		SELECT o.id, u.keycloak_id, o.account_id, o.symbol, o.order_number, o.side, o.type, o.status,
 		       o.amount_base, o.limit_price, o.stop_price, o.filled_amount, o.average_fill_price,
 		       o.created_at, o.updated_at
 		FROM orders o
@@ -155,7 +155,7 @@ func fetchUserOrders(ctx context.Context, pool *pgxpool.Pool, userID int64) ([]m
 // fetchUserPendingOrders retrieves all pending orders for user's accounts in a single query
 func fetchUserPendingOrders(ctx context.Context, pool *pgxpool.Pool, userID int64) ([]models.PendingOrder, error) {
 	query := `
-		SELECT p.id, u.id, p.account_id, p.symbol, p.type, p.side, p.quantity,
+		SELECT p.id, u.keycloak_id, p.account_id, p.symbol, p.type, p.side, p.quantity,
 		       p.trigger_price, p.limit_price, p.status, p.executed_at, p.executed_price,
 		       p.failure_reason, p.created_at, p.updated_at
 		FROM pending_orders p

@@ -8,11 +8,11 @@ echo "===================================="
 echo
 echo "[1/3] Creating Supabase roles and schemas..."
 
-docker exec brokerage-postgres-dev psql -U postgres -d brokerage_dev -c "CREATE ROLE authenticated NOLOGIN;" 2>/dev/null
-docker exec brokerage-postgres-dev psql -U postgres -d brokerage_dev -c "CREATE ROLE anon NOLOGIN;" 2>/dev/null
-docker exec brokerage-postgres-dev psql -U postgres -d brokerage_dev -c "CREATE ROLE service_role NOLOGIN;" 2>/dev/null
-docker exec brokerage-postgres-dev psql -U postgres -d brokerage_dev -c "CREATE SCHEMA IF NOT EXISTS auth;" 2>/dev/null
-docker exec brokerage-postgres-dev psql -U postgres -d brokerage_dev -c "CREATE SCHEMA IF NOT EXISTS storage;" 2>/dev/null
+docker exec brokerage-postgres-dev psql -U postgres_hedgetechs -d brokerage_hedgetechs_dev -c "CREATE ROLE authenticated NOLOGIN;" 2>/dev/null
+docker exec brokerage-postgres-dev psql -U postgres_hedgetechs -d brokerage_hedgetechs_dev -c "CREATE ROLE anon NOLOGIN;" 2>/dev/null
+docker exec brokerage-postgres-dev psql -U postgres_hedgetechs -d brokerage_hedgetechs_dev -c "CREATE ROLE service_role NOLOGIN;" 2>/dev/null
+docker exec brokerage-postgres-dev psql -U postgres_hedgetechs -d brokerage_hedgetechs_dev -c "CREATE SCHEMA IF NOT EXISTS auth;" 2>/dev/null
+docker exec brokerage-postgres-dev psql -U postgres_hedgetechs -d brokerage_hedgetechs_dev -c "CREATE SCHEMA IF NOT EXISTS storage;" 2>/dev/null
 
 echo "Done (errors ignored if roles already exist)"
 
@@ -34,6 +34,13 @@ FILES=(
 "011_transactions.sql"
 "012_forex_klines_1m.sql"
 "013_deposits.sql"
+"014_balances.sql"
+"015_add_deposit_audit_columns.sql"
+"016_withdrawals.sql"
+"017_saved_withdrawal_methods.sql"
+"018_remove_crypto_instruments.sql"
+"019_fix_approved_deposits.sql"
+"020_fix_orders_schema.sql"
 )
 
 COUNT=1
@@ -44,8 +51,8 @@ do
   echo "  [$COUNT/$TOTAL] $FILE"
 
   docker exec -i brokerage-postgres-dev psql \
-    -U postgres \
-    -d brokerage_dev < "migration_sql/$FILE"
+    -U postgres_hedgetechs \
+    -d brokerage_hedgetechs_dev < "migration_sql/$FILE"
 
   if [ $? -ne 0 ]; then
     echo "  ERROR!"
@@ -63,16 +70,16 @@ echo
 echo "Tables created:"
 
 docker exec brokerage-postgres-dev psql \
-  -U postgres \
-  -d brokerage_dev \
+  -U postgres_hedgetechs \
+  -d brokerage_hedgetechs_dev \
   -c "\dt"
 
 echo
 echo "Row counts:"
 
 docker exec brokerage-postgres-dev psql \
-  -U postgres \
-  -d brokerage_dev \
+  -U postgres_hedgetechs \
+  -d brokerage_hedgetechs_dev \
   -c "SELECT schemaname || '.' || relname AS table_name, n_live_tup AS row_count FROM pg_stat_user_tables WHERE schemaname = 'public' ORDER BY relname;"
 
 echo

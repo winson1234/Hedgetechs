@@ -56,7 +56,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	var accountUserID int64
 	var userUUID uuid.UUID
 	err = pool.QueryRow(ctx, `
-		SELECT a.user_id, u.id
+		SELECT a.user_id, u.keycloak_id
 		FROM accounts a
 		JOIN users u ON a.user_id = u.user_id
 		WHERE a.id = $1
@@ -101,9 +101,9 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	// NOTE: orders.user_id is bigint (not UUID), so use accountUserID instead of userUUID
 	orderID := uuid.New()
 	_, err = pool.Exec(ctx,
-		`INSERT INTO orders (id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, product_type, execution_strategy, filled_amount, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'b_book', 0, NOW(), NOW())`,
-		orderID, accountUserID, req.AccountID, normalizedSymbol, orderNumber, req.Side, req.Type, models.OrderStatusPending, req.AmountBase, req.LimitPrice, req.StopPrice, leverage, req.ProductType,
+		`INSERT INTO orders (id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, product_type, pair_id, execution_strategy, filled_amount, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'b_book', 0, NOW(), NOW())`,
+		orderID, accountUserID, req.AccountID, normalizedSymbol, orderNumber, req.Side, req.Type, models.OrderStatusPending, req.AmountBase, req.LimitPrice, req.StopPrice, leverage, req.ProductType, req.PairID,
 	)
 	if err != nil {
 		log.Printf("Failed to insert order: %v", err)
@@ -174,14 +174,14 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	// These will be executed by the order matching engine later
 	var order models.Order
 	err = pool.QueryRow(ctx,
-		`SELECT o.id, u.id, o.account_id, o.symbol, o.order_number, o.side, o.type, o.status, o.amount_base, o.limit_price, o.stop_price, o.leverage, o.product_type, o.filled_amount, o.average_fill_price, o.created_at, o.updated_at
+		`SELECT o.id, u.keycloak_id, o.account_id, o.symbol, o.order_number, o.side, o.type, o.status, o.amount_base, o.limit_price, o.stop_price, o.leverage, o.product_type, o.filled_amount, o.average_fill_price, o.pair_id, o.created_at, o.updated_at
 		 FROM orders o
 		 JOIN users u ON o.user_id = u.user_id
 		 WHERE o.id = $1`,
 		orderID,
 	).Scan(
 		&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.OrderNumber, &order.Side, &order.Type, &order.Status,
-		&order.AmountBase, &order.LimitPrice, &order.StopPrice, &order.Leverage, &order.ProductType, &order.FilledAmount, &order.AverageFillPrice,
+		&order.AmountBase, &order.LimitPrice, &order.StopPrice, &order.Leverage, &order.ProductType, &order.FilledAmount, &order.AverageFillPrice, &order.PairID,
 		&order.CreatedAt, &order.UpdatedAt,
 	)
 	if err != nil {
@@ -242,7 +242,7 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build query with optional product_type filter
-	query := `SELECT o.id, u.id, o.account_id, o.symbol, o.order_number, o.side, o.type, o.status, o.amount_base, o.limit_price, o.stop_price, o.leverage, o.product_type, o.filled_amount, o.average_fill_price, o.created_at, o.updated_at
+	query := `SELECT o.id, u.keycloak_id, o.account_id, o.symbol, o.order_number, o.side, o.type, o.status, o.amount_base, o.limit_price, o.stop_price, o.leverage, o.product_type, o.filled_amount, o.average_fill_price, o.pair_id, o.created_at, o.updated_at
 	          FROM orders o
 	          JOIN users u ON o.user_id = u.user_id
 	          WHERE o.account_id = $1`
@@ -270,7 +270,7 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 		var order models.Order
 		err := rows.Scan(
 			&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.OrderNumber, &order.Side, &order.Type, &order.Status,
-			&order.AmountBase, &order.LimitPrice, &order.StopPrice, &order.Leverage, &order.ProductType, &order.FilledAmount, &order.AverageFillPrice,
+			&order.AmountBase, &order.LimitPrice, &order.StopPrice, &order.Leverage, &order.ProductType, &order.FilledAmount, &order.AverageFillPrice, &order.PairID,
 			&order.CreatedAt, &order.UpdatedAt,
 		)
 		if err != nil {

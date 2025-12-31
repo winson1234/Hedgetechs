@@ -64,10 +64,10 @@ export const signIn = createAsyncThunk(
   async ({ email, password }: { email: string; password: string }, { rejectWithValue }) => {
     try {
       const result = await authService.login({ email, password });
-      
+
       // Store user data
       authService.storeUser(result.user);
-      
+
       return { user: result.user, token: result.token };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Login failed';
@@ -97,11 +97,11 @@ export const validateSession = createAsyncThunk(
     try {
       const { user, isValid } = await authService.validateSession();
       const token = authService.getToken();
-      
+
       if (!isValid || !user || !token) {
         return { user: null, token: null };
       }
-      
+
       return { user, token };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Session validation failed';
@@ -136,17 +136,15 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     // Sign up (creates user account directly, no auth state change - user needs to log in)
+    // Sign up (creates user account directly, no auth state change - user needs to log in)
     builder
       .addCase(signUp.pending, (state) => {
-        state.loading = true;
         state.error = null;
       })
       .addCase(signUp.fulfilled, (state) => {
-        state.loading = false;
         // Registration successful - user can now log in
       })
       .addCase(signUp.rejected, (state, action) => {
-        state.loading = false;
         state.error = action.payload as string;
       });
 

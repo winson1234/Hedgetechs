@@ -60,7 +60,7 @@ func CreatePendingOrder(w http.ResponseWriter, r *http.Request) {
 	var accountUserID int64
 	var userUUID uuid.UUID
 	err = pool.QueryRow(ctx, `
-		SELECT a.user_id, u.id
+		SELECT a.user_id, u.keycloak_id
 		FROM accounts a
 		JOIN users u ON a.user_id = u.user_id
 		WHERE a.id = $1
@@ -282,10 +282,9 @@ func GetPendingOrders(w http.ResponseWriter, r *http.Request) {
 
 	// Build query with optional product_type filter
 	// CRITICAL FIX: Only return orders with status = 'pending' (exclude executed, cancelled, failed)
-	query := `SELECT p.id, u.id, p.account_id, p.symbol, p.type, p.side, p.quantity, p.trigger_price, p.limit_price,
+	query := `SELECT p.id, p.user_id, p.account_id, p.symbol, p.type, p.side, p.quantity, p.trigger_price, p.limit_price,
 	                 p.leverage, p.product_type, p.status, p.executed_at, p.executed_price, p.failure_reason, p.created_at, p.updated_at, p.order_number
 	          FROM pending_orders p
-	          JOIN users u ON p.user_id = u.user_id
 	          WHERE p.account_id = $1 AND p.status = 'pending'`
 
 	args := []interface{}{accountID}
@@ -382,7 +381,7 @@ func CancelPendingOrder(w http.ResponseWriter, r *http.Request) {
 	var userUUID uuid.UUID
 	var orderStatus models.PendingOrderStatus
 	err = pool.QueryRow(ctx, `
-		SELECT a.user_id, u.id, p.status
+		SELECT a.user_id, u.keycloak_id, p.status
 		FROM pending_orders p
 		JOIN accounts a ON p.account_id = a.id
 		JOIN users u ON a.user_id = u.user_id

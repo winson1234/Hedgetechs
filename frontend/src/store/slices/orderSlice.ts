@@ -129,6 +129,7 @@ export const createPendingOrder = createAsyncThunk(
       limit_price?: number;
       leverage?: number; // Add leverage for CFD/Futures orders
       product_type: 'spot' | 'cfd' | 'futures'; // NEW: Product type at order level
+      pair_id?: string; // Add this
     },
     { getState, rejectWithValue }
   ) => {
@@ -192,6 +193,7 @@ export const executeMarketOrder = createAsyncThunk(
       current_price: number; // Current market price passed from frontend
       leverage?: number; // Add leverage for CFD orders
       product_type: 'spot' | 'cfd' | 'futures'; // NEW: Product type at order level
+      pair_id?: string; // Add this
     },
     { getState, rejectWithValue }
   ) => {
@@ -214,6 +216,7 @@ export const executeMarketOrder = createAsyncThunk(
           limit_price: orderData.current_price, // Pass current price for market execution
           leverage: orderData.leverage || 1, // Pass leverage for CFD
           product_type: orderData.product_type, // NEW: Product type at order level
+          pair_id: orderData.pair_id, // Add this
         }),
       });
 

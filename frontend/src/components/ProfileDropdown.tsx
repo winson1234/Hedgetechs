@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store';
 import { signOut } from '../store/slices/authSlice';
+import { apiFetch } from '../utils/api';
 
 type ProfileDropdownProps = {
   isOpen: boolean;
@@ -18,8 +19,8 @@ export default function ProfileDropdown({
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordMessage, setPasswordMessage] = useState<{text: string; type: 'success' | 'error'} | null>(null);
-  const [passwordStrength, setPasswordStrength] = useState<{strength: string; class: string} | null>(null);
+  const [passwordMessage, setPasswordMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [passwordStrength, setPasswordStrength] = useState<{ strength: string; class: string } | null>(null);
 
   // Access Redux store
   const dispatch = useAppDispatch();
@@ -38,22 +39,22 @@ export default function ProfileDropdown({
     setShowChangePasswordModal(true);
     closeDropdown();
   };
-const confirmLogout = async () => {
-  // 1. Clear persisted data (old Zustand stores)
-  localStorage.removeItem('account-store');
-  localStorage.removeItem('order-store');
-  localStorage.removeItem('transaction-storage');
-  localStorage.removeItem('ui-store');
-  localStorage.removeItem('fx_rates_cache');
-  localStorage.removeItem('fx_rates_cache_time');
+  const confirmLogout = async () => {
+    // 1. Clear persisted data (old Zustand stores)
+    localStorage.removeItem('account-store');
+    localStorage.removeItem('order-store');
+    localStorage.removeItem('transaction-storage');
+    localStorage.removeItem('ui-store');
+    localStorage.removeItem('fx_rates_cache');
+    localStorage.removeItem('fx_rates_cache_time');
 
-  // 2. Dispatch Redux logout
-  await dispatch(signOut());
+    // 2. Dispatch Redux logout
+    await dispatch(signOut());
 
-  // 3. Close modal and redirect directly to dashboard
-  setShowLogoutModal(false);
-  navigate('/login', { replace: true });
-};
+    // 3. Close modal and redirect directly to dashboard
+    setShowLogoutModal(false);
+    navigate('/login', { replace: true });
+  };
 
 
   const cancelLogout = () => {
@@ -80,6 +81,31 @@ const confirmLogout = async () => {
     } else {
       setPasswordStrength(null);
     }
+  };
+
+  const [changePasswordStep, setChangePasswordStep] = useState<'form' | 'success'>('form');
+
+  const handleLogoutAll = async () => {
+    try {
+      await apiFetch('/api/v1/auth/logout-all', { method: 'POST' });
+    } catch (e) {
+      console.error('Logout all failed', e);
+    }
+    await confirmLogout();
+  };
+
+  const handleStayLoggedIn = () => {
+    setShowChangePasswordModal(false);
+    resetChangePasswordState();
+  };
+
+  const resetChangePasswordState = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordMessage(null);
+    setPasswordStrength(null);
+    setChangePasswordStep('form');
   };
 
   const handleSavePassword = async () => {
@@ -115,21 +141,16 @@ const confirmLogout = async () => {
 
     // Call backend API to change password
     try {
-      const token = sessionStorage.getItem('auth_token');
-      if (!token) {
-        setPasswordMessage({ text: 'Please log in again to change your password.', type: 'error' });
-        return;
-      }
-
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://localhost:8080'}/api/v1/auth/change-password`, {
+      // apiFetch handles Authorization header injection if token exists in sessionStorage
+      const response = await apiFetch('/api/v1/auth/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           current_password: currentPassword,
-          new_password: newPassword
+          new_password: newPassword,
+          logout_all_devices: false // Explicitly false as we handle it in step 2
         })
       });
 
@@ -139,7 +160,6 @@ const confirmLogout = async () => {
         // Handle specific error cases
         if (data.error === 'session_revoked') {
           setPasswordMessage({ text: 'Your session expired. Please log in again.', type: 'error' });
-          // Optionally trigger logout
         } else if (data.error === 'authentication_error') {
           setPasswordMessage({ text: 'Current password is incorrect.', type: 'error' });
         } else {
@@ -148,19 +168,9 @@ const confirmLogout = async () => {
         return;
       }
 
-      // Success! Show message and prompt re-login
-      setPasswordMessage({
-        text: 'Password changed successfully! Please log in again with your new password.',
-        type: 'success'
-      });
-
-      // Wait 2 seconds then logout (since session was revoked)
-      setTimeout(async () => {
-        // Properly logout using Redux action to clear all auth state
-        await dispatch(signOut());
-        // Redirect to login page
-        navigate('/login');
-      }, 2000);
+      // Success! Switch to success step
+      setChangePasswordStep('success');
+      setPasswordMessage(null); // Clear any previous messages
 
     } catch (error) {
       console.error('Password change error:', error);
@@ -170,11 +180,7 @@ const confirmLogout = async () => {
 
   const handleCancelChangePassword = () => {
     setShowChangePasswordModal(false);
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setPasswordMessage(null);
-    setPasswordStrength(null);
+    resetChangePasswordState();
   };
 
   const handleProfileClick = () => {
@@ -216,105 +222,138 @@ const confirmLogout = async () => {
   // Show change password modal
   if (showChangePasswordModal) {
     return (
-      <div 
+      <div
         className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm"
         onClick={handleCancelChangePassword}
       >
-        <div 
+        <div
           className="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-md w-[90%] shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6 text-center">
-            Change Password
+            {changePasswordStep === 'form' ? 'Change Password' : 'Password Changed'}
           </h3>
 
-          {/* Current Password */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Current Password
-            </label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Enter current password"
-              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          {/* New Password */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              New Password
-            </label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => handleNewPasswordChange(e.target.value)}
-              placeholder="Enter new password"
-              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            {/* Password Strength Indicator */}
-            {passwordStrength && (
-              <div className="mt-2">
-                <div className="h-1 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full transition-all duration-300 ${
-                      passwordStrength.class === 'weak' ? 'w-1/3 bg-red-500' :
-                      passwordStrength.class === 'medium' ? 'w-2/3 bg-yellow-500' :
-                      'w-full bg-green-500'
-                    }`}
-                  />
-                </div>
-                <p className={`text-xs mt-1 font-medium ${
-                  passwordStrength.class === 'weak' ? 'text-red-500' :
-                  passwordStrength.class === 'medium' ? 'text-yellow-500' :
-                  'text-green-500'
-                }`}>
-                  {passwordStrength.strength}
-                </p>
+          {changePasswordStep === 'form' ? (
+            <>
+              {/* Current Password */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Current Password
+                </label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter current password"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
               </div>
-            )}
-          </div>
 
-          {/* Confirm Password */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Retype Password
-            </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter new password"
-              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
+              {/* New Password */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => handleNewPasswordChange(e.target.value)}
+                  placeholder="Enter new password"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                {/* Password Strength Indicator */}
+                {passwordStrength && (
+                  <div className="mt-2">
+                    <div className="h-1 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${passwordStrength.class === 'weak' ? 'w-1/3 bg-red-500' :
+                            passwordStrength.class === 'medium' ? 'w-2/3 bg-yellow-500' :
+                              'w-full bg-green-500'
+                          }`}
+                      />
+                    </div>
+                    <p className={`text-xs mt-1 font-medium ${passwordStrength.class === 'weak' ? 'text-red-500' :
+                        passwordStrength.class === 'medium' ? 'text-yellow-500' :
+                          'text-green-500'
+                      }`}>
+                      {passwordStrength.strength}
+                    </p>
+                  </div>
+                )}
+              </div>
 
-          {/* Message */}
-          {passwordMessage && (
-            <div className={`text-center text-sm font-medium mb-4 ${
-              passwordMessage.type === 'success' ? 'text-green-500' : 'text-red-500'
-            }`}>
-              {passwordMessage.text}
+              {/* Confirm Password */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Retype Password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Message */}
+              {passwordMessage && (
+                <div className={`text-center text-sm font-medium mb-4 ${passwordMessage.type === 'success' ? 'text-green-500' : 'text-red-500'
+                  }`}>
+                  {passwordMessage.text}
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={handleCancelChangePassword}
+                  className="px-6 py-3 rounded-lg font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSavePassword}
+                  className="px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 hover:-translate-y-0.5 transition shadow-lg hover:shadow-emerald-500/40"
+                >
+                  Reset
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center">
+              <div className="mb-6 flex justify-center">
+                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+
+              <h4 className="text-xl font-medium text-slate-900 dark:text-slate-100 mb-2">
+                Password Changed Successfully
+              </h4>
+              <p className="text-slate-600 dark:text-slate-400 mb-8 max-w-xs mx-auto">
+                Your password has been updated. Would you like to log out from all devices?
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleLogoutAll}
+                  className="w-full px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-br from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 transition shadow-lg hover:shadow-red-500/40"
+                >
+                  Log Out All Devices
+                </button>
+                <button
+                  onClick={handleStayLoggedIn}
+                  className="w-full px-6 py-3 rounded-lg font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition"
+                >
+                  Stay Logged In
+                </button>
+              </div>
             </div>
           )}
-
-          {/* Buttons */}
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={handleCancelChangePassword}
-              className="px-6 py-3 rounded-lg font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSavePassword}
-              className="px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-br from-indigo-500 to-indigo-700 hover:from-indigo-600 hover:to-indigo-800 hover:-translate-y-0.5 transition shadow-lg hover:shadow-indigo-500/40"
-            >
-              Reset
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -323,11 +362,11 @@ const confirmLogout = async () => {
   // Show logout modal
   if (showLogoutModal) {
     return (
-      <div 
+      <div
         className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm"
         onClick={cancelLogout}
       >
-        <div 
+        <div
           className="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-md w-[90%] shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >

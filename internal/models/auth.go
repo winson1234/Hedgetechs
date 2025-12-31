@@ -25,10 +25,10 @@ type CheckStatusRequest struct {
 
 // LoginResponse represents the login response
 type LoginResponse struct {
-	Token   string      `json:"token,omitempty"`
-	User    *UserInfo   `json:"user,omitempty"`
-	Message string      `json:"message"`
-	Status  string      `json:"status"` // pending, approved, rejected
+	Token   string    `json:"token,omitempty"`
+	User    *UserInfo `json:"user,omitempty"`
+	Message string    `json:"message"`
+	Status  string    `json:"status"` // pending, approved, rejected
 }
 
 // CheckStatusResponse represents the registration status check response
@@ -39,8 +39,8 @@ type CheckStatusResponse struct {
 
 // UserInfo represents user information returned after login
 type UserInfo struct {
-	ID          uuid.UUID `json:"id"`
-	UserID      string    `json:"user_id"`
+	KeycloakID  uuid.UUID `json:"keycloak_id"`
+	UserID      int64     `json:"user_id"`
 	Email       string    `json:"email"`
 	FirstName   string    `json:"first_name,omitempty"`
 	LastName    string    `json:"last_name,omitempty"`
@@ -76,9 +76,9 @@ type VerifyOTPRequest struct {
 
 // VerifyOTPResponse represents the OTP verification response
 type VerifyOTPResponse struct {
-	Message      string `json:"message"`
-	Success      bool   `json:"success"`
-	ResetToken   string `json:"reset_token,omitempty"`
+	Message    string `json:"message"`
+	Success    bool   `json:"success"`
+	ResetToken string `json:"reset_token,omitempty"`
 }
 
 // ResetPasswordRequest represents the reset password request payload
@@ -96,6 +96,7 @@ type ResetPasswordResponse struct {
 
 // ChangePasswordRequest represents the change password request payload for authenticated users
 type ChangePasswordRequest struct {
-	CurrentPassword string `json:"current_password"`
-	NewPassword     string `json:"new_password"`
+	CurrentPassword  string `json:"current_password"`
+	NewPassword      string `json:"new_password"`
+	LogoutAllDevices bool   `json:"logout_all_devices"`
 }

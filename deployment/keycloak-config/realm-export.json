@@ -1,0 +1,95 @@
+{
+    "realm": "hedgetechs",
+    "enabled": true,
+    "displayName": "Hedgetechs Trading",
+    "loginTheme": "hedgetechs",
+    "accountTheme": "hedgetechs",
+    "adminTheme": "hedgetechs",
+    "emailTheme": "hedgetechs",
+    "sslRequired": "external",
+    "registrationAllowed": true,
+    "loginWithEmailAllowed": true,
+    "duplicateEmailsAllowed": false,
+    "resetPasswordAllowed": true,
+    "editUsernameAllowed": false,
+    "verifyEmail": true,
+    "bruteForceProtected": true,
+    "permanentLockout": false,
+    "maxFailureWaitSeconds": 900,
+    "minimumQuickLoginWaitSeconds": 60,
+    "waitIncrementSeconds": 300,
+    "quickLoginCheckMilliSeconds": 1000,
+    "maxDeltaTimeSeconds": 43200,
+    "failureFactor": 5,
+    "ssoSessionIdleTimeout": 1800,
+    "ssoSessionMaxLifespan": 36000,
+    "ssoSessionIdleTimeoutRememberMe": 0,
+    "ssoSessionMaxLifespanRememberMe": 0,
+    "offlineSessionIdleTimeout": 2592000,
+    "offlineSessionMaxLifespanEnabled": false,
+    "offlineSessionMaxLifespan": 5184000,
+    "clientSessionIdleTimeout": 0,
+    "clientSessionMaxLifespan": 0,
+    "accessTokenLifespan": 300,
+    "accessTokenLifespanForImplicitFlow": 900,
+    "accessCodeLifespan": 60,
+    "accessCodeLifespanUserAction": 300,
+    "accessCodeLifespanLogin": 1800,
+    "actionTokenGeneratedByAdminLifespan": 3600,
+    "actionTokenGeneratedByUserLifespan": 300,
+    "passwordPolicy": "length(8) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1) and notUsername(undefined)",
+    "smtpServer": {
+        "host": "mail.hedgetechs.com",
+        "port": "465",
+        "ssl": "true",
+        "user": "system@hedgetechs.com",
+        "password": "gVGlwZ5kF}5HQq3)",
+        "from": "system@hedgetechs.com",
+        "fromDisplayName": "Hedgetechs System",
+        "replyTo": "support@hedgetechs.com",
+        "replyToDisplayName": "Hedgetechs Support",
+        "envelopeFrom": "system@hedgetechs.com"
+    },
+    "roles": {
+        "realm": [
+            {
+                "name": "user",
+                "description": "User role"
+            },
+            {
+                "name": "admin",
+                "description": "Admin role"
+            }
+        ]
+    },
+    "defaultRoles": [
+        "user"
+    ],
+    "clients": [
+        {
+            "clientId": "brokerage-app",
+            "name": "Hedgetechs React App",
+            "enabled": true,
+            "clientAuthenticatorType": "client-secret",
+            "protocol": "openid-connect",
+            "publicClient": true,
+            "directAccessGrantsEnabled": true,
+            "standardFlowEnabled": true,
+            "implicitFlowEnabled": false,
+            "serviceAccountsEnabled": false,
+            "rootUrl": "https://trade.hedgetechs.com",
+            "baseUrl": "https://trade.hedgetechs.com",
+            "redirectUris": [
+                "https://trade.hedgetechs.com/*",
+                "http://localhost:5173/*",
+                "http://localhost:3000/*"
+            ],
+            "webOrigins": [
+                "+"
+            ],
+            "attributes": {
+                "pkce.code.challenge.method": "S256"
+            }
+        }
+    ]
+}

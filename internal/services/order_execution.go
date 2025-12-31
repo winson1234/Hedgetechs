@@ -48,9 +48,9 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 	var accountCurrency, quoteCurrency string
 	var instrumentType string
 	err = tx.QueryRow(ctx,
-		`SELECT o.id, u.id, o.account_id, o.symbol, o.order_number, o.side, o.type,
+		`SELECT o.id, u.keycloak_id, o.account_id, o.symbol, o.order_number, o.side, o.type,
 		        o.status, o.amount_base, o.limit_price, o.stop_price, o.leverage, o.product_type, o.filled_amount,
-		        o.average_fill_price, o.created_at, o.updated_at,
+		        o.average_fill_price, o.pair_id, o.created_at, o.updated_at,
 		        a.currency,
 		        i.quote_currency,
 		        i.instrument_type
@@ -64,7 +64,7 @@ func (s *OrderExecutionService) ExecuteOrder(ctx context.Context, orderID uuid.U
 	).Scan(
 		&order.ID, &order.UserID, &order.AccountID, &order.Symbol, &order.OrderNumber,
 		&order.Side, &order.Type, &order.Status, &order.AmountBase, &order.LimitPrice,
-		&order.StopPrice, &order.Leverage, &order.ProductType, &order.FilledAmount, &order.AverageFillPrice,
+		&order.StopPrice, &order.Leverage, &order.ProductType, &order.FilledAmount, &order.AverageFillPrice, &order.PairID,
 		&order.CreatedAt, &order.UpdatedAt,
 		&accountCurrency, &quoteCurrency, &instrumentType,
 	)
@@ -558,7 +558,7 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 	// Fetch both contracts (return long contract as primary)
 	var longContract models.Contract
 	err = tx.QueryRow(ctx,
-		`SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size,
+		`SELECT c.id, u.keycloak_id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size,
 		        c.entry_price, c.margin_used, c.leverage, c.liquidation_price, c.tp_price, c.sl_price, c.close_price, c.pnl,
 		        c.swap, c.commission, c.created_at, c.closed_at, c.updated_at
 		 FROM contracts c
@@ -709,11 +709,11 @@ func (s *OrderExecutionService) ExecuteSinglePositionOrder(
 	contractID := uuid.New()
 	_, err = tx.Exec(ctx,
 		`INSERT INTO contracts (id, user_id, account_id, symbol, contract_number, side, status,
-		                        lot_size, entry_price, margin_used, leverage, commission, liquidation_price, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
+		                        lot_size, entry_price, margin_used, leverage, commission, liquidation_price, pair_id, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())`,
 		contractID, accountUserID, order.AccountID, order.Symbol, contractNumber,
 		contractSide, models.ContractStatusOpen, order.AmountBase, executionPrice,
-		marginRequired-fee, leverage, fee, liquidationPrice,
+		marginRequired-fee, leverage, fee, liquidationPrice, order.PairID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create position: %w", err)
@@ -732,7 +732,7 @@ func (s *OrderExecutionService) ExecuteSinglePositionOrder(
 	// Fetch created contract
 	var contract models.Contract
 	err = tx.QueryRow(ctx,
-		`SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size,
+		`SELECT c.id, u.keycloak_id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size,
 		        c.entry_price, c.margin_used, c.leverage, c.liquidation_price, c.tp_price, c.sl_price, c.close_price, c.pnl,
 		        c.swap, c.commission, c.pair_id, c.created_at, c.closed_at, c.updated_at
 		 FROM contracts c

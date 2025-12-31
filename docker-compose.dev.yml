@@ -10,9 +10,11 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-brokerage_dev}
+      - POSTGRES_MULTIPLE_DATABASES=${POSTGRES_DB:-brokerage_dev},keycloak_dev
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
       - postgres-dev-data:/var/lib/postgresql/data
+      - ./deployment/postgres-init:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     networks:
@@ -48,6 +50,40 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ============================================
+  # Keycloak Identity Provider
+  # ============================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: brokerage-keycloak-dev
+    restart: unless-stopped
+    command: start-dev --import-realm
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      - KC_HOSTNAME_URL=http://localhost:8082
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak_dev
+      - KC_DB_USERNAME=${POSTGRES_USER:-postgres}
+      - KC_DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - KC_DB_SCHEMA=public
+      # Truststore Configuration for Self-Signed Certs
+      - KC_SPI_TRUSTSTORE_FILE_FILE=/opt/keycloak/data/truststore.jks
+      - KC_SPI_TRUSTSTORE_FILE_PASSWORD=password
+      - KC_SPI_TRUSTSTORE_FILE_HOSTNAME_VERIFICATION_POLICY=ANY
+      - KC_SPI_TRUSTSTORE_FILE_ENABLED=true
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./deployment/keycloak-config/realm-export.json:/opt/keycloak/data/import/realm.json
+      - ./deployment/keycloak-config/truststore.jks:/opt/keycloak/data/truststore.jks
+      - ./deployment/keycloak-config/themes/hedgetechs:/opt/keycloak/themes/hedgetechs
+    networks:
+      - brokerage-dev-network
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # ============================================
   # Backend (Go API) - Development with Hot Reload
@@ -115,6 +151,16 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - DOCKER_ENV=development
       - PORT=8080
+      
+      # ============================================
+      # KEYCLOAK
+      # ============================================
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=hedgetechs
+      - KEYCLOAK_CLIENT_ID=brokerage-app
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-}
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
       
       # ============================================
       # CORS

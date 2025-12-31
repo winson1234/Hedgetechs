@@ -33,7 +33,7 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
     message: '',
     variant: 'default',
     details: [],
-    onConfirm: () => {}
+    onConfirm: () => { }
   });
 
   // Fetch positions when account changes or when triggered
@@ -84,9 +84,18 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
     // Close hedged pair (both positions) if applicable
     if (isHedgedPosition && pairedPosition && pairedPosition.status === 'open') {
       const pairedPnL = pairedPosition.unrealized_pnl || 0;
-      const pairedPnLText = pairedPnL >= 0 ? `+${formatCurrency(pairedPnL, 'USD')}` : formatCurrency(pairedPnL, 'USD');
       const totalPnL = unrealizedPnL + pairedPnL;
       const totalPnLText = totalPnL >= 0 ? `+${formatCurrency(totalPnL, 'USD')}` : formatCurrency(totalPnL, 'USD');
+
+      // Determine which is Long and which is Short for consistent ordering in dialog
+      const longPos = position.side === 'long' ? position : pairedPosition;
+      const shortPos = position.side === 'short' ? position : pairedPosition;
+
+      const longPnL = longPos.unrealized_pnl || 0;
+      const shortPnL = shortPos.unrealized_pnl || 0;
+
+      const longPnLText = longPnL >= 0 ? `+${formatCurrency(longPnL, 'USD')}` : formatCurrency(longPnL, 'USD');
+      const shortPnLText = shortPnL >= 0 ? `+${formatCurrency(shortPnL, 'USD')}` : formatCurrency(shortPnL, 'USD');
 
       setConfirmDialog({
         isOpen: true,
@@ -94,10 +103,10 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
         message: 'This will close both positions in the hedged pair at the current market price.',
         variant: 'default',
         details: [
-          { label: `${position.side.toUpperCase()} Position`, value: position.symbol, highlight: true },
-          { label: 'P&L', value: pnlText },
-          { label: `${pairedPosition.side.toUpperCase()} Position`, value: pairedPosition.symbol, highlight: true },
-          { label: 'P&L', value: pairedPnLText },
+          { label: 'LONG Position', value: longPos.symbol, highlight: true },
+          { label: 'P&L', value: longPnLText },
+          { label: 'SHORT Position', value: shortPos.symbol, highlight: true },
+          { label: 'P&L', value: shortPnLText },
           { label: 'Combined P&L', value: totalPnLText, highlight: true },
           { label: 'Close Price', value: formatCurrency(currentPrice, 'USD') }
         ],
@@ -261,21 +270,19 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
             {positionsWithPnL.map((position) => (
               <div
                 key={position.id}
-                className={`p-3.5 border rounded-lg transition-all hover:shadow-md ${
-                  position.side === 'long'
+                className={`p-3.5 border rounded-lg transition-all hover:shadow-md ${position.side === 'long'
                     ? 'border-green-500/30 bg-green-500/5 hover:bg-green-500/10'
                     : 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10'
-                }`}
+                  }`}
               >
                 {/* Header Row */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold ${
-                        position.side === 'long'
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold ${position.side === 'long'
                           ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                           : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                      }`}
+                        }`}
                     >
                       {position.side === 'long' ? (
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -381,11 +388,10 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-600 dark:text-slate-400">P&L:</span>
                       <span
-                        className={`text-sm font-bold ${
-                          (position.unrealized_pnl || 0) >= 0
+                        className={`text-sm font-bold ${(position.unrealized_pnl || 0) >= 0
                             ? 'text-green-600 dark:text-green-400'
                             : 'text-red-600 dark:text-red-400'
-                        }`}
+                          }`}
                       >
                         {(position.unrealized_pnl || 0) >= 0 ? '+' : ''}
                         {formatCurrency(position.unrealized_pnl || 0, 'USD')}
@@ -394,11 +400,10 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-600 dark:text-slate-400">ROE:</span>
                       <span
-                        className={`text-sm font-bold ${
-                          (position.roe || 0) >= 0
+                        className={`text-sm font-bold ${(position.roe || 0) >= 0
                             ? 'text-green-400'
                             : 'text-red-400'
-                        }`}
+                          }`}
                       >
                         {(position.roe || 0) >= 0 ? '+' : ''}
                         {(position.roe || 0).toFixed(2)}%

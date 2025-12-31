@@ -139,7 +139,7 @@ func CreateContract(w http.ResponseWriter, r *http.Request) {
 	// Fetch created contract
 	var contract models.Contract
 	err = pool.QueryRow(ctx,
-		`SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
+		`SELECT c.id, u.keycloak_id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
 		        c.tp_price, c.sl_price, c.close_price, c.pnl, c.swap, c.commission, c.pair_id, c.created_at, c.closed_at, c.updated_at
 		 FROM contracts c
 		 JOIN users u ON c.user_id = u.user_id
@@ -207,7 +207,7 @@ func GetContracts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build query based on status filter
-	query := `SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
+	query := `SELECT c.id, u.keycloak_id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
 	                 c.tp_price, c.sl_price, c.close_price, c.pnl, c.swap, c.commission, c.pair_id, c.created_at, c.closed_at, c.updated_at
 	          FROM contracts c
 	          JOIN users u ON c.user_id = u.user_id
@@ -320,7 +320,7 @@ func GetContractHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Query closed and liquidated contracts
-	query := `SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
+	query := `SELECT c.id, u.keycloak_id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
 	                 c.tp_price, c.sl_price, c.close_price, c.pnl, c.swap, c.commission, c.pair_id, c.created_at, c.closed_at, c.updated_at
 	          FROM contracts c
 	          JOIN users u ON c.user_id = u.user_id
@@ -454,7 +454,7 @@ func CloseContract(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	// Fetch closed contract to return details
 	var contract models.Contract
 	err = pool.QueryRow(ctx,
-		`SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
+		`SELECT c.id, u.keycloak_id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
 		        c.tp_price, c.sl_price, c.close_price, c.pnl, c.swap, c.commission, c.pair_id, c.created_at, c.closed_at, c.updated_at
 		 FROM contracts c
 		 JOIN users u ON c.user_id = u.user_id
@@ -591,7 +591,7 @@ func ClosePair(h *hub.Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch both closed contracts to return details
-	query := `SELECT c.id, u.id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
+	query := `SELECT c.id, u.keycloak_id, c.account_id, c.symbol, c.contract_number, c.side, c.status, c.lot_size, c.entry_price, c.margin_used, c.leverage,
 	                 c.tp_price, c.sl_price, c.close_price, c.pnl, c.swap, c.commission, c.pair_id, c.created_at, c.closed_at, c.updated_at
 	          FROM contracts c
 	          JOIN users u ON c.user_id = u.user_id

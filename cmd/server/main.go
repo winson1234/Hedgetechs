@@ -577,6 +577,20 @@ func main() {
 		}
 	})
 
+	// POST /api/v1/auth/resend-verification - Resend verification email (public, with rate limiting)
+	http.HandleFunc("/api/v1/auth/resend-verification", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.CORSMiddleware(middleware.IPRateLimitMiddleware(10, 5)(api.HandleResendVerification(authStorage, keycloakService)))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Create auth middleware factory with session revocation
 	authMiddleware := middleware.NewAuthMiddleware(authStorage, keycloakService)
 

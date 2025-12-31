@@ -177,52 +177,52 @@ services:
       # ============================================
       # REDIS
       # ============================================
-      - REDIS_ADDR=${REDIS_ADDR:-redis:6379}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - REDIS_CHANNEL=${REDIS_CHANNEL}
-      - REDIS_HASH_KEY=${REDIS_HASH_KEY}
+      - REDIS_ADDR
+      - REDIS_PASSWORD
+      - REDIS_CHANNEL
+      - REDIS_HASH_KEY
       
       # ============================================
       # JWT
       # ============================================
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET
       - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
       
       # ============================================
       # PAYMENT PROCESSING
       # ============================================
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - NOWPAYMENTS_API_KEY=${NOWPAYMENTS_API_KEY}
+      - STRIPE_SECRET_KEY
+      - NOWPAYMENTS_API_KEY
       
       # ============================================
       # MARKET DATA
       # ============================================
       - MARKET_DATA_PROVIDER=${MARKET_DATA_PROVIDER:-hybrid}
-      - TWELVE_DATA_API_KEY=${TWELVE_DATA_API_KEY}
+      - TWELVE_DATA_API_KEY
       - TWELVE_DATA_POLL_INTERVAL=${TWELVE_DATA_POLL_INTERVAL:-15m}
       - ENABLE_EXTERNAL_FETCH=${ENABLE_EXTERNAL_FETCH:-true}
       
       # ============================================
       # EMAIL
       # ============================================
-      - RESEND_API_KEY=${RESEND_API_KEY}
+      - RESEND_API_KEY
       - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-onboarding@resend.dev}
       
       # ============================================
       # AWS FACE LIVENESS
       # ============================================
-      - AWS_AI_ACCESS_KEY=${AWS_AI_ACCESS_KEY}
-      - AWS_AI_SECRET_KEY=${AWS_AI_SECRET_KEY}
+      - AWS_AI_ACCESS_KEY
+      - AWS_AI_SECRET_KEY
       - AWS_AI_REGION=${AWS_AI_REGION:-us-east-1}
 
       # ============================================
       # IDENTITY PROVIDER (Internal Docker Network)
       # ============================================
       - KEYCLOAK_URL=https://auth.hedgetechs.com
-      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KEYCLOAK_ADMIN
+      - KEYCLOAK_ADMIN_PASSWORD
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-brokerage-app}
-      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
+      - KEYCLOAK_CLIENT_SECRET
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-hedgetechs}
       
       # ============================================

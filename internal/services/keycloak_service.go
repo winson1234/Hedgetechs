@@ -296,3 +296,66 @@ func (s *KeycloakService) ChangePassword(ctx context.Context, userID, newPasswor
 
 	return nil
 }
+
+// IsEmailVerified checks if a user's email is verified
+func (s *KeycloakService) IsEmailVerified(ctx context.Context, email string) (bool, error) {
+	if err := s.EnsureAdminToken(ctx); err != nil {
+		return false, err
+	}
+	accessToken := s.adminToken.AccessToken
+
+	// Get User ID by email
+	users, err := s.client.GetUsers(ctx, getPtr(accessToken), s.realm, gocloak.GetUsersParams{
+		Email: gocloak.StringP(email),
+	})
+	if err != nil {
+		// Retry if token invalid
+		if isTokenError(err) {
+			s.tokenMutex.Lock()
+			s.adminToken = nil
+			s.tokenMutex.Unlock()
+
+			if retryErr := s.EnsureAdminToken(ctx); retryErr == nil {
+				accessToken = s.adminToken.AccessToken
+				users, err = s.client.GetUsers(ctx, getPtr(accessToken), s.realm, gocloak.GetUsersParams{
+					Email: gocloak.StringP(email),
+				})
+			}
+		}
+
+		if err != nil {
+			return false, fmt.Errorf("failed to find user: %w", err)
+		}
+	}
+
+	if len(users) == 0 {
+		return false, errors.New("user not found")
+	}
+
+	user := users[0]
+	if user.EmailVerified == nil {
+		return false, nil
+	}
+
+	return *user.EmailVerified, nil
+}
+
+// ResendVerificationByEmail finds a user by email and sends a verification email
+func (s *KeycloakService) ResendVerificationByEmail(ctx context.Context, email string) error {
+	if err := s.EnsureAdminToken(ctx); err != nil {
+		return err
+	}
+	accessToken := s.adminToken.AccessToken
+
+	users, err := s.client.GetUsers(ctx, getPtr(accessToken), s.realm, gocloak.GetUsersParams{
+		Email: gocloak.StringP(email),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to find user: %w", err)
+	}
+	if len(users) == 0 {
+		return errors.New("user not found")
+	}
+
+	return s.SendVerificationEmail(ctx, *users[0].ID)
+}

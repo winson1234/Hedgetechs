@@ -50,20 +50,41 @@ export default function LoginPage() {
     }
   }, []);
 
+  const [lastError, setLastError] = useState<any>(null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLastError(null);
 
     try {
       await dispatch(signIn({ email: email.trim().toLowerCase(), password })).unwrap();
       navigate('/trading');
-    } catch (error: unknown) {
-      // Correctly handle unknown error type
-      let message = 'Login failed';
-      if (error instanceof Error) {
-        message = error.message;
-      } else if (typeof error === 'string') {
-        message = error;
+    } catch (error: any) {
+      console.error("Login Error Object:", error); // Debugging
+      setLastError(error); // Capture for display
+
+      // SUPER ROBUST CHECK: Convert everything to string and look for keywords
+      // This handles any weird object nesting or property names
+      const errorString = JSON.stringify(error || {});
+      const errMessageLower = (error?.message || '').toLowerCase();
+
+      if (
+        (error?.error === 'account_not_verified') ||
+        errorString.includes('account_not_verified') ||
+        errorString.includes('Email not verified') ||
+        errMessageLower.includes('email not verified')
+      ) {
+        console.log("Redirecting to verification page...");
+        navigate(`/register?verification_needed=true&email=${encodeURIComponent(email)}`);
+        return;
       }
+
+      // Fallback extraction for alert
+      let message = 'Login failed';
+      if (error instanceof Error) message = error.message;
+      else if (typeof error === 'string') message = error;
+      else if (error?.message) message = error.message;
+
       alert(`❌ ${message}`);
     }
   };
@@ -71,6 +92,29 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="container">
+
+        {/* DEBUG: Show last error on screen to diagnose */}
+        {lastError && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'rgba(255,0,0,0.9)',
+            color: 'white',
+            padding: '20px',
+            zIndex: 9999,
+            overflow: 'auto',
+            maxHeight: '300px',
+            fontFamily: 'monospace'
+          }}>
+            <strong>Debug Error Dump:</strong><br />
+            {JSON.stringify(lastError, null, 2)}
+            <br />
+            <button onClick={() => setLastError(null)} style={{ color: 'black', marginTop: '10px' }}>Close Debug</button>
+          </div>
+        )}
+
         <div className="background"></div>
 
         <div className="login-card">

@@ -69,9 +69,10 @@ export const signIn = createAsyncThunk(
       authService.storeUser(result.user);
 
       return { user: result.user, token: result.token };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Login failed';
-      return rejectWithValue(message);
+    } catch (error: any) {
+      // Pass the fully structured error object from the service layer directly to the component.
+      // The auth service already formats the error.
+      return rejectWithValue(error);
     }
   }
 );
@@ -162,7 +163,11 @@ const authSlice = createSlice({
       })
       .addCase(signIn.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        if (action.payload && typeof action.payload === 'object' && 'message' in (action.payload as any)) {
+          state.error = (action.payload as any).message;
+        } else {
+          state.error = action.payload as string;
+        }
       });
 
     // Sign out

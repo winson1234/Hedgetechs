@@ -90,7 +90,13 @@ export async function login(data: LoginRequest): Promise<AuthResponse> {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.message || result.error || 'Login failed');
+      // Throw the full result object to preserve error codes
+      // But ensure it has a message property for standard error handling
+      const errorPayload = {
+        ...result,
+        message: result.message || result.error || 'Login failed',
+      };
+      throw errorPayload;
     }
 
     // Store token in sessionStorage (cleared when tab closes)
@@ -99,7 +105,11 @@ export async function login(data: LoginRequest): Promise<AuthResponse> {
     }
 
     return result as AuthResponse;
-  } catch (error) {
+  } catch (error: any) {
+    // If it's already a structured error object from above (with message/code), re-throw it.
+    if (error && (error.error || error.code || error.message)) {
+      throw error;
+    }
     throw error instanceof Error ? error : new Error('Login failed');
   }
 }

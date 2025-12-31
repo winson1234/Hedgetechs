@@ -59,8 +59,14 @@ export default function RegisterPage() {
   // Pre-fill email when redirected with query param
   useEffect(() => {
     const emailParam = searchParams.get('email');
+    const verificationNeeded = searchParams.get('verification_needed');
+
     if (emailParam) {
       setFormData(prev => ({ ...prev, email: emailParam }));
+    }
+
+    if (verificationNeeded === 'true') {
+      setIsSuccess(true);
     }
   }, [searchParams]);
 
@@ -282,9 +288,46 @@ export default function RegisterPage() {
                 Please check your inbox and follow the link to verify your account.
               </p>
 
-              <button onClick={() => navigate('/login')}>
-                Back to Login
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+                <button onClick={() => navigate('/login')} className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded w-full">
+                  Back to Login
+                </button>
+
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/v1/auth/resend-verification', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: formData.email })
+                      });
+                      if (response.ok) {
+                        alert('Verification email resent successfully!');
+                      } else {
+                        const data = await response.json();
+                        alert('Failed to resend: ' + (data.message || 'Unknown error'));
+                      }
+                    } catch (e) {
+                      alert('Error communicating with server');
+                    }
+                  }}
+                  style={{
+                    marginTop: '20px',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    fontSize: '14px',
+                    color: '#666',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    width: 'auto',
+                    alignSelf: 'center'
+                  }}
+                  className="hover:text-primary transition-colors focus:outline-none"
+                >
+                  Resend Verification Email
+                </button>
+              </div>
             </div>
           ) : (
             <>

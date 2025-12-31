@@ -304,8 +304,7 @@ func (s *OrderExecutionService) ExecuteSpotTrade(
 			 WHERE account_id = $2 AND currency = $3`,
 			requiredAmount, accountID, actualQuoteCurrency,
 		)
-			requiredAmount, accountID, actualQuoteCurrency,
-		)
+
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23514" {
@@ -345,8 +344,7 @@ func (s *OrderExecutionService) ExecuteSpotTrade(
 			 WHERE account_id = $2 AND currency = $3`,
 			amountBase, accountID, actualBaseCurrency,
 		)
-			amountBase, accountID, actualBaseCurrency,
-		)
+
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23514" {
@@ -511,8 +509,7 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 		 WHERE account_id = $2 AND currency = $3`,
 		totalMarginRequired, order.AccountID, actualAccountCurrency,
 	)
-		totalMarginRequired, order.AccountID, actualAccountCurrency,
-	)
+
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23514" {
@@ -691,8 +688,7 @@ func (s *OrderExecutionService) ExecuteSinglePositionOrder(
 		 WHERE account_id = $2 AND currency = $3`,
 		marginRequired, order.AccountID, actualAccountCurrency,
 	)
-		marginRequired, order.AccountID, actualAccountCurrency,
-	)
+
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23514" {

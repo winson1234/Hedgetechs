@@ -95,6 +95,7 @@ services:
       - KC_DB_PASSWORD=${POSTGRES_PASSWORD}
       - KC_DB_SCHEMA=public
       - KC_HOSTNAME=auth.hedgetechs.com
+      - KC_HOSTNAME_STRICT_BACKCHANNEL=false
       - KC_PROXY=edge
     ports:
       - "127.0.0.1:8082:8080"
@@ -216,7 +217,7 @@ services:
       # ============================================
       # IDENTITY PROVIDER (Internal Docker Network)
       # ============================================
-      - KEYCLOAK_URL=https://auth.hedgetechs.com
+      - KEYCLOAK_URL=http://keycloak:8080
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-brokerage-app}

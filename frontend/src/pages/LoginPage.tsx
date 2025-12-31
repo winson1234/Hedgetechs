@@ -56,8 +56,14 @@ export default function LoginPage() {
     try {
       await dispatch(signIn({ email: email.trim().toLowerCase(), password })).unwrap();
       navigate('/trading');
-    } catch (error: any) {
-      const message = error?.message || (typeof error === 'string' ? error : 'Login failed');
+    } catch (error: unknown) {
+      // Correctly handle unknown error type
+      let message = 'Login failed';
+      if (error instanceof Error) {
+        message = error.message;
+      } else if (typeof error === 'string') {
+        message = error;
+      }
       alert(`❌ ${message}`);
     }
   };

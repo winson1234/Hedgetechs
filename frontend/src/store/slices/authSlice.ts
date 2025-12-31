@@ -141,7 +141,7 @@ const authSlice = createSlice({
       .addCase(signUp.pending, (state) => {
         state.error = null;
       })
-      .addCase(signUp.fulfilled, (state) => {
+      .addCase(signUp.fulfilled, () => {
         // Registration successful - user can now log in
       })
       .addCase(signUp.rejected, (state, action) => {

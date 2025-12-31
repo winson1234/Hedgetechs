@@ -153,15 +153,8 @@ function ChartComponent() {
         timeVisible: true,
         secondsVisible: false,
       },
-      localization: {
-        locale: 'en-US',
-        dateFormat: 'dd MMM',
-        timeFormatter: (time: number) => {
-          if (!time || isNaN(time)) return '';
-          const date = new Date(time * 1000);
-          if (isNaN(date.getTime())) return '';
-          return date.toLocaleString();
-        }
+      rightPriceScale: {
+        borderColor: isDark ? '#334155' : '#cbd5e1',
       },
     })
 
@@ -208,12 +201,9 @@ function ChartComponent() {
 
         if (!Array.isArray(klines) || klines.length === 0) {
           console.warn('No klines data received');
-          seriesRef.current?.setData([]); // Explicitly set empty data
-          lastBarRef.current = null; // Reset last bar
+          seriesRef.current?.setData([]);
+          lastBarRef.current = null;
           setIsLoading(false);
-          // Do NOT return, let logic proceed so references are set? 
-          // Actually if we look below, the code processes 'klines'. 
-          // So we should return, but after setting data.
           return;
         }
 
@@ -347,19 +337,17 @@ function ChartComponent() {
     }
 
     // compute candle time (UTCTimestamp in seconds)
-    if (!currentPrice.timestamp || Number.isNaN(currentPrice.timestamp)) return
+    if (!currentPrice.timestamp || isNaN(currentPrice.timestamp)) return
 
     const tickSec = Math.floor(currentPrice.timestamp / 1000)
     const candleTime = (Math.floor(tickSec / timeframeSeconds) * timeframeSeconds) as UTCTimestamp
 
-    if (Number.isNaN(candleTime) || candleTime === 0) return
+    if (isNaN(candleTime) || candleTime === 0) return
 
     const current = lastBarRef.current
 
     // CRITICAL: Prevent updating with older timestamps (causes "Cannot update oldest data" error)
     if (current && candleTime < current.time) {
-      // Ignore updates that would create candles older than the last known candle
-      // This can happen with longer timeframes (1w, 1M) when switching timeframes
       return
     }
 
@@ -387,12 +375,11 @@ function ChartComponent() {
           volume: volume
         })
       } else if (current && candleTime > current.time) {
-        // new candle: only create if timestamp is newer than current
+        // new candle
         const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
         seriesRef.current.update(newBar)
         lastBarRef.current = newBar
 
-        // Initialize volume for new candle
         volumeDataRef.current.set(candleTime, 0)
         setOhlcv({
           open: newBar.open,
@@ -402,7 +389,7 @@ function ChartComponent() {
           volume: 0
         })
       } else if (!current) {
-        // Handle case where we don't have any historical data yet
+        // Handle initial data
         const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
         seriesRef.current.update(newBar)
         lastBarRef.current = newBar
@@ -417,7 +404,7 @@ function ChartComponent() {
         })
       }
     } catch (err) {
-      console.error('Error updating chart candle:', err, { candleTime, price });
+      console.error('Error updating chart:', err)
     }
   }, [currentPrice, timeframeSeconds, symbol])
 

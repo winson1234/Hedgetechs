@@ -356,57 +356,61 @@ function ChartComponent() {
       return
     }
 
-    if (current && current.time === candleTime) {
-      // update existing candle
-      const updated: CandlestickData<UTCTimestamp> = {
-        time: current.time,
-        open: current.open,
-        high: Math.max(current.high, price),
-        low: Math.min(current.low, price),
-        close: price
+    try {
+      if (current && current.time === candleTime) {
+        // update existing candle
+        const updated: CandlestickData<UTCTimestamp> = {
+          time: current.time,
+          open: current.open,
+          high: Math.max(current.high, price),
+          low: Math.min(current.low, price),
+          close: price
+        }
+        // update chart and lastBarRef
+        seriesRef.current.update(updated)
+        lastBarRef.current = updated
+
+        // Update OHLCV display
+        const volume = volumeDataRef.current.get(candleTime) || 0
+        setOhlcv({
+          open: updated.open,
+          high: updated.high,
+          low: updated.low,
+          close: updated.close,
+          volume: volume
+        })
+      } else if (current && candleTime > current.time) {
+        // new candle: only create if timestamp is newer than current
+        const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
+        seriesRef.current.update(newBar)
+        lastBarRef.current = newBar
+
+        // Initialize volume for new candle
+        volumeDataRef.current.set(candleTime, 0)
+        setOhlcv({
+          open: newBar.open,
+          high: newBar.high,
+          low: newBar.low,
+          close: newBar.close,
+          volume: 0
+        })
+      } else if (!current) {
+        // Handle case where we don't have any historical data yet
+        const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
+        seriesRef.current.update(newBar)
+        lastBarRef.current = newBar
+
+        volumeDataRef.current.set(candleTime, 0)
+        setOhlcv({
+          open: newBar.open,
+          high: newBar.high,
+          low: newBar.low,
+          close: newBar.close,
+          volume: 0
+        })
       }
-      // update chart and lastBarRef
-      seriesRef.current.update(updated)
-      lastBarRef.current = updated
-
-      // Update OHLCV display
-      const volume = volumeDataRef.current.get(candleTime) || 0
-      setOhlcv({
-        open: updated.open,
-        high: updated.high,
-        low: updated.low,
-        close: updated.close,
-        volume: volume
-      })
-    } else if (current && candleTime > current.time) {
-      // new candle: only create if timestamp is newer than current
-      const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
-      seriesRef.current.update(newBar)
-      lastBarRef.current = newBar
-
-      // Initialize volume for new candle
-      volumeDataRef.current.set(candleTime, 0)
-      setOhlcv({
-        open: newBar.open,
-        high: newBar.high,
-        low: newBar.low,
-        close: newBar.close,
-        volume: 0
-      })
-    } else if (!current) {
-      // Handle case where we don't have any historical data yet
-      const newBar: CandlestickData<UTCTimestamp> = { time: candleTime, open: price, high: price, low: price, close: price }
-      seriesRef.current.update(newBar)
-      lastBarRef.current = newBar
-
-      volumeDataRef.current.set(candleTime, 0)
-      setOhlcv({
-        open: newBar.open,
-        high: newBar.high,
-        low: newBar.low,
-        close: newBar.close,
-        volume: 0
-      })
+    } catch (err) {
+      console.error('Error updating chart candle:', err, { candleTime, price });
     }
   }, [currentPrice, timeframeSeconds, symbol])
 

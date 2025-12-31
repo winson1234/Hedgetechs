@@ -84,7 +84,7 @@ services:
     image: quay.io/keycloak/keycloak:23.0
     container_name: brokerage-keycloak-prod
     restart: always
-    command: start --optimized --proxy edge --import-realm
+    command: start --proxy edge --import-realm
     environment:
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}

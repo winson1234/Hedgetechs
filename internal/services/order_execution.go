@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 )
@@ -210,7 +212,8 @@ func (s *OrderExecutionService) getBalanceWithFallback(ctx context.Context, tx p
 		var preferredBalance float64
 		err := tx.QueryRow(ctx,
 			`SELECT COALESCE(amount, 0) FROM balances
-			 WHERE account_id = $1 AND currency = $2`,
+			 WHERE account_id = $1 AND currency = $2
+			 FOR UPDATE`,
 			accountID, preferredCurrency,
 		).Scan(&preferredBalance)
 
@@ -227,7 +230,8 @@ func (s *OrderExecutionService) getBalanceWithFallback(ctx context.Context, tx p
 		var equivalentBalance float64
 		err = tx.QueryRow(ctx,
 			`SELECT COALESCE(amount, 0) FROM balances
-			 WHERE account_id = $1 AND currency = $2`,
+			 WHERE account_id = $1 AND currency = $2
+			 FOR UPDATE`,
 			accountID, equivalentCurrency,
 		).Scan(&equivalentBalance)
 
@@ -246,7 +250,7 @@ func (s *OrderExecutionService) getBalanceWithFallback(ctx context.Context, tx p
 	// For non-equivalent currencies, just check the single balance
 	var balance float64
 	err := tx.QueryRow(ctx,
-		`SELECT amount FROM balances WHERE account_id = $1 AND currency = $2`,
+		`SELECT amount FROM balances WHERE account_id = $1 AND currency = $2 FOR UPDATE`,
 		accountID, preferredCurrency,
 	).Scan(&balance)
 
@@ -300,7 +304,13 @@ func (s *OrderExecutionService) ExecuteSpotTrade(
 			 WHERE account_id = $2 AND currency = $3`,
 			requiredAmount, accountID, actualQuoteCurrency,
 		)
+			requiredAmount, accountID, actualQuoteCurrency,
+		)
 		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23514" {
+				return "", "", "", fmt.Errorf("insufficient %s balance (balance check constraint)", actualQuoteCurrency)
+			}
 			return "", "", "", fmt.Errorf("failed to deduct quote currency: %w", err)
 		}
 
@@ -335,7 +345,13 @@ func (s *OrderExecutionService) ExecuteSpotTrade(
 			 WHERE account_id = $2 AND currency = $3`,
 			amountBase, accountID, actualBaseCurrency,
 		)
+			amountBase, accountID, actualBaseCurrency,
+		)
 		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23514" {
+				return "", "", "", fmt.Errorf("insufficient %s balance (balance check constraint)", actualBaseCurrency)
+			}
 			return "", "", "", fmt.Errorf("failed to deduct base currency: %w", err)
 		}
 
@@ -495,7 +511,13 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 		 WHERE account_id = $2 AND currency = $3`,
 		totalMarginRequired, order.AccountID, actualAccountCurrency,
 	)
+		totalMarginRequired, order.AccountID, actualAccountCurrency,
+	)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23514" {
+			return nil, fmt.Errorf("insufficient %s balance for hedged position", actualAccountCurrency)
+		}
 		return nil, fmt.Errorf("failed to deduct margin: %w", err)
 	}
 
@@ -669,7 +691,13 @@ func (s *OrderExecutionService) ExecuteSinglePositionOrder(
 		 WHERE account_id = $2 AND currency = $3`,
 		marginRequired, order.AccountID, actualAccountCurrency,
 	)
+		marginRequired, order.AccountID, actualAccountCurrency,
+	)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23514" {
+			return nil, fmt.Errorf("insufficient %s balance for position (balance check constraint)", actualAccountCurrency)
+		}
 		return nil, fmt.Errorf("failed to deduct margin: %w", err)
 	}
 

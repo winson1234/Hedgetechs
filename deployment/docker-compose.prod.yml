@@ -214,7 +214,7 @@ services:
       # ============================================
       # IDENTITY PROVIDER (Internal Docker Network)
       # ============================================
-      - KEYCLOAK_URL=http://keycloak:8080/auth
+      - KEYCLOAK_URL=https://auth.hedgetechs.com
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-brokerage-app}

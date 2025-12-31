@@ -162,11 +162,11 @@ func CreateHedgeOrder(w http.ResponseWriter, r *http.Request) {
 	// NOTE: Use accountUserID (int64) for SQL INSERT, not order.UserID (UUID)
 	_, err = tx.Exec(ctx,
 		`INSERT INTO orders (id, user_id, account_id, symbol, order_number, side, type, status, amount_base, limit_price, stop_price, leverage, product_type, pair_id, execution_strategy, filled_amount, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'hedge', 0, NOW(), NOW())`,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'b_book', 0, NOW(), NOW())`,
 		order.ID, accountUserID, order.AccountID, order.Symbol, order.OrderNumber, order.Side, order.Type, models.OrderStatusPending, order.AmountBase, 0, 0, order.Leverage, order.ProductType, nil,
 	)
 	if err != nil {
-		respondWithJSONError(w, http.StatusInternalServerError, "database_error", "failed to create parent order")
+		respondWithJSONError(w, http.StatusInternalServerError, "database_error", fmt.Sprintf("failed to create parent order: %v", err))
 		return
 	}
 

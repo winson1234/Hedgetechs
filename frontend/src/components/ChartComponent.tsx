@@ -156,10 +156,6 @@ function ChartComponent() {
       rightPriceScale: {
         borderColor: isDark ? '#334155' : '#cbd5e1',
       },
-      localization: {
-        locale: 'en-US',
-        dateFormat: 'dd MMM',
-      },
     })
 
     seriesRef.current = chartRef.current.addCandlestickSeries({

@@ -6,7 +6,7 @@
     "accountTheme": "hedgetechs",
     "adminTheme": "hedgetechs",
     "emailTheme": "hedgetechs",
-    "sslRequired": "external",
+    "sslRequired": "NONE",
     "registrationAllowed": true,
     "loginWithEmailAllowed": true,
     "duplicateEmailsAllowed": false,

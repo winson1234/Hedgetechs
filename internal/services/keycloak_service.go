@@ -94,7 +94,7 @@ func (s *KeycloakService) EnsureAdminToken(ctx context.Context) error {
 }
 
 // RegisterUser creates a new user in Keycloak
-func (s *KeycloakService) RegisterUser(ctx context.Context, email, password, firstName, lastName, country, phoneNumber string) (string, error) {
+func (s *KeycloakService) RegisterUser(ctx context.Context, email, password, firstName, lastName, country, phoneNumber, userType string) (string, error) {
 	if err := s.EnsureAdminToken(ctx); err != nil {
 		return "", err
 	}
@@ -112,6 +112,7 @@ func (s *KeycloakService) RegisterUser(ctx context.Context, email, password, fir
 		Attributes: &map[string][]string{
 			"country":      {country},
 			"phone_number": {phoneNumber},
+			"user_type":    {userType},
 		},
 	}
 

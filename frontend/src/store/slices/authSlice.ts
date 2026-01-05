@@ -31,7 +31,8 @@ export const signUp = createAsyncThunk(
     firstName,
     lastName,
     phoneNumber,
-    country
+    country,
+    userType
   }: {
     email: string;
     password: string;
@@ -39,6 +40,7 @@ export const signUp = createAsyncThunk(
     lastName: string;
     phoneNumber?: string;
     country: string;
+    userType: string;
   }, { rejectWithValue }) => {
     try {
       const result = await authService.register({
@@ -48,6 +50,7 @@ export const signUp = createAsyncThunk(
         last_name: lastName,
         phone_number: phoneNumber,
         country,
+        user_type: userType,
       });
 
       return result;

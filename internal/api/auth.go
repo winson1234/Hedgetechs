@@ -33,10 +33,20 @@ func HandleRegister(keycloak *services.KeycloakService) http.HandlerFunc {
 			return
 		}
 
+		// Validate UserType
+		userType := strings.ToLower(req.UserType)
+		if userType == "" {
+			userType = "trader"
+		}
+		if userType != "trader" && userType != "agent" {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Invalid user type. Must be 'trader' or 'agent'")
+			return
+		}
+
 		ctx := r.Context()
 
 		// 1. Create User in Keycloak
-		keycloakID, err := keycloak.RegisterUser(ctx, req.Email, req.Password, req.FirstName, req.LastName, req.Country, req.PhoneNumber)
+		keycloakID, err := keycloak.RegisterUser(ctx, req.Email, req.Password, req.FirstName, req.LastName, req.Country, req.PhoneNumber, userType)
 		if err != nil {
 			// Check if already exists (Keycloak error handling can be tricky, strings check is brittle but common)
 			if strings.Contains(err.Error(), "409") || strings.Contains(strings.ToLower(err.Error()), "already exists") {
@@ -86,8 +96,8 @@ func HandleRegister(keycloak *services.KeycloakService) http.HandlerFunc {
 
 		query := `
 			INSERT INTO users
-			(user_id, keycloak_id, first_name, last_name, email, hash_password, phone_number, country, is_active, created_at, last_updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			(user_id, keycloak_id, first_name, last_name, email, hash_password, phone_number, country, is_active, created_at, last_updated_at, user_type)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			ON CONFLICT (email) DO NOTHING
 		`
 
@@ -103,6 +113,7 @@ func HandleRegister(keycloak *services.KeycloakService) http.HandlerFunc {
 			true, // is_active defaults to true
 			createdAt,
 			time.Now(),
+			userType,
 		)
 
 		if err != nil {

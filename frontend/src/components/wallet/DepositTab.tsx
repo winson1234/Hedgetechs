@@ -10,9 +10,9 @@ import { fetchAccounts } from '../../store/slices/accountSlice';
 import { memo } from 'react';
 import { getToken } from '../../services/auth';
 
-// Platform's Tron wallet address for receiving USDT (TRC20)
-// TODO: Replace with your actual Tron wallet address
-const PLATFORM_TRON_ADDRESS = 'TestingHedgetechWalletAddress';
+// Platform's Tron wallet address from API
+// constant removed in favor of state
+
 
 // Validation schema
 const depositSchema = z.object({
@@ -50,6 +50,29 @@ function DepositTab() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [addressCopied, setAddressCopied] = useState(false);
+  const [platformWalletAddress, setPlatformWalletAddress] = useState<string>('');
+  const [loadingAddress, setLoadingAddress] = useState<boolean>(true);
+
+  // Fetch platform wallet address
+  useEffect(() => {
+    const fetchWalletAddress = async () => {
+      try {
+        const response = await fetch(getApiUrl('/api/v1/platform/wallet-address'));
+        if (response.ok) {
+          const data = await response.json();
+          if (data.address) {
+            setPlatformWalletAddress(data.address);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch platform wallet address:', error);
+      } finally {
+        setLoadingAddress(false);
+      }
+    };
+
+    fetchWalletAddress();
+  }, []);
 
   // React Hook Form
   const { register, handleSubmit, formState: { errors }, setValue, reset } = useForm<DepositFormData>({
@@ -71,11 +94,12 @@ function DepositTab() {
 
   // Copy address to clipboard
   const copyAddress = useCallback(() => {
-    navigator.clipboard.writeText(PLATFORM_TRON_ADDRESS);
+    if (!platformWalletAddress) return;
+    navigator.clipboard.writeText(platformWalletAddress);
     setAddressCopied(true);
     showToast('Wallet address copied to clipboard!', 'success');
     setTimeout(() => setAddressCopied(false), 3000);
-  }, [showToast]);
+  }, [showToast, platformWalletAddress]);
 
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,12 +250,13 @@ function DepositTab() {
               </label>
               <div className="flex items-center gap-2">
                 <code className="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100 break-all">
-                  {PLATFORM_TRON_ADDRESS}
+                  {loadingAddress ? 'Loading...' : (platformWalletAddress || 'Address not available')}
                 </code>
                 <button
                   type="button"
                   onClick={copyAddress}
-                  className="flex-shrink-0 px-3 py-2 bg-[#00C0A2] hover:bg-[#00a085] text-white rounded-lg transition-all text-xs font-semibold"
+                  disabled={!platformWalletAddress || loadingAddress}
+                  className="flex-shrink-0 px-3 py-2 bg-[#00C0A2] hover:bg-[#00a085] text-white rounded-lg transition-all text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {addressCopied ? (
                     <span className="flex items-center gap-1">

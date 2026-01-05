@@ -41,7 +41,8 @@ export default function RegisterPage() {
     email: '',
     phoneNumber: '',
     password: '',
-    retypePassword: ''
+    retypePassword: '',
+    userType: 'trader'
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -236,7 +237,8 @@ export default function RegisterPage() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         phoneNumber: formData.phoneNumber,
-        country: formData.country
+        country: formData.country,
+        userType: formData.userType
       })).unwrap();
 
       // Show success state
@@ -350,6 +352,35 @@ export default function RegisterPage() {
                     <option value="GB">United Kingdom</option>
                     <option value="AU">Australia</option>
                   </select>
+                </div>
+
+                {/* User Type */}
+                <div className="form-group">
+                  <label className="form-label">I am a <span className="required">*</span></label>
+                  <div className="user-type-selector" style={{ display: 'flex', gap: '20px', marginTop: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '15px', color: '#333' }}>
+                      <input
+                        type="radio"
+                        name="userType"
+                        value="trader"
+                        checked={formData.userType === 'trader'}
+                        onChange={(e) => setFormData({ ...formData, userType: e.target.value })}
+                        style={{ marginRight: '8px', accentColor: '#27ae60', width: '18px', height: '18px' }}
+                      />
+                      Trader
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '15px', color: '#333' }}>
+                      <input
+                        type="radio"
+                        name="userType"
+                        value="agent"
+                        checked={formData.userType === 'agent'}
+                        onChange={(e) => setFormData({ ...formData, userType: e.target.value })}
+                        style={{ marginRight: '8px', accentColor: '#27ae60', width: '18px', height: '18px' }}
+                      />
+                      Agent (IB)
+                    </label>
+                  </div>
                 </div>
 
                 {/* Names */}

@@ -774,6 +774,10 @@ func main() {
 	// GET /api/v1/instruments/symbol?symbol=BTCUSDT - Get instrument by symbol
 	http.HandleFunc("/api/v1/instruments/symbol", api.CORSMiddleware(allowHEAD(api.GetInstrumentBySymbol)))
 
+	// Platform configuration endpoints (public)
+	// GET /api/v1/platform/wallet-address - Get platform wallet address for deposits
+	http.HandleFunc("/api/v1/platform/wallet-address", api.CORSMiddleware(allowHEAD(api.GetPlatformWalletAddress)))
+
 	// Forex endpoints (public - no auth required, cache-first design)
 	// Always register endpoints, but handlers will gracefully handle Redis unavailability
 	if redisClient != nil && forexKlines != nil {

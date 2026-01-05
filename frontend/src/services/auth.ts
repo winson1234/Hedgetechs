@@ -29,6 +29,7 @@ export interface RegisterRequest {
   last_name: string;
   phone_number?: string;
   country: string;
+  user_type: string;
 }
 
 export interface LoginRequest {

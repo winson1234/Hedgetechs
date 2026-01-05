@@ -10,6 +10,7 @@ type RegisterRequest struct {
 	Password    string `json:"password"`
 	PhoneNumber string `json:"phone_number"`
 	Country     string `json:"country"`
+	UserType    string `json:"user_type"` // "trader" or "agent"
 }
 
 // LoginRequest represents the login request payload

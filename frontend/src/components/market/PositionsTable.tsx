@@ -14,7 +14,7 @@ interface PositionsTableProps {
 
 export default function PositionsTable({ filterByProductType, selectedProductType }: PositionsTableProps) {
   const dispatch = useAppDispatch();
-  const { activeAccountId } = useAppSelector(state => state.account);
+  const { activeAccountId, accounts } = useAppSelector(state => state.account);
   const { currentPrices } = useAppSelector(state => state.price);
   const { positions, loading, error } = useAppSelector(state => state.position);
   const positionsRefreshTrigger = useAppSelector(state => state.ui.positionsRefreshTrigger);
@@ -38,10 +38,14 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
 
   // Fetch positions when account changes or when triggered
   useEffect(() => {
-    if (activeAccountId) {
+    // Only fetch if we have an active account ID AND it exists in our loaded accounts list
+    // This prevents fetching with a stale ID from localStorage before accounts are loaded
+    const isValidAccount = accounts.some(acc => acc.id === activeAccountId);
+
+    if (activeAccountId && isValidAccount) {
       dispatch(fetchPositions({ accountId: activeAccountId, status: 'open' }));
     }
-  }, [dispatch, activeAccountId, positionsRefreshTrigger]);
+  }, [dispatch, activeAccountId, accounts, positionsRefreshTrigger]);
 
   // Update all positions' P&L when prices change
   useEffect(() => {
@@ -271,8 +275,8 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
               <div
                 key={position.id}
                 className={`p-3.5 border rounded-lg transition-all hover:shadow-md ${position.side === 'long'
-                    ? 'border-green-500/30 bg-green-500/5 hover:bg-green-500/10'
-                    : 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10'
+                  ? 'border-green-500/30 bg-green-500/5 hover:bg-green-500/10'
+                  : 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10'
                   }`}
               >
                 {/* Header Row */}
@@ -280,8 +284,8 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                   <div className="flex items-center gap-2">
                     <span
                       className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold ${position.side === 'long'
-                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        : 'bg-red-500/20 text-red-400 border border-red-500/30'
                         }`}
                     >
                       {position.side === 'long' ? (
@@ -389,8 +393,8 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                       <span className="text-xs text-slate-600 dark:text-slate-400">P&L:</span>
                       <span
                         className={`text-sm font-bold ${(position.unrealized_pnl || 0) >= 0
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-red-600 dark:text-red-400'
+                          ? 'text-green-600 dark:text-green-400'
+                          : 'text-red-600 dark:text-red-400'
                           }`}
                       >
                         {(position.unrealized_pnl || 0) >= 0 ? '+' : ''}
@@ -401,8 +405,8 @@ export default function PositionsTable({ filterByProductType, selectedProductTyp
                       <span className="text-xs text-slate-600 dark:text-slate-400">ROE:</span>
                       <span
                         className={`text-sm font-bold ${(position.roe || 0) >= 0
-                            ? 'text-green-400'
-                            : 'text-red-400'
+                          ? 'text-green-400'
+                          : 'text-red-400'
                           }`}
                       >
                         {(position.roe || 0) >= 0 ? '+' : ''}

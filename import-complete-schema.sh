@@ -43,6 +43,7 @@ FILES=(
 "020_fix_orders_schema.sql"
 "021_add_pair_id_to_orders.sql"
 "022_add_user_type.sql"
+"023_remove_unique_user_account_constraint.sql"
 )
 
 COUNT=1

@@ -564,11 +564,11 @@ func (s *OrderExecutionService) ExecuteDualPositionOrder(
 		return nil, fmt.Errorf("failed to create dual positions: %w", err)
 	}
 
-	// Update order status
+	// Update order status and set pair_id
 	_, err = tx.Exec(ctx,
-		`UPDATE orders SET status = $1, filled_amount = $2, average_fill_price = $3, updated_at = NOW()
-		 WHERE id = $4`,
-		models.OrderStatusFilled, order.AmountBase, executionPrice, order.ID,
+		`UPDATE orders SET status = $1, filled_amount = $2, average_fill_price = $3, pair_id = $4, updated_at = NOW()
+		 WHERE id = $5`,
+		models.OrderStatusFilled, order.AmountBase, executionPrice, pairID, order.ID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update order status: %w", err)

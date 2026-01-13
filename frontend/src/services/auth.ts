@@ -12,7 +12,9 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
+  phone_number?: string;
   country?: string;
+  profile_picture?: string;
   created_at: string;
 }
 
@@ -190,4 +192,83 @@ export async function validateSession(): Promise<{ user: User | null; isValid: b
   // TODO: Optionally implement token validation endpoint
   // For now, just check if token exists
   return { user, isValid: true };
+}
+
+/**
+ * Update user profile
+ */
+export interface UpdateProfileRequest {
+  first_name: string;
+  last_name: string;
+  phone_number: string;
+  country: string;
+  profile_picture?: string;
+}
+
+export async function updateProfile(data: UpdateProfileRequest): Promise<{ success: boolean; message: string; user: User }> {
+  try {
+    const token = getToken();
+    if (!token) throw new Error('No authentication token found');
+
+    const response = await fetch(getApiUrl('/api/v1/user/profile'), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Profile update failed');
+    }
+
+    // Update stored user data
+    if (result.user) {
+      storeUser({ ...getStoredUser(), ...result.user });
+    }
+
+    return {
+      success: true,
+      message: result.message || 'Profile updated successfully',
+      user: result.user
+    };
+  } catch (error) {
+    throw error instanceof Error ? error : new Error('Profile update failed');
+  }
+}
+
+/**
+ * Get user profile
+ */
+export async function getProfile(): Promise<{ user: User }> {
+  try {
+    const token = getToken();
+    if (!token) throw new Error('No authentication token found');
+
+    const response = await fetch(getApiUrl('/api/v1/user/profile'), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+
+    const user = await response.json();
+
+    if (!response.ok) {
+      throw new Error(user.message || user.error || 'Failed to fetch profile');
+    }
+
+    // Update stored user data
+    if (user) {
+      storeUser({ ...getStoredUser(), ...user });
+    }
+
+    return { user };
+  } catch (error) {
+    throw error instanceof Error ? error : new Error('Failed to fetch profile');
+  }
 }

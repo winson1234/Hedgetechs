@@ -268,14 +268,14 @@ export default function ProfileDropdown({
                     <div className="h-1 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
                       <div
                         className={`h-full transition-all duration-300 ${passwordStrength.class === 'weak' ? 'w-1/3 bg-red-500' :
-                            passwordStrength.class === 'medium' ? 'w-2/3 bg-yellow-500' :
-                              'w-full bg-green-500'
+                          passwordStrength.class === 'medium' ? 'w-2/3 bg-yellow-500' :
+                            'w-full bg-green-500'
                           }`}
                       />
                     </div>
                     <p className={`text-xs mt-1 font-medium ${passwordStrength.class === 'weak' ? 'text-red-500' :
-                        passwordStrength.class === 'medium' ? 'text-yellow-500' :
-                          'text-green-500'
+                      passwordStrength.class === 'medium' ? 'text-yellow-500' :
+                        'text-green-500'
                       }`}>
                       {passwordStrength.strength}
                     </p>
@@ -406,9 +406,18 @@ export default function ProfileDropdown({
       <div className="p-4 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-3">
           {/* User Avatar */}
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00C0A2] flex items-center justify-center text-white font-semibold text-lg">
-            {avatarLetter}
-          </div>
+          {/* User Avatar */}
+          {user?.profile_picture ? (
+            <img
+              src={user.profile_picture}
+              alt="Profile"
+              className="w-12 h-12 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-sm"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00C0A2] to-emerald-500 flex items-center justify-center text-white font-semibold text-lg shadow-sm">
+              {avatarLetter}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
               {displayName}

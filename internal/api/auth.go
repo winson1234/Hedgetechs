@@ -432,7 +432,7 @@ func HandleLogin(authStorage *services.AuthStorageService, keycloak *services.Ke
 		getUserQuery := `
 			SELECT keycloak_id, user_id, email, first_name, last_name, phone_number, country, is_active
 			FROM users
-			WHERE email = $1
+			WHERE LOWER(email) = LOWER($1)
 		`
 		err = pool.QueryRow(ctx, getUserQuery, req.Email).Scan(
 			&user.KeycloakID,
@@ -446,10 +446,113 @@ func HandleLogin(authStorage *services.AuthStorageService, keycloak *services.Ke
 		)
 
 		if err != nil {
-			// Lazy creation context? Or error?
-			// For now, return error
-			utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to retrieve local user information")
-			return
+			// Check if user is missing (JIT Provisioning)
+			if strings.Contains(err.Error(), "no rows") {
+				// User authenticated in Keycloak but missing in local DB.
+				// Fetch user details from Keycloak to create local record.
+				kcUser, kcErr := keycloak.GetUserByEmail(ctx, req.Email)
+				if kcErr != nil {
+					fmt.Printf("[JIT ERROR] Failed to fetch user from Keycloak: %v\n", kcErr)
+					utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "Failed to retrieve user profile for provisioning")
+					return
+				}
+				if kcUser == nil {
+					// Should rare if Login just succeeded
+					utils.RespondWithJSONError(w, http.StatusInternalServerError, "server_error", "User profile not found in identity provider")
+					return
+				}
+
+				// Extract details
+				firstName := ""
+				if kcUser.FirstName != nil {
+					firstName = *kcUser.FirstName
+				}
+				lastName := ""
+				if kcUser.LastName != nil {
+					lastName = *kcUser.LastName
+				}
+
+				// Attributes
+				country := ""
+				phone := ""
+				userType := "trader"
+				if kcUser.Attributes != nil {
+					attrs := *kcUser.Attributes
+					if v, ok := attrs["country"]; ok && len(v) > 0 {
+						country = v[0]
+					}
+					if v, ok := attrs["phone_number"]; ok && len(v) > 0 {
+						phone = v[0]
+					}
+					if v, ok := attrs["user_type"]; ok && len(v) > 0 {
+						userType = v[0]
+					}
+				}
+
+				// Keycloak ID
+				var keycloakUUID uuid.UUID
+				if kcUser.ID != nil {
+					keycloakUUID, _ = uuid.Parse(*kcUser.ID)
+				} else {
+					// Fallback (shouldn't happen)
+					keycloakUUID = uuid.New()
+				}
+
+				// Generate Local User ID
+				var userIDInt int64
+				for i := 0; i < 5; i++ {
+					userIDInt = utils.GenerateRandomInt64(100000, 999999)
+					break // Simplified collision handling
+				}
+
+				createdAt := time.Now()
+				// Dummy hash
+				dummyHash, _ := utils.HashPassword(uuid.New().String())
+
+				// Insert into local DB
+				insertQuery := `
+					INSERT INTO users
+					(user_id, keycloak_id, first_name, last_name, email, hash_password, phone_number, country, is_active, created_at, last_updated_at, user_type)
+					VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+					ON CONFLICT (email) DO NOTHING
+				`
+				_, insertErr := pool.Exec(ctx, insertQuery,
+					userIDInt,
+					keycloakUUID,
+					firstName,
+					lastName,
+					req.Email, // Use request email to match casing if preferred, or kcUser.Email
+					dummyHash,
+					phone,
+					country,
+					true,
+					createdAt,
+					time.Now(),
+					userType,
+				)
+				if insertErr != nil {
+					fmt.Printf("[JIT ERROR] Failed to create local user: %v\n", insertErr)
+					utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to provision local user account")
+					return
+				}
+
+				// Populate user struct for response
+				user.KeycloakID = keycloakUUID
+				user.UserID = userIDInt
+				user.Email = req.Email
+				user.FirstName = firstName
+				user.LastName = lastName
+				user.PhoneNumber = phone
+				user.Country = country
+				user.IsActive = true
+
+				fmt.Printf("[JIT SUCCESS] Provisioned local user for email: %s\n", req.Email)
+
+			} else {
+				// Real DB error
+				utils.RespondWithJSONError(w, http.StatusInternalServerError, "database_error", "Failed to retrieve local user information")
+				return
+			}
 		}
 
 		userID = user.KeycloakID // UUID for token/session linkage if needed

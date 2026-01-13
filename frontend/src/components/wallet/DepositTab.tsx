@@ -47,6 +47,7 @@ function DepositTab() {
   }, [dispatch]);
 
   // State
+  const [selectedNetwork, setSelectedNetwork] = useState<'TRC20' | 'BEP20'>('TRC20');
   const [isProcessing, setIsProcessing] = useState(false);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [addressCopied, setAddressCopied] = useState(false);
@@ -56,8 +57,9 @@ function DepositTab() {
   // Fetch platform wallet address
   useEffect(() => {
     const fetchWalletAddress = async () => {
+      setLoadingAddress(true);
       try {
-        const response = await fetch(getApiUrl('/api/v1/platform/wallet-address'));
+        const response = await fetch(getApiUrl(`/api/v1/platform/wallet-address?network=${selectedNetwork}`));
         if (response.ok) {
           const data = await response.json();
           if (data.address) {
@@ -72,7 +74,7 @@ function DepositTab() {
     };
 
     fetchWalletAddress();
-  }, []);
+  }, [selectedNetwork]);
 
   // React Hook Form
   const { register, handleSubmit, formState: { errors }, setValue, reset } = useForm<DepositFormData>({
@@ -163,13 +165,13 @@ function DepositTab() {
         },
         body: JSON.stringify({
           account_id: data.accountId,
-          payment_method: 'tron',
+          payment_method: selectedNetwork === 'TRC20' ? 'tron' : 'bep20',
           amount: data.amount,
           currency: account.currency,
           payment_details: {
             transaction_hash: data.transactionHash || undefined,
             wallet_address: data.walletAddress || undefined,
-            payment_network: 'TRC20',
+            payment_network: selectedNetwork,
             payment_currency: 'USDT',
           },
         }),
@@ -240,13 +242,42 @@ function DepositTab() {
         <div className="lg:sticky lg:top-8">
           <div className="p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
             <h3 className="text-xl font-bold mb-5 text-slate-900 dark:text-slate-100">
-              Tron (USDT TRC20) Deposit
+              {selectedNetwork === 'TRC20' ? 'Tron (TRC20)' : 'BNB Smart Chain (BEP-20)'} Deposit
             </h3>
+
+            {/* Network Selector */}
+            <div className="mb-6">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
+                SELECT NETWORK
+              </label>
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setSelectedNetwork('TRC20')}
+                  className={`py-2 px-4 rounded-md text-sm font-semibold transition-all ${selectedNetwork === 'TRC20'
+                    ? 'bg-white dark:bg-slate-700 text-[#00C0A2] shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    }`}
+                >
+                  TRC20
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedNetwork('BEP20')}
+                  className={`py-2 px-4 rounded-md text-sm font-semibold transition-all ${selectedNetwork === 'BEP20'
+                    ? 'bg-white dark:bg-slate-700 text-[#00C0A2] shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    }`}
+                >
+                  BEP-20
+                </button>
+              </div>
+            </div>
 
             {/* Platform Wallet Address */}
             <div className="mb-6 p-4 bg-white dark:bg-slate-900 border-2 border-[#00C0A2]/30 dark:border-[#00C0A2]/70 rounded-lg">
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
-                PLATFORM WALLET ADDRESS (TRC20)
+                PLATFORM WALLET ADDRESS ({selectedNetwork})
               </label>
               <div className="flex items-center gap-2">
                 <code className="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100 break-all">
@@ -271,7 +302,7 @@ function DepositTab() {
                 </button>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                Send USDT (TRC20) to this address only
+                Send USDT ({selectedNetwork}) to this address only
               </p>
             </div>
 
@@ -282,7 +313,7 @@ function DepositTab() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-[#00C0A2] mt-0.5 font-bold">2.</span>
-                <span>Send USDT (TRC20) from your wallet to this address</span>
+                <span>Send USDT ({selectedNetwork}) from your wallet to this address</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-[#00C0A2] mt-0.5 font-bold">3.</span>
@@ -309,7 +340,7 @@ function DepositTab() {
                     Important
                   </h4>
                   <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
-                    <li>• Only send USDT on TRC20 network</li>
+                    <li>• Only send USDT on {selectedNetwork} network</li>
                     <li>• Do NOT send TRX or other tokens</li>
                     <li>• Double-check the wallet address before sending</li>
                     <li>• Minimum: $5.00 | Maximum: $100,000.00</li>
@@ -397,7 +428,7 @@ function DepositTab() {
               type="text"
               id="transactionHash"
               {...register('transactionHash')}
-              placeholder="Enter Tron transaction hash (if available)"
+              placeholder={`Enter ${selectedNetwork === 'TRC20' ? 'Tron' : 'BSC'} transaction hash (if available)`}
               className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#00C0A2] focus:border-[#00C0A2] transition-all text-sm"
             />
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -414,7 +445,7 @@ function DepositTab() {
               type="text"
               id="walletAddress"
               {...register('walletAddress')}
-              placeholder="Enter your Tron wallet address (TRC20)"
+              placeholder={`Enter your ${selectedNetwork === 'TRC20' ? 'Tron' : 'BSC'} wallet address (${selectedNetwork})`}
               className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#00C0A2] focus:border-[#00C0A2] transition-all text-sm"
             />
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">

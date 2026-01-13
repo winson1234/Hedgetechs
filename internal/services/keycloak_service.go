@@ -360,3 +360,83 @@ func (s *KeycloakService) ResendVerificationByEmail(ctx context.Context, email s
 
 	return s.SendVerificationEmail(ctx, *users[0].ID)
 }
+
+// GetUserByEmail retrieves a user's full details from Keycloak by email
+func (s *KeycloakService) GetUserByEmail(ctx context.Context, email string) (*gocloak.User, error) {
+	if err := s.EnsureAdminToken(ctx); err != nil {
+		return nil, err
+	}
+	accessToken := s.adminToken.AccessToken
+
+	users, err := s.client.GetUsers(ctx, getPtr(accessToken), s.realm, gocloak.GetUsersParams{
+		Email: gocloak.StringP(email),
+	})
+	if err != nil {
+		// Retry if token invalid
+		if isTokenError(err) {
+			s.tokenMutex.Lock()
+			s.adminToken = nil
+			s.tokenMutex.Unlock()
+
+			if retryErr := s.EnsureAdminToken(ctx); retryErr == nil {
+				accessToken = s.adminToken.AccessToken
+				users, err = s.client.GetUsers(ctx, getPtr(accessToken), s.realm, gocloak.GetUsersParams{
+					Email: gocloak.StringP(email),
+				})
+			}
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to find user: %w", err)
+		}
+	}
+
+	if len(users) == 0 {
+		return nil, nil // Not found
+	}
+
+	// Double check exact email match to avoid partial matches if Keycloak behaves loosely
+	for _, u := range users {
+		if u.Email != nil && strings.EqualFold(*u.Email, email) {
+			return u, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// UpdateUser updates user details in Keycloak
+func (s *KeycloakService) UpdateUser(ctx context.Context, userID, firstName, lastName string, attributes map[string][]string) error {
+	if err := s.EnsureAdminToken(ctx); err != nil {
+		return err
+	}
+
+	accessToken := s.adminToken.AccessToken
+
+	user := gocloak.User{
+		ID:         gocloak.StringP(userID),
+		FirstName:  gocloak.StringP(firstName),
+		LastName:   gocloak.StringP(lastName),
+		Attributes: &attributes,
+	}
+
+	err := s.client.UpdateUser(ctx, getPtr(accessToken), s.realm, user)
+	if err != nil {
+		// Retry if token invalid
+		if isTokenError(err) {
+			s.tokenMutex.Lock()
+			s.adminToken = nil
+			s.tokenMutex.Unlock()
+
+			if retryErr := s.EnsureAdminToken(ctx); retryErr == nil {
+				accessToken = s.adminToken.AccessToken
+				err = s.client.UpdateUser(ctx, getPtr(accessToken), s.realm, user)
+			}
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to update user in keycloak: %w", err)
+		}
+	}
+
+	return nil
+}

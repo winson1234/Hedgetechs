@@ -490,7 +490,8 @@ type CloseContractRequest struct {
 type PaymentMethod string
 
 const (
-	PaymentMethodTron PaymentMethod = "tron"
+	PaymentMethodTron  PaymentMethod = "tron"
+	PaymentMethodBEP20 PaymentMethod = "bep20"
 )
 
 // DepositStatus represents the status of a deposit request
@@ -538,9 +539,9 @@ type CreateDepositRequest struct {
 
 // Validate validates the CreateDepositRequest
 func (r *CreateDepositRequest) Validate() error {
-	// Validate payment method (only Tron supported)
-	if r.PaymentMethod != PaymentMethodTron {
-		return &ValidationError{Field: "payment_method", Message: "only 'tron' payment method is supported"}
+	// Validate payment method
+	if r.PaymentMethod != PaymentMethodTron && r.PaymentMethod != PaymentMethodBEP20 {
+		return &ValidationError{Field: "payment_method", Message: "only 'tron' and 'bep20' payment methods are supported"}
 	}
 
 	// Validate amount (minimum $5.00, maximum $100,000.00)

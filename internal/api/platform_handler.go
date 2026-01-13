@@ -13,7 +13,8 @@ import (
 )
 
 // GetPlatformWalletAddress handles GET /api/v1/platform/wallet-address
-// Returns the platform's USDT TRC20 wallet address from platform_settings
+// Returns the platform's USDT wallet address based on network query param
+// Default: TRC20
 func GetPlatformWalletAddress(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondWithJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "only GET method is allowed")
@@ -30,8 +31,27 @@ func GetPlatformWalletAddress(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	// Default setting key for wallet address
-	settingKey := "usdt_trc20_wallet_address"
+	// Get network from query param, default to TRC20
+	network := r.URL.Query().Get("network")
+	if network == "" {
+		network = "TRC20"
+	}
+
+	// Determine setting key based on network
+	var settingKey string
+	var currency = "USDT"
+
+	switch network {
+	case "BEP20":
+		settingKey = "usdt_bep20_wallet_address"
+	case "TRC20":
+		settingKey = "usdt_trc20_wallet_address"
+		network = "TRC20" // Standardize case
+	default:
+		// Fallback to TRC20 for unknown networks
+		network = "TRC20"
+		settingKey = "usdt_trc20_wallet_address"
+	}
 
 	var walletAddress string
 	err = pool.QueryRow(ctx, "SELECT value FROM platform_settings WHERE key = $1", settingKey).Scan(&walletAddress)
@@ -51,7 +71,7 @@ func GetPlatformWalletAddress(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"address":  walletAddress,
-		"network":  "TRC20",
-		"currency": "USDT",
+		"network":  network,
+		"currency": currency,
 	})
 }

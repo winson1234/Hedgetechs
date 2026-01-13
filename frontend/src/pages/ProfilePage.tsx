@@ -1,12 +1,41 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppSelector } from '../store';
+import { useAppDispatch, useAppSelector } from '../store';
+import { setAuth } from '../store/slices/authSlice';
 import { selectIsDarkMode } from '../store/slices/uiSlice';
+import { updateProfile, getProfile } from '../services/auth';
+import ConfirmDialog from '../components/ConfirmDialog';
 import './profile.css';
+
+const COUNTRY_PREFIXES: Record<string, string> = {
+  MY: '+60',
+  SG: '+65',
+  TH: '+66',
+  ID: '+62',
+  PH: '+63',
+  VN: '+84',
+  US: '+1',
+  GB: '+44',
+  AU: '+61',
+};
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  MY: '🇲🇾',
+  SG: '🇸🇬',
+  TH: '🇹🇭',
+  ID: '🇮🇩',
+  PH: '🇵🇭',
+  VN: '🇻🇳',
+  US: '🇺🇸',
+  GB: '🇬🇧',
+  AU: '🇦🇺',
+};
 
 export default function ProfilePage() {
   const user = useAppSelector(state => state.auth.user);
+  const token = useAppSelector(state => state.auth.token);
   const isDarkMode = useAppSelector(selectIsDarkMode);
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
@@ -21,16 +50,75 @@ export default function ProfilePage() {
     ES: "Spain", CA: "Canada", BR: "Brazil", MX: "Mexico"
   };
 
-const [profileData, setProfileData] = useState({
-  name: user ? `${user.first_name} ${user.last_name}`.trim() || user.email.split('@')[0] : 'User',
-  email: user?.email || 'user@example.com',
-  phone: '',
-  country: user?.country || 'United States',
-  language: 'English (US)',
-  timezone: 'GMT+8 (Kuala Lumpur)',
-  currency: 'USD ($)',
-  profilePicture: null as string | null,
-});
+  // Helper to format phone on load/sync
+  const formatInitialPhone = (phone: string | undefined, countryName: string | undefined) => {
+    if (!phone) return '';
+    // Auto-format Malaysia numbers if they start with 01
+    if (phone.startsWith('01')) {
+      return '+60' + phone.substring(1);
+    }
+    return phone;
+  };
+
+  const [profileData, setProfileData] = useState({
+    name: user ? `${user.first_name} ${user.last_name}`.trim() || user.email.split('@')[0] : 'User',
+    email: user?.email || 'user@example.com',
+    phone: formatInitialPhone(user?.phone_number, user?.country),
+    country: user?.country || 'United States',
+    language: 'English (US)',
+    timezone: 'GMT+8 (Kuala Lumpur)',
+    currency: 'USD ($)',
+    currency: 'USD ($)',
+    profilePicture: user?.profile_picture || null,
+  });
+
+  // Fetch latest profile on mount to ensure data persistence
+  useEffect(() => {
+    const fetchLatestProfile = async () => {
+      try {
+        const { user: updatedUser } = await getProfile();
+        if (updatedUser && token) {
+          dispatch(setAuth({ user: updatedUser, token }));
+        }
+      } catch (error) {
+        console.error('Failed to fetch latest profile:', error);
+      }
+    };
+    fetchLatestProfile();
+  }, [dispatch, token]);
+
+  // Sync profileData when user updates
+  useEffect(() => {
+    if (user) {
+      const formattedPhone = formatInitialPhone(user.phone_number, user.country);
+
+      setProfileData(prev => ({
+        ...prev,
+        name: `${user.first_name} ${user.last_name}`.trim() || user.email.split('@')[0],
+        email: user.email,
+        phone: formattedPhone,
+        country: user.country || 'United States',
+        profilePicture: user.profile_picture || null,
+      }));
+
+      // Also update formData if we are not editing currently? 
+      // Or simply let the user see the new data when they open edit.
+      // But we need to update formData if we want "Edit" to show formatted value.
+      setFormData(prev => ({
+        ...prev,
+        // Only update if not editing to avoid overwriting user input?
+        // But this runs on mount/user change.
+        // If user just saved, this runs.
+        // If user just refreshed, this runs.
+        phone: formattedPhone,
+        // We should probably sync all fields to be safe, but phone is the critical one here.
+        name: `${user.first_name} ${user.last_name}`.trim() || user.email.split('@')[0],
+        country: user.country || 'United States',
+        email: user.email,
+        profilePicture: user.profile_picture || null,
+      }));
+    }
+  }, [user]);
 
 
   const [formData, setFormData] = useState({ ...profileData });
@@ -55,7 +143,7 @@ const [profileData, setProfileData] = useState({
   useEffect(() => {
     const htmlElement = document.documentElement;
     htmlElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
-    
+
     // Also apply to body for consistency with other pages
     if (isDarkMode) {
       document.body.classList.add('dark-mode');
@@ -83,10 +171,36 @@ const [profileData, setProfileData] = useState({
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         const imageUrl = event.target?.result as string;
+
+        // Instant UI update
         setProfileData(prev => ({ ...prev, profilePicture: imageUrl }));
-        showSuccessMessage('Profile picture updated successfully!');
+
+        try {
+          // Persist to backend immediately
+          // We need existing fields as backend requires them
+          const nameParts = profileData.name.trim().split(' ');
+          const fName = nameParts[0];
+          const lName = nameParts.slice(1).join(' ') || '.';
+
+          const { user: updatedUser } = await updateProfile({
+            first_name: fName,
+            last_name: lName,
+            phone_number: profileData.phone,
+            country: profileData.country,
+            profile_picture: imageUrl
+          });
+
+          if (updatedUser && token) {
+            dispatch(setAuth({ user: updatedUser, token }));
+          }
+
+          showSuccessMessage('Profile picture updated successfully!');
+        } catch (error) {
+          console.error('Failed to save photo:', error);
+          alert('Failed to save profile picture. Please try again.');
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -131,17 +245,109 @@ const [profileData, setProfileData] = useState({
     }
 
     setFormErrors(errors);
+    setFormErrors(errors);
     return isValid;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let newPhone = e.target.value;
+    let newCountry = formData.country;
+
+    // Find country code from name since ProfilePage stores country name in formData.country
+    // But wait, formData.country stores the NAME ("Malaysia"), but detections use CODE ("MY").
+    // I need to map between them.
+    // existing countryNames map: Code -> Name.
+    // I need Name -> Code or just work with Codes if possible?
+    // ProfilePage state uses Names.
+    // Let's create a helper to find Code from Name if needed, but here we detect Code.
+
+    // Auto-detect Malaysia from local "01..." format
+    if (newPhone.startsWith('01')) {
+      newPhone = '+60' + newPhone.substring(1);
+      newCountry = countryNames['MY'];
+    }
+    // Auto-detect based on country codes
+    else {
+      if (newPhone.startsWith('+')) {
+        for (const [code, prefix] of Object.entries(COUNTRY_PREFIXES)) {
+          if (newPhone.startsWith(prefix)) {
+            newCountry = countryNames[code];
+            break;
+          }
+        }
+      } else {
+        // Check for raw number start (e.g. 60...)
+        for (const [code, prefix] of Object.entries(COUNTRY_PREFIXES)) {
+          const rawPrefix = prefix.replace('+', '');
+          if (newPhone.startsWith(rawPrefix)) {
+            newPhone = '+' + newPhone;
+            newCountry = countryNames[code];
+            break;
+          }
+        }
+      }
+    }
+
+    setFormData(prev => ({ ...prev, phone: newPhone, country: newCountry || prev.country }));
+  };
+
+  const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const code = e.target.value;
+    const newCountryName = countryNames[code];
+    let newPhone = formData.phone;
+
+    // We need to know the OLD code to remove old prefix.
+    // formData.country has the Name. find key by value.
+    const oldCode = Object.keys(countryNames).find(key => countryNames[key] === formData.country) || '';
+
+    const oldPrefix = COUNTRY_PREFIXES[oldCode] || '';
+    const newPrefix = COUNTRY_PREFIXES[code] || '';
+
+    if (oldPrefix && newPhone.startsWith(oldPrefix)) {
+      newPhone = newPrefix + newPhone.substring(oldPrefix.length);
+    } else if (!newPhone) {
+      newPhone = newPrefix;
+    }
+
+    setFormData(prev => ({ ...prev, country: newCountryName, phone: newPhone }));
   };
 
   const handleSavePersonalInfo = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validatePersonalInfo()) return;
 
-    pendingSaveAction.current = () => {
-      setProfileData({ ...formData });
-      setEditingPersonalInfo(false);
-      showSuccessMessage('Profile updated successfully!');
+    pendingSaveAction.current = async () => {
+      try {
+        // Split name into first and last
+        const nameParts = formData.name.trim().split(' ');
+        const firstName = nameParts[0];
+        const lastName = nameParts.slice(1).join(' ') || '.'; // Default to dot if empty, or handle validation
+
+        const result = await updateProfile({
+          first_name: firstName,
+          last_name: lastName,
+          first_name: firstName,
+          last_name: lastName,
+          phone_number: formData.phone,
+          country: formData.country,
+          profile_picture: formData.profilePicture || ''
+        });
+
+        // Update Redux state
+        if (token) {
+          dispatch(setAuth({ user: result.user, token }));
+        }
+
+        // Update local state - useEffect will handle this via Redux, but immediate update is good for responsiveness
+        // Actually, since we dispatch, useEffect will trigger. But keeping local update is redundant but harmless.
+        // I will keep the redundancy for immediate feel or just rely on useEffect?
+        // Reliance on useEffect might cause a brief flash if redux is slow? No, it's client side.
+        // I'll keep it simple.
+        setEditingPersonalInfo(false);
+        showSuccessMessage('Profile updated successfully!');
+      } catch (error: any) {
+        alert(error.message || 'Failed to update profile');
+      }
     };
     setConfirmationModalOpen(true);
   };
@@ -189,19 +395,6 @@ const [profileData, setProfileData] = useState({
   return (
     <>
       {/* Confirmation Modal */}
-      {confirmationModalOpen && (
-        <div className="modal-overlay" onClick={() => setConfirmationModalOpen(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <h3>Confirm Changes</h3>
-            <p>Are you sure you want to save these changes?</p>
-            <div className="modal-actions">
-              <button onClick={handleConfirmSave} className="confirm-btn">Confirm</button>
-              <button onClick={() => setConfirmationModalOpen(false)} className="cancel-btn">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <main className="main-content">
         <div className="profile-header">
           <div className="profile-top">
@@ -216,7 +409,7 @@ const [profileData, setProfileData] = useState({
                 </div>
                 <button className="change-photo-btn" onClick={handleChangePhoto}>
                   <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
+                    <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" />
                   </svg>
                 </button>
                 <input
@@ -235,7 +428,7 @@ const [profileData, setProfileData] = useState({
                 </p>
                 <span className="verification-badge">
                   <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                   Verified Account
                 </span>
@@ -316,20 +509,35 @@ const [profileData, setProfileData] = useState({
                   </div>
                   <div className="form-group">
                     <label>Phone Number *</label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className={formErrors.phone ? 'error' : ''}
-                      required
-                    />
+                    <div className="phone-wrapper" style={{ position: 'relative' }}>
+                      {formData.country && (
+                        <span className="flag-display" style={{
+                          position: 'absolute',
+                          left: '10px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          fontSize: '1.2rem',
+                          zIndex: 1
+                        }}>
+                          {COUNTRY_FLAGS[Object.keys(countryNames).find(key => countryNames[key] === formData.country) || '']}
+                        </span>
+                      )}
+                      <input
+                        type="tel"
+                        value={formData.phone}
+                        onChange={handlePhoneChange}
+                        className={formErrors.phone ? 'error' : ''}
+                        style={{ paddingLeft: formData.country ? '40px' : '10px' }}
+                        required
+                      />
+                    </div>
                     {formErrors.phone && <span className="error-message">{formErrors.phone}</span>}
                   </div>
                   <div className="form-group">
                     <label>Country *</label>
                     <select
                       value={Object.keys(countryNames).find(key => countryNames[key] === formData.country) || ''}
-                      onChange={(e) => setFormData({ ...formData, country: countryNames[e.target.value] })}
+                      onChange={handleCountryChange}
                       className={formErrors.country ? 'error' : ''}
                       required
                     >
@@ -479,6 +687,13 @@ const [profileData, setProfileData] = useState({
           </div>
         </div>
       </main>
+      <ConfirmDialog
+        isOpen={confirmationModalOpen}
+        title="Confirm Changes"
+        message="Are you sure you want to save these changes?"
+        onConfirm={handleConfirmSave}
+        onCancel={() => setConfirmationModalOpen(false)}
+      />
     </>
   );
 }

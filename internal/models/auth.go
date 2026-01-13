@@ -40,14 +40,15 @@ type CheckStatusResponse struct {
 
 // UserInfo represents user information returned after login
 type UserInfo struct {
-	KeycloakID  uuid.UUID `json:"keycloak_id"`
-	UserID      int64     `json:"user_id"`
-	Email       string    `json:"email"`
-	FirstName   string    `json:"first_name,omitempty"`
-	LastName    string    `json:"last_name,omitempty"`
-	PhoneNumber string    `json:"phone_number,omitempty"`
-	Country     string    `json:"country,omitempty"`
-	IsActive    bool      `json:"is_active"`
+	KeycloakID     uuid.UUID `json:"keycloak_id"`
+	UserID         int64     `json:"user_id"`
+	Email          string    `json:"email"`
+	FirstName      string    `json:"first_name,omitempty"`
+	LastName       string    `json:"last_name,omitempty"`
+	PhoneNumber    string    `json:"phone_number,omitempty"`
+	Country        string    `json:"country,omitempty"`
+	ProfilePicture string    `json:"profile_picture,omitempty"`
+	IsActive       bool      `json:"is_active"`
 }
 
 // RegisterResponse represents the registration response

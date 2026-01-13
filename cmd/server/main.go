@@ -608,6 +608,22 @@ func main() {
 		}
 	})
 
+	// User Profile Endpoints (GET/PUT)
+	http.HandleFunc("/api/v1/user/profile", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			api.CORSMiddleware(authMiddleware(api.HandleGetProfile(keycloakService)))(w, r)
+		case http.MethodPut:
+			api.CORSMiddleware(authMiddleware(api.HandleUpdateProfile(keycloakService)))(w, r)
+		case http.MethodOptions:
+			api.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})(w, r)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
 	// POST /api/v1/auth/logout - Logout (authenticated, invalidates current session)
 	http.HandleFunc("/api/v1/auth/logout", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

@@ -501,9 +501,8 @@ export default function ProfilePage() {
                     <input
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className={formErrors.email ? 'error' : ''}
-                      required
+                      disabled
+                      className="disabled-input"
                     />
                     {formErrors.email && <span className="error-message">{formErrors.email}</span>}
                   </div>

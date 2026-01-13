@@ -270,10 +270,10 @@ body {
 }
 
 .profile-dropdown.show {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-  pointer-events: auto;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 
@@ -350,7 +350,7 @@ body {
 
 /* Profile Header */
 .profile-header {
-    margin-top:-40px;
+    margin-top: -40px;
     background: var(--bg-card);
     padding: 40px;
     border-radius: 16px;
@@ -693,8 +693,11 @@ body {
     border: none;
     padding: 12px 28px;
     border-radius: 8px;
- justify-content: center; /* centers horizontally */
-  align-items: center;     /* centers vertically (optional) */    font-size: 14px;
+    justify-content: center;
+    /* centers horizontally */
+    align-items: center;
+    /* centers vertically (optional) */
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -918,4 +921,11 @@ body {
         padding-right: 15px;
         padding-bottom: 15px;
     }
+}
+
+.disabled-input {
+    background-color: var(--bg-secondary) !important;
+    opacity: 0.7;
+    cursor: not-allowed;
+    color: var(--text-secondary);
 }

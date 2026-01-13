@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,26 +24,27 @@ type WithdrawalMethod string
 
 const (
 	WithdrawalMethodTron         WithdrawalMethod = "tron"
+	WithdrawalMethodBep20        WithdrawalMethod = "bep20"
 	WithdrawalMethodBankTransfer WithdrawalMethod = "bank_transfer"
 	WithdrawalMethodWire         WithdrawalMethod = "wire"
 )
 
 // Withdrawal represents a withdrawal request
 type Withdrawal struct {
-	ID               uuid.UUID               `json:"id"`
-	UserID           int64                   `json:"user_id"`
-	AccountID        uuid.UUID               `json:"account_id"`
-	ReferenceID      string                  `json:"reference_id"`
-	WithdrawalMethod WithdrawalMethod        `json:"withdrawal_method"`
-	Amount           float64                 `json:"amount"`            // Original amount requested
-	FeeAmount        float64                 `json:"fee_amount"`        // Fee charged
-	NetAmount        float64                 `json:"net_amount"`        // Amount after fees
-	Currency         string                  `json:"currency"`
+	ID                uuid.UUID              `json:"id"`
+	UserID            int64                  `json:"user_id"`
+	AccountID         uuid.UUID              `json:"account_id"`
+	ReferenceID       string                 `json:"reference_id"`
+	WithdrawalMethod  WithdrawalMethod       `json:"withdrawal_method"`
+	Amount            float64                `json:"amount"`     // Original amount requested
+	FeeAmount         float64                `json:"fee_amount"` // Fee charged
+	NetAmount         float64                `json:"net_amount"` // Amount after fees
+	Currency          string                 `json:"currency"`
 	WithdrawalDetails map[string]interface{} `json:"withdrawal_details,omitempty"`
-	Status           WithdrawalStatus        `json:"status"`
-	TransactionID    *uuid.UUID              `json:"transaction_id,omitempty"`
-	AdminNotes       *string                 `json:"admin_notes,omitempty"`
-	
+	Status            WithdrawalStatus       `json:"status"`
+	TransactionID     *uuid.UUID             `json:"transaction_id,omitempty"`
+	AdminNotes        *string                `json:"admin_notes,omitempty"`
+
 	// Audit fields
 	ClientIP    *string    `json:"client_ip,omitempty"`
 	AdminIP     *string    `json:"admin_ip,omitempty"`
@@ -51,19 +53,19 @@ type Withdrawal struct {
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	ApprovedBy  *int64     `json:"approved_by,omitempty"`
 	RejectedBy  *int64     `json:"rejected_by,omitempty"`
-	
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // CreateWithdrawalRequest represents the request to create a withdrawal
 type CreateWithdrawalRequest struct {
-	AccountID         uuid.UUID               `json:"account_id"`
-	WithdrawalMethod  string                  `json:"withdrawal_method"`
-	Amount            float64                 `json:"amount"`
-	Currency          string                  `json:"currency"`
-	WithdrawalDetails map[string]interface{}  `json:"withdrawal_details,omitempty"`
-	SaveForReuse      bool                    `json:"save_for_reuse,omitempty"` // Flag to save withdrawal method
+	AccountID         uuid.UUID              `json:"account_id"`
+	WithdrawalMethod  string                 `json:"withdrawal_method"`
+	Amount            float64                `json:"amount"`
+	Currency          string                 `json:"currency"`
+	WithdrawalDetails map[string]interface{} `json:"withdrawal_details,omitempty"`
+	SaveForReuse      bool                   `json:"save_for_reuse,omitempty"` // Flag to save withdrawal method
 }
 
 // Validate validates the CreateWithdrawalRequest
@@ -76,6 +78,7 @@ func (r *CreateWithdrawalRequest) Validate() error {
 	// Validate withdrawal method
 	validMethods := map[string]bool{
 		string(WithdrawalMethodTron):         true,
+		string(WithdrawalMethodBep20):        true,
 		string(WithdrawalMethodBankTransfer): true,
 		string(WithdrawalMethodWire):         true,
 	}
@@ -113,13 +116,24 @@ func (r *CreateWithdrawalRequest) Validate() error {
 			return &ValidationError{Field: "withdrawal_details.wallet_address", Message: "invalid Tron wallet address format"}
 		}
 
+	case WithdrawalMethodBep20:
+		// Validate BEP-20 wallet address
+		walletAddress, ok := r.WithdrawalDetails["wallet_address"].(string)
+		if !ok || walletAddress == "" {
+			return &ValidationError{Field: "withdrawal_details.wallet_address", Message: "wallet address is required for BEP-20 withdrawals"}
+		}
+		// Basic ETH/BSC address validation (starts with 0x and 42 characters)
+		if len(walletAddress) != 42 || !strings.HasPrefix(walletAddress, "0x") {
+			return &ValidationError{Field: "withdrawal_details.wallet_address", Message: "invalid BEP-20 wallet address format"}
+		}
+
 	case WithdrawalMethodBankTransfer, WithdrawalMethodWire:
 		// Validate bank details
 		accountHolderName, ok := r.WithdrawalDetails["account_holder_name"].(string)
 		if !ok || accountHolderName == "" {
 			return &ValidationError{Field: "withdrawal_details.account_holder_name", Message: "account holder name is required"}
 		}
-		
+
 		accountNumber, ok := r.WithdrawalDetails["account_number"].(string)
 		if !ok || accountNumber == "" {
 			return &ValidationError{Field: "withdrawal_details.account_number", Message: "account number is required"}
@@ -149,9 +163,9 @@ type UpdateWithdrawalStatusRequest struct {
 // Validate validates the UpdateWithdrawalStatusRequest
 func (r *UpdateWithdrawalStatusRequest) Validate() error {
 	// Validate status (only approved, rejected, or completed allowed)
-	if r.Status != WithdrawalStatusApproved && 
-	   r.Status != WithdrawalStatusRejected && 
-	   r.Status != WithdrawalStatusCompleted {
+	if r.Status != WithdrawalStatusApproved &&
+		r.Status != WithdrawalStatusRejected &&
+		r.Status != WithdrawalStatusCompleted {
 		return &ValidationError{
 			Field:   "status",
 			Message: "status must be 'approved', 'rejected', or 'completed'",
@@ -162,13 +176,12 @@ func (r *UpdateWithdrawalStatusRequest) Validate() error {
 
 // WithdrawalNotificationDetails contains details for withdrawal notification emails
 type WithdrawalNotificationDetails struct {
-	ReferenceID string
-	Amount      float64
-	FeeAmount   float64
-	NetAmount   float64
-	Currency    string
-	AdminNotes  string
-	UserEmail   string
+	ReferenceID  string
+	Amount       float64
+	FeeAmount    float64
+	NetAmount    float64
+	Currency     string
+	AdminNotes   string
+	UserEmail    string
 	WithdrawalID uuid.UUID
 }
-

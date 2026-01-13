@@ -242,7 +242,7 @@ function DepositTab() {
         <div className="lg:sticky lg:top-8">
           <div className="p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
             <h3 className="text-xl font-bold mb-5 text-slate-900 dark:text-slate-100">
-              {selectedNetwork === 'TRC20' ? 'Tron (TRC20)' : 'BNB Smart Chain (BEP-20)'} Deposit
+              {selectedNetwork === 'TRC20' ? 'Tron (TRC-20)' : 'BNB Smart Chain (BEP-20)'} Deposit
             </h3>
 
             {/* Network Selector */}
@@ -259,7 +259,7 @@ function DepositTab() {
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                     }`}
                 >
-                  TRC20
+                  TRC-20
                 </button>
                 <button
                   type="button"
@@ -277,7 +277,7 @@ function DepositTab() {
             {/* Platform Wallet Address */}
             <div className="mb-6 p-4 bg-white dark:bg-slate-900 border-2 border-[#00C0A2]/30 dark:border-[#00C0A2]/70 rounded-lg">
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
-                PLATFORM WALLET ADDRESS ({selectedNetwork})
+                PLATFORM WALLET ADDRESS ({selectedNetwork === 'TRC20' ? 'TRC-20' : 'BEP-20'})
               </label>
               <div className="flex items-center gap-2">
                 <code className="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100 break-all">
@@ -302,7 +302,7 @@ function DepositTab() {
                 </button>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                Send USDT ({selectedNetwork}) to this address only
+                Send USDT ({selectedNetwork === 'TRC20' ? 'TRC-20' : 'BEP-20'}) to this address only
               </p>
             </div>
 
@@ -313,7 +313,7 @@ function DepositTab() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-[#00C0A2] mt-0.5 font-bold">2.</span>
-                <span>Send USDT ({selectedNetwork}) from your wallet to this address</span>
+                <span>Send USDT ({selectedNetwork === 'TRC20' ? 'TRC-20' : 'BEP-20'}) from your wallet to this address</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-[#00C0A2] mt-0.5 font-bold">3.</span>
@@ -340,7 +340,7 @@ function DepositTab() {
                     Important
                   </h4>
                   <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
-                    <li>• Only send USDT on {selectedNetwork} network</li>
+                    <li>• Only send USDT on {selectedNetwork === 'TRC20' ? 'TRC-20' : 'BEP-20'} network</li>
                     <li>• Do NOT send TRX or other tokens</li>
                     <li>• Double-check the wallet address before sending</li>
                     <li>• Minimum: $5.00 | Maximum: $100,000.00</li>
@@ -445,7 +445,7 @@ function DepositTab() {
               type="text"
               id="walletAddress"
               {...register('walletAddress')}
-              placeholder={`Enter your ${selectedNetwork === 'TRC20' ? 'Tron' : 'BSC'} wallet address (${selectedNetwork})`}
+              placeholder={`Enter your ${selectedNetwork === 'TRC20' ? 'Tron' : 'BSC'} wallet address (${selectedNetwork === 'TRC20' ? 'TRC-20' : 'BEP-20'})`}
               className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#00C0A2] focus:border-[#00C0A2] transition-all text-sm"
             />
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">

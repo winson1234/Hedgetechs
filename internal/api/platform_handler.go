@@ -31,10 +31,10 @@ func GetPlatformWalletAddress(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	// Get network from query param, default to TRC20
+	// Get network from query param, default to TRC-20
 	network := r.URL.Query().Get("network")
 	if network == "" {
-		network = "TRC20"
+		network = "TRC-20"
 	}
 
 	// Determine setting key based on network
@@ -42,14 +42,17 @@ func GetPlatformWalletAddress(w http.ResponseWriter, r *http.Request) {
 	var currency = "USDT"
 
 	switch network {
-	case "BEP20":
-		settingKey = "usdt_bep20_wallet_address"
-	case "TRC20":
+	case "BEP20", "BEP-20":
+		settingKey = "usdt_bep20_wallet_address" // Make sure this key exists in platform_settings or plan to add it?
+		// Note: User request implied similar concept to existing. Default behavior if key missing is empty string.
+		// Assuming the key "usdt_bep20_wallet_address" is the convention.
+		network = "BEP-20"
+	case "TRC20", "TRC-20":
 		settingKey = "usdt_trc20_wallet_address"
-		network = "TRC20" // Standardize case
+		network = "TRC-20" // Standardize case
 	default:
-		// Fallback to TRC20 for unknown networks
-		network = "TRC20"
+		// Fallback to TRC-20 for unknown networks
+		network = "TRC-20"
 		settingKey = "usdt_trc20_wallet_address"
 	}
 

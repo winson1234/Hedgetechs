@@ -22,11 +22,13 @@ interface SavedWithdrawalMethod {
 }
 
 // Withdrawal methods
-type WithdrawalMethod = 'tron' | 'bank_transfer' | 'wire';
+// Withdrawal methods
+type WithdrawalMethod = 'tron' | 'bep20' | 'bank_transfer' | 'wire';
 
 // Fee structure (must match backend)
 const WITHDRAWAL_FEES: Record<WithdrawalMethod, { type: 'fixed' | 'percentage'; amount: number; min?: number; max?: number }> = {
   tron: { type: 'fixed', amount: 1.0 },
+  bep20: { type: 'fixed', amount: 1.0 },
   bank_transfer: { type: 'percentage', amount: 0.005, min: 5.0, max: 50.0 }, // 0.5%
   wire: { type: 'fixed', amount: 25.0 },
 };
@@ -56,6 +58,18 @@ const tronWithdrawalSchema = z.object({
   saveForReuse: z.boolean().optional(),
 });
 
+const bep20WithdrawalSchema = z.object({
+  accountId: z.string().min(1, 'Please select an account'),
+  amount: z.number()
+    .min(10, 'Minimum withdrawal amount is $10.00')
+    .max(100000, 'Maximum withdrawal amount is $100,000.00')
+    .positive('Amount must be positive'),
+  walletAddress: z.string()
+    .length(42, 'Invalid BEP-20 address length (must be 42 characters)')
+    .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid BEP-20 wallet address format'),
+  saveForReuse: z.boolean().optional(),
+});
+
 const bankWithdrawalSchema = z.object({
   accountId: z.string().min(1, 'Please select an account'),
   amount: z.number()
@@ -72,8 +86,9 @@ const bankWithdrawalSchema = z.object({
 });
 
 type TronWithdrawalFormData = z.infer<typeof tronWithdrawalSchema>;
+type Bep20WithdrawalFormData = z.infer<typeof bep20WithdrawalSchema>;
 type BankWithdrawalFormData = z.infer<typeof bankWithdrawalSchema>;
-type WithdrawalFormData = TronWithdrawalFormData | BankWithdrawalFormData;
+type WithdrawalFormData = TronWithdrawalFormData | Bep20WithdrawalFormData | BankWithdrawalFormData;
 
 function WithdrawTab() {
   const dispatch = useAppDispatch();
@@ -96,19 +111,25 @@ function WithdrawTab() {
 
   // State
   const [isProcessing, setIsProcessing] = useState(false);
-  const [withdrawalMethod] = useState<WithdrawalMethod>('tron');
+  const [withdrawalMethod, setWithdrawalMethod] = useState<WithdrawalMethod>('tron');
   const [savedMethods, setSavedMethods] = useState<SavedWithdrawalMethod[]>([]);
   const [selectedSavedMethod, setSelectedSavedMethod] = useState<string>('new');
 
   // React Hook Form (dynamic schema based on withdrawal method)
-  const currentSchema = withdrawalMethod === 'tron' ? tronWithdrawalSchema : bankWithdrawalSchema;
-  
+  const currentSchema = useMemo(() => {
+    switch (withdrawalMethod) {
+      case 'tron': return tronWithdrawalSchema;
+      case 'bep20': return bep20WithdrawalSchema;
+      default: return bankWithdrawalSchema;
+    }
+  }, [withdrawalMethod]);
+
   const { register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<WithdrawalFormData>({
     resolver: zodResolver(currentSchema),
     defaultValues: {
       accountId: activeAccount?.id || accounts.find(a => a.type === 'live')?.id || '',
       amount: 0,
-      ...(withdrawalMethod === 'tron' 
+      ...(withdrawalMethod === 'tron' || withdrawalMethod === 'bep20'
         ? { walletAddress: '', saveForReuse: false }
         : { accountHolderName: '', accountNumber: '', routingNumber: '', bankName: '', saveForReuse: false }
       ),
@@ -178,7 +199,7 @@ function WithdrawTab() {
     reset({
       accountId: selectedAccountId,
       amount: 0,
-      ...(withdrawalMethod === 'tron' 
+      ...(withdrawalMethod === 'tron' || withdrawalMethod === 'bep20'
         ? { walletAddress: '', saveForReuse: false }
         : { accountHolderName: '', accountNumber: '', routingNumber: '', bankName: '', saveForReuse: false }
       ),
@@ -193,7 +214,7 @@ function WithdrawTab() {
     const savedMethod = savedMethods.find(m => m.id === selectedSavedMethod);
     if (!savedMethod) return;
 
-    if (savedMethod.withdrawal_method === 'tron') {
+    if (savedMethod.withdrawal_method === 'tron' || savedMethod.withdrawal_method === 'bep20') {
       setValue('walletAddress' as keyof WithdrawalFormData, savedMethod.withdrawal_details.wallet_address as string || '');
     } else {
       setValue('accountHolderName' as keyof WithdrawalFormData, savedMethod.withdrawal_details.account_holder_name as string || '');
@@ -242,11 +263,11 @@ function WithdrawTab() {
 
       // Prepare withdrawal details based on method
       let withdrawalDetails: Record<string, unknown>;
-      if (withdrawalMethod === 'tron') {
-        const tronData = data as TronWithdrawalFormData;
+      if (withdrawalMethod === 'tron' || withdrawalMethod === 'bep20') {
+        const cryptoData = data as TronWithdrawalFormData; // or Bep20WithdrawalFormData
         withdrawalDetails = {
-          wallet_address: tronData.walletAddress,
-          network: 'TRC20',
+          wallet_address: cryptoData.walletAddress,
+          network: withdrawalMethod === 'tron' ? 'TRC-20' : 'BEP-20',
         };
       } else {
         const bankData = data as BankWithdrawalFormData;
@@ -332,8 +353,34 @@ function WithdrawTab() {
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
                 WITHDRAWAL METHOD
               </label>
-              <div className="px-4 py-2.5 rounded-lg font-semibold text-sm bg-[#00C0A2] text-white shadow-md text-center">
-                Tron (USDT)
+
+              <div className="flex flex-col gap-3">
+                {/* Crypto Selection */}
+                <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <span className="text-xs font-semibold text-slate-500 mb-2 block">CRYPTO NETWORK</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawalMethod('tron')}
+                      className={`py-2 px-3 rounded-md text-sm font-semibold transition-all ${withdrawalMethod === 'tron'
+                        ? 'bg-[#00C0A2]/10 text-[#00C0A2] ring-1 ring-[#00C0A2]'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                    >
+                      Tron (TRC-20)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawalMethod('bep20')}
+                      className={`py-2 px-3 rounded-md text-sm font-semibold transition-all ${withdrawalMethod === 'bep20'
+                        ? 'bg-[#00C0A2]/10 text-[#00C0A2] ring-1 ring-[#00C0A2]'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                    >
+                      BSC (BEP-20)
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -489,20 +536,20 @@ function WithdrawTab() {
           {savedMethods.filter(m => m.withdrawal_method === withdrawalMethod).length > 0 && (
             <div>
               <label htmlFor="savedMethod" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-                Use Saved {withdrawalMethod === 'tron' ? 'Wallet' : 'Bank Account'}
+                Use Saved {(withdrawalMethod === 'tron' || withdrawalMethod === 'bep20') ? 'Wallet' : 'Bank Account'}
               </label>
               <select
                 id="savedMethod"
                 value={selectedSavedMethod}
                 onChange={(e) => setSelectedSavedMethod(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#00C0A2] focus:border-[#00C0A2] transition-all text-sm"
+                className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#00C0A2] focus:border-[#00C0A2] transition-all text-sm"
               >
                 <option value="new">+ Enter New Details</option>
                 {savedMethods
                   .filter(m => m.withdrawal_method === withdrawalMethod)
                   .map(method => {
                     let displayName = method.nickname || 'Saved Method';
-                    if (withdrawalMethod === 'tron' && method.withdrawal_details.wallet_address && typeof method.withdrawal_details.wallet_address === 'string') {
+                    if ((withdrawalMethod === 'tron' || withdrawalMethod === 'bep20') && method.withdrawal_details.wallet_address && typeof method.withdrawal_details.wallet_address === 'string') {
                       const addr = method.withdrawal_details.wallet_address;
                       displayName = method.nickname || `${addr.slice(0, 6)}...${addr.slice(-4)}`;
                     } else if (method.withdrawal_details.account_last4 && typeof method.withdrawal_details.account_last4 === 'string') {
@@ -518,23 +565,23 @@ function WithdrawTab() {
             </div>
           )}
 
-          {/* Tron Withdrawal Fields */}
-          {withdrawalMethod === 'tron' && (
+          {/* Crypto Withdrawal Fields */}
+          {(withdrawalMethod === 'tron' || withdrawalMethod === 'bep20') && (
             <>
               <div>
                 <label htmlFor="walletAddress" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-                  Your Tron Wallet Address (TRC20) <span className="text-red-500">*</span>
+                  Your {withdrawalMethod === 'tron' ? 'Tron' : 'BSC'} Wallet Address ({withdrawalMethod === 'tron' ? 'TRC-20' : 'BEP-20'}) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   id="walletAddress"
                   {...register('walletAddress' as keyof WithdrawalFormData)}
-                  placeholder="Enter your Tron wallet address (starts with T)"
+                  placeholder={`Enter your ${withdrawalMethod === 'tron' ? 'Tron (T...)' : 'BSC (0x...)'} wallet address`}
                   disabled={selectedSavedMethod !== 'new'}
                   className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#00C0A2] focus:border-[#00C0A2] transition-all text-sm font-mono disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  USDT will be sent to this TRC20 address
+                  USDT will be sent to this {withdrawalMethod === 'tron' ? 'TRC-20' : 'BEP-20'} address
                 </p>
                 {'walletAddress' in errors && errors.walletAddress && (
                   <p className="text-xs text-red-500 mt-1">

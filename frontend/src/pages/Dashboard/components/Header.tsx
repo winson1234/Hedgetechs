@@ -14,11 +14,11 @@ interface HeaderProps {
   scrollToSection: (index: number) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  isDarkMode, 
-  toggleTheme, 
+const Header: React.FC<HeaderProps> = ({
+  isDarkMode,
+  toggleTheme,
   activeSectionId,
-  scrollToSection 
+  scrollToSection
 }) => {
   const dispatch = useAppDispatch();
   const isLoggedIn = useAppSelector(state => !!state.auth.token);
@@ -107,11 +107,11 @@ const Header: React.FC<HeaderProps> = ({
                   section?.scrollIntoView({ behavior: "smooth" });
                 }}
               >
-                <img 
+                <img
                   key={isDarkMode ? 'dark' : 'light'} // ✅ Forces re-render with animation
-                  src={isDarkMode ? "/new-02.png" : "/new-02.png"} 
-                  alt="Hedgetechs.co" 
-                  className="logo-image" 
+                  src={isDarkMode ? "/new-02.png" : "/new-02.png"}
+                  alt="Hedgetechs.co"
+                  className="logo-image"
                 />
               </a>
             </div>
@@ -153,7 +153,7 @@ const Header: React.FC<HeaderProps> = ({
                   </svg>
                 )}
               </button>
-              
+
               {/* Language Selector */}
               <div className="language-selector">
                 <button

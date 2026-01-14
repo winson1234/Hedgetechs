@@ -10,8 +10,8 @@ const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
   return (
     <footer className="footer" id="footer">
       {/* Support CTA Section */}
-      <div className="footer-support-cta" style={{ 
-        padding: '4rem 0', 
+      <div className="footer-support-cta" style={{
+        padding: '4rem 0',
         background: 'var(--bg-primary)',
         borderBottom: '1px solid var(--border-color)'
       }}>
@@ -33,15 +33,15 @@ const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
           <div className="footer-brand">
             <div className="logo">
               {/* ✅ Dynamic logo based on theme */}
-              <img 
-                src={isDarkMode ? "/new-02" : "/new-02.png"} 
-                alt="Hedgetechs.co" 
-                className="logo-image" 
+              <img
+                src={isDarkMode ? "/new-02" : "/new-02.png"}
+                alt="Hedgetechs.co"
+                className="logo-image"
               />
             </div>
             <p className="footer-tagline">The most trusted cryptocurrency exchange platform.</p>
           </div>
-          
+
           <div className="footer-links">
             <div className="footer-column">
               <h4>Products</h4>

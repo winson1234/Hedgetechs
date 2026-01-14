@@ -1,6 +1,10 @@
 package models
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // RegisterRequest represents the registration request payload
 type RegisterRequest struct {
@@ -49,6 +53,7 @@ type UserInfo struct {
 	Country        string    `json:"country,omitempty"`
 	ProfilePicture string    `json:"profile_picture,omitempty"`
 	IsActive       bool      `json:"is_active"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 // RegisterResponse represents the registration response

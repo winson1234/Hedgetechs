@@ -44,9 +44,9 @@ export default function Header() {
 
   // Derived state
   const isDarkMode = theme === 'dark';
-  
+
   // Get active account and calculate USD balance
-  const activeAccount = useMemo(() => 
+  const activeAccount = useMemo(() =>
     accounts.find(acc => acc.id === activeAccountId),
     [accounts, activeAccountId]
   );
@@ -104,10 +104,10 @@ export default function Header() {
             onClick={() => navigate('/trading')}
             className="hover:opacity-80 transition-opacity cursor-pointer bg-transparent border-none"
           >
-             <img 
-              src={isDarkMode ? "/new-02.png" : "/new-02.png"} 
-              alt="Hedgetechs" 
-              className="h-8 sm:h-10 lg:h-12" 
+            <img
+              src={isDarkMode ? "/new-02.png" : "/new-02.png"}
+              alt="Hedgetechs"
+              className="h-8 sm:h-10 lg:h-12"
             />
           </button>
         </div>
@@ -120,11 +120,10 @@ export default function Header() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive
                     ? 'text-[#00C0A2] bg-[#00C0A2]/10 dark:bg-[#00C0A2]/20'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/50'
-                }`}
+                  }`}
               >
                 <NavIcon iconName={item.icon} />
                 <span>{item.label}</span>
@@ -139,11 +138,10 @@ export default function Header() {
           <div className="hidden sm:block md:hidden">
             {/* Mobile: Show compact badge */}
             {activeAccount && (
-              <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                activeAccount.type === 'live'
+              <span className={`text-xs font-semibold px-2 py-1 rounded-full ${activeAccount.type === 'live'
                   ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
                   : 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
-              }`}>
+                }`}>
                 {activeAccount.type === 'live' ? 'LIVE' : 'DEMO'}
               </span>
             )}
@@ -160,7 +158,7 @@ export default function Header() {
               <span className="hidden sm:inline">{activeLiveAccount ? 'USD' : accountCurrency}</span>
             </span>
           </div>
-          
+
           {/* Wallet Button */}
           <button
             onClick={() => {
@@ -225,11 +223,10 @@ export default function Header() {
           >
             <button
               onClick={() => setIsProfileOpen(prev => !prev)}
-              className={`p-1.5 rounded-full transition-all duration-200 ${
-                isProfileOpen
+              className={`p-1.5 rounded-full transition-all duration-200 ${isProfileOpen
                   ? 'bg-[#00C0A2]/10 dark:bg-[#00C0A2]/20 text-[#00C0A2] dark:text-[#00C0A2]'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
+                }`}
               title="Profile"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -241,12 +238,12 @@ export default function Header() {
             <ProfileDropdown
               isOpen={isProfileOpen}
               closeDropdown={() => setIsProfileOpen(false)}
-             />
+            />
           </div>
-          
+
         </div>
       </div>
-      
+
     </header>
   );
 }

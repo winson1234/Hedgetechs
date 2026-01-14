@@ -7,7 +7,7 @@ import {
 import { useAppSelector } from '../store';
 
 type ClosedPosition = Position & { timestamp: number; itemType: 'closedPosition' };
-type DetailItem = 
+type DetailItem =
   | (Transaction & { itemType: 'transaction' })
   | (ExecutedOrder & { itemType: 'executedOrder' })
   | (PendingOrder & { itemType: 'pendingOrder' })
@@ -87,12 +87,11 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
 
           <div>
             <p className="text-slate-500 dark:text-slate-400">Status</p>
-            <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
-              txn.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
-              txn.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
-              txn.status === 'processing' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' :
-              'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-            }`}>
+            <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${txn.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                txn.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
+                  txn.status === 'processing' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' :
+                    'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+              }`}>
               {txn.status}
             </span>
           </div>
@@ -171,7 +170,7 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
         )}
 
         {/* Error message / Rejection reason */}
-        {txn.status === 'failed' && txn.errorMessage && (
+        {(txn.status === 'failed' || txn.status === 'rejected') && txn.errorMessage && (
           <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
             <p className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">
               {txn.type === 'deposit' ? 'Rejection Reason' : 'Error Details'}
@@ -246,11 +245,10 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
 
           <div>
             <p className="text-slate-500 dark:text-slate-400">Status</p>
-            <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
-              position.status === 'closed' ? 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300' :
-              position.status === 'liquidated' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' :
-              'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-            }`}>
+            <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${position.status === 'closed' ? 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300' :
+                position.status === 'liquidated' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' :
+                  'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+              }`}>
               {position.status}
             </span>
           </div>
@@ -456,9 +454,9 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
           <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
               {item.itemType === 'transaction' ? 'Transaction Details' :
-               item.itemType === 'executedOrder' ? 'Order Details (Executed)' :
-               item.itemType === 'pendingOrder' ? 'Order Details (Pending)' :
-               'Position Details (Closed)'}
+                item.itemType === 'executedOrder' ? 'Order Details (Executed)' :
+                  item.itemType === 'pendingOrder' ? 'Order Details (Pending)' :
+                    'Position Details (Closed)'}
             </h2>
             <button
               onClick={onClose}
@@ -473,8 +471,8 @@ export default function TransactionDetailModal({ item, onClose }: TransactionDet
           {/* Content */}
           <div className="p-6">
             {item.itemType === 'transaction' ? renderTransactionDetails() :
-             item.itemType === 'closedPosition' ? renderClosedPositionDetails() :
-             renderOrderDetails()}
+              item.itemType === 'closedPosition' ? renderClosedPositionDetails() :
+                renderOrderDetails()}
           </div>
 
           {/* Footer */}

@@ -51,9 +51,10 @@ export default function ProfileDropdown({
     // 2. Dispatch Redux logout
     await dispatch(signOut());
 
-    // 3. Close modal and redirect directly to dashboard
+    // 3. Close modal and redirect / force reload
     setShowLogoutModal(false);
-    navigate('/login', { replace: true });
+    // Force reload to clear all in-memory Redux state
+    window.location.href = '/login';
   };
 
 

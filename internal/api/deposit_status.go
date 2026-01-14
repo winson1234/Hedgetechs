@@ -192,7 +192,7 @@ func UpdateDepositStatus(w http.ResponseWriter, r *http.Request) {
 
 	} else {
 		// REJECTED: Mark as failed
-		transactionStatus = string(models.TransactionStatusFailed)
+		transactionStatus = string(models.TransactionStatusRejected)
 		description = fmt.Sprintf("Deposit %s - %s %.2f (Rejected)", deposit.ReferenceID, deposit.Currency, deposit.Amount)
 	}
 

@@ -639,15 +639,53 @@ func UpdateWithdrawalStatus(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Update transaction status to failed
+		// Update transaction status to failed and include rejection reason in metadata
 		description := fmt.Sprintf("Withdrawal %s rejected - %s %.2f",
 			withdrawal.ReferenceID, withdrawal.Currency, withdrawal.Amount)
-		_, err = tx.Exec(ctx,
-			`UPDATE transactions 
-			 SET status = $1, description = $2, updated_at = NOW()
-			 WHERE id = $3`,
-			models.TransactionStatusFailed, description, transactionID,
-		)
+
+		// Fetch existing metadata
+		var existingMetadataJSON []byte
+		err = tx.QueryRow(ctx, "SELECT metadata FROM transactions WHERE id = $1", transactionID).Scan(&existingMetadataJSON)
+		if err != nil && err != pgx.ErrNoRows {
+			log.Printf("Failed to fetch existing transaction metadata: %v", err)
+		}
+
+		// Parse existing metadata
+		metadata := make(map[string]interface{})
+		if len(existingMetadataJSON) > 0 {
+			if err := json.Unmarshal(existingMetadataJSON, &metadata); err != nil {
+				log.Printf("Failed to parse existing metadata: %v", err)
+				metadata = make(map[string]interface{})
+			}
+		}
+
+		// Add rejection reason if provided
+		if req.AdminNotes != nil && *req.AdminNotes != "" {
+			metadata["rejection_reason"] = *req.AdminNotes
+		}
+
+		// Marshal updated metadata
+		metadataJSON, err := json.Marshal(metadata)
+		if err != nil {
+			log.Printf("Failed to marshal metadata: %v", err)
+			metadataJSON = nil
+		}
+
+		if len(metadataJSON) > 0 {
+			_, err = tx.Exec(ctx,
+				`UPDATE transactions 
+				 SET status = $1, description = $2, metadata = $3, updated_at = NOW()
+				 WHERE id = $4`,
+				models.TransactionStatusRejected, description, metadataJSON, transactionID,
+			)
+		} else {
+			_, err = tx.Exec(ctx,
+				`UPDATE transactions 
+				 SET status = $1, description = $2, updated_at = NOW()
+				 WHERE id = $3`,
+				models.TransactionStatusRejected, description, transactionID,
+			)
+		}
 
 	case models.WithdrawalStatusCompleted:
 		// Mark as completed (admin confirms funds were sent)

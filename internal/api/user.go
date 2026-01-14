@@ -50,7 +50,7 @@ func HandleGetProfile(keycloak *services.KeycloakService) http.HandlerFunc {
 		var avatarURL *string
 
 		query := `
-			SELECT user_id, keycloak_id, email, first_name, last_name, phone_number, country, is_active, avatar_url
+			SELECT user_id, keycloak_id, email, first_name, last_name, phone_number, country, is_active, avatar_url, created_at
 			FROM users
 			WHERE keycloak_id = $1
 		`
@@ -64,6 +64,7 @@ func HandleGetProfile(keycloak *services.KeycloakService) http.HandlerFunc {
 			&user.Country,
 			&user.IsActive,
 			&avatarURL,
+			&user.CreatedAt,
 		)
 
 		if err != nil {
@@ -154,7 +155,7 @@ func HandleUpdateProfile(keycloak *services.KeycloakService) http.HandlerFunc {
 			    avatar_url = COALESCE(NULLIF($5, ''), avatar_url), 
 			    last_updated_at = $6
 			WHERE keycloak_id = $7
-			RETURNING user_id, email, first_name, last_name, phone_number, country, is_active, avatar_url
+			RETURNING user_id, email, first_name, last_name, phone_number, country, is_active, avatar_url, created_at
 		`
 		var user models.UserInfo
 		var isActive bool
@@ -177,6 +178,7 @@ func HandleUpdateProfile(keycloak *services.KeycloakService) http.HandlerFunc {
 			&user.Country,
 			&isActive,
 			&avatarURL,
+			&user.CreatedAt,
 		)
 
 		if err != nil {

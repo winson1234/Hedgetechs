@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -40,6 +41,13 @@ func HandleRegister(keycloak *services.KeycloakService) http.HandlerFunc {
 		}
 		if userType != "trader" && userType != "agent" {
 			utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Invalid user type. Must be 'trader' or 'agent'")
+			return
+		}
+
+		// Validate PhoneNumber format (E.164)
+		matched, _ := regexp.MatchString(`^\+[1-9]\d{1,14}$`, req.PhoneNumber)
+		if !matched {
+			utils.RespondWithJSONError(w, http.StatusBadRequest, "validation_error", "Phone number must be in E.164 format (e.g., +14155552671)")
 			return
 		}
 
@@ -354,6 +362,7 @@ func HandleLogin(authStorage *services.AuthStorageService, keycloak *services.Ke
 		jwt, err := keycloak.Login(ctx, req.Email, req.Password)
 		if err != nil {
 			// Log failed login
+			fmt.Printf("[DEBUG] Keycloak login error: %v\n", err)
 			if utils.GlobalAuditLogger != nil {
 				auditEntry := models.NewAuditLogEntry(uuid.Nil, models.ActionLoginFailure, models.ResourceTypeUser).
 					WithMetadata("email", req.Email).
@@ -366,6 +375,13 @@ func HandleLogin(authStorage *services.AuthStorageService, keycloak *services.Ke
 			// Check for account disabled (Brute Force)
 			if strings.Contains(strings.ToLower(err.Error()), "account temporarily disabled") {
 				utils.RespondWithJSONError(w, http.StatusForbidden, "account_disabled", "Account is temporarily disabled due to too many failed attempts. Please try again later.")
+				return
+			}
+
+			// Check for account suspended (Admin Disabled)
+			errMsg := strings.ToLower(err.Error())
+			if strings.Contains(errMsg, "account disabled") || strings.Contains(errMsg, "user_disabled") {
+				utils.RespondWithJSONError(w, http.StatusForbidden, "account_suspended", "Your account has been suspended. Please contact support.")
 				return
 			}
 
@@ -430,7 +446,7 @@ func HandleLogin(authStorage *services.AuthStorageService, keycloak *services.Ke
 		var userID uuid.UUID
 
 		getUserQuery := `
-			SELECT keycloak_id, user_id, email, first_name, last_name, phone_number, country, is_active
+			SELECT keycloak_id, user_id, email, first_name, last_name, phone_number, country, is_active, created_at
 			FROM users
 			WHERE LOWER(email) = LOWER($1)
 		`
@@ -443,6 +459,7 @@ func HandleLogin(authStorage *services.AuthStorageService, keycloak *services.Ke
 			&user.PhoneNumber,
 			&user.Country,
 			&user.IsActive,
+			&user.CreatedAt,
 		)
 
 		if err != nil {
@@ -545,6 +562,7 @@ func HandleLogin(authStorage *services.AuthStorageService, keycloak *services.Ke
 				user.PhoneNumber = phone
 				user.Country = country
 				user.IsActive = true
+				user.CreatedAt = createdAt
 
 				fmt.Printf("[JIT SUCCESS] Provisioned local user for email: %s\n", req.Email)
 

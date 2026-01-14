@@ -60,14 +60,25 @@ export default function ProfilePage() {
     return phone;
   };
 
+  // Helper to ensure we have a valid country code
+  const getCountryCode = (countryValue: string | undefined) => {
+    if (!countryValue) return 'US';
+    // If it's already a code (length 2 and uppercase), return it
+    if (countryValue.length === 2 && COUNTRY_PREFIXES[countryValue.toUpperCase()]) {
+      return countryValue.toUpperCase();
+    }
+    // If it's a name, try to find the code
+    const entry = Object.entries(countryNames).find(([_, name]) => name.toLowerCase() === countryValue.toLowerCase());
+    return entry ? entry[0] : 'US';
+  };
+
   const [profileData, setProfileData] = useState({
     name: user ? `${user.first_name} ${user.last_name}`.trim() || user.email.split('@')[0] : 'User',
     email: user?.email || 'user@example.com',
     phone: formatInitialPhone(user?.phone_number, user?.country),
-    country: user?.country || 'United States',
+    country: getCountryCode(user?.country), // Store CODE
     language: 'English (US)',
     timezone: 'GMT+8 (Kuala Lumpur)',
-    currency: 'USD ($)',
     currency: 'USD ($)',
     profilePicture: user?.profile_picture || null,
   });
@@ -91,29 +102,22 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user) {
       const formattedPhone = formatInitialPhone(user.phone_number, user.country);
+      const countryCode = getCountryCode(user.country);
 
       setProfileData(prev => ({
         ...prev,
         name: `${user.first_name} ${user.last_name}`.trim() || user.email.split('@')[0],
         email: user.email,
         phone: formattedPhone,
-        country: user.country || 'United States',
+        country: countryCode,
         profilePicture: user.profile_picture || null,
       }));
 
-      // Also update formData if we are not editing currently? 
-      // Or simply let the user see the new data when they open edit.
-      // But we need to update formData if we want "Edit" to show formatted value.
       setFormData(prev => ({
         ...prev,
-        // Only update if not editing to avoid overwriting user input?
-        // But this runs on mount/user change.
-        // If user just saved, this runs.
-        // If user just refreshed, this runs.
         phone: formattedPhone,
-        // We should probably sync all fields to be safe, but phone is the critical one here.
         name: `${user.first_name} ${user.last_name}`.trim() || user.email.split('@')[0],
-        country: user.country || 'United States',
+        country: countryCode,
         email: user.email,
         profilePicture: user.profile_picture || null,
       }));
@@ -161,6 +165,16 @@ export default function ProfilePage() {
       return (names[0][0] + names[names.length - 1][0]).toUpperCase();
     }
     return name.substring(0, 2).toUpperCase();
+  };
+
+  const formatMemberSince = (dateString: string | undefined) => {
+    if (!dateString) return 'New Member';
+
+    return new Date(dateString).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
   };
 
   const handleChangePhoto = () => {
@@ -245,33 +259,24 @@ export default function ProfilePage() {
     }
 
     setFormErrors(errors);
-    setFormErrors(errors);
     return isValid;
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let newPhone = e.target.value;
-    let newCountry = formData.country;
-
-    // Find country code from name since ProfilePage stores country name in formData.country
-    // But wait, formData.country stores the NAME ("Malaysia"), but detections use CODE ("MY").
-    // I need to map between them.
-    // existing countryNames map: Code -> Name.
-    // I need Name -> Code or just work with Codes if possible?
-    // ProfilePage state uses Names.
-    // Let's create a helper to find Code from Name if needed, but here we detect Code.
+    let newCountry = formData.country; // This is a Code now
 
     // Auto-detect Malaysia from local "01..." format
     if (newPhone.startsWith('01')) {
       newPhone = '+60' + newPhone.substring(1);
-      newCountry = countryNames['MY'];
+      newCountry = 'MY';
     }
     // Auto-detect based on country codes
     else {
       if (newPhone.startsWith('+')) {
         for (const [code, prefix] of Object.entries(COUNTRY_PREFIXES)) {
           if (newPhone.startsWith(prefix)) {
-            newCountry = countryNames[code];
+            newCountry = code;
             break;
           }
         }
@@ -281,7 +286,7 @@ export default function ProfilePage() {
           const rawPrefix = prefix.replace('+', '');
           if (newPhone.startsWith(rawPrefix)) {
             newPhone = '+' + newPhone;
-            newCountry = countryNames[code];
+            newCountry = code;
             break;
           }
         }
@@ -293,12 +298,10 @@ export default function ProfilePage() {
 
   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const code = e.target.value;
-    const newCountryName = countryNames[code];
     let newPhone = formData.phone;
 
-    // We need to know the OLD code to remove old prefix.
-    // formData.country has the Name. find key by value.
-    const oldCode = Object.keys(countryNames).find(key => countryNames[key] === formData.country) || '';
+    // We use the Code directly
+    const oldCode = formData.country; // Already a code
 
     const oldPrefix = COUNTRY_PREFIXES[oldCode] || '';
     const newPrefix = COUNTRY_PREFIXES[code] || '';
@@ -309,7 +312,7 @@ export default function ProfilePage() {
       newPhone = newPrefix;
     }
 
-    setFormData(prev => ({ ...prev, country: newCountryName, phone: newPhone }));
+    setFormData(prev => ({ ...prev, country: code, phone: newPhone }));
   };
 
   const handleSavePersonalInfo = (e: React.FormEvent) => {
@@ -326,10 +329,8 @@ export default function ProfilePage() {
         const result = await updateProfile({
           first_name: firstName,
           last_name: lastName,
-          first_name: firstName,
-          last_name: lastName,
           phone_number: formData.phone,
-          country: formData.country,
+          country: formData.country, // Sending Code
           profile_picture: formData.profilePicture || ''
         });
 
@@ -338,11 +339,7 @@ export default function ProfilePage() {
           dispatch(setAuth({ user: result.user, token }));
         }
 
-        // Update local state - useEffect will handle this via Redux, but immediate update is good for responsiveness
-        // Actually, since we dispatch, useEffect will trigger. But keeping local update is redundant but harmless.
-        // I will keep the redundancy for immediate feel or just rely on useEffect?
-        // Reliance on useEffect might cause a brief flash if redux is slow? No, it's client side.
-        // I'll keep it simple.
+
         setEditingPersonalInfo(false);
         showSuccessMessage('Profile updated successfully!');
       } catch (error: any) {
@@ -438,7 +435,7 @@ export default function ProfilePage() {
 
           <div className="account-stats">
             <div className="stat-item">
-              <div className="stat-value">2 Yrs</div>
+              <div className="stat-value">{formatMemberSince(user?.created_at)}</div>
               <div className="stat-label">Member Since</div>
             </div>
 
@@ -478,7 +475,8 @@ export default function ProfilePage() {
                 </div>
                 <div className="info-row">
                   <span className="info-label">Country</span>
-                  <span className="info-value">{profileData.country}</span>
+                  {/* Lookup Name from Code */}
+                  <span className="info-value">{countryNames[profileData.country] || profileData.country}</span>
                 </div>
               </div>
             ) : (
@@ -518,7 +516,7 @@ export default function ProfilePage() {
                           fontSize: '1.2rem',
                           zIndex: 1
                         }}>
-                          {COUNTRY_FLAGS[Object.keys(countryNames).find(key => countryNames[key] === formData.country) || '']}
+                          {COUNTRY_FLAGS[formData.country]}
                         </span>
                       )}
                       <input
@@ -535,7 +533,7 @@ export default function ProfilePage() {
                   <div className="form-group">
                     <label>Country *</label>
                     <select
-                      value={Object.keys(countryNames).find(key => countryNames[key] === formData.country) || ''}
+                      value={formData.country} // Bind directly to Code
                       onChange={handleCountryChange}
                       className={formErrors.country ? 'error' : ''}
                       required

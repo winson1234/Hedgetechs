@@ -84,9 +84,13 @@ func fetchUserTransactions(ctx context.Context, pool *pgxpool.Pool, userID int64
 	query := `
 		SELECT t.id, t.account_id, t.transaction_number, t.type, t.currency, t.amount,
 		       t.status, t.target_account_id, t.contract_id, t.description, t.metadata,
-		       t.created_at, t.updated_at
+		       t.created_at, t.updated_at,
+		       d.admin_notes as deposit_admin_notes, d.status as deposit_status,
+		       w.admin_notes as withdrawal_admin_notes, w.status as withdrawal_status
 		FROM transactions t
 		INNER JOIN accounts a ON t.account_id = a.id
+		LEFT JOIN deposits d ON t.id = d.transaction_id
+		LEFT JOIN withdrawals w ON t.id = w.transaction_id
 		WHERE a.user_id = $1
 		ORDER BY t.created_at DESC
 		LIMIT 100
@@ -101,14 +105,60 @@ func fetchUserTransactions(ctx context.Context, pool *pgxpool.Pool, userID int64
 	var transactions []models.Transaction
 	for rows.Next() {
 		var t models.Transaction
+		var metadataJSON []byte
+		var depositAdminNotes *string
+		var depositStatus *string
+		var withdrawalAdminNotes *string
+		var withdrawalStatus *string
+
 		err := rows.Scan(
 			&t.ID, &t.AccountID, &t.TransactionNumber, &t.Type, &t.Currency, &t.Amount,
-			&t.Status, &t.TargetAccountID, &t.ContractID, &t.Description, &t.Metadata,
+			&t.Status, &t.TargetAccountID, &t.ContractID, &t.Description, &metadataJSON,
 			&t.CreatedAt, &t.UpdatedAt,
+			&depositAdminNotes, &depositStatus,
+			&withdrawalAdminNotes, &withdrawalStatus,
 		)
 		if err != nil {
 			return nil, err
 		}
+
+		// Parse metadata JSON
+		if len(metadataJSON) > 0 {
+			if err := json.Unmarshal(metadataJSON, &t.Metadata); err != nil {
+				log.Printf("Failed to parse transaction metadata: %v", err)
+				t.Metadata = make(map[string]any)
+			}
+		} else {
+			t.Metadata = make(map[string]any)
+		}
+
+		// Enrich metadata and override status if applicable
+		// For Deposits
+		if depositStatus != nil {
+			switch *depositStatus {
+			case "rejected":
+				t.Status = models.TransactionStatusRejected
+				if depositAdminNotes != nil && *depositAdminNotes != "" {
+					t.Metadata["rejection_reason"] = *depositAdminNotes
+				}
+			case "approved":
+				t.Status = models.TransactionStatusCompleted
+			}
+		}
+
+		// For Withdrawals
+		if withdrawalStatus != nil {
+			switch *withdrawalStatus {
+			case "rejected":
+				t.Status = models.TransactionStatusRejected
+				if withdrawalAdminNotes != nil && *withdrawalAdminNotes != "" {
+					t.Metadata["rejection_reason"] = *withdrawalAdminNotes
+				}
+			case "approved", "completed":
+				t.Status = models.TransactionStatusCompleted
+			}
+		}
+
 		transactions = append(transactions, t)
 	}
 

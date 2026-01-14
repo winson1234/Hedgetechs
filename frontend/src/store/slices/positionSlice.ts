@@ -5,12 +5,14 @@ import { apiFetch } from '../../utils/api';
 
 interface PositionState {
   positions: Position[];
+  historyPositions: Position[]; // Closed positions
   loading: boolean;
   error: string | null;
 }
 
 const initialState: PositionState = {
   positions: [],
+  historyPositions: [],
   loading: false,
   error: null,
 };
@@ -48,6 +50,41 @@ export const fetchPositions = createAsyncThunk(
       return data.contracts || [];
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch positions';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Fetch closed positions (history) for active account
+export const fetchHistoryPositions = createAsyncThunk(
+  'position/fetchHistoryPositions',
+  async (
+    { accountId }: { accountId: string },
+    { getState, rejectWithValue }
+  ) => {
+    try {
+      const token = getAuthToken(getState as () => RootState);
+      if (!token) throw new Error('Not authenticated');
+
+      // Fetch closed and liquidated positions
+      // We might need two requests or the backend supports multiple statuses?
+      // Assuming backend supports simple filtering for now or we fetch 'closed'
+      // Ideally backend should support list of statuses or we do multiple calls.
+      // Let's fetch 'closed' for now.
+      const response = await apiFetch(
+        `api/v1/contracts?account_id=${accountId}&status=closed`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to fetch history positions');
+      const data = await response.json();
+      return data.contracts || [];
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch history positions';
       return rejectWithValue(message);
     }
   }
@@ -249,6 +286,21 @@ const positionSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
       });
+
+    // Fetch history positions
+    builder
+      .addCase(fetchHistoryPositions.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchHistoryPositions.fulfilled, (state, action) => {
+        state.loading = false;
+        state.historyPositions = action.payload;
+      })
+      .addCase(fetchHistoryPositions.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
   },
 });
 
@@ -262,6 +314,7 @@ export const {
 
 // Selectors
 export const selectPositions = (state: RootState) => state.position.positions;
+export const selectHistoryPositions = (state: RootState) => state.position.historyPositions;
 export const selectPositionsLoading = (state: RootState) => state.position.loading;
 export const selectPositionsError = (state: RootState) => state.position.error;
 

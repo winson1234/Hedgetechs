@@ -29,6 +29,8 @@ const COUNTRY_FLAGS: Record<string, string> = {
   AU: '🇦🇺',
 };
 
+const E164_REGEX = /^\+[1-9]\d{1,14}$/;
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -51,6 +53,7 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState('');
   const [emailError, setEmailError] = useState(false);
+  const [phoneError, setPhoneError] = useState(false);
   const [retypeError, setRetypeError] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({ level: 0, text: '', color: '' });
 
@@ -76,7 +79,12 @@ export default function RegisterPage() {
     const { id, value } = e.target;
 
     if (id === 'phoneNumber') {
-      let newPhone = value;
+      // Allow only digits and '+'
+      // If the user tries to type anything else, we just ignore it (or strip it)
+      // We also enforce that '+' can only be at the start if we want, but regex checks format anyway.
+      // For input masking: remove any non [0-9+] character
+      let newPhone = value.replace(/[^0-9+]/g, '');
+
       let newCountry = formData.country;
 
       // Auto-detect Malaysia from local "01..." format
@@ -199,12 +207,19 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError('');
+    setPhoneError(false);
+    setEmailError(false);
 
     if (!formData.email.includes('@')) {
       setEmailError(true);
       return;
     }
-    setEmailError(false);
+
+    // Validate Phone Number E.164
+    if (!E164_REGEX.test(formData.phoneNumber)) {
+      setPhoneError(true);
+      return;
+    }
 
     // Check password strength
     const password = formData.password;
@@ -283,11 +298,12 @@ export default function RegisterPage() {
                 </svg>
               </div>
               <h1 style={{ marginBottom: '15px', color: '#27ae60' }}>Registration Successful!</h1>
-              <p style={{ fontSize: '16px', lineHeight: '1.6', color: '#555', marginBottom: '30px' }}>
+              <p style={{ fontSize: '14px', lineHeight: '1.6', color: '#555', marginBottom: '30px' }}>
                 We have sent a verification email to<br />
                 <strong style={{ color: '#333', fontSize: '18px' }}>{formData.email}</strong>
                 <br /><br />
-                Please check your inbox and follow the link to verify your account.
+                Please check your inbox (including Spam/Junk folder) and follow the link to verify your account.
+
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
@@ -420,6 +436,7 @@ export default function RegisterPage() {
                       required
                     />
                   </div>
+                  {phoneError && <div className="error-message show">Phone number must be in E.164 format (e.g., +14155552671)</div>}
                 </div>
 
                 {/* Password */}

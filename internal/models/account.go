@@ -49,6 +49,7 @@ const (
 	TransactionStatusPending   TransactionStatus = "pending"
 	TransactionStatusCompleted TransactionStatus = "completed"
 	TransactionStatusFailed    TransactionStatus = "failed"
+	TransactionStatusRejected  TransactionStatus = "rejected"
 )
 
 // User represents a user profile (extends auth.users)

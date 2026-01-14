@@ -52,7 +52,7 @@ export type ToastState = {
 } | null
 
 // Transaction types for wallet operations
-export type TransactionStatus = 'pending' | 'processing' | 'completed' | 'failed'
+export type TransactionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'rejected'
 export type TransactionType = 'deposit' | 'withdraw' | 'transfer' | 'position_close'
 
 export type PaymentMethodMetadata = {
@@ -105,48 +105,48 @@ export type DrawingPoint = {
 // Tagged union for different drawing types
 export type Drawing =
   | {
-      id: string
-      type: 'horizontal-line'
-      price: number
-      color: string
-      lineWidth: number
-      lineStyle: LineStyle
-      lineRef?: unknown // IPriceLine from lightweight-charts, stored at runtime only
-    }
+    id: string
+    type: 'horizontal-line'
+    price: number
+    color: string
+    lineWidth: number
+    lineStyle: LineStyle
+    lineRef?: unknown // IPriceLine from lightweight-charts, stored at runtime only
+  }
   | {
-      id: string
-      type: 'vertical-line'
-      time: number
-      color: string
-      lineWidth: number
-      lineStyle: LineStyle
-    }
+    id: string
+    type: 'vertical-line'
+    time: number
+    color: string
+    lineWidth: number
+    lineStyle: LineStyle
+  }
   | {
-      id: string
-      type: 'trendline'
-      point1: DrawingPoint
-      point2: DrawingPoint
-      color: string
-      lineWidth: number
-      lineStyle: LineStyle
-    }
+    id: string
+    type: 'trendline'
+    point1: DrawingPoint
+    point2: DrawingPoint
+    color: string
+    lineWidth: number
+    lineStyle: LineStyle
+  }
   | {
-      id: string
-      type: 'rectangle'
-      point1: DrawingPoint
-      point2: DrawingPoint
-      color: string
-      lineWidth: number
-      lineStyle: LineStyle
-    }
+    id: string
+    type: 'rectangle'
+    point1: DrawingPoint
+    point2: DrawingPoint
+    color: string
+    lineWidth: number
+    lineStyle: LineStyle
+  }
   | {
-      id: string
-      type: 'text'
-      point: DrawingPoint
-      text: string
-      color: string
-      fontSize?: number
-    }
+    id: string
+    type: 'text'
+    point: DrawingPoint
+    text: string
+    color: string
+    fontSize?: number
+  }
 
 export type DrawingState = {
   type: DrawingType

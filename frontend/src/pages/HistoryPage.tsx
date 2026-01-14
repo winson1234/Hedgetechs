@@ -53,6 +53,7 @@ const getStatusColor = (status: string) => {
     case 'processing':
       return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400';
     case 'failed':
+    case 'rejected':
       return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
     default:
       return 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300';
@@ -241,7 +242,8 @@ const TransactionRow = memo(({
                   ? `${transaction.metadata.cardBrand.toUpperCase()} •••• ${transaction.metadata.last4}`
                   : 'Card payment');
               })()}
-              {!transaction.description && account && ` → Account ${formatAccountId(account.account_id, account.type)}`}
+
+              {account && ` → Account ${formatAccountId(account.account_id, account.type)}`}
             </p>
             {hasRejectionReason && (
               <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
@@ -1172,8 +1174,8 @@ export default function HistoryPage() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as HistoryTab)}
                   className={`whitespace-nowrap py-4 px-3 md:px-6 border-b-2 font-medium text-xs sm:text-sm transition-colors ${activeTab === tab.id
-                      ? 'border-[#00C0A2] text-[#00C0A2] dark:text-[#00C0A2]'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200'
+                    ? 'border-[#00C0A2] text-[#00C0A2] dark:text-[#00C0A2]'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200'
                     }`}
                 >
                   {tab.label} ({tab.count})
